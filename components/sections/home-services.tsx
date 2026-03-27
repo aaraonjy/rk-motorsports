@@ -17,8 +17,8 @@ export function HomeServices() {
   return (
     <section className="py-20 md:py-24">
       <div className="container-rk">
-        <div className="grid gap-12 lg:grid-cols-[1.1fr_1.4fr] lg:items-start">
-          <div>
+        <div className="grid gap-12 lg:grid-cols-[1fr_1.5fr] lg:items-start">
+          <div className="pt-2">
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/45">
               Built around your real workflow
             </p>
@@ -34,14 +34,21 @@ export function HomeServices() {
             </p>
           </div>
 
-          <div className="grid gap-6 md:grid-cols-3">
-            {services.map(([title, desc]) => (
+          <div className="grid gap-0 md:grid-cols-3">
+            {services.map(([title, desc], index) => (
               <div
                 key={title}
-                className="rounded-[1.75rem] border border-white/15 bg-black/35 p-6 backdrop-blur-xl shadow-[0_10px_40px_rgba(0,0,0,0.35)] transition hover:bg-black/45"
+                className={`p-8 md:p-10 ${
+                  index === 0
+                    ? "bg-[#ff1f2d]"
+                    : index === 1
+                    ? "bg-[#ff3340]"
+                    : "bg-[#ff1f2d]"
+                }`}
               >
-                <h3 className="text-xl font-semibold text-white">{title}</h3>
-                <p className="mt-4 leading-7 text-white/70">{desc}</p>
+                <h3 className="text-2xl font-semibold text-white">{title}</h3>
+                <div className="mt-4 h-[2px] w-12 bg-white/80" />
+                <p className="mt-8 leading-7 text-white/90">{desc}</p>
               </div>
             ))}
           </div>

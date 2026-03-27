@@ -17,6 +17,17 @@ export async function SiteHeader() {
   return (
     <header className="absolute left-0 top-0 z-50 w-full bg-transparent">
       <div className="container-rk flex h-20 items-center justify-between gap-6">
+        <Link href="/">
+          <Image
+            src="/logo.png"
+            alt="RK Motorsports"
+            width={180}
+            height={44}
+            className="h-10 w-auto object-contain"
+            priority
+          />
+        </Link>
+
         <div className="flex items-center gap-8">
           <nav className="hidden items-center gap-8 md:flex">
             {nav.map(([label, href]) => (
@@ -60,17 +71,6 @@ export async function SiteHeader() {
             )}
           </div>
         </div>
-
-        <Link href="/">
-          <Image
-            src="/logo.png"
-            alt="RK Motorsports"
-            width={170}
-            height={42}
-            className="h-10 w-auto object-contain"
-            priority
-          />
-        </Link>
       </div>
     </header>
   );
