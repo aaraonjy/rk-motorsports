@@ -10,13 +10,15 @@ export default async function HomePage() {
 
   return (
     <>
-      {/* Section 1 */}
-      <Hero />
+      {/* Section 1 - dark */}
+      <section className="bg-black/55 backdrop-blur-sm">
+        <Hero />
+      </section>
 
-      {/* Section 2 */}
-      <section className="relative z-10 -mt-6 pb-20 md:-mt-8 md:pb-24">
+      {/* Section 2 - light */}
+      <section className="bg-zinc-100/95 py-20 text-black shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] md:py-24">
         <div className="container-rk">
-          <div className="rounded-none border border-black/5 bg-white/95 p-8 text-black shadow-[0_20px_80px_rgba(0,0,0,0.22)] md:p-12">
+          <div className="rounded-[2rem] border border-black/5 bg-white/90 p-8 shadow-[0_20px_80px_rgba(0,0,0,0.12)] md:p-12">
             <div className="mb-8">
               <p className="text-xs font-semibold uppercase tracking-[0.3em] text-black/45">
                 Compare tuning options
@@ -44,25 +46,26 @@ export default async function HomePage() {
             </div>
           </div>
         </div>
-
-        <div className="mt-16">
-          <HomeServices />
-        </div>
       </section>
 
-      {/* Section 3 */}
-      <section className="py-20 md:py-24">
+      {/* Section 3 - dark */}
+      <section className="bg-zinc-900/90 py-20 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] md:py-24">
+        <HomeServices />
+      </section>
+
+      {/* Section 4 - light */}
+      <section className="bg-zinc-100/95 py-20 text-black shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] md:py-24">
         <div className="container-rk">
           <div className="mb-10">
-            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/45">
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-black/45">
               Featured services
             </p>
 
-            <h2 className="mt-3 text-3xl font-bold text-white md:text-5xl">
+            <h2 className="mt-3 text-3xl font-bold md:text-5xl">
               Featured services
             </h2>
 
-            <p className="mt-4 max-w-3xl text-white/65 md:text-lg">
+            <p className="mt-4 max-w-3xl text-black/65 md:text-lg">
               Explore featured ECU and TCU tuning services tailored for performance
               builds, daily-driven platforms, and custom remap workflows.
             </p>

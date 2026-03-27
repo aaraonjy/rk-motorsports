@@ -31,11 +31,6 @@ export function Hero() {
             Start custom tune
           </Link>
         </div>
-
-        <div className="mt-12 flex flex-col items-center text-white/70">
-          <span className="text-xs uppercase tracking-[0.3em]">Scroll</span>
-          <div className="mt-3 text-3xl leading-none">↓</div>
-        </div>
       </div>
     </section>
   );
