@@ -11,10 +11,12 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body>
-        <SiteHeader />
-        <main>{children}</main>
-        <SiteFooter />
+      <body className="text-white bg-[url('/background1.jpeg')] bg-cover bg-center bg-no-repeat">
+        <div className="min-h-screen bg-black/60">
+          <SiteHeader />
+          <main>{children}</main>
+          <SiteFooter />
+        </div>
       </body>
     </html>
   );
