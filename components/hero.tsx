@@ -2,20 +2,16 @@ import Link from "next/link";
 
 export function Hero() {
   return (
-    <section className="relative flex min-h-[92vh] items-center justify-center overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-b from-black/55 via-black/45 to-black/70" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.06),transparent_55%)]" />
+    <section className="relative flex min-h-screen items-center justify-center overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-to-b from-black/45 via-black/45 to-black/70" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.05),transparent_55%)]" />
 
-      <div className="container-rk relative z-10 flex flex-col items-center justify-center py-24 text-center md:py-32">
-        <p className="mb-6 text-xs font-medium uppercase tracking-[0.35em] text-white/55">
-          RK MOTORSPORTS
-        </p>
-
-        <h1 className="max-w-5xl text-5xl font-bold uppercase leading-[0.95] text-white drop-shadow-[0_8px_30px_rgba(0,0,0,0.45)] md:text-7xl xl:text-8xl">
+      <div className="container-rk relative z-10 flex flex-col items-center justify-center py-28 text-center md:py-36">
+        <h1 className="max-w-5xl text-4xl font-bold uppercase leading-[0.95] text-white drop-shadow-[0_8px_30px_rgba(0,0,0,0.45)] md:text-6xl xl:text-7xl">
           Online ECU file service
         </h1>
 
-        <p className="mt-8 max-w-3xl text-lg leading-8 text-white/75 md:text-2xl md:leading-10">
+        <p className="mt-8 max-w-3xl text-lg leading-8 text-white/75 md:text-xl md:leading-9">
           Upload original ECU files, request custom tuning, and receive completed
           tuned files through a premium customer and admin workflow portal.
         </p>

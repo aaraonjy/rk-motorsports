@@ -9,9 +9,11 @@ export default async function HomePage() {
 
   return (
     <>
+      {/* Section 1 */}
       <Hero />
 
-      <section className="relative z-10 -mt-16 pb-8">
+      {/* Section 2 */}
+      <section className="relative z-10 -mt-16 pb-8 md:-mt-20 md:pb-12">
         <div className="container-rk">
           <div className="rounded-[2rem] border border-white/10 bg-white/95 p-6 text-black shadow-[0_20px_80px_rgba(0,0,0,0.35)] md:p-10">
             <div className="mb-6">
@@ -32,24 +34,21 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <section className="section-pad pt-10">
-        <div className="container-rk">
-          <HomeServices />
-        </div>
-      </section>
+      <HomeServices />
 
-      <section className="section-pad pt-0">
+      {/* Section 3 */}
+      <section className="py-20 md:py-24">
         <div className="container-rk">
-          <div className="mb-8">
+          <div className="mb-10">
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/45">
               Featured services
             </p>
             <h2 className="mt-3 text-3xl font-bold text-white md:text-5xl">
-              Popular tuning solutions
+              Featured services
             </h2>
             <p className="mt-4 max-w-3xl text-white/65 md:text-lg">
-              Explore featured ECU and TCU services tailored for performance builds,
-              daily-driven platforms, and custom remap workflows.
+              Explore featured ECU and TCU tuning services tailored for performance
+              builds, daily-driven platforms, and custom remap workflows.
             </p>
           </div>
 
