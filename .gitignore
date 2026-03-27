@@ -5,3 +5,6 @@ node_modules
 prisma/dev.db
 public/uploads/*
 !public/uploads/.gitkeep
+
+.vercel
+.env*.local
