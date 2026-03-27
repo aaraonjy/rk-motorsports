@@ -69,7 +69,6 @@ async function main() {
       { name: "Bosch MG1", manufacturer: "Bosch", protocol: "Bench/OBD", vehicleYearId: gtiYear.id },
       { name: "Bosch MED17", manufacturer: "Bosch", protocol: "OBD", vehicleYearId: mpsYear.id },
     ],
-    skipDuplicates: true,
   });
 
   const products = [
