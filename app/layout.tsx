@@ -12,7 +12,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en">
       <body className="text-white bg-[url('/background1.jpeg')] bg-cover bg-center bg-no-repeat">
-        <div className="min-h-screen bg-black/60">
+	<div className="min-h-screen bg-gradient-to-b from-black/75 via-black/65 to-black/85">
           <SiteHeader />
           <main>{children}</main>
           <SiteFooter />
