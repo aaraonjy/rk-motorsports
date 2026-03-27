@@ -1,5 +1,3 @@
-import Link from "next/link";
-
 const services = [
   [
     "Ready-made map files",
@@ -34,15 +32,6 @@ export function HomeServices() {
               is structured around the real process used by tuning businesses and
               file service providers.
             </p>
-
-            <div className="mt-8">
-              <Link
-                href="/shop"
-                className="inline-flex rounded-full border border-white/20 bg-white/5 px-7 py-3 text-sm font-semibold uppercase tracking-[0.18em] text-white transition hover:bg-white/10"
-              >
-                Find a file
-              </Link>
-            </div>
           </div>
 
           <div className="grid gap-6 md:grid-cols-3">

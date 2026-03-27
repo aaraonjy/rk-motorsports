@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Hero } from "@/components/hero";
 import { VehicleSelector } from "@/components/vehicle-selector";
 import { HomeServices } from "@/components/sections/home-services";
@@ -13,7 +14,7 @@ export default async function HomePage() {
       <Hero />
 
       {/* Section 2 */}
-      <section className="relative z-10 -mt-16 pb-8 md:-mt-20 md:pb-12">
+      <section className="relative z-10 -mt-8 pb-8 md:-mt-10 md:pb-12">
         <div className="container-rk">
           <div className="rounded-[2rem] border border-white/10 bg-white/95 p-6 text-black shadow-[0_20px_80px_rgba(0,0,0,0.35)] md:p-10">
             <div className="mb-6">
@@ -30,6 +31,15 @@ export default async function HomePage() {
             </div>
 
             <VehicleSelector />
+
+            <div className="mt-8">
+              <Link
+                href="/shop"
+                className="inline-flex rounded-full bg-[#ff3b57] px-8 py-4 text-sm font-semibold uppercase tracking-[0.18em] text-white transition hover:bg-[#ff2444]"
+              >
+                Find a file
+              </Link>
+            </div>
           </div>
         </div>
       </section>
