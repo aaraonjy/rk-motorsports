@@ -2,72 +2,44 @@ import Link from "next/link";
 
 export function Hero() {
   return (
-    <section className="section-pad relative overflow-hidden">
-      <div className="container-rk grid gap-12 md:grid-cols-2 md:items-center">
+    <section className="relative flex min-h-[92vh] items-center justify-center overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-to-b from-black/55 via-black/45 to-black/70" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.06),transparent_55%)]" />
 
-        {/* LEFT CONTENT */}
-        <div>
-          {/* Small label */}
-          <p className="mb-4 text-xs uppercase tracking-[0.35em] text-white/60">
-            RK MOTORSPORTS
-          </p>
+      <div className="container-rk relative z-10 flex flex-col items-center justify-center py-24 text-center md:py-32">
+        <p className="mb-6 text-xs font-medium uppercase tracking-[0.35em] text-white/55">
+          RK MOTORSPORTS
+        </p>
 
-          {/* Main headline */}
-          <h1 className="text-5xl font-bold leading-[0.95] text-white drop-shadow-lg md:text-7xl">
-            Performance ECU & TCU tuning
-            <span className="block text-white/70">
-              built for real workflow
-            </span>
-          </h1>
+        <h1 className="max-w-5xl text-5xl font-bold uppercase leading-[0.95] text-white drop-shadow-[0_8px_30px_rgba(0,0,0,0.45)] md:text-7xl xl:text-8xl">
+          Online ECU file service
+        </h1>
 
-          {/* Description */}
-          <p className="mt-6 max-w-xl text-base leading-8 text-white/80 drop-shadow md:text-lg">
-            Upload original ECU files, request custom tuning, manage ready-made map services,
-            and deliver completed files through a streamlined customer and admin portal.
-          </p>
+        <p className="mt-8 max-w-3xl text-lg leading-8 text-white/75 md:text-2xl md:leading-10">
+          Upload original ECU files, request custom tuning, and receive completed
+          tuned files through a premium customer and admin workflow portal.
+        </p>
 
-          {/* Buttons */}
-          <div className="mt-8 flex flex-wrap gap-4">
-            <Link
-              href="/custom-tuning"
-              className="rounded-2xl bg-white px-6 py-3 font-semibold text-black transition hover:bg-zinc-200"
-            >
-              Start custom tune
-            </Link>
+        <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
+          <Link
+            href="/register"
+            className="rounded-full bg-[#ff3b57] px-8 py-4 text-sm font-semibold uppercase tracking-[0.18em] text-white transition hover:bg-[#ff2444]"
+          >
+            Register
+          </Link>
 
-            <Link
-              href="/shop"
-              className="rounded-2xl border border-white/20 bg-white/5 px-6 py-3 font-semibold text-white transition hover:bg-white/10"
-            >
-              Browse services
-            </Link>
-          </div>
+          <Link
+            href="/custom-tuning"
+            className="rounded-full border border-white/20 bg-white/5 px-8 py-4 text-sm font-semibold uppercase tracking-[0.18em] text-white transition hover:bg-white/10"
+          >
+            Start custom tune
+          </Link>
         </div>
 
-        {/* RIGHT CARD */}
-        <div className="rounded-3xl border border-white/15 bg-black/35 p-6 backdrop-blur-xl shadow-[0_10px_40px_rgba(0,0,0,0.4)] md:p-8">
-          <div className="grid gap-4 md:grid-cols-2">
-
-            {[
-              ["01", "Upload original file"],
-              ["02", "Admin tuning process"],
-              ["03", "Upload completed file"],
-              ["04", "Customer download"],
-            ].map(([step, title]) => (
-              <div
-                key={step}
-                className="rounded-2xl border border-white/15 bg-black/40 p-5 transition hover:bg-black/50"
-              >
-                <p className="text-sm text-white/40">{step}</p>
-                <h3 className="mt-2 text-xl font-semibold text-white">
-                  {title}
-                </h3>
-              </div>
-            ))}
-
-          </div>
+        <div className="mt-16 flex flex-col items-center text-white/70">
+          <span className="text-xs uppercase tracking-[0.3em]">Scroll</span>
+          <div className="mt-3 text-3xl leading-none">↓</div>
         </div>
-
       </div>
     </section>
   );

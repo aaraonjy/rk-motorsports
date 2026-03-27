@@ -10,11 +10,49 @@ export default async function HomePage() {
   return (
     <>
       <Hero />
-      <VehicleSelector />
-      <HomeServices />
+
+      <section className="relative z-10 -mt-16 pb-8">
+        <div className="container-rk">
+          <div className="rounded-[2rem] border border-white/10 bg-white/95 p-6 text-black shadow-[0_20px_80px_rgba(0,0,0,0.35)] md:p-10">
+            <div className="mb-6">
+              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-black/45">
+                Compare tuning options
+              </p>
+              <h2 className="mt-3 text-3xl font-bold md:text-5xl">
+                Compare file tuning options for your vehicle
+              </h2>
+              <p className="mt-4 max-w-3xl text-base leading-7 text-black/65 md:text-lg">
+                Select your vehicle platform and ECU to browse available tuning
+                services, ready-made files, and custom file options.
+              </p>
+            </div>
+
+            <VehicleSelector />
+          </div>
+        </div>
+      </section>
+
+      <section className="section-pad pt-10">
+        <div className="container-rk">
+          <HomeServices />
+        </div>
+      </section>
+
       <section className="section-pad pt-0">
         <div className="container-rk">
-          <h2 className="mb-8 text-3xl font-bold md:text-5xl">Featured services</h2>
+          <div className="mb-8">
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/45">
+              Featured services
+            </p>
+            <h2 className="mt-3 text-3xl font-bold text-white md:text-5xl">
+              Popular tuning solutions
+            </h2>
+            <p className="mt-4 max-w-3xl text-white/65 md:text-lg">
+              Explore featured ECU and TCU services tailored for performance builds,
+              daily-driven platforms, and custom remap workflows.
+            </p>
+          </div>
+
           <ProductGrid products={products} />
         </div>
       </section>
