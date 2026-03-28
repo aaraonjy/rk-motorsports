@@ -1,9 +1,14 @@
-export default function ResetPasswordPage({
+type ResetPasswordPageProps = {
+  searchParams?: Promise<{
+    token?: string;
+  }>;
+};
+
+export default async function ResetPasswordPage({
   searchParams,
-}: {
-  searchParams: { token?: string };
-}) {
-  const token = searchParams.token || "";
+}: ResetPasswordPageProps) {
+  const params = (await searchParams) || {};
+  const token = params.token || "";
 
   return (
     <section className="section-pad">
