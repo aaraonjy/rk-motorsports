@@ -28,5 +28,7 @@ export async function POST(req: Request) {
   // TEMP: log instead of email
   console.log("RESET LINK:", resetLink);
 
-  return NextResponse.redirect(new URL("/login", req.url));
+  return NextResponse.redirect(
+    new URL("/forgot-password?sent=1", req.url)
+  );
 }
