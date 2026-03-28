@@ -41,7 +41,6 @@ export function OrderTable({
 
             return (
               <tr key={order.id} className="border-t border-white/10 align-top">
-                {/* Order */}
                 <td className="px-4 py-3">
                   <div className="font-medium">{order.orderNumber}</div>
                   <div className="text-white/45">
@@ -49,29 +48,29 @@ export function OrderTable({
                   </div>
                 </td>
 
-                {/* Customer (admin only) */}
                 {admin ? (
                   <td className="px-4 py-3">{order.user?.email}</td>
                 ) : null}
 
-                {/* Vehicle */}
                 <td className="px-4 py-3">
-                  {[order.vehicleBrand, order.vehicleModel, order.vehicleYear, order.ecuType]
+                  {[
+                    order.vehicleBrand,
+                    order.vehicleModel,
+                    order.vehicleYear,
+                    order.ecuType,
+                  ]
                     .filter(Boolean)
                     .join(" / ") || "-"}
                 </td>
 
-                {/* Status */}
                 <td className="px-4 py-3">
                   {order.status.replaceAll("_", " ")}
                 </td>
 
-                {/* Amount */}
                 <td className="px-4 py-3">
                   {formatCurrency(order.totalAmount)}
                 </td>
 
-                {/* Files */}
                 <td className="px-4 py-3">
                   <div className="flex flex-col gap-2">
                     {customerOriginal ? (
@@ -98,7 +97,6 @@ export function OrderTable({
                   </div>
                 </td>
 
-                {/* Actions */}
                 <td className="px-4 py-3">
                   {admin ? (
                     order.status === "CANCELLED" ? (
@@ -132,6 +130,8 @@ export function OrderTable({
                         </form>
                       </div>
                     )
+                  ) : order.status === "CANCELLED" ? (
+                    <span className="text-red-400">Cancelled</span>
                   ) : adminCompleted ? (
                     <Link
                       href={`/api/files/${adminCompleted.id}/download`}
