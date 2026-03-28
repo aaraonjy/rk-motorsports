@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 
 export async function getProducts() {
@@ -10,7 +11,10 @@ export async function getProducts() {
 export async function getRecentOrdersForUser(userId: string) {
   return db.order.findMany({
     where: { userId },
-    include: { files: true, items: { include: { product: true } } },
+    include: {
+      files: true,
+      items: { include: { product: true } },
+    },
     orderBy: { createdAt: "desc" },
   });
 }
@@ -19,15 +23,15 @@ export async function getAllOrders(filters?: {
   status?: string;
   search?: string;
 }) {
-  const where = {
+  const where: Prisma.OrderWhereInput = {
     ...(filters?.status && filters.status !== "ALL"
-      ? { status: filters.status }
+      ? { status: filters.status as any }
       : {}),
     ...(filters?.search
       ? {
           orderNumber: {
             contains: filters.search,
-            mode: "insensitive" as const,
+            mode: "insensitive",
           },
         }
       : {}),
