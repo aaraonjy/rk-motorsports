@@ -14,5 +14,8 @@ export async function POST(req: Request) {
   if (!ok) return NextResponse.redirect(new URL("/login", req.url));
 
   await createSession(user.id);
-  return NextResponse.redirect(new URL(user.role === "ADMIN" ? "/admin" : "/dashboard", req.url));
+  return NextResponse.redirect(
+    new URL(user.role === "ADMIN" ? "/admin" : "/dashboard", req.url),
+    303
+  );
 }

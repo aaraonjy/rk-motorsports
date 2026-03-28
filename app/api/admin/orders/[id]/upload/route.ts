@@ -15,7 +15,7 @@ export async function POST(
     const file = form.get("file");
 
     if (!(file instanceof File)) {
-      return NextResponse.redirect(new URL("/admin", req.url));
+      return NextResponse.redirect(new URL("/admin", req.url), 303);
     }
 
     const saved = await saveFile(file, "admin-tuned");
@@ -35,9 +35,9 @@ export async function POST(
       data: { status: "READY_FOR_DOWNLOAD" },
     });
 
-    return NextResponse.redirect(new URL("/admin", req.url));
+    return NextResponse.redirect(new URL("/admin", req.url), 303);
   } catch (error) {
     console.error("POST /api/admin/orders/[id]/upload failed:", error);
-    return NextResponse.redirect(new URL("/login", req.url));
+    return NextResponse.redirect(new URL("/login", req.url), 303);
   }
 }

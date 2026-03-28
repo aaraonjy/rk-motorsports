@@ -22,5 +22,5 @@ export async function POST(req: Request) {
   });
 
   await createSession(user.id);
-  return NextResponse.redirect(new URL("/dashboard", req.url));
+  return NextResponse.redirect(new URL("/dashboard", req.url), 303);
 }

@@ -15,7 +15,7 @@ export async function POST(req: Request) {
 
     if (!user) {
       console.log("no user session, redirecting to /login");
-      return NextResponse.redirect(new URL("/login", req.url));
+      return NextResponse.redirect(new URL("/login", req.url), 303);
     }
 
     const productId = String(form.get("productId") || "");
@@ -37,11 +37,12 @@ export async function POST(req: Request) {
     }
 
     const product = await db.product.findUnique({ where: { id: productId } });
+
     console.log("product found:", !!product);
 
     if (!product || !(file instanceof File)) {
       console.log("invalid product or file, redirecting to /custom-tuning");
-      return NextResponse.redirect(new URL("/custom-tuning", req.url));
+      return NextResponse.redirect(new URL("/custom-tuning", req.url), 303);
     }
 
     const saved = await saveFile(file, "customer-original");
@@ -77,7 +78,8 @@ export async function POST(req: Request) {
     });
 
     console.log("order created successfully");
-    return NextResponse.redirect(new URL("/dashboard", req.url));
+
+    return NextResponse.redirect(new URL("/dashboard", req.url), 303);
   } catch (error) {
     console.error("POST /api/orders failed:", error);
     return NextResponse.json(
