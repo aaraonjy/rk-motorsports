@@ -23,8 +23,10 @@ export async function POST(req: Request) {
     },
   });
 
-  const resetLink = `${process.env.NEXT_PUBLIC_APP_URL}/reset-password?token=${token}`;
+  const appUrl =
+    process.env.NEXT_PUBLIC_APP_URL || new URL(req.url).origin;
 
+  const resetLink = `${appUrl}/reset-password?token=${token}`;
   // TEMP: log instead of email
   console.log("RESET LINK:", resetLink);
 
