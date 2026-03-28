@@ -9,7 +9,7 @@ export async function GET(
 ) {
   const user = await getSessionUser();
   if (!user) {
-    return NextResponse.redirect(new URL("/login", req.url));
+    return NextResponse.redirect(new URL("/login", req.url), 303);
   }
 
   const { id } = await ctx.params;
@@ -31,12 +31,16 @@ export async function GET(
     access: "private",
   });
 
-  if (!result || !result.blob?.downloadUrl) {
-    return NextResponse.json(
-      { message: "Blob download unavailable" },
-      { status: 500 }
-    );
-  }
+  const contentType =
+    file.mimeType ||
+    result.headers.get("content-type") ||
+    "application/octet-stream";
 
-  return NextResponse.redirect(result.blob.downloadUrl);
+  return new NextResponse(result.stream, {
+    headers: {
+      "Content-Type": contentType,
+      "Content-Disposition": `attachment; filename="${file.fileName}"`,
+      "Cache-Control": "private, no-store",
+    },
+  });
 }
