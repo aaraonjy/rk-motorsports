@@ -3,7 +3,7 @@ import { getSessionUser } from "@/lib/auth";
 import Image from "next/image";
 
 const nav = [
-  ["Services", "/services"],
+  ["Services", "/#services"],
   ["Shop", "/shop"],
   ["Custom Tuning", "/custom-tuning"],
   ["Pricing", "/pricing"],

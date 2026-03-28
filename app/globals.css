@@ -14,3 +14,7 @@ body { background: #050505; color: white; }
 .input-rk { @apply w-full rounded-2xl border border-white/10 bg-black px-4 py-3 text-white outline-none; }
 .label-rk { @apply mb-2 block text-sm font-medium text-white/75; }
 .textarea-rk { @apply min-h-32 w-full rounded-2xl border border-white/10 bg-black px-4 py-3 text-white outline-none; }
+
+html {
+  scroll-behavior: smooth;
+}
