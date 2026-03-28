@@ -88,7 +88,9 @@ export function VehicleSelector({
   const modelOptions = useMemo(
     () =>
       selectedMake
-        ? selectedMake.models.map((item) => item.name).sort((a, b) => a.localeCompare(b))
+        ? selectedMake.models
+            .map((item) => item.name)
+            .sort((a, b) => a.localeCompare(b))
         : [],
     [selectedMake]
   );
@@ -101,7 +103,9 @@ export function VehicleSelector({
   const engineOptions = useMemo(
     () =>
       selectedModel
-        ? selectedModel.engines.map((item) => item.name).sort((a, b) => a.localeCompare(b))
+        ? selectedModel.engines
+            .map((item) => item.name)
+            .sort((a, b) => a.localeCompare(b))
         : [],
     [selectedModel]
   );
@@ -122,42 +126,45 @@ export function VehicleSelector({
 
   return (
     <section className="pb-10">
-      <div className="grid gap-4 rounded-[1.75rem] border border-white/10 bg-white/[0.03] p-6 md:grid-cols-3">
-        <SelectField
-          defaultLabel="Brand"
-          options={brandOptions}
-          value={brand}
-          onChange={setBrand}
-        />
+      <div className="rounded-[1.75rem] border border-white/10 bg-white/[0.03] p-6">
+        <div className="grid gap-4 md:grid-cols-3">
+          <SelectField
+            defaultLabel="Brand"
+            options={brandOptions}
+            value={brand}
+            onChange={setBrand}
+          />
 
-        <SelectField
-          defaultLabel="Model"
-          options={modelOptions}
-          value={model}
-          onChange={setModel}
-          disabled={!brand}
-        />
+          <SelectField
+            defaultLabel="Model"
+            options={modelOptions}
+            value={model}
+            onChange={setModel}
+            disabled={!brand}
+          />
 
-        <SelectField
-          defaultLabel="Engine"
-          options={engineOptions}
-          value={engine}
-          onChange={setEngine}
-          disabled={!model}
-        />
-      </div>
-
-      {onSearch ? (
-        <div className="mt-6">
-          <button
-            onClick={handleSearch}
-            disabled={!brand || !model || !engine}
-            className="rounded-full bg-[#ff3b57] px-8 py-4 text-sm font-semibold uppercase tracking-[0.18em] text-white transition hover:bg-[#ff2444] disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Find Performance Estimate
-          </button>
+          <SelectField
+            defaultLabel="Engine"
+            options={engineOptions}
+            value={engine}
+            onChange={setEngine}
+            disabled={!model}
+          />
         </div>
-      ) : null}
+
+        {onSearch ? (
+          <div className="mt-6 flex justify-start">
+            <button
+              type="button"
+              onClick={handleSearch}
+              disabled={!brand || !model || !engine}
+              className="rounded-full bg-[#ff3b57] px-8 py-4 text-sm font-semibold uppercase tracking-[0.18em] text-white transition hover:bg-[#ff2444] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Find Performance Estimate
+            </button>
+          </div>
+        ) : null}
+      </div>
     </section>
   );
 }
