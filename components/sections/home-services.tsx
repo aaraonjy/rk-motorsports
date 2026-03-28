@@ -1,57 +1,82 @@
+import { Gauge, Flame, Settings, Zap, Wrench, Rocket } from "lucide-react";
+
 const services = [
-  [
-    "Ready-made map files",
-    "Browse fixed tuning packages and ready-made services by platform, ECU type, and performance stage.",
-  ],
-  [
-    "Custom file service",
-    "Customer uploads an original ECU file, requests a tune, and receives a professionally prepared return file.",
-  ],
-  [
-    "Admin workflow",
-    "Track orders, manage uploaded files, update delivery status, and streamline customer communication.",
-  ],
+  {
+    title: "Stage 1 Remap",
+    desc: "Optimized ECU calibration for stock vehicles improving power, torque, and throttle response.",
+    icon: Gauge,
+  },
+  {
+    title: "Stage 2 / 3 Remap",
+    desc: "Custom tuning for modified setups including turbo upgrades, fueling, and exhaust systems.",
+    icon: Rocket,
+  },
+  {
+    title: "DPF / EGR Solutions",
+    desc: "Software solutions to prevent common issues after hardware modifications.",
+    icon: Settings,
+  },
+  {
+    title: "Pop & Bang / Flames",
+    desc: "Enhance exhaust sound with controlled pops, crackles, or flame tuning.",
+    icon: Flame,
+  },
+  {
+    title: "Launch Control",
+    desc: "Optimized launch strategy for faster acceleration and consistent performance.",
+    icon: Zap,
+  },
+  {
+    title: "Custom ECU File",
+    desc: "Upload your ECU file and receive a fully custom-tuned calibration.",
+    icon: Wrench,
+  },
 ];
 
 export function HomeServices() {
   return (
     <section className="py-20 md:py-24">
       <div className="container-rk">
-        <div className="grid gap-12 lg:grid-cols-[1fr_1.5fr] lg:items-start">
-          <div className="pt-2">
-            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/45">
-              Built around your real workflow
-            </p>
+        {/* Header */}
+        <div className="mb-12 text-center">
+          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/45">
+            Services
+          </p>
 
-            <h2 className="mt-4 text-3xl font-bold text-white md:text-5xl">
-              Built around your real workflow
-            </h2>
+          <h2 className="mt-4 text-3xl font-bold md:text-5xl">
+            Professional ECU Tuning Services
+          </h2>
 
-            <p className="mt-5 max-w-xl text-base leading-8 text-white/65 md:text-lg">
-              From original file upload to final tuned file delivery, the platform
-              is structured around the real process used by tuning businesses and
-              file service providers.
-            </p>
-          </div>
+          <p className="mt-4 max-w-2xl mx-auto text-white/65 md:text-lg">
+            Explore our range of ECU and performance tuning services tailored for
+            both daily drivers and high-performance builds.
+          </p>
+        </div>
 
-          <div className="grid gap-0 md:grid-cols-3">
-            {services.map(([title, desc], index) => (
+        {/* Grid */}
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {services.map((service) => {
+            const Icon = service.icon;
+
+            return (
               <div
-                key={title}
-                className={`p-8 md:p-10 ${
-                  index === 0
-                    ? "bg-[#ff1f2d]"
-                    : index === 1
-                    ? "bg-[#ff3340]"
-                    : "bg-[#ff1f2d]"
-                }`}
+                key={service.title}
+                className="group card-rk p-6 transition hover:-translate-y-1 hover:border-white/20 hover:bg-white/10"
               >
-                <h3 className="text-2xl font-semibold text-white">{title}</h3>
-                <div className="mt-4 h-[2px] w-12 bg-white/80" />
-                <p className="mt-8 leading-7 text-white/90">{desc}</p>
+                <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-white/10">
+                  <Icon className="h-6 w-6 text-white" />
+                </div>
+
+                <h3 className="text-lg font-semibold text-white">
+                  {service.title}
+                </h3>
+
+                <p className="mt-3 text-sm leading-6 text-white/70">
+                  {service.desc}
+                </p>
               </div>
-            ))}
-          </div>
+            );
+          })}
         </div>
       </div>
     </section>
