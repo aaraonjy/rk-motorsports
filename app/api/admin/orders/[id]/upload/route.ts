@@ -20,19 +20,37 @@ export async function POST(
 
     const saved = await saveFile(file, "admin-tuned");
 
-    await db.orderFile.create({
-      data: {
+    const existingCompletedFile = await db.orderFile.findFirst({
+      where: {
         orderId: id,
         kind: "ADMIN_COMPLETED",
-        fileName: saved.fileName,
-        storagePath: saved.storagePath,
-        mimeType: saved.mimeType,
       },
     });
 
+    if (existingCompletedFile) {
+      await db.orderFile.update({
+        where: { id: existingCompletedFile.id },
+        data: {
+          fileName: saved.fileName,
+          storagePath: saved.storagePath,
+          mimeType: saved.mimeType,
+        },
+      });
+    } else {
+      await db.orderFile.create({
+        data: {
+          orderId: id,
+          kind: "ADMIN_COMPLETED",
+          fileName: saved.fileName,
+          storagePath: saved.storagePath,
+          mimeType: saved.mimeType,
+        },
+      });
+    }
+
     await db.order.update({
       where: { id },
-      data: { status: "READY_FOR_DOWNLOAD" },
+      data: { status: "AWAITING_PAYMENT" },
     });
 
     return NextResponse.redirect(new URL("/admin", req.url), 303);

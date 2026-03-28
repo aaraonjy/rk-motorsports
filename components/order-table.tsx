@@ -39,6 +39,11 @@ export function OrderTable({
               (f) => f.kind === "ADMIN_COMPLETED"
             );
 
+            const statusLabel =
+              order.status === "AWAITING_PAYMENT"
+                ? "DONE (PENDING PAYMENT)"
+                : order.status.replaceAll("_", " ");
+
             return (
               <tr key={order.id} className="border-t border-white/10 align-top">
                 <td className="px-4 py-3">
@@ -63,9 +68,7 @@ export function OrderTable({
                     .join(" / ") || "-"}
                 </td>
 
-                <td className="px-4 py-3">
-                  {order.status.replaceAll("_", " ")}
-                </td>
+                <td className="px-4 py-3">{statusLabel}</td>
 
                 <td className="px-4 py-3">
                   {formatCurrency(order.totalAmount)}
@@ -84,13 +87,28 @@ export function OrderTable({
                       <span className="text-white/40">No original file</span>
                     )}
 
-                    {adminCompleted ? (
+                    {admin ? (
+                      adminCompleted ? (
+                        <Link
+                          href={`/api/files/${adminCompleted.id}/download`}
+                          className="inline-block rounded-xl border border-white/15 px-3 py-2 hover:bg-white/10"
+                        >
+                          Tuned File
+                        </Link>
+                      ) : (
+                        <span className="text-white/40">No tuned file</span>
+                      )
+                    ) : order.status === "READY_FOR_DOWNLOAD" && adminCompleted ? (
                       <Link
                         href={`/api/files/${adminCompleted.id}/download`}
                         className="inline-block rounded-xl border border-white/15 px-3 py-2 hover:bg-white/10"
                       >
                         Tuned File
                       </Link>
+                    ) : order.status === "AWAITING_PAYMENT" && adminCompleted ? (
+                      <span className="text-amber-300/80">
+                        Tuned file locked until payment is confirmed
+                      </span>
                     ) : (
                       <span className="text-white/40">No tuned file</span>
                     )}
@@ -120,25 +138,35 @@ export function OrderTable({
                           </button>
                         </form>
 
-                        <form
-                          action={`/api/admin/orders/${order.id}/complete`}
-                          method="post"
-                        >
-                          <button className="rounded-xl border border-white/15 px-3 py-2 hover:bg-white/10">
-                            Mark Ready
-                          </button>
-                        </form>
+                        {order.status === "AWAITING_PAYMENT" ? (
+                          <form
+                            action={`/api/admin/orders/${order.id}/complete`}
+                            method="post"
+                          >
+                            <button className="rounded-xl border border-emerald-500/40 px-3 py-2 text-emerald-400 hover:bg-emerald-500/10">
+                              Release Download
+                            </button>
+                          </form>
+                        ) : order.status === "READY_FOR_DOWNLOAD" ? (
+                          <span className="text-emerald-400">
+                            Download Released
+                          </span>
+                        ) : null}
                       </div>
                     )
                   ) : order.status === "CANCELLED" ? (
                     <span className="text-red-400">Cancelled</span>
-                  ) : adminCompleted ? (
+                  ) : order.status === "READY_FOR_DOWNLOAD" && adminCompleted ? (
                     <Link
                       href={`/api/files/${adminCompleted.id}/download`}
                       className="inline-block rounded-xl border border-white/15 px-3 py-2 hover:bg-white/10"
                     >
                       Download
                     </Link>
+                  ) : order.status === "AWAITING_PAYMENT" && adminCompleted ? (
+                    <span className="text-amber-300/80">
+                      Done (Pending Payment)
+                    </span>
                   ) : order.status === "FILE_RECEIVED" ? (
                     <form
                       action={`/api/orders/${order.id}/cancel`}

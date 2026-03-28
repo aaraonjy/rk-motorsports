@@ -11,13 +11,25 @@ export async function POST(
 
     const { id } = await ctx.params;
 
+    const adminCompletedFile = await db.orderFile.findFirst({
+      where: {
+        orderId: id,
+        kind: "ADMIN_COMPLETED",
+      },
+    });
+
+    if (!adminCompletedFile) {
+      return NextResponse.redirect(new URL("/admin", req.url), 303);
+    }
+
     await db.order.update({
       where: { id },
       data: { status: "READY_FOR_DOWNLOAD" },
     });
 
     return NextResponse.redirect(new URL("/admin", req.url), 303);
-  } catch {
+  } catch (error) {
+    console.error("POST /api/admin/orders/[id]/complete failed:", error);
     return NextResponse.redirect(new URL("/login", req.url), 303);
   }
 }
