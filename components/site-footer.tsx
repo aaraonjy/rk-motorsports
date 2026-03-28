@@ -8,11 +8,8 @@ export function SiteFooter() {
 
         {/* RIGHT */}
         <div className="text-right">
-          <p className="text-white/60">
+          <p className="text-white/50 text-sm">
             High-performance ECU tuning and custom file services.
-          </p>
-          <p className="text-white/40 text-xs mt-1">
-            Built for power, precision, and real-world results.
           </p>
         </div>
 
