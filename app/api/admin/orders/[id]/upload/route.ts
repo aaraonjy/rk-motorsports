@@ -3,7 +3,10 @@ import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { saveFile } from "@/lib/storage";
 
-export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
+export async function POST(
+  req: Request,
+  ctx: { params: Promise<{ id: string }> }
+) {
   try {
     await requireAdmin();
 
@@ -33,7 +36,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     });
 
     return NextResponse.redirect(new URL("/admin", req.url));
-  } catch {
+  } catch (error) {
+    console.error("POST /api/admin/orders/[id]/upload failed:", error);
     return NextResponse.redirect(new URL("/login", req.url));
   }
 }

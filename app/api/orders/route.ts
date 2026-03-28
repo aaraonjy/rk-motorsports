@@ -29,6 +29,7 @@ export async function POST(req: Request) {
     console.log("productId:", productId);
     console.log("vehicle:", { vehicleBrand, vehicleModel, vehicleYear, ecuType });
     console.log("file present:", file instanceof File);
+
     if (file instanceof File) {
       console.log("file name:", file.name);
       console.log("file size:", file.size);
@@ -36,7 +37,6 @@ export async function POST(req: Request) {
     }
 
     const product = await db.product.findUnique({ where: { id: productId } });
-
     console.log("product found:", !!product);
 
     if (!product || !(file instanceof File)) {
@@ -77,7 +77,6 @@ export async function POST(req: Request) {
     });
 
     console.log("order created successfully");
-
     return NextResponse.redirect(new URL("/dashboard", req.url));
   } catch (error) {
     console.error("POST /api/orders failed:", error);
