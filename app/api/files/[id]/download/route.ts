@@ -31,7 +31,7 @@ export async function GET(
     access: "private",
   });
 
-  if (!blob.url) {
+  if (!blob || !blob.url) {
     return NextResponse.json(
       { message: "Blob download unavailable" },
       { status: 500 }
