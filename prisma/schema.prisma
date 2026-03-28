@@ -29,15 +29,17 @@ enum OrderStatus {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  name         String
-  email        String   @unique
-  passwordHash String
-  role         Role     @default(CUSTOMER)
-  phone        String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  orders       Order[]
+  id               String    @id @default(cuid())
+  name             String
+  email            String    @unique
+  passwordHash     String
+  role             Role      @default(CUSTOMER)
+  phone            String?
+  resetToken       String?
+  resetTokenExpiry DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  orders           Order[]
 }
 
 model VehicleBrand {
@@ -48,80 +50,80 @@ model VehicleBrand {
 }
 
 model VehicleModel {
-  id      String        @id @default(cuid())
+  id      String       @id @default(cuid())
   name    String
   slug    String
   brandId String
-  brand   VehicleBrand  @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  brand   VehicleBrand @relation(fields: [brandId], references: [id], onDelete: Cascade)
   years   VehicleYear[]
 
   @@unique([brandId, slug])
 }
 
 model VehicleYear {
-  id      String        @id @default(cuid())
+  id      String       @id @default(cuid())
   year    Int
   modelId String
-  model   VehicleModel  @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  model   VehicleModel @relation(fields: [modelId], references: [id], onDelete: Cascade)
   ecus    EcuType[]
 
   @@unique([modelId, year])
 }
 
 model EcuType {
-  id            String        @id @default(cuid())
+  id            String      @id @default(cuid())
   name          String
   manufacturer  String?
   protocol      String?
   vehicleYearId String
-  vehicleYear   VehicleYear   @relation(fields: [vehicleYearId], references: [id], onDelete: Cascade)
+  vehicleYear   VehicleYear @relation(fields: [vehicleYearId], references: [id], onDelete: Cascade)
 }
 
 model Product {
-  id            String      @id @default(cuid())
-  title         String
-  slug          String      @unique
-  description   String
-  type          ProductType
-  basePrice     Int
-  isActive      Boolean     @default(true)
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
-  orderItems    OrderItem[]
+  id          String      @id @default(cuid())
+  title       String
+  slug        String      @unique
+  description String
+  type        ProductType
+  basePrice   Int
+  isActive    Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  orderItems  OrderItem[]
 }
 
 model Order {
-  id             String       @id @default(cuid())
-  orderNumber    String       @unique
-  status         OrderStatus  @default(AWAITING_PAYMENT)
+  id             String      @id @default(cuid())
+  orderNumber    String      @unique
+  status         OrderStatus @default(AWAITING_PAYMENT)
   notes          String?
   requestDetails String?
   vehicleBrand   String?
   vehicleModel   String?
   vehicleYear    String?
   ecuType        String?
-  totalAmount    Int          @default(0)
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  totalAmount    Int         @default(0)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
   userId         String
-  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user           User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   items          OrderItem[]
   files          OrderFile[]
 }
 
 model OrderItem {
-  id         String    @id @default(cuid())
-  price      Int
-  quantity   Int       @default(1)
-  orderId    String
-  productId  String
-  order      Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  product    Product   @relation(fields: [productId], references: [id], onDelete: Restrict)
+  id        String  @id @default(cuid())
+  price     Int
+  quantity  Int     @default(1)
+  orderId   String
+  productId String
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
 }
 
 model OrderFile {
   id          String   @id @default(cuid())
-  orderId      String
+  orderId     String
   kind        String
   fileName    String
   storagePath String
