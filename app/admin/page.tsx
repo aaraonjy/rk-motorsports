@@ -58,24 +58,45 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               <label className="mb-2 block text-sm text-white/65">
                 Filter Status
               </label>
-              <select
-                name="status"
-                defaultValue={status}
-                className="w-full rounded-xl border border-white/15 bg-black/50 px-4 py-3 text-white outline-none"
-              >
-                <option value="ALL">All Statuses</option>
-                <option value="FILE_RECEIVED">File Received</option>
-                <option value="IN_PROGRESS">In Progress</option>
-                <option value="AWAITING_PAYMENT">Awaiting Payment</option>
-                <option value="PAID">Paid</option>
-                <option value="READY_FOR_DOWNLOAD">Ready For Download</option>
-                <option value="COMPLETED">Completed</option>
-                <option value="CANCELLED">Cancelled</option>
-              </select>
+              <div className="relative">
+                <select
+                  name="status"
+                  defaultValue={status}
+                  className="w-full appearance-none rounded-xl border border-white/15 bg-black/50 px-4 py-3 pr-12 text-white outline-none"
+                >
+                  <option value="ALL">All Statuses</option>
+                  <option value="FILE_RECEIVED">File Received</option>
+                  <option value="IN_PROGRESS">In Progress</option>
+                  <option value="AWAITING_PAYMENT">Awaiting Payment</option>
+                  <option value="PAID">Paid</option>
+                  <option value="READY_FOR_DOWNLOAD">Ready for Download</option>
+                  <option value="COMPLETED">Completed</option>
+                  <option value="CANCELLED">Cancelled</option>
+                </select>
+
+                <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/60">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    className="h-5 w-5"
+                    aria-hidden="true"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.51a.75.75 0 0 1-1.08 0l-4.25-4.51a.75.75 0 0 1 .02-1.06Z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                </div>
+              </div>
             </div>
 
             <div className="flex items-end gap-3">
-              <button className="rounded-xl border border-white/15 bg-black/30 px-4 py-3 hover:bg-white/10">
+              <button
+                type="submit"
+                className="rounded-xl border border-white/15 bg-black/30 px-4 py-3 hover:bg-white/10"
+              >
                 Apply
               </button>
               <a
