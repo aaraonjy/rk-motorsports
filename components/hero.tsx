@@ -8,22 +8,22 @@ export function Hero() {
 
       <div className="container-rk relative z-10 flex flex-col items-center justify-center py-20 text-center md:py-24">
         
-        {/* 🔥 NEW HEADLINE */}
+        {/* 🔥 HEADLINE */}
         <h1 className="max-w-5xl text-4xl font-bold uppercase leading-[0.95] text-white drop-shadow-[0_8px_30px_rgba(0,0,0,0.45)] md:text-6xl xl:text-7xl">
           Unlock Your Engine’s True Performance
         </h1>
 
-        {/* 🔥 NEW SUBTEXT */}
+        {/* 🔥 SUBTEXT */}
         <p className="mt-8 max-w-3xl text-lg leading-8 text-white/75 md:text-xl md:leading-9">
           Upload your ECU file, request custom tuning, and receive optimized
           performance maps — fast, secure, and built for real results.
         </p>
 
-        {/* 🔥 IMPROVED BUTTONS */}
+        {/* 🔥 BUTTONS (FIXED COLOR) */}
         <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
           <Link
             href="/custom-tuning"
-            className="rounded-full bg-[#ff3b57] px-8 py-4 text-sm font-semibold uppercase tracking-[0.18em] text-white transition hover:bg-[#ff2444]"
+            className="rounded-full bg-red-600 px-8 py-4 text-sm font-semibold uppercase tracking-[0.18em] text-white transition hover:bg-red-500"
           >
             Start Tuning
           </Link>
@@ -36,7 +36,7 @@ export function Hero() {
           </Link>
         </div>
 
-        {/* 🔥 TRUST LINE (NEW - HIGH IMPACT) */}
+        {/* 🔥 TRUST LINE */}
         <div className="mt-6 text-sm text-white/60">
           ✔ Fast turnaround&nbsp;&nbsp;✔ Professional calibration&nbsp;&nbsp;✔ Secure file handling
         </div>
