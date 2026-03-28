@@ -38,6 +38,9 @@ export function OrderTable({
             const adminCompleted = order.files.find(
               (f) => f.kind === "ADMIN_COMPLETED"
             );
+            const paymentProof = order.files.find(
+              (f) => f.kind === "CUSTOMER_PAYMENT_PROOF"
+            );
 
             const statusLabel =
               order.status === "AWAITING_PAYMENT"
@@ -112,6 +115,17 @@ export function OrderTable({
                     ) : (
                       <span className="text-white/40">No tuned file</span>
                     )}
+
+                    {paymentProof ? (
+                      <Link
+                        href={`/api/files/${paymentProof.id}/download`}
+                        className="inline-block rounded-xl border border-white/15 px-3 py-2 hover:bg-white/10"
+                      >
+                        Payment Slip
+                      </Link>
+                    ) : admin ? (
+                      <span className="text-white/40">No payment proof</span>
+                    ) : null}
                   </div>
                 </td>
 
@@ -138,15 +152,19 @@ export function OrderTable({
                           </button>
                         </form>
 
-                        {order.status === "AWAITING_PAYMENT" ? (
+                        {order.status === "AWAITING_PAYMENT" && paymentProof ? (
                           <form
                             action={`/api/admin/orders/${order.id}/complete`}
                             method="post"
                           >
                             <button className="rounded-xl border border-emerald-500/40 px-3 py-2 text-emerald-400 hover:bg-emerald-500/10">
-                              Release Download
+                              Confirm Payment & Release
                             </button>
                           </form>
+                        ) : order.status === "AWAITING_PAYMENT" ? (
+                          <span className="text-amber-300/80">
+                            Waiting for payment proof
+                          </span>
                         ) : order.status === "READY_FOR_DOWNLOAD" ? (
                           <span className="text-emerald-400">
                             Download Released
@@ -164,9 +182,28 @@ export function OrderTable({
                       Download
                     </Link>
                   ) : order.status === "AWAITING_PAYMENT" && adminCompleted ? (
-                    <span className="text-amber-300/80">
-                      Done (Pending Payment)
-                    </span>
+                    <div className="flex flex-col gap-2">
+                      <span className="text-amber-300/80">
+                        Done (Pending Payment)
+                      </span>
+
+                      <form
+                        action={`/api/orders/${order.id}/upload-payment`}
+                        method="post"
+                        encType="multipart/form-data"
+                        className="flex flex-col gap-2"
+                      >
+                        <input
+                          type="file"
+                          name="file"
+                          required
+                          className="block w-full text-xs text-white/80 file:mr-3 file:rounded-lg file:border file:border-white/15 file:bg-white/5 file:px-3 file:py-2 file:text-white hover:file:bg-white/10"
+                        />
+                        <button className="rounded-xl border border-amber-500/40 px-3 py-2 text-amber-300 hover:bg-amber-500/10">
+                          Upload Payment Slip
+                        </button>
+                      </form>
+                    </div>
                   ) : order.status === "FILE_RECEIVED" ? (
                     <form
                       action={`/api/orders/${order.id}/cancel`}
