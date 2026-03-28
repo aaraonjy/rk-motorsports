@@ -23,16 +23,16 @@ const addOns = [
 const ADD_ON_PRICE = 300;
 
 export default function PricingPage() {
-  const [selectedTune, setSelectedTune] = useState(baseTunes[0].id);
+  const [selectedTune, setSelectedTune] = useState<string | null>(null);
   const [selectedAddOns, setSelectedAddOns] = useState<string[]>([]);
 
   const activeTune = useMemo(
-    () => baseTunes.find((item) => item.id === selectedTune) ?? baseTunes[0],
+    () => baseTunes.find((item) => item.id === selectedTune) || null,
     [selectedTune]
   );
 
   const addOnTotal = selectedAddOns.length * ADD_ON_PRICE;
-  const estimatedTotal = activeTune.price + addOnTotal;
+  const estimatedTotal = (activeTune?.price || 0) + addOnTotal;
 
   function toggleAddOn(option: string) {
     setSelectedAddOns((prev) =>
@@ -54,7 +54,6 @@ export default function PricingPage() {
         </p>
 
         <div className="mt-12 grid gap-8 lg:grid-cols-[1.5fr_0.9fr]">
-          {/* LEFT COLUMN */}
           <div className="rounded-[2rem] border border-white/10 bg-black/45 p-6 backdrop-blur-md md:p-8">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/45">
@@ -106,16 +105,17 @@ export default function PricingPage() {
                 return (
                   <label
                     key={option}
-                    className={`flex cursor-pointer items-center justify-between rounded-2xl border px-5 py-4 transition ${
+                    className={`flex items-center justify-between rounded-2xl border px-5 py-4 transition ${
                       checked
                         ? "border-[#ff3b57] bg-[#ff3b57]/10"
                         : "border-white/10 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.05]"
-                    }`}
+                    } ${!selectedTune ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}
                   >
                     <div className="flex items-center gap-4">
                       <input
                         type="checkbox"
                         checked={checked}
+                        disabled={!selectedTune}
                         onChange={() => toggleAddOn(option)}
                         className="h-4 w-4 accent-[#ff3b57]"
                       />
@@ -131,7 +131,6 @@ export default function PricingPage() {
             </div>
           </div>
 
-          {/* RIGHT COLUMN */}
           <div className="rounded-[2rem] border border-white/10 bg-black/45 p-6 backdrop-blur-md md:p-8">
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/45">
               Estimated price
@@ -143,12 +142,19 @@ export default function PricingPage() {
 
             <div className="mt-8 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
               <p className="text-sm text-white/60">Selected tune</p>
-              <p className="mt-2 text-lg font-semibold text-white">
-                {activeTune.name}
-              </p>
-              <p className="mt-1 text-white/70">
-                RM {activeTune.price.toLocaleString()}
-              </p>
+
+              {activeTune ? (
+                <>
+                  <p className="mt-2 text-lg font-semibold text-white">
+                    {activeTune.name}
+                  </p>
+                  <p className="mt-1 text-white/70">
+                    RM {activeTune.price.toLocaleString()}
+                  </p>
+                </>
+              ) : (
+                <p className="mt-2 text-white/50">No tuning package selected</p>
+              )}
             </div>
 
             <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
@@ -178,7 +184,13 @@ export default function PricingPage() {
                 Total estimated price
               </p>
               <p className="mt-3 text-4xl font-bold text-white">
-                RM {estimatedTotal.toLocaleString()}
+                {activeTune ? (
+                  `RM ${estimatedTotal.toLocaleString()}`
+                ) : (
+                  <span className="text-2xl font-semibold text-white/50">
+                    Select a package
+                  </span>
+                )}
               </p>
             </div>
 
