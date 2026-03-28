@@ -52,26 +52,21 @@ export async function SiteHeader() {
                   {user.role === "ADMIN" ? "Admin" : "Dashboard"}
                 </Link>
                 <form action="/api/auth/logout" method="post">
-                  <button className="rounded-full border border-white/20 px-4 py-2 text-white/85 transition hover:bg-white/10">
+                  <button
+                    type="submit"
+                    className="rounded-full border border-white/20 px-4 py-2 text-white/85 transition hover:bg-white/10"
+                  >
                     Logout
                   </button>
                 </form>
               </>
             ) : (
-              <>
-                <Link
-                  href="/login"
-                  className="text-white/75 transition hover:text-white"
-                >
-                  Login
-                </Link>
-                <Link
-                  href="/register"
-                  className="rounded-full bg-white px-5 py-2 font-medium text-black transition hover:bg-zinc-200"
-                >
-                  Register
-                </Link>
-              </>
+              <Link
+                href="/login"
+                className="rounded-full border border-white/20 px-5 py-2 text-white/85 transition hover:bg-white/10 hover:text-white"
+              >
+                Login
+              </Link>
             )}
           </div>
         </div>

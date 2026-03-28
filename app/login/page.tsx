@@ -41,7 +41,19 @@ export default function LoginPage() {
             />
           </div>
 
-          <button className="btn-primary w-full">Login</button>
+          <button type="submit" className="btn-primary w-full">
+            Login
+          </button>
+
+          <p className="text-center text-sm text-white/70">
+            Don&apos;t have an account?{" "}
+            <Link
+              href="/register"
+              className="font-medium text-white transition hover:text-white/80"
+            >
+              Register
+            </Link>
+          </p>
 
           <p className="text-sm text-white/55">
             Demo admin: admin@rkmotorsports.com / admin123
