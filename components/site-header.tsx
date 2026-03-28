@@ -15,8 +15,8 @@ export async function SiteHeader() {
 
   return (
     <header className="absolute left-0 top-0 z-50 w-full bg-transparent">
-      <div className="container-rk flex h-20 items-center justify-between gap-6">
-        <Link href="/">
+      <div className="container-rk flex h-20 items-center justify-between">
+        <Link href="/" className="shrink-0">
           <Image
             src="/logo.png"
             alt="RK Motorsports"
@@ -27,7 +27,7 @@ export async function SiteHeader() {
           />
         </Link>
 
-        <div className="flex items-center gap-8">
+        <div className="flex items-center gap-10">
           <nav className="hidden items-center gap-8 md:flex">
             {nav.map(([label, href]) => (
               <Link
@@ -40,7 +40,9 @@ export async function SiteHeader() {
             ))}
           </nav>
 
-          <div className="flex items-center gap-3 text-sm">
+          <div className="hidden h-6 w-px bg-white/10 md:block" />
+
+          <div className="flex items-center gap-4 text-sm">
             {user ? (
               <>
                 <Link
@@ -57,12 +59,15 @@ export async function SiteHeader() {
               </>
             ) : (
               <>
-                <Link href="/login" className="text-white/75 transition hover:text-white">
+                <Link
+                  href="/login"
+                  className="text-white/75 transition hover:text-white"
+                >
                   Login
                 </Link>
                 <Link
                   href="/register"
-                  className="rounded-full bg-white px-4 py-2 font-medium text-black transition hover:bg-zinc-200"
+                  className="rounded-full bg-white px-5 py-2 font-medium text-black transition hover:bg-zinc-200"
                 >
                   Register
                 </Link>

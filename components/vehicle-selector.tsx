@@ -12,7 +12,7 @@ function SelectField({ defaultLabel, options }: SelectFieldProps) {
         defaultValue=""
         className="w-full appearance-none rounded-full border border-white/10 bg-black/80 px-6 py-4 pr-14 text-white outline-none transition hover:border-white/25"
       >
-        <option value="" disabled>
+        <option value="" disabled hidden>
           {defaultLabel}
         </option>
         {options.map((option) => (
