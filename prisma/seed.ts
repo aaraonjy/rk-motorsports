@@ -9,7 +9,10 @@ async function main() {
 
   await prisma.user.upsert({
     where: { email: "admin@rkmotorsports.com" },
-    update: {},
+    update: {
+      name: "RK Admin",
+      role: Role.ADMIN,
+    },
     create: {
       name: "RK Admin",
       email: "admin@rkmotorsports.com",
@@ -20,7 +23,9 @@ async function main() {
 
   await prisma.user.upsert({
     where: { email: "customer@example.com" },
-    update: {},
+    update: {
+      name: "Demo Customer",
+    },
     create: {
       name: "Demo Customer",
       email: "customer@example.com",
@@ -30,25 +35,25 @@ async function main() {
 
   const vw = await prisma.vehicleBrand.upsert({
     where: { slug: "volkswagen" },
-    update: {},
+    update: { name: "Volkswagen" },
     create: { name: "Volkswagen", slug: "volkswagen" },
   });
 
   const mazda = await prisma.vehicleBrand.upsert({
     where: { slug: "mazda" },
-    update: {},
+    update: { name: "Mazda" },
     create: { name: "Mazda", slug: "mazda" },
   });
 
   const gti = await prisma.vehicleModel.upsert({
     where: { brandId_slug: { brandId: vw.id, slug: "mk7-gti" } },
-    update: {},
+    update: { name: "MK7 GTI" },
     create: { name: "MK7 GTI", slug: "mk7-gti", brandId: vw.id },
   });
 
   const mps = await prisma.vehicleModel.upsert({
     where: { brandId_slug: { brandId: mazda.id, slug: "mazda-3-mps" } },
-    update: {},
+    update: { name: "Mazda 3 MPS" },
     create: { name: "Mazda 3 MPS", slug: "mazda-3-mps", brandId: mazda.id },
   });
 
@@ -64,12 +69,57 @@ async function main() {
     create: { modelId: mps.id, year: 2011 },
   });
 
-  await prisma.ecuType.createMany({
-    data: [
-      { name: "Bosch MG1", manufacturer: "Bosch", protocol: "Bench/OBD", vehicleYearId: gtiYear.id },
-      { name: "Bosch MED17", manufacturer: "Bosch", protocol: "OBD", vehicleYearId: mpsYear.id },
-    ],
+  const existingMg1 = await prisma.ecuType.findFirst({
+    where: {
+      vehicleYearId: gtiYear.id,
+      name: "Bosch MG1",
+    },
   });
+
+  if (existingMg1) {
+    await prisma.ecuType.update({
+      where: { id: existingMg1.id },
+      data: {
+        manufacturer: "Bosch",
+        protocol: "Bench/OBD",
+      },
+    });
+  } else {
+    await prisma.ecuType.create({
+      data: {
+        name: "Bosch MG1",
+        manufacturer: "Bosch",
+        protocol: "Bench/OBD",
+        vehicleYearId: gtiYear.id,
+      },
+    });
+  }
+
+  const existingMed17 = await prisma.ecuType.findFirst({
+    where: {
+      vehicleYearId: mpsYear.id,
+      name: "Bosch MED17",
+    },
+  });
+
+  if (existingMed17) {
+    await prisma.ecuType.update({
+      where: { id: existingMed17.id },
+      data: {
+        manufacturer: "Bosch",
+        protocol: "OBD",
+      },
+    });
+  } else {
+    await prisma.ecuType.create({
+      data: {
+        name: "Bosch MED17",
+        manufacturer: "Bosch",
+        protocol: "OBD",
+        vehicleYearId: mpsYear.id,
+      },
+    });
+  }
 
   const products = [
     {
@@ -78,6 +128,7 @@ async function main() {
       description: "Balanced daily performance calibration.",
       type: ProductType.SERVICE,
       basePrice: 1500,
+      isActive: true,
     },
     {
       title: "Stage 2 ECU Tune",
@@ -85,6 +136,7 @@ async function main() {
       description: "Performance calibration for upgraded hardware.",
       type: ProductType.SERVICE,
       basePrice: 2200,
+      isActive: true,
     },
     {
       title: "Custom File Service",
@@ -92,18 +144,32 @@ async function main() {
       description: "Upload your original ECU file and receive a custom tuned file.",
       type: ProductType.CUSTOM_TUNE,
       basePrice: 1800,
+      isActive: true,
     },
   ];
 
   for (const product of products) {
     await prisma.product.upsert({
       where: { slug: product.slug },
-      update: {},
+      update: {
+        title: product.title,
+        description: product.description,
+        type: product.type,
+        basePrice: product.basePrice,
+        isActive: product.isActive,
+      },
       create: product,
     });
   }
+
+  console.log("Seed completed successfully.");
 }
 
-main().finally(async () => {
-  await prisma.$disconnect();
-});
+main()
+  .catch((error) => {
+    console.error("Seed failed:", error);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });

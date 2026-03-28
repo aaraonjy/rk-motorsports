@@ -5,8 +5,7 @@ import { getSessionUser } from "@/lib/auth";
 export default async function CustomTuningPage() {
   const user = await getSessionUser();
   const products = await getProducts();
-  const customProduct =
-    products.find((p) => p.slug === "custom-file-service") || products[0];
+  const customProduct = products.find((p) => p.slug === "custom-file-service");
 
   return (
     <section className="section-pad">
@@ -18,7 +17,11 @@ export default async function CustomTuningPage() {
 
         {!customProduct ? (
           <div className="card-rk mt-8 p-6 text-white/70">
-            Custom File Service product is not configured yet.
+            <p className="font-medium text-white">Custom File Service product is not configured yet.</p>
+            <p className="mt-3 text-white/65">
+              Please run the database seed or create the product record with slug{" "}
+              <code className="rounded bg-black/40 px-2 py-1">custom-file-service</code>.
+            </p>
           </div>
         ) : !user ? (
           <div className="card-rk mt-8 p-6">
