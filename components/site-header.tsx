@@ -63,7 +63,7 @@ export async function SiteHeader() {
             ) : (
               <Link
                 href="/login"
-                className="rounded-full border border-white/20 px-5 py-2 text-white/85 transition hover:bg-white/10 hover:text-white"
+                className="rounded-full bg-red-600 px-5 py-2 font-medium text-white transition hover:bg-red-500"
               >
                 Login
               </Link>
