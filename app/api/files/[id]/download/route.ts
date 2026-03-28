@@ -13,6 +13,7 @@ export async function GET(
   }
 
   const { id } = await ctx.params;
+
   const file = await db.orderFile.findUnique({
     where: { id },
     include: { order: true },
@@ -26,11 +27,16 @@ export async function GET(
     return NextResponse.json({ message: "Forbidden" }, { status: 403 });
   }
 
-  const blob = await get(file.storagePath);
+  const blob = await get(file.storagePath, {
+    access: "private",
+  });
 
-  if (!blob.downloadUrl) {
-    return NextResponse.json({ message: "Blob download unavailable" }, { status: 500 });
+  if (!blob.url) {
+    return NextResponse.json(
+      { message: "Blob download unavailable" },
+      { status: 500 }
+    );
   }
 
-  return NextResponse.redirect(blob.downloadUrl);
+  return NextResponse.redirect(blob.url);
 }
