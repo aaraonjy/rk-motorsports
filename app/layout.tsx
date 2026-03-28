@@ -8,13 +8,15 @@ export const metadata: Metadata = {
   description: "Custom ECU tuning workflow portal.",
 };
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default function RootLayout({
+  children,
+}: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body className="text-white bg-[url('/background1.jpeg')] bg-cover bg-center bg-no-repeat">
-	<div className="min-h-screen bg-gradient-to-b from-black/75 via-black/65 to-black/85">
+      <body className="bg-[url('/background1.jpeg')] bg-cover bg-center bg-no-repeat text-white">
+        <div className="flex min-h-screen flex-col bg-gradient-to-b from-black/75 via-black/65 to-black/85">
           <SiteHeader />
-          <main>{children}</main>
+          <main className="flex-1">{children}</main>
           <SiteFooter />
         </div>
       </body>
