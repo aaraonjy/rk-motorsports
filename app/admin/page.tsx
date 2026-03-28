@@ -64,7 +64,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   defaultValue={status}
                   className="w-full appearance-none rounded-xl border border-white/15 bg-black/50 px-4 py-3 pr-12 text-white outline-none"
                 >
-                  <option value="ALL">All Statuses</option>
+                  <option value="ALL">All Status</option>
                   <option value="FILE_RECEIVED">File Received</option>
                   <option value="IN_PROGRESS">In Progress</option>
                   <option value="AWAITING_PAYMENT">Awaiting Payment</option>
