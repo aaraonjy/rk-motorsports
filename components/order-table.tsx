@@ -11,21 +11,21 @@ type OrderWithRelations = Order & {
 function getStatusBadge(status: string) {
   switch (status) {
     case "AWAITING_PAYMENT":
-      return "bg-amber-500/15 text-amber-300 border border-amber-500/30";
+      return "border border-amber-500/30 bg-amber-500/15 text-amber-300";
     case "READY_FOR_DOWNLOAD":
-      return "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30";
+      return "border border-emerald-500/30 bg-emerald-500/15 text-emerald-300";
     case "CANCELLED":
-      return "bg-red-500/15 text-red-300 border border-red-500/30";
+      return "border border-red-500/30 bg-red-500/15 text-red-300";
     case "FILE_RECEIVED":
-      return "bg-sky-500/15 text-sky-300 border border-sky-500/30";
+      return "border border-sky-500/30 bg-sky-500/15 text-sky-300";
     case "IN_PROGRESS":
-      return "bg-violet-500/15 text-violet-300 border border-violet-500/30";
+      return "border border-violet-500/30 bg-violet-500/15 text-violet-300";
     case "COMPLETED":
-      return "bg-green-500/15 text-green-300 border border-green-500/30";
+      return "border border-green-500/30 bg-green-500/15 text-green-300";
     case "PAID":
-      return "bg-cyan-500/15 text-cyan-300 border border-cyan-500/30";
+      return "border border-cyan-500/30 bg-cyan-500/15 text-cyan-300";
     default:
-      return "bg-white/10 text-white/80 border border-white/15";
+      return "border border-white/15 bg-white/10 text-white/80";
   }
 }
 
@@ -42,17 +42,17 @@ export function OrderTable({
   admin?: boolean;
 }) {
   return (
-    <div className="overflow-x-auto rounded-3xl border border-white/10">
+    <div className="overflow-x-auto rounded-3xl border border-white/20 bg-black/60 shadow-xl shadow-black/40 backdrop-blur-md">
       <table className="min-w-full text-left text-sm">
-        <thead className="bg-white/5 text-white/60">
+        <thead className="bg-black/50 text-white/65">
           <tr>
-            <th className="px-4 py-3">Order</th>
-            {admin ? <th className="px-4 py-3">Customer</th> : null}
-            <th className="px-4 py-3">Vehicle</th>
-            <th className="px-4 py-3">Status</th>
-            <th className="px-4 py-3">Amount</th>
-            <th className="px-4 py-3">Files</th>
-            <th className="px-4 py-3">Action</th>
+            <th className="px-4 py-4">Order</th>
+            {admin ? <th className="px-4 py-4">Customer</th> : null}
+            <th className="px-4 py-4">Vehicle</th>
+            <th className="px-4 py-4">Status</th>
+            <th className="px-4 py-4">Amount</th>
+            <th className="px-4 py-4">Files</th>
+            <th className="px-4 py-4">Action</th>
           </tr>
         </thead>
 
@@ -73,18 +73,18 @@ export function OrderTable({
 
             return (
               <tr key={order.id} className="border-t border-white/10 align-top">
-                <td className="px-4 py-3">
-                  <div className="font-medium">{order.orderNumber}</div>
+                <td className="px-4 py-4">
+                  <div className="font-semibold">{order.orderNumber}</div>
                   <div className="text-white/45">
                     {new Date(order.createdAt).toLocaleDateString()}
                   </div>
                 </td>
 
                 {admin ? (
-                  <td className="px-4 py-3">{order.user?.email}</td>
+                  <td className="px-4 py-4">{order.user?.email}</td>
                 ) : null}
 
-                <td className="px-4 py-3">
+                <td className="px-4 py-4">
                   {[
                     order.vehicleBrand,
                     order.vehicleModel,
@@ -95,24 +95,24 @@ export function OrderTable({
                     .join(" / ") || "-"}
                 </td>
 
-                <td className="px-4 py-3">
+                <td className="px-4 py-4">
                   <span
-                    className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${statusBadgeClass}`}
+                    className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${statusBadgeClass}`}
                   >
                     {statusLabel}
                   </span>
                 </td>
 
-                <td className="px-4 py-3">
+                <td className="px-4 py-4">
                   {formatCurrency(order.totalAmount)}
                 </td>
 
-                <td className="px-4 py-3">
+                <td className="px-4 py-4">
                   <div className="flex min-w-[270px] flex-col gap-2">
                     {customerOriginal ? (
                       <Link
                         href={`/api/files/${customerOriginal.id}/download`}
-                        className="inline-block rounded-xl border border-white/15 px-3 py-2 hover:bg-white/10"
+                        className="inline-block rounded-xl border border-white/15 bg-black/30 px-3 py-2 hover:bg-white/10"
                       >
                         Original File
                       </Link>
@@ -124,7 +124,7 @@ export function OrderTable({
                       adminCompleted ? (
                         <Link
                           href={`/api/files/${adminCompleted.id}/download`}
-                          className="inline-block rounded-xl border border-white/15 px-3 py-2 hover:bg-white/10"
+                          className="inline-block rounded-xl border border-white/15 bg-black/30 px-3 py-2 hover:bg-white/10"
                         >
                           Tuned File
                         </Link>
@@ -134,12 +134,12 @@ export function OrderTable({
                     ) : order.status === "READY_FOR_DOWNLOAD" && adminCompleted ? (
                       <Link
                         href={`/api/files/${adminCompleted.id}/download`}
-                        className="inline-block rounded-xl border border-white/15 px-3 py-2 hover:bg-white/10"
+                        className="inline-block rounded-xl border border-white/15 bg-black/30 px-3 py-2 hover:bg-white/10"
                       >
                         Tuned File
                       </Link>
                     ) : order.status === "AWAITING_PAYMENT" && adminCompleted ? (
-                      <span className="text-amber-300/80">
+                      <span className="text-amber-300/90">
                         Tuned file locked until payment is confirmed
                       </span>
                     ) : (
@@ -149,7 +149,7 @@ export function OrderTable({
                     {paymentProof ? (
                       <Link
                         href={`/api/files/${paymentProof.id}/download`}
-                        className="inline-block rounded-xl border border-white/15 px-3 py-2 hover:bg-white/10"
+                        className="inline-block rounded-xl border border-white/15 bg-black/30 px-3 py-2 hover:bg-white/10"
                       >
                         Payment Slip
                       </Link>
@@ -159,7 +159,7 @@ export function OrderTable({
                   </div>
                 </td>
 
-                <td className="px-4 py-3">
+                <td className="px-4 py-4">
                   {admin ? (
                     order.status === "CANCELLED" ? (
                       <span className="text-red-400">Order Cancelled</span>
@@ -175,9 +175,9 @@ export function OrderTable({
                             type="file"
                             name="file"
                             required
-                            className="block w-full text-xs text-white/80 file:mr-3 file:rounded-lg file:border file:border-white/15 file:bg-white/5 file:px-3 file:py-2 file:text-white hover:file:bg-white/10"
+                            className="block w-full text-xs text-white/80 file:mr-3 file:rounded-lg file:border file:border-white/15 file:bg-black/40 file:px-3 file:py-2 file:text-white hover:file:bg-white/10"
                           />
-                          <button className="rounded-xl border border-white/15 px-3 py-2 hover:bg-white/10">
+                          <button className="rounded-xl border border-white/15 bg-black/30 px-3 py-2 hover:bg-white/10">
                             Upload Tuned File
                           </button>
                         </form>
@@ -192,7 +192,7 @@ export function OrderTable({
                             </button>
                           </form>
                         ) : order.status === "AWAITING_PAYMENT" ? (
-                          <span className="text-amber-300/80">
+                          <span className="text-amber-300/90">
                             Waiting for payment proof
                           </span>
                         ) : order.status === "READY_FOR_DOWNLOAD" ? (
@@ -207,19 +207,19 @@ export function OrderTable({
                   ) : order.status === "READY_FOR_DOWNLOAD" && adminCompleted ? (
                     <Link
                       href={`/api/files/${adminCompleted.id}/download`}
-                      className="inline-block rounded-xl border border-white/15 px-3 py-2 hover:bg-white/10"
+                      className="inline-block rounded-xl border border-white/15 bg-black/30 px-3 py-2 hover:bg-white/10"
                     >
                       Download
                     </Link>
                   ) : order.status === "AWAITING_PAYMENT" && adminCompleted ? (
                     <div className="flex min-w-[230px] flex-col gap-2">
-                      <span className="text-amber-300/80">
+                      <span className="text-amber-300/90">
                         Done (Pending Payment)
                       </span>
 
                       {paymentProof ? (
                         <>
-                          <span className="text-emerald-300/80">
+                          <span className="text-emerald-300/90">
                             Payment Slip Uploaded
                           </span>
                           <form
@@ -231,9 +231,9 @@ export function OrderTable({
                             <input
                               type="file"
                               name="file"
-                              className="block w-full text-xs text-white/80 file:mr-3 file:rounded-lg file:border file:border-white/15 file:bg-white/5 file:px-3 file:py-2 file:text-white hover:file:bg-white/10"
+                              className="block w-full text-xs text-white/80 file:mr-3 file:rounded-lg file:border file:border-white/15 file:bg-black/40 file:px-3 file:py-2 file:text-white hover:file:bg-white/10"
                             />
-                            <button className="rounded-xl border border-white/15 px-3 py-2 text-white/80 hover:bg-white/10">
+                            <button className="rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-white/80 hover:bg-white/10">
                               Replace Payment Slip
                             </button>
                           </form>
@@ -249,7 +249,7 @@ export function OrderTable({
                             type="file"
                             name="file"
                             required
-                            className="block w-full text-xs text-white/80 file:mr-3 file:rounded-lg file:border file:border-white/15 file:bg-white/5 file:px-3 file:py-2 file:text-white hover:file:bg-white/10"
+                            className="block w-full text-xs text-white/80 file:mr-3 file:rounded-lg file:border file:border-white/15 file:bg-black/40 file:px-3 file:py-2 file:text-white hover:file:bg-white/10"
                           />
                           <button className="rounded-xl border border-amber-500/40 px-3 py-2 text-amber-300 hover:bg-amber-500/10">
                             Upload Payment Slip

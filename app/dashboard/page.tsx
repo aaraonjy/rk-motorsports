@@ -27,21 +27,21 @@ export default async function DashboardPage() {
               transfer and upload your payment slip for verification.
             </p>
 
-            <div className="mt-4 grid gap-3 text-sm text-white/80 sm:grid-cols-2">
+            <div className="mt-4 grid gap-4 text-sm text-white/85 sm:grid-cols-2">
               <div>
-                <div className="text-white/50">Bank Name</div>
+                <div className="text-white/55">Bank Name</div>
                 <div className="font-medium">{paymentConfig.bankName}</div>
               </div>
               <div>
-                <div className="text-white/50">Account Name</div>
+                <div className="text-white/55">Account Name</div>
                 <div className="font-medium">{paymentConfig.accountName}</div>
               </div>
               <div>
-                <div className="text-white/50">Account Number</div>
+                <div className="text-white/55">Account Number</div>
                 <div className="font-medium">{paymentConfig.accountNumber}</div>
               </div>
               <div>
-                <div className="text-white/50">Order Reference</div>
+                <div className="text-white/55">Order Reference</div>
                 <div className="font-medium">
                   Please include your order number in the transfer reference.
                 </div>

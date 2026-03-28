@@ -30,7 +30,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         </p>
 
         <div className="mt-8 space-y-4">
-          <div className="card-rk p-6 text-white/70">
+          <div className="card-rk p-6 text-white/75">
             <p>
               Search by order number or filter by status to manage customer
               orders more efficiently.
@@ -42,7 +42,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             className="card-rk grid gap-4 p-6 md:grid-cols-[1fr_220px_auto]"
           >
             <div>
-              <label className="mb-2 block text-sm text-white/60">
+              <label className="mb-2 block text-sm text-white/65">
                 Search Order Number
               </label>
               <input
@@ -50,18 +50,18 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 name="search"
                 defaultValue={search}
                 placeholder="e.g. RK-20260328-2017"
-                className="w-full rounded-xl border border-white/15 bg-black/30 px-4 py-3 text-white outline-none placeholder:text-white/35"
+                className="w-full rounded-xl border border-white/15 bg-black/50 px-4 py-3 text-white outline-none placeholder:text-white/35"
               />
             </div>
 
             <div>
-              <label className="mb-2 block text-sm text-white/60">
+              <label className="mb-2 block text-sm text-white/65">
                 Filter Status
               </label>
               <select
                 name="status"
                 defaultValue={status}
-                className="w-full rounded-xl border border-white/15 bg-black/30 px-4 py-3 text-white outline-none"
+                className="w-full rounded-xl border border-white/15 bg-black/50 px-4 py-3 text-white outline-none"
               >
                 <option value="ALL">All Statuses</option>
                 <option value="FILE_RECEIVED">File Received</option>
@@ -75,12 +75,12 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             </div>
 
             <div className="flex items-end gap-3">
-              <button className="rounded-xl border border-white/15 px-4 py-3 hover:bg-white/10">
+              <button className="rounded-xl border border-white/15 bg-black/30 px-4 py-3 hover:bg-white/10">
                 Apply
               </button>
               <a
                 href="/admin"
-                className="rounded-xl border border-white/15 px-4 py-3 text-white/70 hover:bg-white/10"
+                className="rounded-xl border border-white/15 bg-black/30 px-4 py-3 text-white/70 hover:bg-white/10"
               >
                 Reset
               </a>
