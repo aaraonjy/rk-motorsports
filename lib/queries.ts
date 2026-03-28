@@ -1,7 +1,10 @@
 import { db } from "@/lib/db";
 
 export async function getProducts() {
-  return db.product.findMany({ where: { isActive: true }, orderBy: { title: "asc" } });
+  return db.product.findMany({
+    where: { isActive: true },
+    orderBy: { title: "asc" },
+  });
 }
 
 export async function getRecentOrdersForUser(userId: string) {
@@ -12,9 +15,31 @@ export async function getRecentOrdersForUser(userId: string) {
   });
 }
 
-export async function getAllOrders() {
+export async function getAllOrders(filters?: {
+  status?: string;
+  search?: string;
+}) {
+  const where = {
+    ...(filters?.status && filters.status !== "ALL"
+      ? { status: filters.status }
+      : {}),
+    ...(filters?.search
+      ? {
+          orderNumber: {
+            contains: filters.search,
+            mode: "insensitive" as const,
+          },
+        }
+      : {}),
+  };
+
   return db.order.findMany({
-    include: { user: true, files: true, items: { include: { product: true } } },
+    where,
+    include: {
+      user: true,
+      files: true,
+      items: { include: { product: true } },
+    },
     orderBy: { createdAt: "desc" },
   });
 }

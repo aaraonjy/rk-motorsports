@@ -8,6 +8,32 @@ type OrderWithRelations = Order & {
   items: (OrderItem & { product: Product })[];
 };
 
+function getStatusBadge(status: string) {
+  switch (status) {
+    case "AWAITING_PAYMENT":
+      return "bg-amber-500/15 text-amber-300 border border-amber-500/30";
+    case "READY_FOR_DOWNLOAD":
+      return "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30";
+    case "CANCELLED":
+      return "bg-red-500/15 text-red-300 border border-red-500/30";
+    case "FILE_RECEIVED":
+      return "bg-sky-500/15 text-sky-300 border border-sky-500/30";
+    case "IN_PROGRESS":
+      return "bg-violet-500/15 text-violet-300 border border-violet-500/30";
+    case "COMPLETED":
+      return "bg-green-500/15 text-green-300 border border-green-500/30";
+    case "PAID":
+      return "bg-cyan-500/15 text-cyan-300 border border-cyan-500/30";
+    default:
+      return "bg-white/10 text-white/80 border border-white/15";
+  }
+}
+
+function getStatusLabel(status: string) {
+  if (status === "AWAITING_PAYMENT") return "DONE (PENDING PAYMENT)";
+  return status.replaceAll("_", " ");
+}
+
 export function OrderTable({
   orders,
   admin = false,
@@ -42,10 +68,8 @@ export function OrderTable({
               (f) => f.kind === "CUSTOMER_PAYMENT_PROOF"
             );
 
-            const statusLabel =
-              order.status === "AWAITING_PAYMENT"
-                ? "DONE (PENDING PAYMENT)"
-                : order.status.replaceAll("_", " ");
+            const statusLabel = getStatusLabel(order.status);
+            const statusBadgeClass = getStatusBadge(order.status);
 
             return (
               <tr key={order.id} className="border-t border-white/10 align-top">
@@ -71,14 +95,20 @@ export function OrderTable({
                     .join(" / ") || "-"}
                 </td>
 
-                <td className="px-4 py-3">{statusLabel}</td>
+                <td className="px-4 py-3">
+                  <span
+                    className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${statusBadgeClass}`}
+                  >
+                    {statusLabel}
+                  </span>
+                </td>
 
                 <td className="px-4 py-3">
                   {formatCurrency(order.totalAmount)}
                 </td>
 
                 <td className="px-4 py-3">
-                  <div className="flex flex-col gap-2">
+                  <div className="flex min-w-[270px] flex-col gap-2">
                     {customerOriginal ? (
                       <Link
                         href={`/api/files/${customerOriginal.id}/download`}
@@ -134,7 +164,7 @@ export function OrderTable({
                     order.status === "CANCELLED" ? (
                       <span className="text-red-400">Order Cancelled</span>
                     ) : (
-                      <div className="flex min-w-[260px] flex-col gap-3">
+                      <div className="flex min-w-[280px] flex-col gap-3">
                         <form
                           action={`/api/admin/orders/${order.id}/upload`}
                           method="post"
@@ -182,27 +212,50 @@ export function OrderTable({
                       Download
                     </Link>
                   ) : order.status === "AWAITING_PAYMENT" && adminCompleted ? (
-                    <div className="flex flex-col gap-2">
+                    <div className="flex min-w-[230px] flex-col gap-2">
                       <span className="text-amber-300/80">
                         Done (Pending Payment)
                       </span>
 
-                      <form
-                        action={`/api/orders/${order.id}/upload-payment`}
-                        method="post"
-                        encType="multipart/form-data"
-                        className="flex flex-col gap-2"
-                      >
-                        <input
-                          type="file"
-                          name="file"
-                          required
-                          className="block w-full text-xs text-white/80 file:mr-3 file:rounded-lg file:border file:border-white/15 file:bg-white/5 file:px-3 file:py-2 file:text-white hover:file:bg-white/10"
-                        />
-                        <button className="rounded-xl border border-amber-500/40 px-3 py-2 text-amber-300 hover:bg-amber-500/10">
-                          Upload Payment Slip
-                        </button>
-                      </form>
+                      {paymentProof ? (
+                        <>
+                          <span className="text-emerald-300/80">
+                            Payment Slip Uploaded
+                          </span>
+                          <form
+                            action={`/api/orders/${order.id}/upload-payment`}
+                            method="post"
+                            encType="multipart/form-data"
+                            className="flex flex-col gap-2"
+                          >
+                            <input
+                              type="file"
+                              name="file"
+                              className="block w-full text-xs text-white/80 file:mr-3 file:rounded-lg file:border file:border-white/15 file:bg-white/5 file:px-3 file:py-2 file:text-white hover:file:bg-white/10"
+                            />
+                            <button className="rounded-xl border border-white/15 px-3 py-2 text-white/80 hover:bg-white/10">
+                              Replace Payment Slip
+                            </button>
+                          </form>
+                        </>
+                      ) : (
+                        <form
+                          action={`/api/orders/${order.id}/upload-payment`}
+                          method="post"
+                          encType="multipart/form-data"
+                          className="flex flex-col gap-2"
+                        >
+                          <input
+                            type="file"
+                            name="file"
+                            required
+                            className="block w-full text-xs text-white/80 file:mr-3 file:rounded-lg file:border file:border-white/15 file:bg-white/5 file:px-3 file:py-2 file:text-white hover:file:bg-white/10"
+                          />
+                          <button className="rounded-xl border border-amber-500/40 px-3 py-2 text-amber-300 hover:bg-amber-500/10">
+                            Upload Payment Slip
+                          </button>
+                        </form>
+                      )}
                     </div>
                   ) : order.status === "FILE_RECEIVED" ? (
                     <form

@@ -3,22 +3,90 @@ import { getAllOrders } from "@/lib/queries";
 import { redirect } from "next/navigation";
 import { OrderTable } from "@/components/order-table";
 
-export default async function AdminPage() {
+type AdminPageProps = {
+  searchParams?: Promise<{
+    status?: string;
+    search?: string;
+  }>;
+};
+
+export default async function AdminPage({ searchParams }: AdminPageProps) {
   const user = await getSessionUser();
   if (!user) redirect("/login");
   if (user.role !== "ADMIN") redirect("/dashboard");
 
-  const orders = await getAllOrders();
+  const params = (await searchParams) || {};
+  const status = params.status || "ALL";
+  const search = params.search || "";
+
+  const orders = await getAllOrders({ status, search });
 
   return (
     <section className="section-pad">
       <div className="container-rk">
         <h1 className="text-4xl font-bold">Admin Dashboard</h1>
-        <p className="mt-4 text-white/70">Review orders, uploaded files, and mark jobs ready for download.</p>
+        <p className="mt-4 text-white/70">
+          Review orders, uploaded files, and manage delivery workflow.
+        </p>
+
         <div className="mt-8 space-y-4">
           <div className="card-rk p-6 text-white/70">
-            <p>To simulate completed file delivery locally, place a file inside <code className="rounded bg-black/40 px-2 py-1">public/uploads</code> and add an admin-completed record manually or extend the admin upload route later.</p>
+            <p>
+              Search by order number or filter by status to manage customer
+              orders more efficiently.
+            </p>
           </div>
+
+          <form
+            method="get"
+            className="card-rk grid gap-4 p-6 md:grid-cols-[1fr_220px_auto]"
+          >
+            <div>
+              <label className="mb-2 block text-sm text-white/60">
+                Search Order Number
+              </label>
+              <input
+                type="text"
+                name="search"
+                defaultValue={search}
+                placeholder="e.g. RK-20260328-2017"
+                className="w-full rounded-xl border border-white/15 bg-black/30 px-4 py-3 text-white outline-none placeholder:text-white/35"
+              />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm text-white/60">
+                Filter Status
+              </label>
+              <select
+                name="status"
+                defaultValue={status}
+                className="w-full rounded-xl border border-white/15 bg-black/30 px-4 py-3 text-white outline-none"
+              >
+                <option value="ALL">All Statuses</option>
+                <option value="FILE_RECEIVED">File Received</option>
+                <option value="IN_PROGRESS">In Progress</option>
+                <option value="AWAITING_PAYMENT">Awaiting Payment</option>
+                <option value="PAID">Paid</option>
+                <option value="READY_FOR_DOWNLOAD">Ready For Download</option>
+                <option value="COMPLETED">Completed</option>
+                <option value="CANCELLED">Cancelled</option>
+              </select>
+            </div>
+
+            <div className="flex items-end gap-3">
+              <button className="rounded-xl border border-white/15 px-4 py-3 hover:bg-white/10">
+                Apply
+              </button>
+              <a
+                href="/admin"
+                className="rounded-xl border border-white/15 px-4 py-3 text-white/70 hover:bg-white/10"
+              >
+                Reset
+              </a>
+            </div>
+          </form>
+
           <OrderTable orders={orders} admin />
         </div>
       </div>
