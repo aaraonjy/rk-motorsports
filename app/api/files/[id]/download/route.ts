@@ -27,16 +27,16 @@ export async function GET(
     return NextResponse.json({ message: "Forbidden" }, { status: 403 });
   }
 
-  const blob = await get(file.storagePath, {
+  const result = await get(file.storagePath, {
     access: "private",
   });
 
-  if (!blob || !blob.url) {
+  if (!result || !result.blob?.downloadUrl) {
     return NextResponse.json(
       { message: "Blob download unavailable" },
       { status: 500 }
     );
   }
 
-  return NextResponse.redirect(blob.url);
+  return NextResponse.redirect(result.blob.downloadUrl);
 }
