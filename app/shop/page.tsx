@@ -5,7 +5,7 @@ export default function ShopPage() {
   return (
     <section className="flex min-h-[calc(100vh-80px)] items-center pt-24">
       <div className="container-rk flex w-full justify-center">
-        <div className="w-full max-w-6xl rounded-[2rem] border border-white/10 bg-black/45 p-8 shadow-[0_20px_80px_rgba(0,0,0,0.35)] backdrop-blur-md md:p-12">
+        <div className="w-full max-w-6xl rounded-[2rem] border border-white/15 bg-black/55 p-8 shadow-[0_30px_120px_rgba(0,0,0,0.6)] backdrop-blur-md md:p-12">
           <div className="mb-8">
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/45">
               Compare tuning options
@@ -33,7 +33,7 @@ export default function ShopPage() {
 
             <Link
               href="/custom-tuning"
-              className="inline-flex rounded-full border border-white/20 bg-white/5 px-8 py-4 text-sm font-semibold uppercase tracking-[0.18em] text-white transition hover:bg-white/10"
+              className="inline-flex rounded-full border border-white/20 bg-white/10 px-8 py-4 text-sm font-semibold uppercase tracking-[0.18em] text-white transition hover:bg-white/20"
             >
               Request Custom Tune
             </Link>
