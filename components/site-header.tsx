@@ -7,7 +7,6 @@ const nav = [
   ["Shop", "/shop"],
   ["Custom Tuning", "/custom-tuning"],
   ["Pricing", "/pricing"],
-  ["FAQ", "/faq"],
   ["Contact", "/contact"],
 ] as const;
 

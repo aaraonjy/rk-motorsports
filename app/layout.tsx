@@ -2,6 +2,7 @@ import "./globals.css";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import type { Metadata } from "next";
+import { WhatsAppButton } from "@/components/whatsapp-button";
 
 export const metadata: Metadata = {
   title: "RK Motorsports",
@@ -15,10 +16,12 @@ export default function RootLayout({
     <html lang="en">
       <body className="bg-[url('/background1.jpeg')] bg-cover bg-center bg-no-repeat text-white">
         <div className="flex min-h-screen flex-col bg-gradient-to-b from-black/75 via-black/65 to-black/85">
-          <SiteHeader />
-          <main className="flex-1">{children}</main>
-          <SiteFooter />
+             <SiteHeader />
+             <main className="flex-1">{children}</main>
+             <SiteFooter />
         </div>
+	{/* ✅ Floating WhatsApp Button */}
+	<WhatsAppButton />
       </body>
     </html>
   );
