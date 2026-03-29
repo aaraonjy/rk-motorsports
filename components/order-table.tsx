@@ -67,33 +67,6 @@ function confirmCustomerCancel(event: FormEvent<HTMLFormElement>) {
   }
 }
 
-function confirmAdminCancel(event: FormEvent<HTMLFormElement>) {
-  const confirmed = window.confirm(
-    "Are you sure you want to cancel this order?"
-  );
-
-  if (!confirmed) {
-    event.preventDefault();
-    return;
-  }
-
-  const form = event.currentTarget;
-  const reasonInput = form.querySelector(
-    'input[name="cancelReason"]'
-  ) as HTMLInputElement | null;
-
-  if (reasonInput) {
-    const reason = window.prompt(
-      "Reason to cancel this order? (optional)",
-      ""
-    );
-
-    if (reason !== null) {
-      reasonInput.value = reason.trim();
-    }
-  }
-}
-
 function VehicleDetails({
   order,
 }: {
@@ -170,6 +143,79 @@ function RequestDetailsModal({
   );
 }
 
+function AdminCancelModal({
+  isOpen,
+  orderId,
+  onClose,
+}: {
+  isOpen: boolean;
+  orderId: string | null;
+  onClose: () => void;
+}) {
+  const [reason, setReason] = useState("");
+
+  if (!isOpen || !orderId) return null;
+
+  return (
+    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 px-4">
+      <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-zinc-950 p-6 shadow-2xl">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h3 className="text-lg font-semibold text-white">Cancel Order</h3>
+            <p className="mt-1 text-sm text-white/50">
+              This will mark the order as cancelled and stop further processing.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border border-white/15 px-3 py-1.5 text-sm text-white/70 transition hover:bg-white/10 hover:text-white"
+          >
+            Close
+          </button>
+        </div>
+
+        <form
+          action={`/api/admin/orders/${orderId}/cancel`}
+          method="post"
+          className="mt-5 space-y-4"
+        >
+          <div>
+            <label className="mb-2 block text-sm text-white/70">
+              Cancellation Reason <span className="text-white/40">(optional)</span>
+            </label>
+            <textarea
+              name="cancelReason"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="e.g. Unsupported ECU, unreadable file, wrong file uploaded"
+              className="min-h-[110px] w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/30 hover:border-white/20 focus:border-white/25"
+            />
+          </div>
+
+          <div className="flex items-center justify-end gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-xl border border-white/15 px-4 py-2.5 text-sm text-white/75 transition hover:bg-white/10 hover:text-white"
+            >
+              Keep Order
+            </button>
+
+            <button
+              type="submit"
+              className="rounded-xl border border-red-500/40 px-4 py-2.5 text-sm text-red-300 transition hover:bg-red-500/10"
+            >
+              Confirm Cancel
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export function OrderTable({
   orders,
   admin = false,
@@ -178,6 +224,7 @@ export function OrderTable({
   admin?: boolean;
 }) {
   const [activeRequest, setActiveRequest] = useState<string | null>(null);
+  const [cancelOrderId, setCancelOrderId] = useState<string | null>(null);
 
   return (
     <>
@@ -265,7 +312,9 @@ export function OrderTable({
                       <div className="mt-3">
                         <button
                           type="button"
-                          onClick={() => setActiveRequest(order.requestDetails || "")}
+                          onClick={() =>
+                            setActiveRequest(order.requestDetails || "")
+                          }
                           className="rounded-lg border border-white/15 bg-black/30 px-3 py-1.5 text-xs text-white/80 transition hover:bg-white/10"
                         >
                           View Request
@@ -369,23 +418,13 @@ export function OrderTable({
                           {["FILE_RECEIVED", "IN_PROGRESS", "AWAITING_PAYMENT"].includes(
                             order.status
                           ) ? (
-                            <form
-                              action={`/api/admin/orders/${order.id}/cancel`}
-                              method="post"
-                              onSubmit={confirmAdminCancel}
+                            <button
+                              type="button"
+                              onClick={() => setCancelOrderId(order.id)}
+                              className="rounded-xl border border-red-500/40 px-3 py-2 text-red-400 hover:bg-red-500/10"
                             >
-                              <input
-                                type="hidden"
-                                name="cancelReason"
-                                value=""
-                              />
-                              <button
-                                type="submit"
-                                className="rounded-xl border border-red-500/40 px-3 py-2 text-red-400 hover:bg-red-500/10"
-                              >
-                                Admin Cancel Order
-                              </button>
-                            </form>
+                              Admin Cancel Order
+                            </button>
                           ) : null}
 
                           {order.status === "AWAITING_PAYMENT" && paymentProof ? (
@@ -501,6 +540,12 @@ export function OrderTable({
         isOpen={activeRequest !== null}
         onClose={() => setActiveRequest(null)}
         details={activeRequest || ""}
+      />
+
+      <AdminCancelModal
+        isOpen={cancelOrderId !== null}
+        orderId={cancelOrderId}
+        onClose={() => setCancelOrderId(null)}
       />
     </>
   );
