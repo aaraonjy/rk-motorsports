@@ -4,6 +4,12 @@ import { getSessionUser } from "@/lib/auth";
 import { generateOrderNumber } from "@/lib/utils";
 import { saveFile } from "@/lib/storage";
 
+const tunePrices: Record<string, number> = {
+  "Stage 1 ECU Tune": 1500,
+  "Stage 2 ECU Tune": 2200,
+  "Custom File Service": 1800,
+};
+
 export async function POST(req: Request) {
   try {
     const form = await req.formData();
@@ -20,16 +26,39 @@ export async function POST(req: Request) {
     const engineCapacity = String(form.get("engineCapacity") || "");
     const vehicleYear = String(form.get("vehicleYear") || "");
     const ecuType = String(form.get("ecuType") || "");
-    const requestDetails = String(form.get("requestDetails") || "");
+    const tunePackage = String(form.get("tunePackage") || "");
+    const remarks = String(form.get("remarks") || "").trim();
+    const estimatedTotalRaw = Number(form.get("estimatedTotal") || 0);
+    const selectedAddOns = form
+      .getAll("addOns")
+      .map((value) => String(value))
+      .filter(Boolean);
     const file = form.get("file");
 
     const product = await db.product.findUnique({
       where: { id: productId },
     });
 
-    if (!product || !(file instanceof File)) {
+    if (!product || !(file instanceof File) || !tunePackage) {
       return NextResponse.redirect(new URL("/custom-tuning", req.url), 303);
     }
+
+    const safeBasePrice = tunePrices[tunePackage] ?? product.basePrice;
+    const calculatedTotal =
+      safeBasePrice + selectedAddOns.length * 300;
+
+    const finalTotal =
+      estimatedTotalRaw > 0 ? estimatedTotalRaw : calculatedTotal;
+
+    const requestDetailsLines = [
+      `Base Tune: ${tunePackage}`,
+      `Add-ons: ${
+        selectedAddOns.length > 0 ? selectedAddOns.join(", ") : "None"
+      }`,
+      `Remarks: ${remarks || "None"}`,
+    ];
+
+    const requestDetails = requestDetailsLines.join("\n");
 
     const saved = await saveFile(file, "customer-original");
 
@@ -37,7 +66,7 @@ export async function POST(req: Request) {
       data: {
         orderNumber: generateOrderNumber(),
         userId: user.id,
-        totalAmount: product.basePrice,
+        totalAmount: finalTotal,
         requestDetails,
         vehicleBrand,
         vehicleModel,
@@ -49,7 +78,7 @@ export async function POST(req: Request) {
         items: {
           create: {
             productId: product.id,
-            price: product.basePrice,
+            price: finalTotal,
             quantity: 1,
           },
         },

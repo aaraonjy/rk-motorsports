@@ -110,9 +110,32 @@ function RequestDetailsModal({
 }) {
   if (!isOpen) return null;
 
+  const lines = details
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const baseTune =
+    lines
+      .find((line) => line.startsWith("Base Tune:"))
+      ?.replace("Base Tune:", "")
+      .trim() || "Not specified";
+
+  const addOns =
+    lines
+      .find((line) => line.startsWith("Add-ons:"))
+      ?.replace("Add-ons:", "")
+      .trim() || "None";
+
+  const remarks =
+    lines
+      .find((line) => line.startsWith("Remarks:"))
+      ?.replace("Remarks:", "")
+      .trim() || "None";
+
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 px-4">
-      <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-zinc-950 p-6 shadow-2xl">
+      <div className="w-full max-w-2xl rounded-2xl border border-white/10 bg-zinc-950 p-6 shadow-2xl">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h3 className="text-lg font-semibold text-white">Request Details</h3>
@@ -130,8 +153,33 @@ function RequestDetailsModal({
           </button>
         </div>
 
-        <div className="mt-5 whitespace-pre-wrap rounded-xl border border-white/10 bg-black/40 p-4 text-sm leading-7 text-white/85">
-          {details.trim() || "No request details provided."}
+        <div className="mt-5 grid gap-4">
+          <div className="rounded-xl border border-white/10 bg-black/40 p-4">
+            <p className="text-xs uppercase tracking-[0.2em] text-white/45">
+              Base tune
+            </p>
+            <p className="mt-2 text-base font-semibold text-white">
+              {baseTune}
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-white/10 bg-black/40 p-4">
+            <p className="text-xs uppercase tracking-[0.2em] text-white/45">
+              Add-ons
+            </p>
+            <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-white/85">
+              {addOns}
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-white/10 bg-black/40 p-4">
+            <p className="text-xs uppercase tracking-[0.2em] text-white/45">
+              Remarks
+            </p>
+            <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-white/85">
+              {remarks}
+            </p>
+          </div>
         </div>
       </div>
     </div>
@@ -170,7 +218,8 @@ function AdminCancelModal({
         >
           <div>
             <label className="mb-2 block text-sm text-white/70">
-              Cancellation Reason <span className="text-white/40">(optional)</span>
+              Cancellation Reason{" "}
+              <span className="text-white/40">(optional)</span>
             </label>
             <textarea
               name="cancelReason"
