@@ -79,12 +79,14 @@ export default function HomePage() {
   return (
     <>
       {/* SECTION 1: HERO */}
-      <section className="bg-black/55 backdrop-blur-sm">
+      <section className="bg-black/50 backdrop-blur-sm">
         <Hero />
       </section>
 
+      <div className="h-px w-full bg-white/5" />
+
       {/* SECTION 2: COMPARE TUNING OPTIONS */}
-      <section className="bg-black/70 py-20 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] md:py-24">
+      <section className="bg-black/65 py-20 text-white backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] md:py-24">
         <div className="container-rk">
           <div className="rounded-[2rem] border border-white/10 bg-black/45 p-8 shadow-[0_20px_80px_rgba(0,0,0,0.35)] backdrop-blur-md md:p-12">
             <div className="mb-8">
@@ -142,10 +144,12 @@ export default function HomePage() {
         </div>
       </section>
 
+      <div className="h-px w-full bg-white/5" />
+
       {/* SECTION 3: SERVICES */}
       <section
         id="services"
-        className="bg-zinc-900/90 py-20 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] md:py-24"
+        className="bg-zinc-900 py-20 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] md:py-24"
       >
         <HomeServices />
       </section>

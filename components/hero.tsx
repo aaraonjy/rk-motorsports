@@ -33,7 +33,8 @@ export function Hero() {
         </div>
 
         <div className="mt-6 text-sm text-white/60">
-          ✔ Fast turnaround&nbsp;&nbsp;✔ Professional calibration&nbsp;&nbsp;✔ Secure file handling
+          ✔ Fast turnaround&nbsp;&nbsp;✔ Professional calibration&nbsp;&nbsp;✔
+          Secure file handling
         </div>
       </div>
     </section>
