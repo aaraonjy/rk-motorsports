@@ -21,9 +21,11 @@ export default async function CustomTuningPage() {
         </p>
 
         {/* 🔥 RESPONSE TIME */}
-        <p className="mt-3 text-sm text-white/50">
-          Typical response time: within 12–24 hours
-        </p>
+	<p className="mt-5 max-w-xl text-white/70 leading-relaxed">
+  	  Fill in your vehicle details, tuning request, and upload your original ECU file.
+  	  <br />
+  	  Our team will review your request and contact you shortly after submission to confirm compatibility, pricing, and turnaround time.
+	</p>
 
         {!customProduct ? (
           <div className="card-rk mt-10 p-6 text-white/70">
