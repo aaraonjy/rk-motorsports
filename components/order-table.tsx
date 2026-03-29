@@ -23,7 +23,7 @@ type UploadModalState = {
 function getStatusBadge(status: string) {
   switch (status) {
     case "AWAITING_PAYMENT":
-      return "inline-flex items-center justify-center rounded-full border border-amber-500/30 bg-amber-500/15 px-3 py-1 text-xs font-semibold text-amber-300";
+      return "inline-flex items-center justify-center min-w-[120px] text-center rounded-full border border-amber-500/30 bg-amber-500/15 px-3 py-1 text-xs font-semibold text-amber-300";
     case "READY_FOR_DOWNLOAD":
       return "inline-flex items-center justify-center rounded-full border border-emerald-500/30 bg-emerald-500/15 px-3 py-1 text-xs font-semibold text-emerald-300";
     case "CANCELLED":
