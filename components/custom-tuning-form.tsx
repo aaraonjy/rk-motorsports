@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import carLibrary from "@/lib/car-library.json";
 import ecuReadToolsData from "@/lib/ecu-read-tools.json";
 import fuelGradesData from "@/lib/fuel-grades.json";
+import wmiOptionsData from "@/lib/wmi-options.json";
 
 const baseTunes = [
   { id: "stage1", name: "Stage 1 ECU Tune", price: 1500 },
@@ -48,6 +49,10 @@ type EcuReadToolsFile = {
   tools: string[];
 };
 
+type WmiOptionsFile = {
+  options: string[];
+};
+
 type CustomTuningFormProps = {
   productId: string;
 };
@@ -80,8 +85,12 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
 
   const [ecuReadTool, setEcuReadTool] = useState("");
   const [ecuReadToolOther, setEcuReadToolOther] = useState("");
+
   const [fuelGrade, setFuelGrade] = useState("");
   const [fuelGradeOther, setFuelGradeOther] = useState("");
+
+  const [wmiOption, setWmiOption] = useState("");
+  const [wmiOther, setWmiOther] = useState("");
 
   const brands = useMemo(
     () =>
@@ -97,6 +106,11 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
   );
 
   const fuelGrades = useMemo(() => (fuelGradesData as string[]) || [], []);
+
+  const wmiOptions = useMemo(
+    () => (wmiOptionsData as WmiOptionsFile).options || [],
+    []
+  );
 
   const selectedBrandData = useMemo(
     () => brands.find((brand) => brand.make === selectedBrand) || null,
@@ -149,6 +163,13 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
     return fuelGrade;
   }, [fuelGrade, fuelGradeOther]);
 
+  const finalWmiOption = useMemo(() => {
+    if (wmiOption === "Custom (Specify)") {
+      return wmiOther.trim();
+    }
+    return wmiOption;
+  }, [wmiOption, wmiOther]);
+
   const activeTune = useMemo(
     () => baseTunes.find((item) => item.id === selectedTune) || null,
     [selectedTune]
@@ -178,6 +199,12 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
     }
   }, [fuelGrade]);
 
+  useEffect(() => {
+    if (wmiOption !== "Custom (Specify)") {
+      setWmiOther("");
+    }
+  }, [wmiOption]);
+
   function toggleAddOn(option: string) {
     setSelectedAddOns((prev) =>
       prev.includes(option)
@@ -194,7 +221,8 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
     !ecuReadTool ||
     !fuelGrade ||
     (ecuReadTool === "Other (Specify)" && !ecuReadToolOther.trim()) ||
-    (fuelGrade === "Other (Specify)" && !fuelGradeOther.trim());
+    (fuelGrade === "Other (Specify)" && !fuelGradeOther.trim()) ||
+    (wmiOption === "Custom (Specify)" && !wmiOther.trim());
 
   return (
     <form
@@ -221,6 +249,7 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
       <input type="hidden" name="engineCapacity" value={derivedCapacity} />
       <input type="hidden" name="ecuReadTool" value={finalEcuReadTool} />
       <input type="hidden" name="fuelGrade" value={finalFuelGrade} />
+      <input type="hidden" name="waterMethanolInjection" value={finalWmiOption} />
 
       <div className="rounded-[2rem] border border-white/10 bg-black/45 p-6 backdrop-blur-md md:p-8">
         <div className="grid gap-6 md:grid-cols-3">
@@ -430,6 +459,40 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
               </div>
             </div>
           </div>
+
+          <div>
+            <label className="label-rk">Water Methanol Injection</label>
+            <div className="relative">
+              <select
+                className="input-rk appearance-none pr-12"
+                value={wmiOption}
+                onChange={(e) => setWmiOption(e.target.value)}
+              >
+                <option value="">Not selected</option>
+                {wmiOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+
+              <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/50">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  className="h-5 w-5"
+                  aria-hidden="true"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.51a.75.75 0 0 1-1.08 0l-4.25-4.51a.75.75 0 0 1 .02-1.06Z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </div>
+            </div>
+          </div>
         </div>
 
         {ecuReadTool === "Other (Specify)" ? (
@@ -453,6 +516,19 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
               value={fuelGradeOther}
               onChange={(e) => setFuelGradeOther(e.target.value)}
               placeholder="Specify fuel grade"
+              required
+            />
+          </div>
+        ) : null}
+
+        {wmiOption === "Custom (Specify)" ? (
+          <div className="mt-6">
+            <label className="label-rk">Custom Water Methanol Injection</label>
+            <input
+              className="input-rk"
+              value={wmiOther}
+              onChange={(e) => setWmiOther(e.target.value)}
+              placeholder="Specify WMI setup"
               required
             />
           </div>
@@ -657,6 +733,10 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
               <p>
                 <span className="text-white/45">Fuel Grade:</span>{" "}
                 {finalFuelGrade || "-"}
+              </p>
+              <p>
+                <span className="text-white/45">Water Methanol Injection:</span>{" "}
+                {finalWmiOption || "Not selected"}
               </p>
             </div>
           ) : (

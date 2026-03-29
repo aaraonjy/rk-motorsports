@@ -1,0 +1,9 @@
+{
+  "options": [
+    "No WMI",
+    "50/50 (Water/Methanol)",
+    "70/30 (Water/Methanol)",
+    "100% Methanol",
+    "Custom (Specify)"
+  ]
+}

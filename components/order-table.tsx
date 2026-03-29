@@ -84,6 +84,9 @@ function VehicleDetails({
   const fuelGrade = order.requestDetails
     ? getRequestValue(order.requestDetails, "Fuel Grade")
     : "";
+  const waterMethanolInjection = order.requestDetails
+    ? getRequestValue(order.requestDetails, "Water Methanol Injection")
+    : "";
 
   return (
     <div className="space-y-1 text-sm leading-6">
@@ -121,6 +124,12 @@ function VehicleDetails({
         <span className="text-white/45">Fuel Grade:</span>{" "}
         <span className="text-white/90">{fuelGrade || "-"}</span>
       </div>
+      <div>
+        <span className="text-white/45">Water Methanol Injection:</span>{" "}
+        <span className="text-white/90">
+          {waterMethanolInjection || "Not selected"}
+        </span>
+      </div>
     </div>
   );
 }
@@ -138,8 +147,11 @@ function RequestDetailsModal({
 
   const baseTune = getRequestValue(details, "Base Tune") || "Not specified";
   const addOns = getRequestValue(details, "Add-ons") || "None";
-  const ecuReadTool = getRequestValue(details, "ECU Read Tool") || "Not specified";
+  const ecuReadTool =
+    getRequestValue(details, "ECU Read Tool") || "Not specified";
   const fuelGrade = getRequestValue(details, "Fuel Grade") || "Not specified";
+  const waterMethanolInjection =
+    getRequestValue(details, "Water Methanol Injection") || "Not selected";
   const remarks = getRequestValue(details, "Remarks") || "None";
 
   return (
@@ -199,6 +211,15 @@ function RequestDetailsModal({
                 {fuelGrade}
               </p>
             </div>
+          </div>
+
+          <div className="rounded-xl border border-white/10 bg-black/40 p-4">
+            <p className="text-xs uppercase tracking-[0.2em] text-white/45">
+              Water Methanol Injection
+            </p>
+            <p className="mt-2 text-sm leading-7 text-white/85">
+              {waterMethanolInjection}
+            </p>
           </div>
 
           <div className="rounded-xl border border-white/10 bg-black/40 p-4">

@@ -28,6 +28,9 @@ export async function POST(req: Request) {
     const ecuType = String(form.get("ecuType") || "").trim();
     const ecuReadTool = String(form.get("ecuReadTool") || "").trim();
     const fuelGrade = String(form.get("fuelGrade") || "").trim();
+    const waterMethanolInjection = String(
+      form.get("waterMethanolInjection") || ""
+    ).trim();
     const tunePackage = String(form.get("tunePackage") || "").trim();
     const remarks = String(form.get("remarks") || "").trim();
     const estimatedTotalRaw = Number(form.get("estimatedTotal") || 0);
@@ -70,6 +73,9 @@ export async function POST(req: Request) {
       }`,
       `ECU Read Tool: ${ecuReadTool}`,
       `Fuel Grade: ${fuelGrade}`,
+      `Water Methanol Injection: ${
+        waterMethanolInjection || "Not selected"
+      }`,
       `Remarks: ${remarks || "None"}`,
     ];
 
