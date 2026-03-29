@@ -687,7 +687,7 @@ export function OrderTable({
                       order.status === "CANCELLED" ? (
                         <span className="text-red-400">Order Cancelled</span>
                       ) : (
-                        <div className="flex min-w-[280px] flex-col gap-3">
+                        <div className="flex w-full min-w-[220px] max-w-[260px] flex-col gap-3">
                           <button
                             type="button"
                             onClick={() =>
@@ -696,7 +696,7 @@ export function OrderTable({
                                 orderId: order.id,
                               })
                             }
-                            className="rounded-xl border border-white/15 bg-black/30 px-3 py-2 transition hover:bg-white/10"
+                            className="w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center transition hover:bg-white/10"
                           >
                             Upload Tuned File
                           </button>
@@ -707,7 +707,7 @@ export function OrderTable({
                             <button
                               type="button"
                               onClick={() => setCancelOrderId(order.id)}
-                              className="rounded-xl border border-red-500/40 px-3 py-2 text-red-400 transition hover:bg-red-500/10"
+                              className="w-full rounded-xl border border-red-500/40 px-3 py-2 text-center text-red-400 transition hover:bg-red-500/10"
                             >
                               Admin Cancel Order
                             </button>
@@ -717,14 +717,14 @@ export function OrderTable({
                             <button
                               type="button"
                               onClick={() => setReleaseOrderId(order.id)}
-                              className="rounded-xl border border-emerald-500/40 px-3 py-2 text-emerald-400 transition hover:bg-emerald-500/10"
+                              className="w-full rounded-xl border border-emerald-500/40 px-3 py-2 text-center text-emerald-400 transition hover:bg-emerald-500/10"
                             >
                               Confirm Payment & Release
                             </button>
                           ) : null}
 
                           {order.status === "READY_FOR_DOWNLOAD" ? (
-                            <span className="inline-flex items-center justify-center rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-emerald-400">
+                            <span className="inline-flex w-full items-center justify-center rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-center text-emerald-400">
                               Download Released
                             </span>
                           ) : null}
