@@ -15,6 +15,11 @@ type OrderWithRelations = Order & {
   cancelReason?: string | null;
 };
 
+type UploadModalState = {
+  action: "admin-upload" | "customer-upload-payment" | "customer-replace-payment";
+  orderId: string;
+} | null;
+
 function getStatusBadge(status: string) {
   switch (status) {
     case "AWAITING_PAYMENT":
@@ -54,38 +59,6 @@ function getStatusLabel(status: string) {
       return "Paid";
     default:
       return status.replaceAll("_", " ");
-  }
-}
-
-function confirmCustomerCancel(event: FormEvent<HTMLFormElement>) {
-  const confirmed = window.confirm(
-    "Are you sure you want to cancel this order?"
-  );
-
-  if (!confirmed) {
-    event.preventDefault();
-  }
-}
-
-function confirmFileUpload(
-  event: FormEvent<HTMLFormElement>,
-  message: string
-) {
-  const form = event.currentTarget;
-  const fileInput = form.querySelector(
-    'input[type="file"]'
-  ) as HTMLInputElement | null;
-
-  if (fileInput && !fileInput.files?.length) {
-    event.preventDefault();
-    window.alert("Please choose a file first.");
-    return;
-  }
-
-  const confirmed = window.confirm(message);
-
-  if (!confirmed) {
-    event.preventDefault();
   }
 }
 
@@ -310,6 +283,110 @@ function ReleaseOrderModal({
   );
 }
 
+function UploadConfirmModal({
+  isOpen,
+  mode,
+  orderId,
+  onClose,
+}: {
+  isOpen: boolean;
+  mode: "admin-upload" | "customer-upload-payment" | "customer-replace-payment" | null;
+  orderId: string | null;
+  onClose: () => void;
+}) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  if (!isOpen || !mode || !orderId) return null;
+
+  const isAdminUpload = mode === "admin-upload";
+  const isReplace = mode === "customer-replace-payment";
+
+  const action =
+    mode === "admin-upload"
+      ? `/api/admin/orders/${orderId}/upload`
+      : `/api/orders/${orderId}/upload-payment`;
+
+  const title = isAdminUpload
+    ? "Upload Tuned File"
+    : isReplace
+      ? "Replace Payment Slip"
+      : "Upload Payment Slip";
+
+  const description = isAdminUpload
+    ? "Please confirm you want to upload this tuned file for the selected order."
+    : isReplace
+      ? "Please confirm you want to replace the current payment slip."
+      : "Please confirm you want to upload this payment slip.";
+
+  const buttonLabel = isAdminUpload
+    ? "Confirm Upload"
+    : isReplace
+      ? "Confirm Replace"
+      : "Confirm Upload";
+
+  return (
+    <div className="fixed inset-0 z-[112] flex items-center justify-center bg-black/70 px-4">
+      <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-zinc-950 p-6 shadow-2xl">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h3 className="text-lg font-semibold text-white">{title}</h3>
+            <p className="mt-1 text-sm text-white/50">{description}</p>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isSubmitting}
+            className="rounded-lg border border-white/15 px-3 py-1.5 text-sm text-white/70 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Close
+          </button>
+        </div>
+
+        <form
+          action={action}
+          method="post"
+          encType="multipart/form-data"
+          className="mt-6 space-y-4"
+          onSubmit={() => setIsSubmitting(true)}
+        >
+          <div>
+            <label className="mb-2 block text-sm text-white/70">
+              Choose File
+            </label>
+            <input
+              type="file"
+              name="file"
+              required
+              disabled={isSubmitting}
+              className="block w-full text-xs text-white/80 file:mr-3 file:rounded-lg file:border file:border-white/15 file:bg-black/40 file:px-3 file:py-2 file:text-white hover:file:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+            />
+          </div>
+
+          <div className="flex items-center justify-end gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isSubmitting}
+              className="rounded-xl border border-white/15 px-4 py-2.5 text-sm text-white/75 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Cancel
+            </button>
+
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="rounded-xl border border-white/15 px-4 py-2.5 text-sm text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isSubmitting ? "Submitting..." : buttonLabel}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export function OrderTable({
   orders,
   admin = false,
@@ -320,7 +397,10 @@ export function OrderTable({
   const [activeRequest, setActiveRequest] = useState<string | null>(null);
   const [cancelOrderId, setCancelOrderId] = useState<string | null>(null);
   const [releaseOrderId, setReleaseOrderId] = useState<string | null>(null);
+  const [uploadModal, setUploadModal] = useState<UploadModalState>(null);
   const [submittingAction, setSubmittingAction] = useState<string | null>(null);
+
+  const customerCancelKey = (id: string) => `customer-cancel-${id}`;
 
   const handleCustomerCancel = (
     event: FormEvent<HTMLFormElement>,
@@ -337,10 +417,6 @@ export function OrderTable({
 
     setSubmittingAction(actionKey);
   };
-
-  const customerUploadPaymentKey = (id: string) => `customer-upload-payment-${id}`;
-  const customerReplacePaymentKey = (id: string) => `customer-replace-payment-${id}`;
-  const customerCancelKey = (id: string) => `customer-cancel-${id}`;
 
   return (
     <>
@@ -373,10 +449,6 @@ export function OrderTable({
               const statusLabel = getStatusLabel(order.status);
               const statusBadgeClass = getStatusBadge(order.status);
 
-              const isCustomerUploadingPayment =
-                submittingAction === customerUploadPaymentKey(order.id);
-              const isCustomerReplacingPayment =
-                submittingAction === customerReplacePaymentKey(order.id);
               const isCustomerCancelling =
                 submittingAction === customerCancelKey(order.id);
 
@@ -518,31 +590,18 @@ export function OrderTable({
                         <span className="text-red-400">Order Cancelled</span>
                       ) : (
                         <div className="flex min-w-[280px] flex-col gap-3">
-                          <form
-                            action={`/api/admin/orders/${order.id}/upload`}
-                            method="post"
-                            encType="multipart/form-data"
-                            className="flex flex-col gap-2"
-                            onSubmit={(event) =>
-                              confirmFileUpload(
-                                event,
-                                "Are you sure you want to upload this tuned file?"
-                              )
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setUploadModal({
+                                action: "admin-upload",
+                                orderId: order.id,
+                              })
                             }
+                            className="rounded-xl border border-white/15 bg-black/30 px-3 py-2 hover:bg-white/10"
                           >
-                            <input
-                              type="file"
-                              name="file"
-                              required
-                              className="block w-full text-xs text-white/80 file:mr-3 file:rounded-lg file:border file:border-white/15 file:bg-black/40 file:px-3 file:py-2 file:text-white hover:file:bg-white/10"
-                            />
-                            <button
-                              type="submit"
-                              className="rounded-xl border border-white/15 bg-black/30 px-3 py-2 hover:bg-white/10"
-                            >
-                              Upload Tuned File
-                            </button>
-                          </form>
+                            Upload Tuned File
+                          </button>
 
                           {["FILE_RECEIVED", "IN_PROGRESS", "AWAITING_PAYMENT"].includes(
                             order.status
@@ -595,57 +654,32 @@ export function OrderTable({
                             <span className="text-emerald-300/90">
                               Payment Slip Uploaded
                             </span>
-                            <form
-                              action={`/api/orders/${order.id}/upload-payment`}
-                              method="post"
-                              encType="multipart/form-data"
-                              className="flex flex-col gap-2"
-                              onSubmit={(event) =>
-                                confirmFileUpload(
-                                  event,
-                                  "Are you sure you want to replace the payment slip?"
-                                )
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setUploadModal({
+                                  action: "customer-replace-payment",
+                                  orderId: order.id,
+                                })
                               }
+                              className="rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-white/80 hover:bg-white/10"
                             >
-                              <input
-                                type="file"
-                                name="file"
-                                className="block w-full text-xs text-white/80 file:mr-3 file:rounded-lg file:border file:border-white/15 file:bg-black/40 file:px-3 file:py-2 file:text-white hover:file:bg-white/10"
-                              />
-                              <button
-                                type="submit"
-                                className="rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-white/80 hover:bg-white/10"
-                              >
-                                Replace Payment Slip
-                              </button>
-                            </form>
+                              Replace Payment Slip
+                            </button>
                           </>
                         ) : (
-                          <form
-                            action={`/api/orders/${order.id}/upload-payment`}
-                            method="post"
-                            encType="multipart/form-data"
-                            className="flex flex-col gap-2"
-                            onSubmit={(event) =>
-                              confirmFileUpload(
-                                event,
-                                "Are you sure you want to upload this payment slip?"
-                              )
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setUploadModal({
+                                action: "customer-upload-payment",
+                                orderId: order.id,
+                              })
                             }
+                            className="rounded-xl border border-amber-500/40 px-3 py-2 text-amber-300 hover:bg-amber-500/10"
                           >
-                            <input
-                              type="file"
-                              name="file"
-                              required
-                              className="block w-full text-xs text-white/80 file:mr-3 file:rounded-lg file:border file:border-white/15 file:bg-black/40 file:px-3 file:py-2 file:text-white hover:file:bg-white/10"
-                            />
-                            <button
-                              type="submit"
-                              className="rounded-xl border border-amber-500/40 px-3 py-2 text-amber-300 hover:bg-amber-500/10"
-                            >
-                              Upload Payment Slip
-                            </button>
-                          </form>
+                            Upload Payment Slip
+                          </button>
                         )}
                       </div>
                     ) : order.status === "FILE_RECEIVED" ||
@@ -692,6 +726,13 @@ export function OrderTable({
         isOpen={releaseOrderId !== null}
         orderId={releaseOrderId}
         onClose={() => setReleaseOrderId(null)}
+      />
+
+      <UploadConfirmModal
+        isOpen={uploadModal !== null}
+        mode={uploadModal?.action || null}
+        orderId={uploadModal?.orderId || null}
+        onClose={() => setUploadModal(null)}
       />
     </>
   );
