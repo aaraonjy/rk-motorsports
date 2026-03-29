@@ -108,7 +108,10 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
   const fuelGrades = useMemo(() => (fuelGradesData as string[]) || [], []);
 
   const wmiOptions = useMemo(
-    () => (wmiOptionsData as WmiOptionsFile).options || [],
+    () =>
+      ((wmiOptionsData as WmiOptionsFile).options || []).filter(
+        (option) => option !== "No WMI"
+      ),
     []
   );
 
@@ -464,7 +467,9 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
             <label className="label-rk">Water Methanol Injection</label>
             <div className="relative">
               <select
-                className="input-rk appearance-none pr-12"
+                className={`input-rk appearance-none pr-12 ${
+                  !wmiOption ? "text-white/45" : "text-white"
+                }`}
                 value={wmiOption}
                 onChange={(e) => setWmiOption(e.target.value)}
               >
@@ -793,8 +798,7 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
         </div>
 
         <p className="mt-6 text-sm leading-6 text-white/55">
-          This is an estimated price only. Final quotation may vary based on ECU
-          type, vehicle setup, and requested tuning complexity.
+          This is an estimated price only.
         </p>
       </div>
     </form>
