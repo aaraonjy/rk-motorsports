@@ -20,33 +20,42 @@ export async function POST(req: Request) {
     }
 
     const productId = String(form.get("productId") || "");
-    const vehicleBrand = String(form.get("vehicleBrand") || "");
-    const vehicleModel = String(form.get("vehicleModel") || "");
-    const engineModel = String(form.get("engineModel") || "");
-    const engineCapacity = String(form.get("engineCapacity") || "");
-    const vehicleYear = String(form.get("vehicleYear") || "");
-    const ecuType = String(form.get("ecuType") || "");
-    const tunePackage = String(form.get("tunePackage") || "");
+    const vehicleBrand = String(form.get("vehicleBrand") || "").trim();
+    const vehicleModel = String(form.get("vehicleModel") || "").trim();
+    const engineModel = String(form.get("engineModel") || "").trim();
+    const engineCapacity = String(form.get("engineCapacity") || "").trim();
+    const vehicleYear = String(form.get("vehicleYear") || "").trim();
+    const ecuType = String(form.get("ecuType") || "").trim();
+    const tunePackage = String(form.get("tunePackage") || "").trim();
     const remarks = String(form.get("remarks") || "").trim();
     const estimatedTotalRaw = Number(form.get("estimatedTotal") || 0);
+
     const selectedAddOns = form
       .getAll("addOns")
-      .map((value) => String(value))
+      .map((value) => String(value).trim())
       .filter(Boolean);
+
     const file = form.get("file");
 
     const product = await db.product.findUnique({
       where: { id: productId },
     });
 
-    if (!product || !(file instanceof File) || !tunePackage) {
+    const missingVehicleData =
+      !vehicleBrand || !vehicleModel || !engineModel || !vehicleYear;
+
+    if (
+      !product ||
+      !(file instanceof File) ||
+      !tunePackage ||
+      missingVehicleData ||
+      !ecuType
+    ) {
       return NextResponse.redirect(new URL("/custom-tuning", req.url), 303);
     }
 
     const safeBasePrice = tunePrices[tunePackage] ?? product.basePrice;
-    const calculatedTotal =
-      safeBasePrice + selectedAddOns.length * 300;
-
+    const calculatedTotal = safeBasePrice + selectedAddOns.length * 300;
     const finalTotal =
       estimatedTotalRaw > 0 ? estimatedTotalRaw : calculatedTotal;
 

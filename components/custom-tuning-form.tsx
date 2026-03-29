@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import carLibrary from "@/lib/car-library.json";
 
 const baseTunes = [
   { id: "stage1", name: "Stage 1 ECU Tune", price: 1500 },
@@ -22,13 +23,94 @@ const addOns = [
 
 const ADD_ON_PRICE = 300;
 
+type EngineOption = {
+  id: string;
+  name: string;
+};
+
+type ModelOption = {
+  id: string;
+  name: string;
+  engines: EngineOption[];
+};
+
+type BrandOption = {
+  make: string;
+  models: ModelOption[];
+};
+
 type CustomTuningFormProps = {
   productId: string;
 };
 
+function extractYearRange(modelName: string) {
+  const match = modelName.match(/(19|20)\d{2}\s*-\s*((19|20)\d{2}|->)/);
+  return match ? match[0].replace(/\s+/g, " ").trim() : "";
+}
+
+function extractEngineCapacityCc(engineName: string) {
+  const match = engineName.match(/(\d+(?:\.\d+)?)\s*(TFSI|TFSI-e|TFSi|TSI|TDI|TGI|FSI|i|D|T|G-Tron)/i);
+
+  if (!match) return "";
+
+  const liters = Number(match[1]);
+  if (Number.isNaN(liters)) return "";
+
+  return String(Math.round(liters * 1000));
+}
+
 export function CustomTuningForm({ productId }: CustomTuningFormProps) {
   const [selectedTune, setSelectedTune] = useState<string>("");
   const [selectedAddOns, setSelectedAddOns] = useState<string[]>([]);
+
+  const [selectedBrand, setSelectedBrand] = useState("");
+  const [selectedModelId, setSelectedModelId] = useState("");
+  const [selectedEngineId, setSelectedEngineId] = useState("");
+
+  const brands = useMemo(
+    () =>
+      [...(carLibrary as BrandOption[])].sort((a, b) =>
+        a.make.localeCompare(b.make)
+      ),
+    []
+  );
+
+  const selectedBrandData = useMemo(
+    () => brands.find((brand) => brand.make === selectedBrand) || null,
+    [brands, selectedBrand]
+  );
+
+  const availableModels = useMemo(
+    () => selectedBrandData?.models || [],
+    [selectedBrandData]
+  );
+
+  const selectedModelData = useMemo(
+    () => availableModels.find((model) => model.id === selectedModelId) || null,
+    [availableModels, selectedModelId]
+  );
+
+  const availableEngines = useMemo(
+    () => selectedModelData?.engines || [],
+    [selectedModelData]
+  );
+
+  const selectedEngineData = useMemo(
+    () =>
+      availableEngines.find((engine) => engine.id === selectedEngineId) || null,
+    [availableEngines, selectedEngineId]
+  );
+
+  const derivedYearRange = useMemo(
+    () => (selectedModelData ? extractYearRange(selectedModelData.name) : ""),
+    [selectedModelData]
+  );
+
+  const derivedCapacity = useMemo(
+    () =>
+      selectedEngineData ? extractEngineCapacityCc(selectedEngineData.name) : "",
+    [selectedEngineData]
+  );
 
   const activeTune = useMemo(
     () => baseTunes.find((item) => item.id === selectedTune) || null,
@@ -37,6 +119,15 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
 
   const addOnTotal = selectedAddOns.length * ADD_ON_PRICE;
   const estimatedTotal = (activeTune?.price || 0) + addOnTotal;
+
+  useEffect(() => {
+    setSelectedModelId("");
+    setSelectedEngineId("");
+  }, [selectedBrand]);
+
+  useEffect(() => {
+    setSelectedEngineId("");
+  }, [selectedModelId]);
 
   function toggleAddOn(option: string) {
     setSelectedAddOns((prev) =>
@@ -56,36 +147,136 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
       <input type="hidden" name="productId" value={productId} />
       <input type="hidden" name="selectedTune" value={selectedTune} />
       <input type="hidden" name="estimatedTotal" value={estimatedTotal || ""} />
+      <input type="hidden" name="vehicleBrand" value={selectedBrand} />
+      <input
+        type="hidden"
+        name="vehicleModel"
+        value={selectedModelData?.name || ""}
+      />
+      <input
+        type="hidden"
+        name="engineModel"
+        value={selectedEngineData?.name || ""}
+      />
+      <input type="hidden" name="vehicleYear" value={derivedYearRange} />
+      <input type="hidden" name="engineCapacity" value={derivedCapacity} />
 
       <div className="rounded-[2rem] border border-white/10 bg-black/45 p-6 backdrop-blur-md md:p-8">
-        <div className="grid gap-6 md:grid-cols-2">
+        <div className="grid gap-6 md:grid-cols-3">
           <div>
             <label className="label-rk">Vehicle Brand</label>
-            <input
-              className="input-rk"
-              name="vehicleBrand"
-              placeholder="e.g. Volkswagen, Audi, BMW, Mazda"
-              required
-            />
+            <div className="relative">
+              <select
+                className="input-rk appearance-none pr-12"
+                value={selectedBrand}
+                onChange={(e) => setSelectedBrand(e.target.value)}
+                required
+              >
+                <option value="">Select brand</option>
+                {brands.map((brand) => (
+                  <option key={brand.make} value={brand.make}>
+                    {brand.make}
+                  </option>
+                ))}
+              </select>
+
+              <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/50">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  className="h-5 w-5"
+                  aria-hidden="true"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.51a.75.75 0 0 1-1.08 0l-4.25-4.51a.75.75 0 0 1 .02-1.06Z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </div>
+            </div>
           </div>
 
           <div>
-            <label className="label-rk">Vehicle Model</label>
-            <input
-              className="input-rk"
-              name="vehicleModel"
-              placeholder="e.g. Golf GTI MK7, A4 B9, 320i, Mazda 3 MPS"
-              required
-            />
+            <label className="label-rk">Model / Generation</label>
+            <div className="relative">
+              <select
+                className="input-rk appearance-none pr-12"
+                value={selectedModelId}
+                onChange={(e) => setSelectedModelId(e.target.value)}
+                disabled={!selectedBrand}
+                required
+              >
+                <option value="">Select model</option>
+                {availableModels.map((model) => (
+                  <option key={model.id} value={model.id}>
+                    {model.name}
+                  </option>
+                ))}
+              </select>
+
+              <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/50">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  className="h-5 w-5"
+                  aria-hidden="true"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.51a.75.75 0 0 1-1.08 0l-4.25-4.51a.75.75 0 0 1 .02-1.06Z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </div>
+            </div>
           </div>
 
           <div>
             <label className="label-rk">Engine / Variant</label>
+            <div className="relative">
+              <select
+                className="input-rk appearance-none pr-12"
+                value={selectedEngineId}
+                onChange={(e) => setSelectedEngineId(e.target.value)}
+                disabled={!selectedModelId}
+                required
+              >
+                <option value="">Select engine</option>
+                {availableEngines.map((engine) => (
+                  <option key={engine.id} value={engine.id}>
+                    {engine.name}
+                  </option>
+                ))}
+              </select>
+
+              <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/50">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  className="h-5 w-5"
+                  aria-hidden="true"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.51a.75.75 0 0 1-1.08 0l-4.25-4.51a.75.75 0 0 1 .02-1.06Z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="label-rk">Year / Range</label>
             <input
               className="input-rk"
-              name="engineModel"
-              placeholder="e.g. 2.0 TSI, 1.8T, EA888 Gen 3, B58"
-              required
+              value={derivedYearRange}
+              placeholder="Auto-filled from model"
+              readOnly
             />
           </div>
 
@@ -93,19 +284,9 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
             <label className="label-rk">Engine Capacity (cc)</label>
             <input
               className="input-rk"
-              name="engineCapacity"
-              placeholder="e.g. 1984"
-              inputMode="numeric"
-            />
-          </div>
-
-          <div>
-            <label className="label-rk">Year</label>
-            <input
-              className="input-rk"
-              name="vehicleYear"
-              placeholder="e.g. 2011, 2018, 2022"
-              required
+              value={derivedCapacity}
+              placeholder="Auto-filled from engine"
+              readOnly
             />
           </div>
 
@@ -118,6 +299,11 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
               required
             />
           </div>
+        </div>
+
+        <div className="mt-3 text-xs text-white/45">
+          Select brand, model, and engine from the list to avoid compatibility
+          mistakes and keep your order details consistent.
         </div>
 
         <div className="mt-12">
@@ -258,7 +444,12 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
         <div className="mt-8">
           <button
             className="btn-primary px-8 py-3 text-sm tracking-wide disabled:cursor-not-allowed disabled:opacity-50"
-            disabled={!selectedTune}
+            disabled={
+              !selectedBrand ||
+              !selectedModelId ||
+              !selectedEngineId ||
+              !selectedTune
+            }
           >
             Submit Tuning Request
           </button>
@@ -288,6 +479,30 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
             </>
           ) : (
             <p className="mt-2 text-white/50">No tuning package selected</p>
+          )}
+        </div>
+
+        <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+          <p className="text-sm text-white/60">Vehicle selection</p>
+
+          {selectedBrand && selectedModelData && selectedEngineData ? (
+            <div className="mt-3 space-y-2 text-sm text-white/75">
+              <p>
+                <span className="text-white/45">Brand:</span> {selectedBrand}
+              </p>
+              <p>
+                <span className="text-white/45">Model:</span>{" "}
+                {selectedModelData.name}
+              </p>
+              <p>
+                <span className="text-white/45">Engine:</span>{" "}
+                {selectedEngineData.name}
+              </p>
+            </div>
+          ) : (
+            <p className="mt-3 text-sm text-white/50">
+              No vehicle selected yet.
+            </p>
           )}
         </div>
 

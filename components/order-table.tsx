@@ -74,12 +74,16 @@ function VehicleDetails({
         <span className="text-white/90">{order.vehicleBrand || "-"}</span>
       </div>
       <div>
-        <span className="text-white/45">Model:</span>{" "}
+        <span className="text-white/45">Model / Generation:</span>{" "}
         <span className="text-white/90">{order.vehicleModel || "-"}</span>
       </div>
       <div>
-        <span className="text-white/45">Engine:</span>{" "}
+        <span className="text-white/45">Engine / Variant:</span>{" "}
         <span className="text-white/90">{order.engineModel || "-"}</span>
+      </div>
+      <div>
+        <span className="text-white/45">Year / Range:</span>{" "}
+        <span className="text-white/90">{order.vehicleYear || "-"}</span>
       </div>
       {order.engineCapacity ? (
         <div>
@@ -87,10 +91,6 @@ function VehicleDetails({
           <span className="text-white/90">{order.engineCapacity}cc</span>
         </div>
       ) : null}
-      <div>
-        <span className="text-white/45">Year:</span>{" "}
-        <span className="text-white/90">{order.vehicleYear || "-"}</span>
-      </div>
       <div>
         <span className="text-white/45">ECU/TCU:</span>{" "}
         <span className="text-white/90">{order.ecuType || "-"}</span>
