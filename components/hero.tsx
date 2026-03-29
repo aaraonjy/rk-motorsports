@@ -3,6 +3,14 @@ import Link from "next/link";
 export function Hero() {
   return (
     <section className="relative flex min-h-[78vh] items-center justify-center overflow-hidden pt-24 md:min-h-[86vh]">
+      {/* background image layer */}
+      <div
+        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: "url('/background1.jpeg')" }}
+      />
+
+      {/* overlays */}
+      <div className="absolute inset-0 bg-black/60" />
       <div className="absolute inset-0 bg-gradient-to-b from-black/35 via-black/45 to-black/90" />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.03),transparent_55%)]" />
       <div className="absolute bottom-0 left-0 right-0 h-40 bg-gradient-to-b from-transparent to-[#0a0a0a]" />

@@ -66,7 +66,7 @@ export default function HomePage() {
     const { hp, torque } = parsePower(engineEntry.name);
 
     setResult({
-      name: `${makeEntry.make} ${modelEntry.name} - ${engineEntry.name}`,
+      name: `${makeEntry.make} ${modelEntry.name} ${engineEntry.name}`,
       stockHp: hp,
       stockTorque: torque,
       stage1Hp: Math.round(hp * 1.1),
@@ -107,7 +107,7 @@ export default function HomePage() {
               <div className="mt-8 rounded-2xl border border-white/10 bg-[#151515] p-6 text-white md:p-8">
                 <div className="mb-6">
                   <p className="text-xs font-semibold uppercase tracking-[0.28em] text-white/40">
-                    Performance preview
+                    Performance Preview
                   </p>
                   <h3 className="mt-3 text-xl font-bold md:text-2xl">
                     {result.name}
@@ -117,30 +117,30 @@ export default function HomePage() {
                 <div className="grid gap-4 text-center md:grid-cols-3">
                   <div className="rounded-2xl border border-white/10 bg-black/35 p-5">
                     <p className="text-sm text-white/55">Stock</p>
-                    <p className="mt-3 text-xl font-semibold">
+                    <p className="mt-3 text-3xl font-semibold">
                       {result.stockHp} HP
                     </p>
-                    <p className="mt-1 text-sm text-white/65">
+                    <p className="mt-2 text-base text-white/70">
                       {result.stockTorque} Nm
                     </p>
                   </div>
 
-                  <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-5">
-                    <p className="text-sm text-red-200/75">Stage 1</p>
-                    <p className="mt-3 text-xl font-semibold text-red-300">
+                  <div className="rounded-2xl border border-red-500/25 bg-red-500/10 p-5">
+                    <p className="text-sm text-red-200/80">Stage 1</p>
+                    <p className="mt-3 text-3xl font-semibold text-red-300">
                       {result.stage1Hp} HP
                     </p>
-                    <p className="mt-1 text-sm text-red-200/80">
+                    <p className="mt-2 text-base text-red-200/85">
                       {result.stage1Torque} Nm
                     </p>
                   </div>
 
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-                    <p className="text-sm text-white/55">Stage 2</p>
-                    <p className="mt-3 text-xl font-semibold">
+                  <div className="rounded-2xl border border-amber-500/25 bg-amber-500/10 p-5">
+                    <p className="text-sm text-amber-200/80">Stage 2</p>
+                    <p className="mt-3 text-3xl font-semibold text-amber-300">
                       {result.stage2Hp} HP
                     </p>
-                    <p className="mt-1 text-sm text-white/65">
+                    <p className="mt-2 text-base text-amber-200/85">
                       {result.stage2Torque} Nm
                     </p>
                   </div>

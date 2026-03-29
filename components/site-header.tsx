@@ -4,7 +4,7 @@ import Image from "next/image";
 
 const nav = [
   ["Services", "/#services"],
-  ["Shop", "/shop"],
+  ["Find a File", "/shop"],
   ["Custom Tuning", "/custom-tuning"],
   ["Pricing", "/pricing"],
   ["Contact", "/contact"],
