@@ -9,7 +9,7 @@ export default async function CustomTuningPage() {
 
   return (
     <section className="section-pad">
-      <div className="container-rk max-w-3xl"> {/* 🔥 slightly narrower */}
+      <div className="container-rk max-w-3xl">
 
         {/* 🔥 HEADER */}
         <h1 className="text-4xl font-bold">Custom Tuning Request</h1>
@@ -17,22 +17,19 @@ export default async function CustomTuningPage() {
         <p className="mt-5 max-w-xl text-white/70 leading-relaxed">
           Fill in your vehicle details, tuning request, and upload your original ECU file.
           <br />
-          Our team will review your request and contact you to confirm compatibility, pricing, and turnaround time before proceeding.
+          Our team will review your request and contact you shortly after submission to confirm compatibility, pricing, and turnaround time.
         </p>
-
-        {/* 🔥 RESPONSE TIME */}
-	<p className="mt-5 max-w-xl text-white/70 leading-relaxed">
-  	  Fill in your vehicle details, tuning request, and upload your original ECU file.
-  	  <br />
-  	  Our team will review your request and contact you shortly after submission to confirm compatibility, pricing, and turnaround time.
-	</p>
 
         {!customProduct ? (
           <div className="card-rk mt-10 p-6 text-white/70">
-            <p className="font-medium text-white">Custom File Service product is not configured yet.</p>
+            <p className="font-medium text-white">
+              Custom File Service product is not configured yet.
+            </p>
             <p className="mt-3 text-white/65">
               Please run the database seed or create the product record with slug{" "}
-              <code className="rounded bg-black/40 px-2 py-1">custom-file-service</code>.
+              <code className="rounded bg-black/40 px-2 py-1">
+                custom-file-service
+              </code>.
             </p>
           </div>
 
