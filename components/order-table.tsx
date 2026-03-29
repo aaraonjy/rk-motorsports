@@ -6,6 +6,8 @@ type OrderWithRelations = Order & {
   user?: User;
   files: OrderFile[];
   items: (OrderItem & { product: Product })[];
+  engineModel?: string | null;
+  engineCapacity?: string | number | null;
 };
 
 function getStatusBadge(status: string) {
@@ -30,8 +32,24 @@ function getStatusBadge(status: string) {
 }
 
 function getStatusLabel(status: string) {
-  if (status === "AWAITING_PAYMENT") return "DONE (PENDING PAYMENT)";
-  return status.replaceAll("_", " ");
+  switch (status) {
+    case "FILE_RECEIVED":
+      return "Received";
+    case "IN_PROGRESS":
+      return "In Progress";
+    case "AWAITING_PAYMENT":
+      return "Pending Payment";
+    case "READY_FOR_DOWNLOAD":
+      return "Completed";
+    case "COMPLETED":
+      return "Completed";
+    case "CANCELLED":
+      return "Cancelled";
+    case "PAID":
+      return "Paid";
+    default:
+      return status.replaceAll("_", " ");
+  }
 }
 
 export function OrderTable({
@@ -71,6 +89,17 @@ export function OrderTable({
             const statusLabel = getStatusLabel(order.status);
             const statusBadgeClass = getStatusBadge(order.status);
 
+            const vehicleParts = [
+              order.vehicleBrand,
+              order.vehicleModel,
+              order.engineModel,
+              order.engineCapacity ? `${order.engineCapacity}cc` : null,
+              order.vehicleYear,
+              order.ecuType,
+            ]
+              .filter(Boolean)
+              .join(" / ");
+
             return (
               <tr key={order.id} className="border-t border-white/10 align-top">
                 <td className="px-4 py-4">
@@ -84,16 +113,7 @@ export function OrderTable({
                   <td className="px-4 py-4">{order.user?.email}</td>
                 ) : null}
 
-                <td className="px-4 py-4">
-                  {[
-                    order.vehicleBrand,
-                    order.vehicleModel,
-                    order.vehicleYear,
-                    order.ecuType,
-                  ]
-                    .filter(Boolean)
-                    .join(" / ") || "-"}
-                </td>
+                <td className="px-4 py-4">{vehicleParts || "-"}</td>
 
                 <td className="px-4 py-4">
                   <span
@@ -129,7 +149,11 @@ export function OrderTable({
                           Tuned File
                         </Link>
                       ) : (
-                        <span className="text-white/40">No tuned file</span>
+                        <span className="text-white/40">
+                          {order.status === "IN_PROGRESS" || order.status === "FILE_RECEIVED"
+                            ? "Tuning in progress"
+                            : "No tuned file"}
+                        </span>
                       )
                     ) : order.status === "READY_FOR_DOWNLOAD" && adminCompleted ? (
                       <Link
@@ -143,7 +167,11 @@ export function OrderTable({
                         Tuned file locked until payment is confirmed
                       </span>
                     ) : (
-                      <span className="text-white/40">No tuned file</span>
+                      <span className="text-white/40">
+                        {order.status === "IN_PROGRESS" || order.status === "FILE_RECEIVED"
+                          ? "Tuning in progress"
+                          : "No tuned file"}
+                      </span>
                     )}
 
                     {paymentProof ? (
@@ -214,7 +242,7 @@ export function OrderTable({
                   ) : order.status === "AWAITING_PAYMENT" && adminCompleted ? (
                     <div className="flex min-w-[230px] flex-col gap-2">
                       <span className="text-amber-300/90">
-                        Done (Pending Payment)
+                        Pending Payment
                       </span>
 
                       {paymentProof ? (
@@ -257,7 +285,7 @@ export function OrderTable({
                         </form>
                       )}
                     </div>
-                  ) : order.status === "FILE_RECEIVED" ? (
+                  ) : order.status === "FILE_RECEIVED" || order.status === "IN_PROGRESS" ? (
                     <form
                       action={`/api/orders/${order.id}/cancel`}
                       method="post"

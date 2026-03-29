@@ -158,7 +158,7 @@ export function VehicleSelector({
               type="button"
               onClick={handleSearch}
               disabled={!brand || !model || !engine}
-              className="rounded-full bg-[#ff3b57] px-8 py-4 text-sm font-semibold uppercase tracking-[0.18em] text-white transition hover:bg-[#ff2444] disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-full bg-red-600 px-8 py-4 text-sm font-semibold uppercase tracking-[0.18em] text-white transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Find Performance Estimate
             </button>

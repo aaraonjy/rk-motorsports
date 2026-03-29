@@ -10,8 +10,6 @@ export default async function CustomTuningPage() {
   return (
     <section className="section-pad">
       <div className="container-rk max-w-3xl">
-
-        {/* 🔥 HEADER */}
         <h1 className="text-4xl font-bold">Custom Tuning Request</h1>
 
         <p className="mt-5 max-w-xl text-white/70 leading-relaxed">
@@ -32,7 +30,6 @@ export default async function CustomTuningPage() {
               </code>.
             </p>
           </div>
-
         ) : !user ? (
           <div className="card-rk mt-10 p-6">
             <p className="text-white/75">
@@ -47,7 +44,6 @@ export default async function CustomTuningPage() {
               </Link>
             </div>
           </div>
-
         ) : (
           <form
             action="/api/orders"
@@ -57,7 +53,6 @@ export default async function CustomTuningPage() {
           >
             <input type="hidden" name="productId" value={customProduct.id} />
 
-            {/* 🔥 VEHICLE INFO */}
             <div>
               <label className="label-rk">Vehicle Brand</label>
               <input
@@ -75,6 +70,26 @@ export default async function CustomTuningPage() {
                 name="vehicleModel"
                 placeholder="e.g. Golf GTI MK7, A4 B9, 320i, Mazda 3 MPS"
                 required
+              />
+            </div>
+
+            <div>
+              <label className="label-rk">Engine / Variant</label>
+              <input
+                className="input-rk"
+                name="engineModel"
+                placeholder="e.g. 2.0 TSI, 1.8T, EA888 Gen 3, B58"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="label-rk">Engine Capacity (cc)</label>
+              <input
+                className="input-rk"
+                name="engineCapacity"
+                placeholder="e.g. 1984"
+                inputMode="numeric"
               />
             </div>
 
@@ -98,24 +113,23 @@ export default async function CustomTuningPage() {
               />
             </div>
 
-            {/* 🔥 REQUEST DETAILS */}
             <div className="md:col-span-2">
               <label className="label-rk">Request Details</label>
               <textarea
                 className="textarea-rk"
                 name="requestDetails"
-                placeholder="e.g. Stage 1, 95RON, pops and bangs off, hardcut limiter, launch control, gearbox tune"
+                placeholder="e.g. Stage 1 / Stage 2, fuel type (RON95/98), pops & bangs on/off, launch control, gearbox tuning, any special request"
               />
             </div>
 
-            {/* 🔥 FILE INFO */}
             <div className="md:col-span-2 text-sm text-white/60">
               <p>Please upload your original stock ECU file.</p>
-              <p>Supported formats: .bin, .ori, .hex, .frf, .sgo</p>
+              <p>Allowed formats: .bin, .ori, .hex, .frf, .sgo</p>
+              <p>Max recommended size: 10MB</p>
               <p>If you are unsure which file to upload, contact us before submitting.</p>
+              <p className="mt-1 text-white/50">Your file will be handled securely and kept confidential.</p>
             </div>
 
-            {/* 🔥 FILE INPUT */}
             <div className="md:col-span-2">
               <label className="label-rk">Original ECU File</label>
               <input
@@ -126,9 +140,8 @@ export default async function CustomTuningPage() {
               />
             </div>
 
-            {/* 🔥 TRUST BOX */}
             <div className="md:col-span-2 rounded-xl border border-white/10 bg-white/5 p-5 text-sm text-white/70">
-              <p className="font-semibold text-white mb-2">Important Notes</p>
+              <p className="mb-2 font-semibold text-white">Important Notes</p>
               <ul className="space-y-1">
                 <li>• Your uploaded ECU file will be handled confidentially</li>
                 <li>• We do not share customer files with third parties</li>
@@ -137,13 +150,11 @@ export default async function CustomTuningPage() {
               </ul>
             </div>
 
-            {/* 🔥 BUTTON */}
             <div className="md:col-span-2 pt-2">
               <button className="btn-primary px-8 py-3 text-sm tracking-wide">
                 Submit Tuning Request
               </button>
             </div>
-
           </form>
         )}
       </div>
