@@ -1,5 +1,6 @@
 "use client";
 
+import type { FormEvent } from "react";
 import Link from "next/link";
 import { Order, OrderFile, OrderItem, Product, User } from "@prisma/client";
 import { formatCurrency } from "@/lib/utils";
@@ -10,6 +11,8 @@ type OrderWithRelations = Order & {
   items: (OrderItem & { product: Product })[];
   engineModel?: string | null;
   engineCapacity?: string | number | null;
+  cancelledBy?: "CUSTOMER" | "ADMIN" | null;
+  cancelReason?: string | null;
 };
 
 function getStatusBadge(status: string) {
@@ -54,13 +57,40 @@ function getStatusLabel(status: string) {
   }
 }
 
-function confirmCancel(event: React.FormEvent<HTMLFormElement>) {
+function confirmCustomerCancel(event: FormEvent<HTMLFormElement>) {
   const confirmed = window.confirm(
     "Are you sure you want to cancel this order?"
   );
 
   if (!confirmed) {
     event.preventDefault();
+  }
+}
+
+function confirmAdminCancel(event: FormEvent<HTMLFormElement>) {
+  const confirmed = window.confirm(
+    "Are you sure you want to cancel this order?"
+  );
+
+  if (!confirmed) {
+    event.preventDefault();
+    return;
+  }
+
+  const form = event.currentTarget;
+  const reasonInput = form.querySelector(
+    'input[name="cancelReason"]'
+  ) as HTMLInputElement | null;
+
+  if (reasonInput) {
+    const reason = window.prompt(
+      "Reason to cancel this order? (optional)",
+      ""
+    );
+
+    if (reason !== null) {
+      reasonInput.value = reason.trim();
+    }
   }
 }
 
@@ -133,6 +163,14 @@ export function OrderTable({
                   >
                     {statusLabel}
                   </span>
+
+                  {admin && order.status === "CANCELLED" && order.cancelledBy ? (
+                    <div className="mt-2 text-xs text-white/45">
+                      Cancelled by{" "}
+                      {order.cancelledBy === "ADMIN" ? "admin" : "customer"}
+                      {order.cancelReason ? ` • ${order.cancelReason}` : ""}
+                    </div>
+                  ) : null}
                 </td>
 
                 <td className="px-4 py-4">
@@ -227,6 +265,24 @@ export function OrderTable({
                           </button>
                         </form>
 
+                        {["FILE_RECEIVED", "IN_PROGRESS", "AWAITING_PAYMENT"].includes(
+                          order.status
+                        ) ? (
+                          <form
+                            action={`/api/admin/orders/${order.id}/cancel`}
+                            method="post"
+                            onSubmit={confirmAdminCancel}
+                          >
+                            <input type="hidden" name="cancelReason" value="" />
+                            <button
+                              type="submit"
+                              className="rounded-xl border border-red-500/40 px-3 py-2 text-red-400 hover:bg-red-500/10"
+                            >
+                              Admin Cancel Order
+                            </button>
+                          </form>
+                        ) : null}
+
                         {order.status === "AWAITING_PAYMENT" && paymentProof ? (
                           <form
                             action={`/api/admin/orders/${order.id}/complete`}
@@ -316,7 +372,7 @@ export function OrderTable({
                     <form
                       action={`/api/orders/${order.id}/cancel`}
                       method="post"
-                      onSubmit={confirmCancel}
+                      onSubmit={confirmCustomerCancel}
                     >
                       <button
                         type="submit"

@@ -28,6 +28,11 @@ enum OrderStatus {
   CANCELLED
 }
 
+enum CancelledBy {
+  CUSTOMER
+  ADMIN
+}
+
 model User {
   id               String    @id @default(cuid())
   name             String
@@ -93,20 +98,25 @@ model Product {
 }
 
 model Order {
-  id             String      @id @default(cuid())
-  orderNumber    String      @unique
-  status         OrderStatus @default(AWAITING_PAYMENT)
+  id             String       @id @default(cuid())
+  orderNumber    String       @unique
+  status         OrderStatus  @default(AWAITING_PAYMENT)
   notes          String?
   requestDetails String?
   vehicleBrand   String?
   vehicleModel   String?
+  engineModel    String?
+  engineCapacity String?
   vehicleYear    String?
   ecuType        String?
-  totalAmount    Int         @default(0)
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  cancelledBy    CancelledBy?
+  cancelReason   String?
+  cancelledAt    DateTime?
+  totalAmount    Int          @default(0)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
   userId         String
-  user           User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   items          OrderItem[]
   files          OrderFile[]
 }

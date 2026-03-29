@@ -12,7 +12,17 @@ export async function POST(
     return NextResponse.redirect(new URL("/login", req.url), 303);
   }
 
+  if (user.role !== "ADMIN") {
+    return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+  }
+
   const { id } = await ctx.params;
+  const formData = await req.formData();
+  const cancelReasonRaw = formData.get("cancelReason");
+  const cancelReason =
+    typeof cancelReasonRaw === "string" && cancelReasonRaw.trim()
+      ? cancelReasonRaw.trim()
+      : null;
 
   const order = await db.order.findUnique({
     where: { id },
@@ -22,11 +32,9 @@ export async function POST(
     return NextResponse.json({ message: "Order not found" }, { status: 404 });
   }
 
-  if (user.role !== "ADMIN" && order.userId !== user.id) {
-    return NextResponse.json({ message: "Forbidden" }, { status: 403 });
-  }
-
-  if (!["FILE_RECEIVED", "IN_PROGRESS"].includes(order.status)) {
+  if (
+    !["FILE_RECEIVED", "IN_PROGRESS", "AWAITING_PAYMENT"].includes(order.status)
+  ) {
     return NextResponse.json(
       { message: "Order cannot be cancelled at this stage" },
       { status: 400 }
@@ -37,11 +45,11 @@ export async function POST(
     where: { id },
     data: {
       status: "CANCELLED",
-      cancelledBy: "CUSTOMER",
-      cancelReason: null,
+      cancelledBy: "ADMIN",
+      cancelReason,
       cancelledAt: new Date(),
     },
   });
 
-  return NextResponse.redirect(new URL("/dashboard", req.url), 303);
+  return NextResponse.redirect(new URL("/admin", req.url), 303);
 }
