@@ -57,16 +57,6 @@ function getStatusLabel(status: string) {
   }
 }
 
-function confirmCustomerCancel(event: FormEvent<HTMLFormElement>) {
-  const confirmed = window.confirm(
-    "Are you sure you want to cancel this order?"
-  );
-
-  if (!confirmed) {
-    event.preventDefault();
-  }
-}
-
 function VehicleDetails({
   order,
 }: {
@@ -153,6 +143,7 @@ function AdminCancelModal({
   onClose: () => void;
 }) {
   const [reason, setReason] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!isOpen || !orderId) return null;
 
@@ -170,7 +161,8 @@ function AdminCancelModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-white/15 px-3 py-1.5 text-sm text-white/70 transition hover:bg-white/10 hover:text-white"
+            disabled={isSubmitting}
+            className="rounded-lg border border-white/15 px-3 py-1.5 text-sm text-white/70 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
           >
             Close
           </button>
@@ -180,6 +172,7 @@ function AdminCancelModal({
           action={`/api/admin/orders/${orderId}/cancel`}
           method="post"
           className="mt-5 space-y-4"
+          onSubmit={() => setIsSubmitting(true)}
         >
           <div>
             <label className="mb-2 block text-sm text-white/70">
@@ -190,7 +183,8 @@ function AdminCancelModal({
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               placeholder="e.g. Unsupported ECU, unreadable file, wrong file uploaded"
-              className="min-h-[110px] w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/30 hover:border-white/20 focus:border-white/25"
+              disabled={isSubmitting}
+              className="min-h-[110px] w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/30 hover:border-white/20 focus:border-white/25 disabled:cursor-not-allowed disabled:opacity-50"
             />
           </div>
 
@@ -198,16 +192,84 @@ function AdminCancelModal({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-xl border border-white/15 px-4 py-2.5 text-sm text-white/75 transition hover:bg-white/10 hover:text-white"
+              disabled={isSubmitting}
+              className="rounded-xl border border-white/15 px-4 py-2.5 text-sm text-white/75 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
             >
               Keep Order
             </button>
 
             <button
               type="submit"
-              className="rounded-xl border border-red-500/40 px-4 py-2.5 text-sm text-red-300 transition hover:bg-red-500/10"
+              disabled={isSubmitting}
+              className="rounded-xl border border-red-500/40 px-4 py-2.5 text-sm text-red-300 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Confirm Cancel
+              {isSubmitting ? "Cancelling..." : "Confirm Cancel"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function ReleaseOrderModal({
+  isOpen,
+  orderId,
+  onClose,
+}: {
+  isOpen: boolean;
+  orderId: string | null;
+  onClose: () => void;
+}) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  if (!isOpen || !orderId) return null;
+
+  return (
+    <div className="fixed inset-0 z-[115] flex items-center justify-center bg-black/70 px-4">
+      <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-zinc-950 p-6 shadow-2xl">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h3 className="text-lg font-semibold text-white">
+              Confirm Payment & Release
+            </h3>
+            <p className="mt-1 text-sm text-white/50">
+              This will confirm payment and release the tuned file for customer download.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isSubmitting}
+            className="rounded-lg border border-white/15 px-3 py-1.5 text-sm text-white/70 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Close
+          </button>
+        </div>
+
+        <form
+          action={`/api/admin/orders/${orderId}/complete`}
+          method="post"
+          className="mt-6"
+          onSubmit={() => setIsSubmitting(true)}
+        >
+          <div className="flex items-center justify-end gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isSubmitting}
+              className="rounded-xl border border-white/15 px-4 py-2.5 text-sm text-white/75 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Cancel
+            </button>
+
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="rounded-xl border border-emerald-500/40 px-4 py-2.5 text-sm text-emerald-300 transition hover:bg-emerald-500/10 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isSubmitting ? "Releasing..." : "Confirm & Release"}
             </button>
           </div>
         </form>
@@ -225,6 +287,28 @@ export function OrderTable({
 }) {
   const [activeRequest, setActiveRequest] = useState<string | null>(null);
   const [cancelOrderId, setCancelOrderId] = useState<string | null>(null);
+  const [releaseOrderId, setReleaseOrderId] = useState<string | null>(null);
+  const [submittingAction, setSubmittingAction] = useState<string | null>(null);
+
+  const handleCustomerCancel = (
+    event: FormEvent<HTMLFormElement>,
+    actionKey: string
+  ) => {
+    const confirmed = window.confirm(
+      "Are you sure you want to cancel this order?"
+    );
+
+    if (!confirmed) {
+      event.preventDefault();
+      return;
+    }
+
+    setSubmittingAction(actionKey);
+  };
+
+  const handleSimpleSubmit = (actionKey: string) => {
+    setSubmittingAction(actionKey);
+  };
 
   return (
     <>
@@ -256,6 +340,21 @@ export function OrderTable({
 
               const statusLabel = getStatusLabel(order.status);
               const statusBadgeClass = getStatusBadge(order.status);
+
+              const adminUploadKey = `admin-upload-${order.id}`;
+              const adminReleaseKey = `admin-release-${order.id}`;
+              const customerUploadPaymentKey = `customer-upload-payment-${order.id}`;
+              const customerReplacePaymentKey = `customer-replace-payment-${order.id}`;
+              const customerCancelKey = `customer-cancel-${order.id}`;
+
+              const isAdminUploading = submittingAction === adminUploadKey;
+              const isAdminReleasing = submittingAction === adminReleaseKey;
+              const isCustomerUploadingPayment =
+                submittingAction === customerUploadPaymentKey;
+              const isCustomerReplacingPayment =
+                submittingAction === customerReplacePaymentKey;
+              const isCustomerCancelling =
+                submittingAction === customerCancelKey;
 
               return (
                 <tr
@@ -400,18 +499,21 @@ export function OrderTable({
                             method="post"
                             encType="multipart/form-data"
                             className="flex flex-col gap-2"
+                            onSubmit={() => handleSimpleSubmit(adminUploadKey)}
                           >
                             <input
                               type="file"
                               name="file"
                               required
-                              className="block w-full text-xs text-white/80 file:mr-3 file:rounded-lg file:border file:border-white/15 file:bg-black/40 file:px-3 file:py-2 file:text-white hover:file:bg-white/10"
+                              disabled={isAdminUploading}
+                              className="block w-full text-xs text-white/80 file:mr-3 file:rounded-lg file:border file:border-white/15 file:bg-black/40 file:px-3 file:py-2 file:text-white hover:file:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
                             />
                             <button
                               type="submit"
-                              className="rounded-xl border border-white/15 bg-black/30 px-3 py-2 hover:bg-white/10"
+                              disabled={isAdminUploading}
+                              className="rounded-xl border border-white/15 bg-black/30 px-3 py-2 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
                             >
-                              Upload Tuned File
+                              {isAdminUploading ? "Uploading..." : "Upload Tuned File"}
                             </button>
                           </form>
 
@@ -428,17 +530,13 @@ export function OrderTable({
                           ) : null}
 
                           {order.status === "AWAITING_PAYMENT" && paymentProof ? (
-                            <form
-                              action={`/api/admin/orders/${order.id}/complete`}
-                              method="post"
+                            <button
+                              type="button"
+                              onClick={() => setReleaseOrderId(order.id)}
+                              className="rounded-xl border border-emerald-500/40 px-3 py-2 text-emerald-400 hover:bg-emerald-500/10"
                             >
-                              <button
-                                type="submit"
-                                className="rounded-xl border border-emerald-500/40 px-3 py-2 text-emerald-400 hover:bg-emerald-500/10"
-                              >
-                                Confirm Payment & Release
-                              </button>
-                            </form>
+                              Confirm Payment & Release
+                            </button>
                           ) : order.status === "AWAITING_PAYMENT" ? (
                             <span className="text-amber-300/90">
                               Waiting for payment proof
@@ -475,17 +573,24 @@ export function OrderTable({
                               method="post"
                               encType="multipart/form-data"
                               className="flex flex-col gap-2"
+                              onSubmit={() =>
+                                handleSimpleSubmit(customerReplacePaymentKey)
+                              }
                             >
                               <input
                                 type="file"
                                 name="file"
-                                className="block w-full text-xs text-white/80 file:mr-3 file:rounded-lg file:border file:border-white/15 file:bg-black/40 file:px-3 file:py-2 file:text-white hover:file:bg-white/10"
+                                disabled={isCustomerReplacingPayment}
+                                className="block w-full text-xs text-white/80 file:mr-3 file:rounded-lg file:border file:border-white/15 file:bg-black/40 file:px-3 file:py-2 file:text-white hover:file:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
                               />
                               <button
                                 type="submit"
-                                className="rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-white/80 hover:bg-white/10"
+                                disabled={isCustomerReplacingPayment}
+                                className="rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-white/80 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
                               >
-                                Replace Payment Slip
+                                {isCustomerReplacingPayment
+                                  ? "Uploading..."
+                                  : "Replace Payment Slip"}
                               </button>
                             </form>
                           </>
@@ -495,18 +600,25 @@ export function OrderTable({
                             method="post"
                             encType="multipart/form-data"
                             className="flex flex-col gap-2"
+                            onSubmit={() =>
+                              handleSimpleSubmit(customerUploadPaymentKey)
+                            }
                           >
                             <input
                               type="file"
                               name="file"
                               required
-                              className="block w-full text-xs text-white/80 file:mr-3 file:rounded-lg file:border file:border-white/15 file:bg-black/40 file:px-3 file:py-2 file:text-white hover:file:bg-white/10"
+                              disabled={isCustomerUploadingPayment}
+                              className="block w-full text-xs text-white/80 file:mr-3 file:rounded-lg file:border file:border-white/15 file:bg-black/40 file:px-3 file:py-2 file:text-white hover:file:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
                             />
                             <button
                               type="submit"
-                              className="rounded-xl border border-amber-500/40 px-3 py-2 text-amber-300 hover:bg-amber-500/10"
+                              disabled={isCustomerUploadingPayment}
+                              className="rounded-xl border border-amber-500/40 px-3 py-2 text-amber-300 hover:bg-amber-500/10 disabled:cursor-not-allowed disabled:opacity-50"
                             >
-                              Upload Payment Slip
+                              {isCustomerUploadingPayment
+                                ? "Uploading..."
+                                : "Upload Payment Slip"}
                             </button>
                           </form>
                         )}
@@ -516,13 +628,16 @@ export function OrderTable({
                       <form
                         action={`/api/orders/${order.id}/cancel`}
                         method="post"
-                        onSubmit={confirmCustomerCancel}
+                        onSubmit={(event) =>
+                          handleCustomerCancel(event, customerCancelKey)
+                        }
                       >
                         <button
                           type="submit"
-                          className="rounded-xl border border-red-500/40 px-3 py-2 text-red-400 hover:bg-red-500/10"
+                          disabled={isCustomerCancelling}
+                          className="rounded-xl border border-red-500/40 px-3 py-2 text-red-400 hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                          Cancel Order
+                          {isCustomerCancelling ? "Cancelling..." : "Cancel Order"}
                         </button>
                       </form>
                     ) : (
@@ -546,6 +661,12 @@ export function OrderTable({
         isOpen={cancelOrderId !== null}
         orderId={cancelOrderId}
         onClose={() => setCancelOrderId(null)}
+      />
+
+      <ReleaseOrderModal
+        isOpen={releaseOrderId !== null}
+        orderId={releaseOrderId}
+        onClose={() => setReleaseOrderId(null)}
       />
     </>
   );
