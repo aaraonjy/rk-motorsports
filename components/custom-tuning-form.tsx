@@ -221,6 +221,8 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
     !selectedBrand ||
     !selectedModelId ||
     !selectedEngineId ||
+    !derivedYearRange ||
+    !derivedCapacity ||
     !selectedTune ||
     !ecuReadTool ||
     !fuelGrade ||
@@ -260,28 +262,6 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
       />
 
       <div className="rounded-[2rem] border border-white/10 bg-black/45 p-6 backdrop-blur-md md:p-8">
-        <div className="mb-10 rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/45">
-            Process flow
-          </p>
-          <div className="mt-4 grid gap-3 md:grid-cols-5">
-            {[
-              "Step 1: Select Vehicle Information",
-              "Step 2: Select Tuning Package",
-              "Step 3: Select Additional Add-On",
-              "Step 4: Upload ECU File",
-              "Step 5: Remarks",
-            ].map((step) => (
-              <div
-                key={step}
-                className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white/75"
-              >
-                {step}
-              </div>
-            ))}
-          </div>
-        </div>
-
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/45">
             Step 1
@@ -410,6 +390,7 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
               value={derivedYearRange}
               placeholder="Auto-filled from model"
               readOnly
+              required
             />
           </div>
 
@@ -420,6 +401,7 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
               value={derivedCapacity}
               placeholder="Auto-filled from engine"
               readOnly
+              required
             />
           </div>
 
@@ -739,9 +721,6 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
             Step 5
           </p>
           <h2 className="mt-3 text-2xl font-semibold text-white">Remarks</h2>
-          <p className="mt-3 text-white/65">
-            Add any extra request or setup detail not already covered above.
-          </p>
         </div>
 
         <div className="mt-6">
@@ -751,10 +730,6 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
             name="remarks"
             placeholder="e.g. tuned for RON97, upgraded intake, daily driving setup, aggressive burble, any special request not covered above"
           />
-          <p className="mt-2 text-xs text-white/45">
-            Use this only for extra details not already covered by the selections
-            above.
-          </p>
         </div>
 
         <div className="mt-6 rounded-xl border border-white/10 bg-white/5 p-5 text-sm text-white/70">
