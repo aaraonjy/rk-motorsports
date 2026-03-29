@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import carLibrary from "@/lib/car-library.json";
+import ecuReadToolsData from "@/lib/ecu-read-tools.json";
+import fuelGradesData from "@/lib/fuel-grades.json";
 
 const baseTunes = [
   { id: "stage1", name: "Stage 1 ECU Tune", price: 1500 },
@@ -39,6 +41,13 @@ type BrandOption = {
   models: ModelOption[];
 };
 
+type EcuReadToolsFile = {
+  name: string;
+  version: string;
+  description: string;
+  tools: string[];
+};
+
 type CustomTuningFormProps = {
   productId: string;
 };
@@ -49,7 +58,9 @@ function extractYearRange(modelName: string) {
 }
 
 function extractEngineCapacityCc(engineName: string) {
-  const match = engineName.match(/(\d+(?:\.\d+)?)\s*(TFSI|TFSI-e|TFSi|TSI|TDI|TGI|FSI|i|D|T|G-Tron)/i);
+  const match = engineName.match(
+    /(\d+(?:\.\d+)?)\s*(TFSI|TFSI-e|TFSi|TSI|TDI|TGI|FSI|i|D|T|G-Tron)/i
+  );
 
   if (!match) return "";
 
@@ -67,6 +78,11 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
   const [selectedModelId, setSelectedModelId] = useState("");
   const [selectedEngineId, setSelectedEngineId] = useState("");
 
+  const [ecuReadTool, setEcuReadTool] = useState("");
+  const [ecuReadToolOther, setEcuReadToolOther] = useState("");
+  const [fuelGrade, setFuelGrade] = useState("");
+  const [fuelGradeOther, setFuelGradeOther] = useState("");
+
   const brands = useMemo(
     () =>
       [...(carLibrary as BrandOption[])].sort((a, b) =>
@@ -74,6 +90,13 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
       ),
     []
   );
+
+  const ecuReadTools = useMemo(
+    () => (ecuReadToolsData as EcuReadToolsFile).tools || [],
+    []
+  );
+
+  const fuelGrades = useMemo(() => (fuelGradesData as string[]) || [], []);
 
   const selectedBrandData = useMemo(
     () => brands.find((brand) => brand.make === selectedBrand) || null,
@@ -112,6 +135,20 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
     [selectedEngineData]
   );
 
+  const finalEcuReadTool = useMemo(() => {
+    if (ecuReadTool === "Other (Specify)") {
+      return ecuReadToolOther.trim();
+    }
+    return ecuReadTool;
+  }, [ecuReadTool, ecuReadToolOther]);
+
+  const finalFuelGrade = useMemo(() => {
+    if (fuelGrade === "Other (Specify)") {
+      return fuelGradeOther.trim();
+    }
+    return fuelGrade;
+  }, [fuelGrade, fuelGradeOther]);
+
   const activeTune = useMemo(
     () => baseTunes.find((item) => item.id === selectedTune) || null,
     [selectedTune]
@@ -129,6 +166,18 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
     setSelectedEngineId("");
   }, [selectedModelId]);
 
+  useEffect(() => {
+    if (ecuReadTool !== "Other (Specify)") {
+      setEcuReadToolOther("");
+    }
+  }, [ecuReadTool]);
+
+  useEffect(() => {
+    if (fuelGrade !== "Other (Specify)") {
+      setFuelGradeOther("");
+    }
+  }, [fuelGrade]);
+
   function toggleAddOn(option: string) {
     setSelectedAddOns((prev) =>
       prev.includes(option)
@@ -136,6 +185,16 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
         : [...prev, option]
     );
   }
+
+  const disableSubmit =
+    !selectedBrand ||
+    !selectedModelId ||
+    !selectedEngineId ||
+    !selectedTune ||
+    !ecuReadTool ||
+    !fuelGrade ||
+    (ecuReadTool === "Other (Specify)" && !ecuReadToolOther.trim()) ||
+    (fuelGrade === "Other (Specify)" && !fuelGradeOther.trim());
 
   return (
     <form
@@ -160,6 +219,8 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
       />
       <input type="hidden" name="vehicleYear" value={derivedYearRange} />
       <input type="hidden" name="engineCapacity" value={derivedCapacity} />
+      <input type="hidden" name="ecuReadTool" value={finalEcuReadTool} />
+      <input type="hidden" name="fuelGrade" value={finalFuelGrade} />
 
       <div className="rounded-[2rem] border border-white/10 bg-black/45 p-6 backdrop-blur-md md:p-8">
         <div className="grid gap-6 md:grid-cols-3">
@@ -291,15 +352,111 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
           </div>
 
           <div>
-            <label className="label-rk">ECU / TCU</label>
+            <label className="label-rk">ECU Type</label>
             <input
               className="input-rk"
               name="ecuType"
-              placeholder="e.g. Bosch MED17, MG1, DQ250, DQ381"
+              placeholder="e.g. Bosch MED17, MG1, EDC17"
               required
             />
           </div>
+
+          <div>
+            <label className="label-rk">ECU Read Tool</label>
+            <div className="relative">
+              <select
+                className="input-rk appearance-none pr-12"
+                value={ecuReadTool}
+                onChange={(e) => setEcuReadTool(e.target.value)}
+                required
+              >
+                <option value="">Select read tool</option>
+                {ecuReadTools.map((tool) => (
+                  <option key={tool} value={tool}>
+                    {tool}
+                  </option>
+                ))}
+              </select>
+
+              <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/50">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  className="h-5 w-5"
+                  aria-hidden="true"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.51a.75.75 0 0 1-1.08 0l-4.25-4.51a.75.75 0 0 1 .02-1.06Z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="label-rk">Fuel Grade</label>
+            <div className="relative">
+              <select
+                className="input-rk appearance-none pr-12"
+                value={fuelGrade}
+                onChange={(e) => setFuelGrade(e.target.value)}
+                required
+              >
+                <option value="">Select fuel grade</option>
+                {fuelGrades.map((grade) => (
+                  <option key={grade} value={grade}>
+                    {grade}
+                  </option>
+                ))}
+              </select>
+
+              <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/50">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  className="h-5 w-5"
+                  aria-hidden="true"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.51a.75.75 0 0 1-1.08 0l-4.25-4.51a.75.75 0 0 1 .02-1.06Z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </div>
+            </div>
+          </div>
         </div>
+
+        {ecuReadTool === "Other (Specify)" ? (
+          <div className="mt-6">
+            <label className="label-rk">Other ECU Read Tool</label>
+            <input
+              className="input-rk"
+              value={ecuReadToolOther}
+              onChange={(e) => setEcuReadToolOther(e.target.value)}
+              placeholder="Specify ECU read tool"
+              required
+            />
+          </div>
+        ) : null}
+
+        {fuelGrade === "Other (Specify)" ? (
+          <div className="mt-6">
+            <label className="label-rk">Other Fuel Grade</label>
+            <input
+              className="input-rk"
+              value={fuelGradeOther}
+              onChange={(e) => setFuelGradeOther(e.target.value)}
+              placeholder="Specify fuel grade"
+              required
+            />
+          </div>
+        ) : null}
 
         <div className="mt-3 text-xs text-white/45">
           Select brand, model, and engine from the list to avoid compatibility
@@ -444,12 +601,7 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
         <div className="mt-8">
           <button
             className="btn-primary px-8 py-3 text-sm tracking-wide disabled:cursor-not-allowed disabled:opacity-50"
-            disabled={
-              !selectedBrand ||
-              !selectedModelId ||
-              !selectedEngineId ||
-              !selectedTune
-            }
+            disabled={disableSubmit}
           >
             Submit Tuning Request
           </button>
@@ -497,6 +649,14 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
               <p>
                 <span className="text-white/45">Engine:</span>{" "}
                 {selectedEngineData.name}
+              </p>
+              <p>
+                <span className="text-white/45">ECU Read Tool:</span>{" "}
+                {finalEcuReadTool || "-"}
+              </p>
+              <p>
+                <span className="text-white/45">Fuel Grade:</span>{" "}
+                {finalFuelGrade || "-"}
               </p>
             </div>
           ) : (

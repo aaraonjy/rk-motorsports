@@ -1,0 +1,32 @@
+{
+  "name": "ECU Read Tools List",
+  "version": "1.0",
+  "description": "List of supported ECU reading and flashing tools for RK Motorsports platform",
+  "tools": [
+    "Alientech KESS V2",
+    "Alientech KESS3",
+    "Alientech K-TAG",
+    "Magic Motorsport FLEX",
+    "Magic Motorsport MAGPro2",
+    "Dimsport New Genius",
+    "Dimsport New Trasdata",
+    "Autotuner",
+    "CMD Flash",
+    "bFlash",
+    "PCM Flash",
+    "MPPS",
+    "BitBox",
+    "Byteshooter",
+    "Scanmatik (J2534)",
+    "Tactrix Openport 2.0",
+    "HP Tuners MPVI",
+    "MMC Flasher",
+    "TGFlash",
+    "KT200",
+    "FoxFlash",
+    "FGTech (Galletto)",
+    "KESS V2 Clone",
+    "KTAG Clone",
+    "Other (Specify)"
+  ]
+}

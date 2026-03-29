@@ -62,11 +62,29 @@ function getStatusLabel(status: string) {
   }
 }
 
+function getRequestValue(details: string, key: string) {
+  return (
+    details
+      .split("\n")
+      .map((line) => line.trim())
+      .find((line) => line.startsWith(`${key}:`))
+      ?.replace(`${key}:`, "")
+      .trim() || ""
+  );
+}
+
 function VehicleDetails({
   order,
 }: {
   order: OrderWithRelations;
 }) {
+  const ecuReadTool = order.requestDetails
+    ? getRequestValue(order.requestDetails, "ECU Read Tool")
+    : "";
+  const fuelGrade = order.requestDetails
+    ? getRequestValue(order.requestDetails, "Fuel Grade")
+    : "";
+
   return (
     <div className="space-y-1 text-sm leading-6">
       <div>
@@ -92,8 +110,16 @@ function VehicleDetails({
         </div>
       ) : null}
       <div>
-        <span className="text-white/45">ECU/TCU:</span>{" "}
+        <span className="text-white/45">ECU Type:</span>{" "}
         <span className="text-white/90">{order.ecuType || "-"}</span>
+      </div>
+      <div>
+        <span className="text-white/45">ECU Read Tool:</span>{" "}
+        <span className="text-white/90">{ecuReadTool || "-"}</span>
+      </div>
+      <div>
+        <span className="text-white/45">Fuel Grade:</span>{" "}
+        <span className="text-white/90">{fuelGrade || "-"}</span>
       </div>
     </div>
   );
@@ -110,28 +136,11 @@ function RequestDetailsModal({
 }) {
   if (!isOpen) return null;
 
-  const lines = details
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean);
-
-  const baseTune =
-    lines
-      .find((line) => line.startsWith("Base Tune:"))
-      ?.replace("Base Tune:", "")
-      .trim() || "Not specified";
-
-  const addOns =
-    lines
-      .find((line) => line.startsWith("Add-ons:"))
-      ?.replace("Add-ons:", "")
-      .trim() || "None";
-
-  const remarks =
-    lines
-      .find((line) => line.startsWith("Remarks:"))
-      ?.replace("Remarks:", "")
-      .trim() || "None";
+  const baseTune = getRequestValue(details, "Base Tune") || "Not specified";
+  const addOns = getRequestValue(details, "Add-ons") || "None";
+  const ecuReadTool = getRequestValue(details, "ECU Read Tool") || "Not specified";
+  const fuelGrade = getRequestValue(details, "Fuel Grade") || "Not specified";
+  const remarks = getRequestValue(details, "Remarks") || "None";
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 px-4">
@@ -170,6 +179,26 @@ function RequestDetailsModal({
             <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-white/85">
               {addOns}
             </p>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="rounded-xl border border-white/10 bg-black/40 p-4">
+              <p className="text-xs uppercase tracking-[0.2em] text-white/45">
+                ECU Read Tool
+              </p>
+              <p className="mt-2 text-sm leading-7 text-white/85">
+                {ecuReadTool}
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-white/10 bg-black/40 p-4">
+              <p className="text-xs uppercase tracking-[0.2em] text-white/45">
+                Fuel Grade
+              </p>
+              <p className="mt-2 text-sm leading-7 text-white/85">
+                {fuelGrade}
+              </p>
+            </div>
           </div>
 
           <div className="rounded-xl border border-white/10 bg-black/40 p-4">

@@ -26,6 +26,8 @@ export async function POST(req: Request) {
     const engineCapacity = String(form.get("engineCapacity") || "").trim();
     const vehicleYear = String(form.get("vehicleYear") || "").trim();
     const ecuType = String(form.get("ecuType") || "").trim();
+    const ecuReadTool = String(form.get("ecuReadTool") || "").trim();
+    const fuelGrade = String(form.get("fuelGrade") || "").trim();
     const tunePackage = String(form.get("tunePackage") || "").trim();
     const remarks = String(form.get("remarks") || "").trim();
     const estimatedTotalRaw = Number(form.get("estimatedTotal") || 0);
@@ -49,7 +51,9 @@ export async function POST(req: Request) {
       !(file instanceof File) ||
       !tunePackage ||
       missingVehicleData ||
-      !ecuType
+      !ecuType ||
+      !ecuReadTool ||
+      !fuelGrade
     ) {
       return NextResponse.redirect(new URL("/custom-tuning", req.url), 303);
     }
@@ -64,6 +68,8 @@ export async function POST(req: Request) {
       `Add-ons: ${
         selectedAddOns.length > 0 ? selectedAddOns.join(", ") : "None"
       }`,
+      `ECU Read Tool: ${ecuReadTool}`,
+      `Fuel Grade: ${fuelGrade}`,
       `Remarks: ${remarks || "None"}`,
     ];
 
