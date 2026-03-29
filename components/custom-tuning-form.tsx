@@ -468,7 +468,7 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
                 value={wmiOption}
                 onChange={(e) => setWmiOption(e.target.value)}
               >
-                <option value="">Not selected</option>
+                <option value="">Optional</option>
                 {wmiOptions.map((option) => (
                   <option key={option} value={option}>
                     {option}
@@ -670,7 +670,6 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
             <li>• Your uploaded ECU file will be handled confidentially</li>
             <li>• We do not share customer files with third parties</li>
             <li>• All tuning requests are reviewed manually before work begins</li>
-            <li>• Final quotation may vary based on ECU type and complexity</li>
           </ul>
         </div>
 
