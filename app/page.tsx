@@ -70,19 +70,17 @@ export default function HomePage() {
       stockTorque: torque,
       stage1Hp: Math.round(hp * 1.1),
       stage1Torque: Math.round(torque * 1.1),
-      stage2Hp: Math.round(hp * 1.3),
+      stage2Hp: Math.round(torque * 1.3),
       stage2Torque: Math.round(torque * 1.3),
     };
   };
 
   return (
     <>
-      {/* ✅ HERO (NOW HANDLES SEARCH + RESULT) */}
       <section className="bg-black/55 backdrop-blur-sm">
         <Hero onSearch={handleSearch} />
       </section>
 
-      {/* ✅ SERVICES */}
       <section
         id="services"
         className="bg-zinc-900/90 py-20 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] md:py-24"
