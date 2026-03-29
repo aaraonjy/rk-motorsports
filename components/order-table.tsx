@@ -57,6 +57,41 @@ function getStatusLabel(status: string) {
   }
 }
 
+function handleFileFormSubmit(
+  event: FormEvent<HTMLFormElement>,
+  loadingText: string
+) {
+  const form = event.currentTarget;
+  const fileInput = form.querySelector('input[type="file"]') as HTMLInputElement | null;
+  const submitButton = form.querySelector('button[type="submit"]') as HTMLButtonElement | null;
+
+  if (fileInput && !fileInput.files?.length) {
+    event.preventDefault();
+    window.alert("Please choose a file first.");
+    return;
+  }
+
+  if (submitButton) {
+    submitButton.disabled = true;
+    submitButton.textContent = loadingText;
+    submitButton.classList.add("opacity-50", "cursor-not-allowed");
+  }
+
+  if (fileInput) {
+    fileInput.disabled = true;
+  }
+}
+
+function confirmCustomerCancel(event: FormEvent<HTMLFormElement>) {
+  const confirmed = window.confirm(
+    "Are you sure you want to cancel this order?"
+  );
+
+  if (!confirmed) {
+    event.preventDefault();
+  }
+}
+
 function VehicleDetails({
   order,
 }: {
@@ -183,8 +218,8 @@ function AdminCancelModal({
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               placeholder="e.g. Unsupported ECU, unreadable file, wrong file uploaded"
-              disabled={isSubmitting}
               className="min-h-[110px] w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/30 hover:border-white/20 focus:border-white/25 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={isSubmitting}
             />
           </div>
 
@@ -306,10 +341,6 @@ export function OrderTable({
     setSubmittingAction(actionKey);
   };
 
-  const handleSimpleSubmit = (actionKey: string) => {
-    setSubmittingAction(actionKey);
-  };
-
   return (
     <>
       <div className="overflow-x-auto rounded-3xl border border-white/20 bg-black/60 shadow-xl shadow-black/40 backdrop-blur-md">
@@ -341,14 +372,10 @@ export function OrderTable({
               const statusLabel = getStatusLabel(order.status);
               const statusBadgeClass = getStatusBadge(order.status);
 
-              const adminUploadKey = `admin-upload-${order.id}`;
-              const adminReleaseKey = `admin-release-${order.id}`;
               const customerUploadPaymentKey = `customer-upload-payment-${order.id}`;
               const customerReplacePaymentKey = `customer-replace-payment-${order.id}`;
               const customerCancelKey = `customer-cancel-${order.id}`;
 
-              const isAdminUploading = submittingAction === adminUploadKey;
-              const isAdminReleasing = submittingAction === adminReleaseKey;
               const isCustomerUploadingPayment =
                 submittingAction === customerUploadPaymentKey;
               const isCustomerReplacingPayment =
@@ -499,21 +526,21 @@ export function OrderTable({
                             method="post"
                             encType="multipart/form-data"
                             className="flex flex-col gap-2"
-                            onSubmit={() => handleSimpleSubmit(adminUploadKey)}
+                            onSubmit={(event) =>
+                              handleFileFormSubmit(event, "Uploading...")
+                            }
                           >
                             <input
                               type="file"
                               name="file"
                               required
-                              disabled={isAdminUploading}
-                              className="block w-full text-xs text-white/80 file:mr-3 file:rounded-lg file:border file:border-white/15 file:bg-black/40 file:px-3 file:py-2 file:text-white hover:file:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+                              className="block w-full text-xs text-white/80 file:mr-3 file:rounded-lg file:border file:border-white/15 file:bg-black/40 file:px-3 file:py-2 file:text-white hover:file:bg-white/10"
                             />
                             <button
                               type="submit"
-                              disabled={isAdminUploading}
-                              className="rounded-xl border border-white/15 bg-black/30 px-3 py-2 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+                              className="rounded-xl border border-white/15 bg-black/30 px-3 py-2 hover:bg-white/10"
                             >
-                              {isAdminUploading ? "Uploading..." : "Upload Tuned File"}
+                              Upload Tuned File
                             </button>
                           </form>
 
@@ -573,24 +600,20 @@ export function OrderTable({
                               method="post"
                               encType="multipart/form-data"
                               className="flex flex-col gap-2"
-                              onSubmit={() =>
-                                handleSimpleSubmit(customerReplacePaymentKey)
+                              onSubmit={(event) =>
+                                handleFileFormSubmit(event, "Uploading...")
                               }
                             >
                               <input
                                 type="file"
                                 name="file"
-                                disabled={isCustomerReplacingPayment}
-                                className="block w-full text-xs text-white/80 file:mr-3 file:rounded-lg file:border file:border-white/15 file:bg-black/40 file:px-3 file:py-2 file:text-white hover:file:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="block w-full text-xs text-white/80 file:mr-3 file:rounded-lg file:border file:border-white/15 file:bg-black/40 file:px-3 file:py-2 file:text-white hover:file:bg-white/10"
                               />
                               <button
                                 type="submit"
-                                disabled={isCustomerReplacingPayment}
-                                className="rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-white/80 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-white/80 hover:bg-white/10"
                               >
-                                {isCustomerReplacingPayment
-                                  ? "Uploading..."
-                                  : "Replace Payment Slip"}
+                                Replace Payment Slip
                               </button>
                             </form>
                           </>
@@ -600,25 +623,21 @@ export function OrderTable({
                             method="post"
                             encType="multipart/form-data"
                             className="flex flex-col gap-2"
-                            onSubmit={() =>
-                              handleSimpleSubmit(customerUploadPaymentKey)
+                            onSubmit={(event) =>
+                              handleFileFormSubmit(event, "Uploading...")
                             }
                           >
                             <input
                               type="file"
                               name="file"
                               required
-                              disabled={isCustomerUploadingPayment}
-                              className="block w-full text-xs text-white/80 file:mr-3 file:rounded-lg file:border file:border-white/15 file:bg-black/40 file:px-3 file:py-2 file:text-white hover:file:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+                              className="block w-full text-xs text-white/80 file:mr-3 file:rounded-lg file:border file:border-white/15 file:bg-black/40 file:px-3 file:py-2 file:text-white hover:file:bg-white/10"
                             />
                             <button
                               type="submit"
-                              disabled={isCustomerUploadingPayment}
-                              className="rounded-xl border border-amber-500/40 px-3 py-2 text-amber-300 hover:bg-amber-500/10 disabled:cursor-not-allowed disabled:opacity-50"
+                              className="rounded-xl border border-amber-500/40 px-3 py-2 text-amber-300 hover:bg-amber-500/10"
                             >
-                              {isCustomerUploadingPayment
-                                ? "Uploading..."
-                                : "Upload Payment Slip"}
+                              Upload Payment Slip
                             </button>
                           </form>
                         )}
