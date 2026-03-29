@@ -23,21 +23,21 @@ type UploadModalState = {
 function getStatusBadge(status: string) {
   switch (status) {
     case "AWAITING_PAYMENT":
-      return "border border-amber-500/30 bg-amber-500/15 text-amber-300";
+      return "inline-flex items-center justify-center rounded-full border border-amber-500/30 bg-amber-500/15 px-3 py-1 text-xs font-semibold text-amber-300";
     case "READY_FOR_DOWNLOAD":
-      return "border border-emerald-500/30 bg-emerald-500/15 text-emerald-300";
+      return "inline-flex items-center justify-center rounded-full border border-emerald-500/30 bg-emerald-500/15 px-3 py-1 text-xs font-semibold text-emerald-300";
     case "CANCELLED":
-      return "border border-red-500/30 bg-red-500/15 text-red-300";
+      return "inline-flex items-center justify-center rounded-full border border-red-500/30 bg-red-500/15 px-3 py-1 text-xs font-semibold text-red-300";
     case "FILE_RECEIVED":
-      return "border border-sky-500/30 bg-sky-500/15 text-sky-300";
+      return "inline-flex items-center justify-center rounded-full border border-sky-500/30 bg-sky-500/15 px-3 py-1 text-xs font-semibold text-sky-300";
     case "IN_PROGRESS":
-      return "border border-violet-500/30 bg-violet-500/15 text-violet-300";
+      return "inline-flex items-center justify-center rounded-full border border-violet-500/30 bg-violet-500/15 px-3 py-1 text-xs font-semibold text-violet-300";
     case "COMPLETED":
-      return "border border-green-500/30 bg-green-500/15 text-green-300";
+      return "inline-flex items-center justify-center rounded-full border border-green-500/30 bg-green-500/15 px-3 py-1 text-xs font-semibold text-green-300";
     case "PAID":
-      return "border border-cyan-500/30 bg-cyan-500/15 text-cyan-300";
+      return "inline-flex items-center justify-center rounded-full border border-cyan-500/30 bg-cyan-500/15 px-3 py-1 text-xs font-semibold text-cyan-300";
     default:
-      return "border border-white/15 bg-white/10 text-white/80";
+      return "inline-flex items-center justify-center rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold text-white/80";
   }
 }
 
@@ -368,9 +368,6 @@ function UploadConfirmModal({
           className="mt-6 space-y-4"
         >
           <div>
-            <label className="mb-2 block text-sm text-white/70">
-              Choose File
-            </label>
             <input
               type="file"
               name="file"
@@ -466,11 +463,7 @@ export function OrderTable({
                   </td>
 
                   <td className="px-4 py-4">
-                    <span
-                      className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${statusBadgeClass}`}
-                    >
-                      {statusLabel}
-                    </span>
+                    <span className={statusBadgeClass}>{statusLabel}</span>
 
                     {admin && order.status === "CANCELLED" && order.cancelledBy ? (
                       <div className="mt-2 text-xs text-white/45">
