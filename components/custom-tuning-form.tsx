@@ -78,6 +78,7 @@ function extractEngineCapacityCc(engineName: string) {
 export function CustomTuningForm({ productId }: CustomTuningFormProps) {
   const [selectedTune, setSelectedTune] = useState<string>("");
   const [selectedAddOns, setSelectedAddOns] = useState<string[]>([]);
+  const [isAddOnsOpen, setIsAddOnsOpen] = useState(false);
 
   const [selectedBrand, setSelectedBrand] = useState("");
   const [selectedModelId, setSelectedModelId] = useState("");
@@ -252,10 +253,49 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
       <input type="hidden" name="engineCapacity" value={derivedCapacity} />
       <input type="hidden" name="ecuReadTool" value={finalEcuReadTool} />
       <input type="hidden" name="fuelGrade" value={finalFuelGrade} />
-      <input type="hidden" name="waterMethanolInjection" value={finalWmiOption} />
+      <input
+        type="hidden"
+        name="waterMethanolInjection"
+        value={finalWmiOption}
+      />
 
       <div className="rounded-[2rem] border border-white/10 bg-black/45 p-6 backdrop-blur-md md:p-8">
-        <div className="grid gap-6 md:grid-cols-3">
+        <div className="mb-10 rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/45">
+            Process flow
+          </p>
+          <div className="mt-4 grid gap-3 md:grid-cols-5">
+            {[
+              "Step 1: Select Vehicle Information",
+              "Step 2: Select Tuning Package",
+              "Step 3: Select Additional Add-On",
+              "Step 4: Upload ECU File",
+              "Step 5: Remarks",
+            ].map((step) => (
+              <div
+                key={step}
+                className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white/75"
+              >
+                {step}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/45">
+            Step 1
+          </p>
+          <h2 className="mt-3 text-2xl font-semibold text-white">
+            Select vehicle information
+          </h2>
+          <p className="mt-3 text-white/65">
+            Choose the correct vehicle details to keep your tuning request
+            accurate and compatible.
+          </p>
+        </div>
+
+        <div className="mt-8 grid gap-6 md:grid-cols-3">
           <div>
             <label className="label-rk">Vehicle Brand</label>
             <div className="relative">
@@ -546,10 +586,10 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
 
         <div className="mt-12">
           <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/45">
-            Base tune
+            Step 2
           </p>
           <h2 className="mt-3 text-2xl font-semibold text-white">
-            Choose your tuning package
+            Select tuning package
           </h2>
           <p className="mt-3 text-white/65">
             Select one base package before choosing additional options.
@@ -588,66 +628,91 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
         </div>
 
         <div className="mt-12">
-          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/45">
-            Additional options
-          </p>
-          <h2 className="mt-3 text-2xl font-semibold text-white">
-            Select add-on services
-          </h2>
-          <p className="mt-3 text-white/65">
-            Each additional option costs RM {ADD_ON_PRICE}.
-          </p>
+          <div className="flex flex-col gap-4 rounded-2xl border border-white/10 bg-white/[0.03] p-5 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/45">
+                Step 3
+              </p>
+              <h2 className="mt-3 text-2xl font-semibold text-white">
+                Select additional add-on
+              </h2>
+              <p className="mt-3 text-white/65">
+                Optional. Expand this section only if you need extra add-on
+                services.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsAddOnsOpen((prev) => !prev)}
+              className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-medium text-white transition hover:border-white/20 hover:bg-white/[0.06]"
+            >
+              {isAddOnsOpen ? "Hide Add-On Services" : "Show Add-On Services"}
+            </button>
+          </div>
         </div>
 
-        <div className="mt-8 grid gap-3">
-          {addOns.map((option) => {
-            const checked = selectedAddOns.includes(option);
+        {isAddOnsOpen ? (
+          <>
+            <div className="mt-6">
+              <p className="text-white/65">
+                Each additional option costs RM {ADD_ON_PRICE}.
+              </p>
+            </div>
 
-            return (
-              <label
-                key={option}
-                className={`flex items-center justify-between rounded-2xl border px-5 py-4 transition ${
-                  checked
-                    ? "border-[#ff3b57] bg-[#ff3b57]/10"
-                    : "border-white/10 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.05]"
-                } ${!selectedTune ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}
-              >
-                <div className="flex items-center gap-4">
-                  <input
-                    type="checkbox"
-                    name="addOns"
-                    value={option}
-                    checked={checked}
-                    disabled={!selectedTune}
-                    onChange={() => toggleAddOn(option)}
-                    className="h-4 w-4 accent-[#ff3b57]"
-                  />
-                  <span className="text-white">{option}</span>
-                </div>
+            <div className="mt-6 grid gap-3">
+              {addOns.map((option) => {
+                const checked = selectedAddOns.includes(option);
 
-                <span className="text-sm font-medium text-white/70">
-                  RM {ADD_ON_PRICE}
-                </span>
-              </label>
-            );
-          })}
-        </div>
+                return (
+                  <label
+                    key={option}
+                    className={`flex items-center justify-between rounded-2xl border px-5 py-4 transition ${
+                      checked
+                        ? "border-[#ff3b57] bg-[#ff3b57]/10"
+                        : "border-white/10 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.05]"
+                    } ${
+                      !selectedTune
+                        ? "cursor-not-allowed opacity-50"
+                        : "cursor-pointer"
+                    }`}
+                  >
+                    <div className="flex items-center gap-4">
+                      <input
+                        type="checkbox"
+                        name="addOns"
+                        value={option}
+                        checked={checked}
+                        disabled={!selectedTune}
+                        onChange={() => toggleAddOn(option)}
+                        className="h-4 w-4 accent-[#ff3b57]"
+                      />
+                      <span className="text-white">{option}</span>
+                    </div>
+
+                    <span className="text-sm font-medium text-white/70">
+                      RM {ADD_ON_PRICE}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          </>
+        ) : null}
 
         <div className="mt-12">
-          <label className="label-rk">Special Requests (Optional)</label>
-          <textarea
-            className="textarea-rk"
-            name="remarks"
-            placeholder="e.g. tuned for RON97, upgraded intake, daily driving setup, aggressive burble, any special request not covered above"
-          />
-          <p className="mt-2 text-xs text-white/45">
-            Use this only for extra details not already covered by the selections
-            above.
+          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/45">
+            Step 4
+          </p>
+          <h2 className="mt-3 text-2xl font-semibold text-white">
+            Upload ECU file
+          </h2>
+          <p className="mt-3 text-white/65">
+            Please upload your original stock ECU file for review.
           </p>
         </div>
 
-        <div className="mt-10 text-sm text-white/60">
-          <p>Please upload your original stock ECU file.</p>
+        <div className="mt-6 text-sm text-white/60">
           <p>Allowed formats: .bin, .ori, .hex, .frf, .sgo</p>
           <p>Max recommended size: 10MB</p>
           <p>
@@ -667,6 +732,29 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
             type="file"
             required
           />
+        </div>
+
+        <div className="mt-12">
+          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/45">
+            Step 5
+          </p>
+          <h2 className="mt-3 text-2xl font-semibold text-white">Remarks</h2>
+          <p className="mt-3 text-white/65">
+            Add any extra request or setup detail not already covered above.
+          </p>
+        </div>
+
+        <div className="mt-6">
+          <label className="label-rk">Remarks (Optional)</label>
+          <textarea
+            className="textarea-rk"
+            name="remarks"
+            placeholder="e.g. tuned for RON97, upgraded intake, daily driving setup, aggressive burble, any special request not covered above"
+          />
+          <p className="mt-2 text-xs text-white/45">
+            Use this only for extra details not already covered by the selections
+            above.
+          </p>
         </div>
 
         <div className="mt-6 rounded-xl border border-white/10 bg-white/5 p-5 text-sm text-white/70">
@@ -798,7 +886,8 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
         </div>
 
         <p className="mt-6 text-sm leading-6 text-white/55">
-          This is an estimated price only.
+          Final price is subject to change after file review, ECU type
+          verification, and vehicle setup complexity.
         </p>
       </div>
     </form>
