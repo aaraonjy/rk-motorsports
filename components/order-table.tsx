@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { Order, OrderFile, OrderItem, Product, User } from "@prisma/client";
 import { formatCurrency } from "@/lib/utils";
@@ -155,22 +155,11 @@ function AdminCancelModal({
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 px-4">
       <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-zinc-950 p-6 shadow-2xl">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h3 className="text-lg font-semibold text-white">Cancel Order</h3>
-            <p className="mt-1 text-sm text-white/50">
-              This will mark the order as cancelled and stop further processing.
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={isSubmitting}
-            className="rounded-lg border border-white/15 px-3 py-1.5 text-sm text-white/70 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Close
-          </button>
+        <div>
+          <h3 className="text-lg font-semibold text-white">Cancel Order</h3>
+          <p className="mt-1 text-sm text-white/50">
+            This will mark the order as cancelled and stop further processing.
+          </p>
         </div>
 
         <form
@@ -193,6 +182,59 @@ function AdminCancelModal({
             />
           </div>
 
+          <div className="flex items-center justify-end gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isSubmitting}
+              className="rounded-xl border border-white/15 px-4 py-2.5 text-sm text-white/75 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Keep Order
+            </button>
+
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="rounded-xl border border-red-500/40 px-4 py-2.5 text-sm text-red-300 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isSubmitting ? "Cancelling..." : "Confirm Cancel"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function CustomerCancelModal({
+  isOpen,
+  orderId,
+  onClose,
+}: {
+  isOpen: boolean;
+  orderId: string | null;
+  onClose: () => void;
+}) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  if (!isOpen || !orderId) return null;
+
+  return (
+    <div className="fixed inset-0 z-[111] flex items-center justify-center bg-black/70 px-4">
+      <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-zinc-950 p-6 shadow-2xl">
+        <div>
+          <h3 className="text-lg font-semibold text-white">Cancel Order</h3>
+          <p className="mt-1 text-sm text-white/50">
+            Are you sure you want to cancel this order?
+          </p>
+        </div>
+
+        <form
+          action={`/api/orders/${orderId}/cancel`}
+          method="post"
+          className="mt-6"
+          onSubmit={() => setIsSubmitting(true)}
+        >
           <div className="flex items-center justify-end gap-3">
             <button
               type="button"
@@ -327,20 +369,9 @@ function UploadConfirmModal({
   return (
     <div className="fixed inset-0 z-[112] flex items-center justify-center bg-black/70 px-4">
       <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-zinc-950 p-6 shadow-2xl">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h3 className="text-lg font-semibold text-white">{title}</h3>
-            <p className="mt-1 text-sm text-white/50">{description}</p>
-          </div>
-
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={isSubmitting}
-            className="rounded-lg border border-white/15 px-3 py-1.5 text-sm text-white/70 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Close
-          </button>
+        <div>
+          <h3 className="text-lg font-semibold text-white">{title}</h3>
+          <p className="mt-1 text-sm text-white/50">{description}</p>
         </div>
 
         <form
@@ -396,27 +427,9 @@ export function OrderTable({
 }) {
   const [activeRequest, setActiveRequest] = useState<string | null>(null);
   const [cancelOrderId, setCancelOrderId] = useState<string | null>(null);
+  const [customerCancelOrderId, setCustomerCancelOrderId] = useState<string | null>(null);
   const [releaseOrderId, setReleaseOrderId] = useState<string | null>(null);
   const [uploadModal, setUploadModal] = useState<UploadModalState>(null);
-  const [submittingAction, setSubmittingAction] = useState<string | null>(null);
-
-  const customerCancelKey = (id: string) => `customer-cancel-${id}`;
-
-  const handleCustomerCancel = (
-    event: FormEvent<HTMLFormElement>,
-    actionKey: string
-  ) => {
-    const confirmed = window.confirm(
-      "Are you sure you want to cancel this order?"
-    );
-
-    if (!confirmed) {
-      event.preventDefault();
-      return;
-    }
-
-    setSubmittingAction(actionKey);
-  };
 
   return (
     <>
@@ -448,9 +461,6 @@ export function OrderTable({
 
               const statusLabel = getStatusLabel(order.status);
               const statusBadgeClass = getStatusBadge(order.status);
-
-              const isCustomerCancelling =
-                submittingAction === customerCancelKey(order.id);
 
               return (
                 <tr
@@ -684,21 +694,13 @@ export function OrderTable({
                       </div>
                     ) : order.status === "FILE_RECEIVED" ||
                       order.status === "IN_PROGRESS" ? (
-                      <form
-                        action={`/api/orders/${order.id}/cancel`}
-                        method="post"
-                        onSubmit={(event) =>
-                          handleCustomerCancel(event, customerCancelKey(order.id))
-                        }
+                      <button
+                        type="button"
+                        onClick={() => setCustomerCancelOrderId(order.id)}
+                        className="rounded-xl border border-red-500/40 px-3 py-2 text-red-400 hover:bg-red-500/10"
                       >
-                        <button
-                          type="submit"
-                          disabled={isCustomerCancelling}
-                          className="rounded-xl border border-red-500/40 px-3 py-2 text-red-400 hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          {isCustomerCancelling ? "Cancelling..." : "Cancel Order"}
-                        </button>
-                      </form>
+                        Cancel Order
+                      </button>
                     ) : (
                       <span className="text-white/40">Waiting for file</span>
                     )}
@@ -720,6 +722,12 @@ export function OrderTable({
         isOpen={cancelOrderId !== null}
         orderId={cancelOrderId}
         onClose={() => setCancelOrderId(null)}
+      />
+
+      <CustomerCancelModal
+        isOpen={customerCancelOrderId !== null}
+        orderId={customerCancelOrderId}
+        onClose={() => setCustomerCancelOrderId(null)}
       />
 
       <ReleaseOrderModal
