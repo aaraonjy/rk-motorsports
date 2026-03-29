@@ -23,21 +23,21 @@ type UploadModalState = {
 function getStatusBadge(status: string) {
   switch (status) {
     case "AWAITING_PAYMENT":
-      return "inline-flex items-center justify-center min-w-[120px] text-center rounded-full border border-amber-500/30 bg-amber-500/15 px-3 py-1 text-xs font-semibold text-amber-300";
+      return "inline-flex min-w-[122px] items-center justify-center rounded-full border border-amber-500/30 bg-amber-500/15 px-3 py-1 text-center text-xs font-semibold text-amber-300";
     case "READY_FOR_DOWNLOAD":
-      return "inline-flex items-center justify-center rounded-full border border-emerald-500/30 bg-emerald-500/15 px-3 py-1 text-xs font-semibold text-emerald-300";
+      return "inline-flex min-w-[122px] items-center justify-center rounded-full border border-emerald-500/30 bg-emerald-500/15 px-3 py-1 text-center text-xs font-semibold text-emerald-300";
     case "CANCELLED":
-      return "inline-flex items-center justify-center rounded-full border border-red-500/30 bg-red-500/15 px-3 py-1 text-xs font-semibold text-red-300";
+      return "inline-flex min-w-[122px] items-center justify-center rounded-full border border-red-500/30 bg-red-500/15 px-3 py-1 text-center text-xs font-semibold text-red-300";
     case "FILE_RECEIVED":
-      return "inline-flex items-center justify-center rounded-full border border-sky-500/30 bg-sky-500/15 px-3 py-1 text-xs font-semibold text-sky-300";
+      return "inline-flex min-w-[122px] items-center justify-center rounded-full border border-sky-500/30 bg-sky-500/15 px-3 py-1 text-center text-xs font-semibold text-sky-300";
     case "IN_PROGRESS":
-      return "inline-flex items-center justify-center rounded-full border border-violet-500/30 bg-violet-500/15 px-3 py-1 text-xs font-semibold text-violet-300";
+      return "inline-flex min-w-[122px] items-center justify-center rounded-full border border-violet-500/30 bg-violet-500/15 px-3 py-1 text-center text-xs font-semibold text-violet-300";
     case "COMPLETED":
-      return "inline-flex items-center justify-center rounded-full border border-green-500/30 bg-green-500/15 px-3 py-1 text-xs font-semibold text-green-300";
+      return "inline-flex min-w-[122px] items-center justify-center rounded-full border border-green-500/30 bg-green-500/15 px-3 py-1 text-center text-xs font-semibold text-green-300";
     case "PAID":
-      return "inline-flex items-center justify-center rounded-full border border-cyan-500/30 bg-cyan-500/15 px-3 py-1 text-xs font-semibold text-cyan-300";
+      return "inline-flex min-w-[122px] items-center justify-center rounded-full border border-cyan-500/30 bg-cyan-500/15 px-3 py-1 text-center text-xs font-semibold text-cyan-300";
     default:
-      return "inline-flex items-center justify-center rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold text-white/80";
+      return "inline-flex min-w-[122px] items-center justify-center rounded-full border border-white/15 bg-white/10 px-3 py-1 text-center text-xs font-semibold text-white/80";
   }
 }
 
@@ -130,7 +130,7 @@ function RequestDetailsModal({
           </button>
         </div>
 
-        <div className="mt-5 rounded-xl border border-white/10 bg-black/40 p-4 text-sm leading-7 text-white/85 whitespace-pre-wrap">
+        <div className="mt-5 whitespace-pre-wrap rounded-xl border border-white/10 bg-black/40 p-4 text-sm leading-7 text-white/85">
           {details.trim() || "No request details provided."}
         </div>
       </div>
@@ -280,7 +280,8 @@ function ReleaseOrderModal({
             Confirm Payment & Release
           </h3>
           <p className="mt-1 text-sm text-white/50">
-            This will confirm payment and release the tuned file for customer download.
+            This will confirm payment and release the tuned file for customer
+            download.
           </p>
         </div>
 
@@ -321,7 +322,11 @@ function UploadConfirmModal({
   onClose,
 }: {
   isOpen: boolean;
-  mode: "admin-upload" | "customer-upload-payment" | "customer-replace-payment" | null;
+  mode:
+    | "admin-upload"
+    | "customer-upload-payment"
+    | "customer-replace-payment"
+    | null;
   orderId: string | null;
   onClose: () => void;
 }) {
@@ -445,7 +450,7 @@ export function OrderTable({
               return (
                 <tr
                   key={order.id}
-                  className="border-t border-white/10 align-top"
+                  className="border-t border-white/10 align-top transition-colors hover:bg-white/[0.03]"
                 >
                   <td className="px-4 py-4">
                     <div className="font-semibold">{order.orderNumber}</div>
@@ -463,34 +468,42 @@ export function OrderTable({
                   </td>
 
                   <td className="px-4 py-4">
-                    <span className={statusBadgeClass}>{statusLabel}</span>
+                    <div className="flex min-w-[150px] flex-col items-start gap-3">
+                      <span className={statusBadgeClass}>{statusLabel}</span>
 
-                    {admin && order.status === "CANCELLED" && order.cancelledBy ? (
-                      <div className="mt-2 text-xs text-white/45">
-                        Cancelled by{" "}
-                        {order.cancelledBy === "ADMIN" ? "admin" : "customer"}
-                        {order.cancelReason ? ` • ${order.cancelReason}` : ""}
-                      </div>
-                    ) : !admin &&
-                      order.status === "CANCELLED" &&
-                      order.cancelledBy === "CUSTOMER" ? (
-                      <div className="mt-2 text-xs text-white/45">
-                        Cancelled by you
-                      </div>
-                    ) : !admin &&
-                      order.status === "CANCELLED" &&
-                      order.cancelledBy === "ADMIN" ? (
-                      <div className="mt-2 text-xs text-white/45">
-                        Cancelled by RK Motorsports
-                        <div className="mt-1 text-white/40">
-                          This request could not be processed after review. Please
-                          contact us for clarification.
+                      {admin &&
+                      order.status === "AWAITING_PAYMENT" &&
+                      !paymentProof ? (
+                        <div className="text-sm text-amber-300/90">
+                          Waiting for payment proof
                         </div>
-                      </div>
-                    ) : null}
+                      ) : null}
 
-                    {order.requestDetails ? (
-                      <div className="mt-3">
+                      {admin && order.status === "CANCELLED" && order.cancelledBy ? (
+                        <div className="text-xs text-white/45">
+                          Cancelled by{" "}
+                          {order.cancelledBy === "ADMIN" ? "admin" : "customer"}
+                          {order.cancelReason ? ` • ${order.cancelReason}` : ""}
+                        </div>
+                      ) : !admin &&
+                        order.status === "CANCELLED" &&
+                        order.cancelledBy === "CUSTOMER" ? (
+                        <div className="text-xs text-white/45">
+                          Cancelled by you
+                        </div>
+                      ) : !admin &&
+                        order.status === "CANCELLED" &&
+                        order.cancelledBy === "ADMIN" ? (
+                        <div className="text-xs text-white/45">
+                          Cancelled by RK Motorsports
+                          <div className="mt-1 text-white/40">
+                            This request could not be processed after review.
+                            Please contact us for clarification.
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {order.requestDetails ? (
                         <button
                           type="button"
                           onClick={() =>
@@ -500,8 +513,8 @@ export function OrderTable({
                         >
                           View Request
                         </button>
-                      </div>
-                    ) : null}
+                      ) : null}
+                    </div>
                   </td>
 
                   <td className="px-4 py-4">
@@ -509,7 +522,7 @@ export function OrderTable({
                   </td>
 
                   <td className="px-4 py-4">
-                    <div className="flex min-w-[270px] flex-col gap-2">
+                    <div className="flex min-w-[270px] flex-col gap-3">
                       {customerOriginal ? (
                         <Link
                           href={`/api/files/${customerOriginal.id}/download`}
@@ -584,7 +597,7 @@ export function OrderTable({
                                 orderId: order.id,
                               })
                             }
-                            className="rounded-xl border border-white/15 bg-black/30 px-3 py-2 hover:bg-white/10"
+                            className="rounded-xl border border-white/15 bg-black/30 px-3 py-2 transition hover:bg-white/10"
                           >
                             Upload Tuned File
                           </button>
@@ -595,7 +608,7 @@ export function OrderTable({
                             <button
                               type="button"
                               onClick={() => setCancelOrderId(order.id)}
-                              className="rounded-xl border border-red-500/40 px-3 py-2 text-red-400 hover:bg-red-500/10"
+                              className="rounded-xl border border-red-500/40 px-3 py-2 text-red-400 transition hover:bg-red-500/10"
                             >
                               Admin Cancel Order
                             </button>
@@ -605,16 +618,14 @@ export function OrderTable({
                             <button
                               type="button"
                               onClick={() => setReleaseOrderId(order.id)}
-                              className="rounded-xl border border-emerald-500/40 px-3 py-2 text-emerald-400 hover:bg-emerald-500/10"
+                              className="rounded-xl border border-emerald-500/40 px-3 py-2 text-emerald-400 transition hover:bg-emerald-500/10"
                             >
                               Confirm Payment & Release
                             </button>
-                          ) : order.status === "AWAITING_PAYMENT" ? (
-                            <span className="text-amber-300/90">
-                              Waiting for payment proof
-                            </span>
-                          ) : order.status === "READY_FOR_DOWNLOAD" ? (
-                            <span className="text-emerald-400">
+                          ) : null}
+
+                          {order.status === "READY_FOR_DOWNLOAD" ? (
+                            <span className="inline-flex items-center justify-center rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-emerald-400">
                               Download Released
                             </span>
                           ) : null}
