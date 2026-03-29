@@ -94,6 +94,47 @@ function confirmAdminCancel(event: FormEvent<HTMLFormElement>) {
   }
 }
 
+function showRequestDetails(requestDetails?: string | null) {
+  window.alert(requestDetails?.trim() || "No request details provided.");
+}
+
+function VehicleDetails({
+  order,
+}: {
+  order: OrderWithRelations;
+}) {
+  return (
+    <div className="space-y-1 text-sm leading-6">
+      <div>
+        <span className="text-white/45">Brand:</span>{" "}
+        <span className="text-white/90">{order.vehicleBrand || "-"}</span>
+      </div>
+      <div>
+        <span className="text-white/45">Model:</span>{" "}
+        <span className="text-white/90">{order.vehicleModel || "-"}</span>
+      </div>
+      <div>
+        <span className="text-white/45">Engine:</span>{" "}
+        <span className="text-white/90">{order.engineModel || "-"}</span>
+      </div>
+      {order.engineCapacity ? (
+        <div>
+          <span className="text-white/45">Capacity:</span>{" "}
+          <span className="text-white/90">{order.engineCapacity}cc</span>
+        </div>
+      ) : null}
+      <div>
+        <span className="text-white/45">Year:</span>{" "}
+        <span className="text-white/90">{order.vehicleYear || "-"}</span>
+      </div>
+      <div>
+        <span className="text-white/45">ECU/TCU:</span>{" "}
+        <span className="text-white/90">{order.ecuType || "-"}</span>
+      </div>
+    </div>
+  );
+}
+
 export function OrderTable({
   orders,
   admin = false,
@@ -131,17 +172,6 @@ export function OrderTable({
             const statusLabel = getStatusLabel(order.status);
             const statusBadgeClass = getStatusBadge(order.status);
 
-            const vehicleParts = [
-              order.vehicleBrand,
-              order.vehicleModel,
-              order.engineModel,
-              order.engineCapacity ? `${order.engineCapacity}cc` : null,
-              order.vehicleYear,
-              order.ecuType,
-            ]
-              .filter(Boolean)
-              .join(" / ");
-
             return (
               <tr key={order.id} className="border-t border-white/10 align-top">
                 <td className="px-4 py-4">
@@ -155,7 +185,9 @@ export function OrderTable({
                   <td className="px-4 py-4">{order.user?.email}</td>
                 ) : null}
 
-                <td className="px-4 py-4">{vehicleParts || "-"}</td>
+                <td className="px-4 py-4">
+                  <VehicleDetails order={order} />
+                </td>
 
                 <td className="px-4 py-4">
                   <span
@@ -185,6 +217,18 @@ export function OrderTable({
                         This request could not be processed after review. Please
                         contact us for clarification.
                       </div>
+                    </div>
+                  ) : null}
+
+                  {order.requestDetails ? (
+                    <div className="mt-3">
+                      <button
+                        type="button"
+                        onClick={() => showRequestDetails(order.requestDetails)}
+                        className="rounded-lg border border-white/15 bg-black/30 px-3 py-1.5 text-xs text-white/80 transition hover:bg-white/10"
+                      >
+                        View Request
+                      </button>
                     </div>
                   ) : null}
                 </td>
