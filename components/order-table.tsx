@@ -608,7 +608,7 @@ export function OrderTable({
                           onClick={() =>
                             setActiveRequest(order.requestDetails || "")
                           }
-                          className="rounded-lg border border-white/15 bg-black/30 px-3 py-1.5 text-xs text-white/80 transition hover:bg-white/10"
+                          className="inline-flex items-center justify-center rounded-full border border-white/12 bg-white/[0.03] px-3 py-1.5 text-xs font-medium text-white/72 transition hover:border-white/20 hover:bg-white/[0.07] hover:text-white"
                         >
                           View Request
                         </button>
