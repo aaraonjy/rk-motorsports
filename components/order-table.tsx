@@ -336,8 +336,6 @@ function UploadConfirmModal({
   orderId: string | null;
   onClose: () => void;
 }) {
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
   if (!isOpen || !mode || !orderId) return null;
 
   const isAdminUpload = mode === "admin-upload";
@@ -379,7 +377,6 @@ function UploadConfirmModal({
           method="post"
           encType="multipart/form-data"
           className="mt-6 space-y-4"
-          onSubmit={() => setIsSubmitting(true)}
         >
           <div>
             <label className="mb-2 block text-sm text-white/70">
@@ -389,8 +386,7 @@ function UploadConfirmModal({
               type="file"
               name="file"
               required
-              disabled={isSubmitting}
-              className="block w-full text-xs text-white/80 file:mr-3 file:rounded-lg file:border file:border-white/15 file:bg-black/40 file:px-3 file:py-2 file:text-white hover:file:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+              className="block w-full text-xs text-white/80 file:mr-3 file:rounded-lg file:border file:border-white/15 file:bg-black/40 file:px-3 file:py-2 file:text-white hover:file:bg-white/10"
             />
           </div>
 
@@ -398,18 +394,16 @@ function UploadConfirmModal({
             <button
               type="button"
               onClick={onClose}
-              disabled={isSubmitting}
-              className="rounded-xl border border-white/15 px-4 py-2.5 text-sm text-white/75 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-xl border border-white/15 px-4 py-2.5 text-sm text-white/75 transition hover:bg-white/10 hover:text-white"
             >
               Cancel
             </button>
 
             <button
               type="submit"
-              disabled={isSubmitting}
-              className="rounded-xl border border-white/15 px-4 py-2.5 text-sm text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-xl border border-white/15 px-4 py-2.5 text-sm text-white transition hover:bg-white/10"
             >
-              {isSubmitting ? "Submitting..." : buttonLabel}
+              {buttonLabel}
             </button>
           </div>
         </form>
