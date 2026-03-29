@@ -275,24 +275,13 @@ function ReleaseOrderModal({
   return (
     <div className="fixed inset-0 z-[115] flex items-center justify-center bg-black/70 px-4">
       <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-zinc-950 p-6 shadow-2xl">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h3 className="text-lg font-semibold text-white">
-              Confirm Payment & Release
-            </h3>
-            <p className="mt-1 text-sm text-white/50">
-              This will confirm payment and release the tuned file for customer download.
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={isSubmitting}
-            className="rounded-lg border border-white/15 px-3 py-1.5 text-sm text-white/70 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Close
-          </button>
+        <div>
+          <h3 className="text-lg font-semibold text-white">
+            Confirm Payment & Release
+          </h3>
+          <p className="mt-1 text-sm text-white/50">
+            This will confirm payment and release the tuned file for customer download.
+          </p>
         </div>
 
         <form
