@@ -170,6 +170,22 @@ export function OrderTable({
                       {order.cancelledBy === "ADMIN" ? "admin" : "customer"}
                       {order.cancelReason ? ` • ${order.cancelReason}` : ""}
                     </div>
+                  ) : !admin &&
+                    order.status === "CANCELLED" &&
+                    order.cancelledBy === "CUSTOMER" ? (
+                    <div className="mt-2 text-xs text-white/45">
+                      Cancelled by you
+                    </div>
+                  ) : !admin &&
+                    order.status === "CANCELLED" &&
+                    order.cancelledBy === "ADMIN" ? (
+                    <div className="mt-2 text-xs text-white/45">
+                      Cancelled by RK Motorsports
+                      <div className="mt-1 text-white/40">
+                        This request could not be processed after review. Please
+                        contact us for clarification.
+                      </div>
+                    </div>
                   ) : null}
                 </td>
 
