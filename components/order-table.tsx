@@ -57,13 +57,24 @@ function getStatusLabel(status: string) {
   }
 }
 
-function handleFileFormSubmit(
+function confirmCustomerCancel(event: FormEvent<HTMLFormElement>) {
+  const confirmed = window.confirm(
+    "Are you sure you want to cancel this order?"
+  );
+
+  if (!confirmed) {
+    event.preventDefault();
+  }
+}
+
+function confirmFileUpload(
   event: FormEvent<HTMLFormElement>,
-  loadingText: string
+  message: string
 ) {
   const form = event.currentTarget;
-  const fileInput = form.querySelector('input[type="file"]') as HTMLInputElement | null;
-  const submitButton = form.querySelector('button[type="submit"]') as HTMLButtonElement | null;
+  const fileInput = form.querySelector(
+    'input[type="file"]'
+  ) as HTMLInputElement | null;
 
   if (fileInput && !fileInput.files?.length) {
     event.preventDefault();
@@ -71,21 +82,7 @@ function handleFileFormSubmit(
     return;
   }
 
-  if (submitButton) {
-    submitButton.disabled = true;
-    submitButton.textContent = loadingText;
-    submitButton.classList.add("opacity-50", "cursor-not-allowed");
-  }
-
-  if (fileInput) {
-    fileInput.disabled = true;
-  }
-}
-
-function confirmCustomerCancel(event: FormEvent<HTMLFormElement>) {
-  const confirmed = window.confirm(
-    "Are you sure you want to cancel this order?"
-  );
+  const confirmed = window.confirm(message);
 
   if (!confirmed) {
     event.preventDefault();
@@ -341,6 +338,10 @@ export function OrderTable({
     setSubmittingAction(actionKey);
   };
 
+  const customerUploadPaymentKey = (id: string) => `customer-upload-payment-${id}`;
+  const customerReplacePaymentKey = (id: string) => `customer-replace-payment-${id}`;
+  const customerCancelKey = (id: string) => `customer-cancel-${id}`;
+
   return (
     <>
       <div className="overflow-x-auto rounded-3xl border border-white/20 bg-black/60 shadow-xl shadow-black/40 backdrop-blur-md">
@@ -372,16 +373,12 @@ export function OrderTable({
               const statusLabel = getStatusLabel(order.status);
               const statusBadgeClass = getStatusBadge(order.status);
 
-              const customerUploadPaymentKey = `customer-upload-payment-${order.id}`;
-              const customerReplacePaymentKey = `customer-replace-payment-${order.id}`;
-              const customerCancelKey = `customer-cancel-${order.id}`;
-
               const isCustomerUploadingPayment =
-                submittingAction === customerUploadPaymentKey;
+                submittingAction === customerUploadPaymentKey(order.id);
               const isCustomerReplacingPayment =
-                submittingAction === customerReplacePaymentKey;
+                submittingAction === customerReplacePaymentKey(order.id);
               const isCustomerCancelling =
-                submittingAction === customerCancelKey;
+                submittingAction === customerCancelKey(order.id);
 
               return (
                 <tr
@@ -527,7 +524,10 @@ export function OrderTable({
                             encType="multipart/form-data"
                             className="flex flex-col gap-2"
                             onSubmit={(event) =>
-                              handleFileFormSubmit(event, "Uploading...")
+                              confirmFileUpload(
+                                event,
+                                "Are you sure you want to upload this tuned file?"
+                              )
                             }
                           >
                             <input
@@ -601,7 +601,10 @@ export function OrderTable({
                               encType="multipart/form-data"
                               className="flex flex-col gap-2"
                               onSubmit={(event) =>
-                                handleFileFormSubmit(event, "Uploading...")
+                                confirmFileUpload(
+                                  event,
+                                  "Are you sure you want to replace the payment slip?"
+                                )
                               }
                             >
                               <input
@@ -624,7 +627,10 @@ export function OrderTable({
                             encType="multipart/form-data"
                             className="flex flex-col gap-2"
                             onSubmit={(event) =>
-                              handleFileFormSubmit(event, "Uploading...")
+                              confirmFileUpload(
+                                event,
+                                "Are you sure you want to upload this payment slip?"
+                              )
                             }
                           >
                             <input
@@ -648,7 +654,7 @@ export function OrderTable({
                         action={`/api/orders/${order.id}/cancel`}
                         method="post"
                         onSubmit={(event) =>
-                          handleCustomerCancel(event, customerCancelKey)
+                          handleCustomerCancel(event, customerCancelKey(order.id))
                         }
                       >
                         <button
