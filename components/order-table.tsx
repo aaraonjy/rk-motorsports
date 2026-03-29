@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import { Order, OrderFile, OrderItem, Product, User } from "@prisma/client";
 import { formatCurrency } from "@/lib/utils";
@@ -49,6 +51,16 @@ function getStatusLabel(status: string) {
       return "Paid";
     default:
       return status.replaceAll("_", " ");
+  }
+}
+
+function confirmCancel(event: React.FormEvent<HTMLFormElement>) {
+  const confirmed = window.confirm(
+    "Are you sure you want to cancel this order?"
+  );
+
+  if (!confirmed) {
+    event.preventDefault();
   }
 }
 
@@ -150,7 +162,8 @@ export function OrderTable({
                         </Link>
                       ) : (
                         <span className="text-white/40">
-                          {order.status === "IN_PROGRESS" || order.status === "FILE_RECEIVED"
+                          {order.status === "IN_PROGRESS" ||
+                          order.status === "FILE_RECEIVED"
                             ? "Tuning in progress"
                             : "No tuned file"}
                         </span>
@@ -168,7 +181,8 @@ export function OrderTable({
                       </span>
                     ) : (
                       <span className="text-white/40">
-                        {order.status === "IN_PROGRESS" || order.status === "FILE_RECEIVED"
+                        {order.status === "IN_PROGRESS" ||
+                        order.status === "FILE_RECEIVED"
                           ? "Tuning in progress"
                           : "No tuned file"}
                       </span>
@@ -205,7 +219,10 @@ export function OrderTable({
                             required
                             className="block w-full text-xs text-white/80 file:mr-3 file:rounded-lg file:border file:border-white/15 file:bg-black/40 file:px-3 file:py-2 file:text-white hover:file:bg-white/10"
                           />
-                          <button className="rounded-xl border border-white/15 bg-black/30 px-3 py-2 hover:bg-white/10">
+                          <button
+                            type="submit"
+                            className="rounded-xl border border-white/15 bg-black/30 px-3 py-2 hover:bg-white/10"
+                          >
                             Upload Tuned File
                           </button>
                         </form>
@@ -215,7 +232,10 @@ export function OrderTable({
                             action={`/api/admin/orders/${order.id}/complete`}
                             method="post"
                           >
-                            <button className="rounded-xl border border-emerald-500/40 px-3 py-2 text-emerald-400 hover:bg-emerald-500/10">
+                            <button
+                              type="submit"
+                              className="rounded-xl border border-emerald-500/40 px-3 py-2 text-emerald-400 hover:bg-emerald-500/10"
+                            >
                               Confirm Payment & Release
                             </button>
                           </form>
@@ -261,7 +281,10 @@ export function OrderTable({
                               name="file"
                               className="block w-full text-xs text-white/80 file:mr-3 file:rounded-lg file:border file:border-white/15 file:bg-black/40 file:px-3 file:py-2 file:text-white hover:file:bg-white/10"
                             />
-                            <button className="rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-white/80 hover:bg-white/10">
+                            <button
+                              type="submit"
+                              className="rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-white/80 hover:bg-white/10"
+                            >
                               Replace Payment Slip
                             </button>
                           </form>
@@ -279,18 +302,26 @@ export function OrderTable({
                             required
                             className="block w-full text-xs text-white/80 file:mr-3 file:rounded-lg file:border file:border-white/15 file:bg-black/40 file:px-3 file:py-2 file:text-white hover:file:bg-white/10"
                           />
-                          <button className="rounded-xl border border-amber-500/40 px-3 py-2 text-amber-300 hover:bg-amber-500/10">
+                          <button
+                            type="submit"
+                            className="rounded-xl border border-amber-500/40 px-3 py-2 text-amber-300 hover:bg-amber-500/10"
+                          >
                             Upload Payment Slip
                           </button>
                         </form>
                       )}
                     </div>
-                  ) : order.status === "FILE_RECEIVED" || order.status === "IN_PROGRESS" ? (
+                  ) : order.status === "FILE_RECEIVED" ||
+                    order.status === "IN_PROGRESS" ? (
                     <form
                       action={`/api/orders/${order.id}/cancel`}
                       method="post"
+                      onSubmit={confirmCancel}
                     >
-                      <button className="rounded-xl border border-red-500/40 px-3 py-2 text-red-400 hover:bg-red-500/10">
+                      <button
+                        type="submit"
+                        className="rounded-xl border border-red-500/40 px-3 py-2 text-red-400 hover:bg-red-500/10"
+                      >
                         Cancel Order
                       </button>
                     </form>
