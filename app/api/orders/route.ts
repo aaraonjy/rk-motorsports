@@ -6,47 +6,32 @@ import { saveFile } from "@/lib/storage";
 
 export async function POST(req: Request) {
   try {
-    console.log("POST /api/orders started");
-
     const form = await req.formData();
     const user = await getSessionUser();
 
-    console.log("session user:", user?.id ?? "none");
-
     if (!user) {
-      console.log("no user session, redirecting to /login");
       return NextResponse.redirect(new URL("/login", req.url), 303);
     }
 
     const productId = String(form.get("productId") || "");
     const vehicleBrand = String(form.get("vehicleBrand") || "");
     const vehicleModel = String(form.get("vehicleModel") || "");
+    const engineModel = String(form.get("engineModel") || "");
+    const engineCapacity = String(form.get("engineCapacity") || "");
     const vehicleYear = String(form.get("vehicleYear") || "");
     const ecuType = String(form.get("ecuType") || "");
     const requestDetails = String(form.get("requestDetails") || "");
     const file = form.get("file");
 
-    console.log("productId:", productId);
-    console.log("vehicle:", { vehicleBrand, vehicleModel, vehicleYear, ecuType });
-    console.log("file present:", file instanceof File);
-
-    if (file instanceof File) {
-      console.log("file name:", file.name);
-      console.log("file size:", file.size);
-      console.log("file type:", file.type);
-    }
-
-    const product = await db.product.findUnique({ where: { id: productId } });
-
-    console.log("product found:", !!product);
+    const product = await db.product.findUnique({
+      where: { id: productId },
+    });
 
     if (!product || !(file instanceof File)) {
-      console.log("invalid product or file, redirecting to /custom-tuning");
       return NextResponse.redirect(new URL("/custom-tuning", req.url), 303);
     }
 
     const saved = await saveFile(file, "customer-original");
-    console.log("file saved:", saved);
 
     await db.order.create({
       data: {
@@ -56,6 +41,8 @@ export async function POST(req: Request) {
         requestDetails,
         vehicleBrand,
         vehicleModel,
+        engineModel,
+        engineCapacity,
         vehicleYear,
         ecuType,
         status: "FILE_RECEIVED",
@@ -76,8 +63,6 @@ export async function POST(req: Request) {
         },
       },
     });
-
-    console.log("order created successfully");
 
     return NextResponse.redirect(new URL("/dashboard", req.url), 303);
   } catch (error) {

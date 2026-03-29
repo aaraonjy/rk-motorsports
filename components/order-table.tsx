@@ -1,6 +1,6 @@
 "use client";
 
-import type { FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { Order, OrderFile, OrderItem, Product, User } from "@prisma/client";
 import { formatCurrency } from "@/lib/utils";
@@ -94,10 +94,6 @@ function confirmAdminCancel(event: FormEvent<HTMLFormElement>) {
   }
 }
 
-function showRequestDetails(requestDetails?: string | null) {
-  window.alert(requestDetails?.trim() || "No request details provided.");
-}
-
 function VehicleDetails({
   order,
 }: {
@@ -135,6 +131,45 @@ function VehicleDetails({
   );
 }
 
+function RequestDetailsModal({
+  isOpen,
+  onClose,
+  details,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  details: string;
+}) {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 px-4">
+      <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-zinc-950 p-6 shadow-2xl">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h3 className="text-lg font-semibold text-white">Request Details</h3>
+            <p className="mt-1 text-sm text-white/50">
+              Submitted tuning requirements
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border border-white/15 px-3 py-1.5 text-sm text-white/70 transition hover:bg-white/10 hover:text-white"
+          >
+            Close
+          </button>
+        </div>
+
+        <div className="mt-5 rounded-xl border border-white/10 bg-black/40 p-4 text-sm leading-7 text-white/85 whitespace-pre-wrap">
+          {details.trim() || "No request details provided."}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function OrderTable({
   orders,
   admin = false,
@@ -142,122 +177,147 @@ export function OrderTable({
   orders: OrderWithRelations[];
   admin?: boolean;
 }) {
+  const [activeRequest, setActiveRequest] = useState<string | null>(null);
+
   return (
-    <div className="overflow-x-auto rounded-3xl border border-white/20 bg-black/60 shadow-xl shadow-black/40 backdrop-blur-md">
-      <table className="min-w-full text-left text-sm">
-        <thead className="bg-black/50 text-white/65">
-          <tr>
-            <th className="px-4 py-4">Order</th>
-            {admin ? <th className="px-4 py-4">Customer</th> : null}
-            <th className="px-4 py-4">Vehicle</th>
-            <th className="px-4 py-4">Status</th>
-            <th className="px-4 py-4">Amount</th>
-            <th className="px-4 py-4">Files</th>
-            <th className="px-4 py-4">Action</th>
-          </tr>
-        </thead>
+    <>
+      <div className="overflow-x-auto rounded-3xl border border-white/20 bg-black/60 shadow-xl shadow-black/40 backdrop-blur-md">
+        <table className="min-w-full text-left text-sm">
+          <thead className="bg-black/50 text-white/65">
+            <tr>
+              <th className="px-4 py-4">Order</th>
+              {admin ? <th className="px-4 py-4">Customer</th> : null}
+              <th className="px-4 py-4">Vehicle</th>
+              <th className="px-4 py-4">Status</th>
+              <th className="px-4 py-4">Amount</th>
+              <th className="px-4 py-4">Files</th>
+              <th className="px-4 py-4">Action</th>
+            </tr>
+          </thead>
 
-        <tbody>
-          {orders.map((order) => {
-            const customerOriginal = order.files.find(
-              (f) => f.kind === "CUSTOMER_ORIGINAL"
-            );
-            const adminCompleted = order.files.find(
-              (f) => f.kind === "ADMIN_COMPLETED"
-            );
-            const paymentProof = order.files.find(
-              (f) => f.kind === "CUSTOMER_PAYMENT_PROOF"
-            );
+          <tbody>
+            {orders.map((order) => {
+              const customerOriginal = order.files.find(
+                (f) => f.kind === "CUSTOMER_ORIGINAL"
+              );
+              const adminCompleted = order.files.find(
+                (f) => f.kind === "ADMIN_COMPLETED"
+              );
+              const paymentProof = order.files.find(
+                (f) => f.kind === "CUSTOMER_PAYMENT_PROOF"
+              );
 
-            const statusLabel = getStatusLabel(order.status);
-            const statusBadgeClass = getStatusBadge(order.status);
+              const statusLabel = getStatusLabel(order.status);
+              const statusBadgeClass = getStatusBadge(order.status);
 
-            return (
-              <tr key={order.id} className="border-t border-white/10 align-top">
-                <td className="px-4 py-4">
-                  <div className="font-semibold">{order.orderNumber}</div>
-                  <div className="text-white/45">
-                    {new Date(order.createdAt).toLocaleDateString()}
-                  </div>
-                </td>
-
-                {admin ? (
-                  <td className="px-4 py-4">{order.user?.email}</td>
-                ) : null}
-
-                <td className="px-4 py-4">
-                  <VehicleDetails order={order} />
-                </td>
-
-                <td className="px-4 py-4">
-                  <span
-                    className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${statusBadgeClass}`}
-                  >
-                    {statusLabel}
-                  </span>
-
-                  {admin && order.status === "CANCELLED" && order.cancelledBy ? (
-                    <div className="mt-2 text-xs text-white/45">
-                      Cancelled by{" "}
-                      {order.cancelledBy === "ADMIN" ? "admin" : "customer"}
-                      {order.cancelReason ? ` • ${order.cancelReason}` : ""}
+              return (
+                <tr
+                  key={order.id}
+                  className="border-t border-white/10 align-top"
+                >
+                  <td className="px-4 py-4">
+                    <div className="font-semibold">{order.orderNumber}</div>
+                    <div className="text-white/45">
+                      {new Date(order.createdAt).toLocaleDateString()}
                     </div>
-                  ) : !admin &&
-                    order.status === "CANCELLED" &&
-                    order.cancelledBy === "CUSTOMER" ? (
-                    <div className="mt-2 text-xs text-white/45">
-                      Cancelled by you
-                    </div>
-                  ) : !admin &&
-                    order.status === "CANCELLED" &&
-                    order.cancelledBy === "ADMIN" ? (
-                    <div className="mt-2 text-xs text-white/45">
-                      Cancelled by RK Motorsports
-                      <div className="mt-1 text-white/40">
-                        This request could not be processed after review. Please
-                        contact us for clarification.
+                  </td>
+
+                  {admin ? (
+                    <td className="px-4 py-4">{order.user?.email}</td>
+                  ) : null}
+
+                  <td className="px-4 py-4">
+                    <VehicleDetails order={order} />
+                  </td>
+
+                  <td className="px-4 py-4">
+                    <span
+                      className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${statusBadgeClass}`}
+                    >
+                      {statusLabel}
+                    </span>
+
+                    {admin && order.status === "CANCELLED" && order.cancelledBy ? (
+                      <div className="mt-2 text-xs text-white/45">
+                        Cancelled by{" "}
+                        {order.cancelledBy === "ADMIN" ? "admin" : "customer"}
+                        {order.cancelReason ? ` • ${order.cancelReason}` : ""}
                       </div>
-                    </div>
-                  ) : null}
+                    ) : !admin &&
+                      order.status === "CANCELLED" &&
+                      order.cancelledBy === "CUSTOMER" ? (
+                      <div className="mt-2 text-xs text-white/45">
+                        Cancelled by you
+                      </div>
+                    ) : !admin &&
+                      order.status === "CANCELLED" &&
+                      order.cancelledBy === "ADMIN" ? (
+                      <div className="mt-2 text-xs text-white/45">
+                        Cancelled by RK Motorsports
+                        <div className="mt-1 text-white/40">
+                          This request could not be processed after review. Please
+                          contact us for clarification.
+                        </div>
+                      </div>
+                    ) : null}
 
-                  {order.requestDetails ? (
-                    <div className="mt-3">
-                      <button
-                        type="button"
-                        onClick={() => showRequestDetails(order.requestDetails)}
-                        className="rounded-lg border border-white/15 bg-black/30 px-3 py-1.5 text-xs text-white/80 transition hover:bg-white/10"
-                      >
-                        View Request
-                      </button>
-                    </div>
-                  ) : null}
-                </td>
+                    {order.requestDetails ? (
+                      <div className="mt-3">
+                        <button
+                          type="button"
+                          onClick={() => setActiveRequest(order.requestDetails || "")}
+                          className="rounded-lg border border-white/15 bg-black/30 px-3 py-1.5 text-xs text-white/80 transition hover:bg-white/10"
+                        >
+                          View Request
+                        </button>
+                      </div>
+                    ) : null}
+                  </td>
 
-                <td className="px-4 py-4">
-                  {formatCurrency(order.totalAmount)}
-                </td>
+                  <td className="px-4 py-4">
+                    {formatCurrency(order.totalAmount)}
+                  </td>
 
-                <td className="px-4 py-4">
-                  <div className="flex min-w-[270px] flex-col gap-2">
-                    {customerOriginal ? (
-                      <Link
-                        href={`/api/files/${customerOriginal.id}/download`}
-                        className="inline-block rounded-xl border border-white/15 bg-black/30 px-3 py-2 hover:bg-white/10"
-                      >
-                        Original File
-                      </Link>
-                    ) : (
-                      <span className="text-white/40">No original file</span>
-                    )}
+                  <td className="px-4 py-4">
+                    <div className="flex min-w-[270px] flex-col gap-2">
+                      {customerOriginal ? (
+                        <Link
+                          href={`/api/files/${customerOriginal.id}/download`}
+                          className="inline-block rounded-xl border border-white/15 bg-black/30 px-3 py-2 hover:bg-white/10"
+                        >
+                          Original File
+                        </Link>
+                      ) : (
+                        <span className="text-white/40">No original file</span>
+                      )}
 
-                    {admin ? (
-                      adminCompleted ? (
+                      {admin ? (
+                        adminCompleted ? (
+                          <Link
+                            href={`/api/files/${adminCompleted.id}/download`}
+                            className="inline-block rounded-xl border border-white/15 bg-black/30 px-3 py-2 hover:bg-white/10"
+                          >
+                            Tuned File
+                          </Link>
+                        ) : (
+                          <span className="text-white/40">
+                            {order.status === "IN_PROGRESS" ||
+                            order.status === "FILE_RECEIVED"
+                              ? "Tuning in progress"
+                              : "No tuned file"}
+                          </span>
+                        )
+                      ) : order.status === "READY_FOR_DOWNLOAD" && adminCompleted ? (
                         <Link
                           href={`/api/files/${adminCompleted.id}/download`}
                           className="inline-block rounded-xl border border-white/15 bg-black/30 px-3 py-2 hover:bg-white/10"
                         >
                           Tuned File
                         </Link>
+                      ) : order.status === "AWAITING_PAYMENT" && adminCompleted ? (
+                        <span className="text-amber-300/90">
+                          Tuned file locked until payment is confirmed
+                        </span>
                       ) : (
                         <span className="text-white/40">
                           {order.status === "IN_PROGRESS" ||
@@ -265,127 +325,132 @@ export function OrderTable({
                             ? "Tuning in progress"
                             : "No tuned file"}
                         </span>
+                      )}
+
+                      {paymentProof ? (
+                        <Link
+                          href={`/api/files/${paymentProof.id}/download`}
+                          className="inline-block rounded-xl border border-white/15 bg-black/30 px-3 py-2 hover:bg-white/10"
+                        >
+                          Payment Slip
+                        </Link>
+                      ) : admin ? (
+                        <span className="text-white/40">No payment proof</span>
+                      ) : null}
+                    </div>
+                  </td>
+
+                  <td className="px-4 py-4">
+                    {admin ? (
+                      order.status === "CANCELLED" ? (
+                        <span className="text-red-400">Order Cancelled</span>
+                      ) : (
+                        <div className="flex min-w-[280px] flex-col gap-3">
+                          <form
+                            action={`/api/admin/orders/${order.id}/upload`}
+                            method="post"
+                            encType="multipart/form-data"
+                            className="flex flex-col gap-2"
+                          >
+                            <input
+                              type="file"
+                              name="file"
+                              required
+                              className="block w-full text-xs text-white/80 file:mr-3 file:rounded-lg file:border file:border-white/15 file:bg-black/40 file:px-3 file:py-2 file:text-white hover:file:bg-white/10"
+                            />
+                            <button
+                              type="submit"
+                              className="rounded-xl border border-white/15 bg-black/30 px-3 py-2 hover:bg-white/10"
+                            >
+                              Upload Tuned File
+                            </button>
+                          </form>
+
+                          {["FILE_RECEIVED", "IN_PROGRESS", "AWAITING_PAYMENT"].includes(
+                            order.status
+                          ) ? (
+                            <form
+                              action={`/api/admin/orders/${order.id}/cancel`}
+                              method="post"
+                              onSubmit={confirmAdminCancel}
+                            >
+                              <input
+                                type="hidden"
+                                name="cancelReason"
+                                value=""
+                              />
+                              <button
+                                type="submit"
+                                className="rounded-xl border border-red-500/40 px-3 py-2 text-red-400 hover:bg-red-500/10"
+                              >
+                                Admin Cancel Order
+                              </button>
+                            </form>
+                          ) : null}
+
+                          {order.status === "AWAITING_PAYMENT" && paymentProof ? (
+                            <form
+                              action={`/api/admin/orders/${order.id}/complete`}
+                              method="post"
+                            >
+                              <button
+                                type="submit"
+                                className="rounded-xl border border-emerald-500/40 px-3 py-2 text-emerald-400 hover:bg-emerald-500/10"
+                              >
+                                Confirm Payment & Release
+                              </button>
+                            </form>
+                          ) : order.status === "AWAITING_PAYMENT" ? (
+                            <span className="text-amber-300/90">
+                              Waiting for payment proof
+                            </span>
+                          ) : order.status === "READY_FOR_DOWNLOAD" ? (
+                            <span className="text-emerald-400">
+                              Download Released
+                            </span>
+                          ) : null}
+                        </div>
                       )
+                    ) : order.status === "CANCELLED" ? (
+                      <span className="text-red-400">Cancelled</span>
                     ) : order.status === "READY_FOR_DOWNLOAD" && adminCompleted ? (
                       <Link
                         href={`/api/files/${adminCompleted.id}/download`}
                         className="inline-block rounded-xl border border-white/15 bg-black/30 px-3 py-2 hover:bg-white/10"
                       >
-                        Tuned File
+                        Download
                       </Link>
                     ) : order.status === "AWAITING_PAYMENT" && adminCompleted ? (
-                      <span className="text-amber-300/90">
-                        Tuned file locked until payment is confirmed
-                      </span>
-                    ) : (
-                      <span className="text-white/40">
-                        {order.status === "IN_PROGRESS" ||
-                        order.status === "FILE_RECEIVED"
-                          ? "Tuning in progress"
-                          : "No tuned file"}
-                      </span>
-                    )}
+                      <div className="flex min-w-[230px] flex-col gap-2">
+                        <span className="text-amber-300/90">
+                          Pending Payment
+                        </span>
 
-                    {paymentProof ? (
-                      <Link
-                        href={`/api/files/${paymentProof.id}/download`}
-                        className="inline-block rounded-xl border border-white/15 bg-black/30 px-3 py-2 hover:bg-white/10"
-                      >
-                        Payment Slip
-                      </Link>
-                    ) : admin ? (
-                      <span className="text-white/40">No payment proof</span>
-                    ) : null}
-                  </div>
-                </td>
-
-                <td className="px-4 py-4">
-                  {admin ? (
-                    order.status === "CANCELLED" ? (
-                      <span className="text-red-400">Order Cancelled</span>
-                    ) : (
-                      <div className="flex min-w-[280px] flex-col gap-3">
-                        <form
-                          action={`/api/admin/orders/${order.id}/upload`}
-                          method="post"
-                          encType="multipart/form-data"
-                          className="flex flex-col gap-2"
-                        >
-                          <input
-                            type="file"
-                            name="file"
-                            required
-                            className="block w-full text-xs text-white/80 file:mr-3 file:rounded-lg file:border file:border-white/15 file:bg-black/40 file:px-3 file:py-2 file:text-white hover:file:bg-white/10"
-                          />
-                          <button
-                            type="submit"
-                            className="rounded-xl border border-white/15 bg-black/30 px-3 py-2 hover:bg-white/10"
-                          >
-                            Upload Tuned File
-                          </button>
-                        </form>
-
-                        {["FILE_RECEIVED", "IN_PROGRESS", "AWAITING_PAYMENT"].includes(
-                          order.status
-                        ) ? (
-                          <form
-                            action={`/api/admin/orders/${order.id}/cancel`}
-                            method="post"
-                            onSubmit={confirmAdminCancel}
-                          >
-                            <input type="hidden" name="cancelReason" value="" />
-                            <button
-                              type="submit"
-                              className="rounded-xl border border-red-500/40 px-3 py-2 text-red-400 hover:bg-red-500/10"
+                        {paymentProof ? (
+                          <>
+                            <span className="text-emerald-300/90">
+                              Payment Slip Uploaded
+                            </span>
+                            <form
+                              action={`/api/orders/${order.id}/upload-payment`}
+                              method="post"
+                              encType="multipart/form-data"
+                              className="flex flex-col gap-2"
                             >
-                              Admin Cancel Order
-                            </button>
-                          </form>
-                        ) : null}
-
-                        {order.status === "AWAITING_PAYMENT" && paymentProof ? (
-                          <form
-                            action={`/api/admin/orders/${order.id}/complete`}
-                            method="post"
-                          >
-                            <button
-                              type="submit"
-                              className="rounded-xl border border-emerald-500/40 px-3 py-2 text-emerald-400 hover:bg-emerald-500/10"
-                            >
-                              Confirm Payment & Release
-                            </button>
-                          </form>
-                        ) : order.status === "AWAITING_PAYMENT" ? (
-                          <span className="text-amber-300/90">
-                            Waiting for payment proof
-                          </span>
-                        ) : order.status === "READY_FOR_DOWNLOAD" ? (
-                          <span className="text-emerald-400">
-                            Download Released
-                          </span>
-                        ) : null}
-                      </div>
-                    )
-                  ) : order.status === "CANCELLED" ? (
-                    <span className="text-red-400">Cancelled</span>
-                  ) : order.status === "READY_FOR_DOWNLOAD" && adminCompleted ? (
-                    <Link
-                      href={`/api/files/${adminCompleted.id}/download`}
-                      className="inline-block rounded-xl border border-white/15 bg-black/30 px-3 py-2 hover:bg-white/10"
-                    >
-                      Download
-                    </Link>
-                  ) : order.status === "AWAITING_PAYMENT" && adminCompleted ? (
-                    <div className="flex min-w-[230px] flex-col gap-2">
-                      <span className="text-amber-300/90">
-                        Pending Payment
-                      </span>
-
-                      {paymentProof ? (
-                        <>
-                          <span className="text-emerald-300/90">
-                            Payment Slip Uploaded
-                          </span>
+                              <input
+                                type="file"
+                                name="file"
+                                className="block w-full text-xs text-white/80 file:mr-3 file:rounded-lg file:border file:border-white/15 file:bg-black/40 file:px-3 file:py-2 file:text-white hover:file:bg-white/10"
+                              />
+                              <button
+                                type="submit"
+                                className="rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-white/80 hover:bg-white/10"
+                              >
+                                Replace Payment Slip
+                              </button>
+                            </form>
+                          </>
+                        ) : (
                           <form
                             action={`/api/orders/${order.id}/upload-payment`}
                             method="post"
@@ -395,61 +460,48 @@ export function OrderTable({
                             <input
                               type="file"
                               name="file"
+                              required
                               className="block w-full text-xs text-white/80 file:mr-3 file:rounded-lg file:border file:border-white/15 file:bg-black/40 file:px-3 file:py-2 file:text-white hover:file:bg-white/10"
                             />
                             <button
                               type="submit"
-                              className="rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-white/80 hover:bg-white/10"
+                              className="rounded-xl border border-amber-500/40 px-3 py-2 text-amber-300 hover:bg-amber-500/10"
                             >
-                              Replace Payment Slip
+                              Upload Payment Slip
                             </button>
                           </form>
-                        </>
-                      ) : (
-                        <form
-                          action={`/api/orders/${order.id}/upload-payment`}
-                          method="post"
-                          encType="multipart/form-data"
-                          className="flex flex-col gap-2"
-                        >
-                          <input
-                            type="file"
-                            name="file"
-                            required
-                            className="block w-full text-xs text-white/80 file:mr-3 file:rounded-lg file:border file:border-white/15 file:bg-black/40 file:px-3 file:py-2 file:text-white hover:file:bg-white/10"
-                          />
-                          <button
-                            type="submit"
-                            className="rounded-xl border border-amber-500/40 px-3 py-2 text-amber-300 hover:bg-amber-500/10"
-                          >
-                            Upload Payment Slip
-                          </button>
-                        </form>
-                      )}
-                    </div>
-                  ) : order.status === "FILE_RECEIVED" ||
-                    order.status === "IN_PROGRESS" ? (
-                    <form
-                      action={`/api/orders/${order.id}/cancel`}
-                      method="post"
-                      onSubmit={confirmCustomerCancel}
-                    >
-                      <button
-                        type="submit"
-                        className="rounded-xl border border-red-500/40 px-3 py-2 text-red-400 hover:bg-red-500/10"
+                        )}
+                      </div>
+                    ) : order.status === "FILE_RECEIVED" ||
+                      order.status === "IN_PROGRESS" ? (
+                      <form
+                        action={`/api/orders/${order.id}/cancel`}
+                        method="post"
+                        onSubmit={confirmCustomerCancel}
                       >
-                        Cancel Order
-                      </button>
-                    </form>
-                  ) : (
-                    <span className="text-white/40">Waiting for file</span>
-                  )}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
+                        <button
+                          type="submit"
+                          className="rounded-xl border border-red-500/40 px-3 py-2 text-red-400 hover:bg-red-500/10"
+                        >
+                          Cancel Order
+                        </button>
+                      </form>
+                    ) : (
+                      <span className="text-white/40">Waiting for file</span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <RequestDetailsModal
+        isOpen={activeRequest !== null}
+        onClose={() => setActiveRequest(null)}
+        details={activeRequest || ""}
+      />
+    </>
   );
 }
