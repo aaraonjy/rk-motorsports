@@ -19,7 +19,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const status = params.status || "ALL";
   const search = params.search || "";
 
-  const orders: OrderWithRelations[] = await getAllOrders({ status, search });
+  const orders = (await getAllOrders({ status, search })) as OrderWithRelations[];
 
   return (
     <section className="section-pad">
