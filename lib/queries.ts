@@ -13,6 +13,12 @@ export async function getRecentOrdersForUser(userId: string) {
     where: { userId },
     include: {
       files: true,
+      revisions: {
+        include: {
+          orderFile: true,
+        },
+        orderBy: { revisionNo: "desc" },
+      },
       items: { include: { product: true } },
     },
     orderBy: { createdAt: "desc" },
@@ -42,6 +48,12 @@ export async function getAllOrders(filters?: {
     include: {
       user: true,
       files: true,
+      revisions: {
+        include: {
+          orderFile: true,
+        },
+        orderBy: { revisionNo: "desc" },
+      },
       items: { include: { product: true } },
     },
     orderBy: { createdAt: "desc" },

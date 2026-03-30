@@ -98,9 +98,9 @@ model Product {
 }
 
 model Order {
-  id             String       @id @default(cuid())
-  orderNumber    String       @unique
-  status         OrderStatus  @default(AWAITING_PAYMENT)
+  id             String          @id @default(cuid())
+  orderNumber    String          @unique
+  status         OrderStatus     @default(AWAITING_PAYMENT)
   notes          String?
   requestDetails String?
   vehicleBrand   String?
@@ -112,13 +112,14 @@ model Order {
   cancelledBy    CancelledBy?
   cancelReason   String?
   cancelledAt    DateTime?
-  totalAmount    Int          @default(0)
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  totalAmount    Int             @default(0)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
   userId         String
-  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   items          OrderItem[]
   files          OrderFile[]
+  revisions      OrderRevision[]
 }
 
 model OrderItem {
@@ -132,12 +133,28 @@ model OrderItem {
 }
 
 model OrderFile {
-  id          String   @id @default(cuid())
+  id          String          @id @default(cuid())
   orderId     String
   kind        String
   fileName    String
   storagePath String
   mimeType    String?
-  createdAt   DateTime @default(now())
-  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  createdAt   DateTime        @default(now())
+  order       Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  revision    OrderRevision?
+}
+
+model OrderRevision {
+  id          String    @id @default(cuid())
+  orderId      String
+  orderFileId  String    @unique
+  revisionNo   Int
+  remark       String
+  createdAt    DateTime  @default(now())
+
+  order        Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderFile    OrderFile @relation(fields: [orderFileId], references: [id], onDelete: Cascade)
+
+  @@unique([orderId, revisionNo])
+  @@index([orderId, createdAt])
 }

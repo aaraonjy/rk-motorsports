@@ -2,12 +2,20 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Order, OrderFile, OrderItem, Product, User } from "@prisma/client";
+import {
+  Order,
+  OrderFile,
+  OrderItem,
+  OrderRevision,
+  Product,
+  User,
+} from "@prisma/client";
 import { formatCurrency } from "@/lib/utils";
 
 type OrderWithRelations = Order & {
   user?: User;
   files: OrderFile[];
+  revisions: (OrderRevision & { orderFile: OrderFile })[];
   items: (OrderItem & { product: Product })[];
   engineModel?: string | null;
   engineCapacity?: string | number | null;
@@ -15,10 +23,16 @@ type OrderWithRelations = Order & {
   cancelReason?: string | null;
 };
 
-type UploadModalState = {
-  action: "admin-upload" | "customer-upload-payment" | "customer-replace-payment";
-  orderId: string;
-} | null;
+type UploadModalState =
+  | {
+      action:
+        | "admin-upload"
+        | "admin-upload-revision"
+        | "customer-upload-payment"
+        | "customer-replace-payment";
+      orderId: string;
+    }
+  | null;
 
 function getStatusBadge(status: string) {
   switch (status) {
@@ -423,36 +437,46 @@ function UploadConfirmModal({
   isOpen: boolean;
   mode:
     | "admin-upload"
+    | "admin-upload-revision"
     | "customer-upload-payment"
     | "customer-replace-payment"
     | null;
   orderId: string | null;
   onClose: () => void;
 }) {
+  const [remark, setRemark] = useState("");
+
   if (!isOpen || !mode || !orderId) return null;
 
   const isAdminUpload = mode === "admin-upload";
+  const isAdminRevision = mode === "admin-upload-revision";
   const isReplace = mode === "customer-replace-payment";
 
   const action =
     mode === "admin-upload"
       ? `/api/admin/orders/${orderId}/upload`
-      : `/api/orders/${orderId}/upload-payment`;
+      : mode === "admin-upload-revision"
+        ? `/api/admin/orders/${orderId}/upload-revision`
+        : `/api/orders/${orderId}/upload-payment`;
 
   const title = isAdminUpload
     ? "Upload Tuned File"
-    : isReplace
-      ? "Replace Payment Slip"
-      : "Upload Payment Slip";
+    : isAdminRevision
+      ? "Upload Revision File"
+      : isReplace
+        ? "Replace Payment Slip"
+        : "Upload Payment Slip";
 
   const description = isAdminUpload
     ? "Please confirm you want to upload this tuned file for the selected order."
-    : isReplace
-      ? "Please confirm you want to replace the current payment slip."
-      : "Please confirm you want to upload this payment slip.";
+    : isAdminRevision
+      ? "Upload a new revision file for this order. Internal remark is required."
+      : isReplace
+        ? "Please confirm you want to replace the current payment slip."
+        : "Please confirm you want to upload this payment slip.";
 
-  const buttonLabel = isAdminUpload
-    ? "Confirm Upload"
+  const buttonLabel = isAdminRevision
+    ? "Upload Revision"
     : isReplace
       ? "Confirm Replace"
       : "Confirm Upload";
@@ -480,10 +504,29 @@ function UploadConfirmModal({
             />
           </div>
 
+          {isAdminRevision ? (
+            <div>
+              <label className="mb-2 block text-sm text-white/70">
+                Internal Remark <span className="text-red-300">*</span>
+              </label>
+              <textarea
+                name="remark"
+                value={remark}
+                onChange={(e) => setRemark(e.target.value)}
+                required
+                placeholder="e.g. Reduced boost spike, adjusted fueling, fixed checksum issue"
+                className="min-h-[110px] w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/30 hover:border-white/20 focus:border-white/25"
+              />
+            </div>
+          ) : null}
+
           <div className="flex items-center justify-end gap-3">
             <button
               type="button"
-              onClick={onClose}
+              onClick={() => {
+                setRemark("");
+                onClose();
+              }}
               className="rounded-xl border border-white/15 px-4 py-2.5 text-sm text-white/75 transition hover:bg-white/10 hover:text-white"
             >
               Cancel
@@ -542,6 +585,8 @@ export function OrderTable({
               const paymentProof = order.files.find(
                 (f) => f.kind === "CUSTOMER_PAYMENT_PROOF"
               );
+              const latestRevision = order.revisions?.[0] || null;
+              const revisionCount = order.revisions?.length || 0;
 
               const statusLabel = getStatusLabel(order.status);
               const statusBadgeClass = getStatusBadge(order.status);
@@ -654,7 +699,7 @@ export function OrderTable({
                           href={`/api/files/${adminCompleted.id}/download`}
                           className="inline-block rounded-xl border border-white/15 bg-black/30 px-3 py-2 hover:bg-white/10"
                         >
-                          Tuned File
+                          Download Tuned File
                         </Link>
                       ) : order.status === "AWAITING_PAYMENT" && adminCompleted ? (
                         <span className="text-amber-300/90">
@@ -668,6 +713,22 @@ export function OrderTable({
                             : "No tuned file"}
                         </span>
                       )}
+
+                      {latestRevision ? (
+                        <div className="flex flex-col gap-1">
+                          <Link
+                            href={`/api/files/${latestRevision.orderFile.id}/download`}
+                            className="inline-block rounded-xl border border-white/15 bg-black/30 px-3 py-2 hover:bg-white/10"
+                          >
+                            {admin ? "Latest Revision File" : "Download Latest Revision"}
+                          </Link>
+                          <span className="text-xs text-white/45">
+                            Rev {latestRevision.revisionNo}
+                          </span>
+                        </div>
+                      ) : admin ? (
+                        <span className="text-white/40">No revision file</span>
+                      ) : null}
 
                       {paymentProof ? (
                         <Link
@@ -688,18 +749,20 @@ export function OrderTable({
                         <span className="text-red-400">Order Cancelled</span>
                       ) : (
                         <div className="flex w-full min-w-[220px] max-w-[260px] flex-col gap-3">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setUploadModal({
-                                action: "admin-upload",
-                                orderId: order.id,
-                              })
-                            }
-                            className="w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center transition hover:bg-white/10"
-                          >
-                            Upload Tuned File
-                          </button>
+                          {!adminCompleted ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setUploadModal({
+                                  action: "admin-upload",
+                                  orderId: order.id,
+                                })
+                              }
+                              className="w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center transition hover:bg-white/10"
+                            >
+                              Upload Tuned File
+                            </button>
+                          ) : null}
 
                           {["FILE_RECEIVED", "IN_PROGRESS", "AWAITING_PAYMENT"].includes(
                             order.status
@@ -723,6 +786,27 @@ export function OrderTable({
                             </button>
                           ) : null}
 
+                          {["READY_FOR_DOWNLOAD", "COMPLETED"].includes(order.status) &&
+                          adminCompleted ? (
+                            <div className="flex flex-col gap-1">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setUploadModal({
+                                    action: "admin-upload-revision",
+                                    orderId: order.id,
+                                  })
+                                }
+                                className="w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center transition hover:bg-white/10"
+                              >
+                                Upload Revision
+                              </button>
+                              <span className="text-center text-xs text-white/45">
+                                Revision count: {revisionCount}
+                              </span>
+                            </div>
+                          ) : null}
+
                           {order.status === "READY_FOR_DOWNLOAD" ? (
                             <span className="inline-flex w-full items-center justify-center rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-center text-emerald-400">
                               Download Released
@@ -733,12 +817,23 @@ export function OrderTable({
                     ) : order.status === "CANCELLED" ? (
                       <span className="text-red-400">Cancelled</span>
                     ) : order.status === "READY_FOR_DOWNLOAD" && adminCompleted ? (
-                      <Link
-                        href={`/api/files/${adminCompleted.id}/download`}
-                        className="inline-block rounded-xl border border-white/15 bg-black/30 px-3 py-2 hover:bg-white/10"
-                      >
-                        Download
-                      </Link>
+                      <div className="flex min-w-[220px] flex-col gap-2">
+                        <Link
+                          href={`/api/files/${adminCompleted.id}/download`}
+                          className="inline-block rounded-xl border border-white/15 bg-black/30 px-3 py-2 hover:bg-white/10"
+                        >
+                          Download
+                        </Link>
+
+                        {latestRevision ? (
+                          <Link
+                            href={`/api/files/${latestRevision.orderFile.id}/download`}
+                            className="inline-block rounded-xl border border-white/15 bg-black/30 px-3 py-2 hover:bg-white/10"
+                          >
+                            Download Latest Revision
+                          </Link>
+                        ) : null}
+                      </div>
                     ) : order.status === "AWAITING_PAYMENT" && adminCompleted ? (
                       <div className="flex min-w-[230px] flex-col gap-2">
                         <span className="text-amber-300/90">

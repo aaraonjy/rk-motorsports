@@ -14,15 +14,19 @@ export async function POST(
     const { id } = await ctx.params;
     const form = await req.formData();
     const file = form.get("file");
+    const remark = String(form.get("remark") || "").trim();
 
-    if (!(file instanceof File) || file.size === 0) {
+    if (!(file instanceof File) || file.size === 0 || !remark) {
       return NextResponse.redirect(new URL("/admin", req.url), 303);
     }
 
     const order = await db.order.findUnique({
       where: { id },
       include: {
-        revisions: true,
+        files: true,
+        revisions: {
+          orderBy: { revisionNo: "desc" },
+        },
       },
     });
 
@@ -30,44 +34,35 @@ export async function POST(
       return NextResponse.redirect(new URL("/admin", req.url), 303);
     }
 
-    if (order.revisions.length > 0) {
+    const mainTunedFile = order.files.find((f) => f.kind === "ADMIN_COMPLETED");
+
+    if (!mainTunedFile) {
       return NextResponse.redirect(new URL("/admin", req.url), 303);
     }
 
-    const saved = await saveFile(file, "admin-tuned");
+    if (!["READY_FOR_DOWNLOAD", "COMPLETED"].includes(order.status)) {
+      return NextResponse.redirect(new URL("/admin", req.url), 303);
+    }
 
-    const existingCompletedFile = await db.orderFile.findFirst({
-      where: {
+    const nextRevisionNo = (order.revisions[0]?.revisionNo || 0) + 1;
+    const saved = await saveFile(file, "admin-revision");
+
+    const revisionFile = await db.orderFile.create({
+      data: {
         orderId: id,
-        kind: "ADMIN_COMPLETED",
+        kind: "ADMIN_REVISION",
+        fileName: saved.fileName,
+        storagePath: saved.storagePath,
+        mimeType: saved.mimeType,
       },
     });
 
-    if (existingCompletedFile) {
-      await db.orderFile.update({
-        where: { id: existingCompletedFile.id },
-        data: {
-          fileName: saved.fileName,
-          storagePath: saved.storagePath,
-          mimeType: saved.mimeType,
-        },
-      });
-    } else {
-      await db.orderFile.create({
-        data: {
-          orderId: id,
-          kind: "ADMIN_COMPLETED",
-          fileName: saved.fileName,
-          storagePath: saved.storagePath,
-          mimeType: saved.mimeType,
-        },
-      });
-    }
-
-    await db.order.update({
-      where: { id },
+    await db.orderRevision.create({
       data: {
-        status: "AWAITING_PAYMENT",
+        orderId: id,
+        orderFileId: revisionFile.id,
+        revisionNo: nextRevisionNo,
+        remark,
       },
     });
 
@@ -76,7 +71,7 @@ export async function POST(
 
     return NextResponse.redirect(new URL("/admin", req.url), 303);
   } catch (error) {
-    console.error("POST /api/admin/orders/[id]/upload failed:", error);
+    console.error("POST /api/admin/orders/[id]/upload-revision failed:", error);
     return NextResponse.redirect(new URL("/admin", req.url), 303);
   }
 }
