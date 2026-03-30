@@ -586,7 +586,6 @@ export function OrderTable({
                 (f) => f.kind === "CUSTOMER_PAYMENT_PROOF"
               );
               const latestRevision = order.revisions?.[0] || null;
-              const revisionCount = order.revisions?.length || 0;
 
               const statusLabel = getStatusLabel(order.status);
               const statusBadgeClass = getStatusBadge(order.status);
@@ -714,6 +713,17 @@ export function OrderTable({
                         </span>
                       )}
 
+                      {paymentProof ? (
+                        <Link
+                          href={`/api/files/${paymentProof.id}/download`}
+                          className="inline-block rounded-xl border border-white/15 bg-black/30 px-3 py-2 hover:bg-white/10"
+                        >
+                          Payment Slip
+                        </Link>
+                      ) : admin ? (
+                        <span className="text-white/40">No payment proof</span>
+                      ) : null}
+
                       {latestRevision ? (
                         <div className="flex flex-col gap-1">
                           <Link
@@ -725,20 +735,14 @@ export function OrderTable({
                           <span className="text-xs text-white/45">
                             Rev {latestRevision.revisionNo}
                           </span>
+                          {admin ? (
+                            <span className="text-xs text-white/45">
+                              Remark: {latestRevision.remark}
+                            </span>
+                          ) : null}
                         </div>
                       ) : admin ? (
                         <span className="text-white/40">No revision file</span>
-                      ) : null}
-
-                      {paymentProof ? (
-                        <Link
-                          href={`/api/files/${paymentProof.id}/download`}
-                          className="inline-block rounded-xl border border-white/15 bg-black/30 px-3 py-2 hover:bg-white/10"
-                        >
-                          Payment Slip
-                        </Link>
-                      ) : admin ? (
-                        <span className="text-white/40">No payment proof</span>
                       ) : null}
                     </div>
                   </td>
@@ -788,23 +792,18 @@ export function OrderTable({
 
                           {["READY_FOR_DOWNLOAD", "COMPLETED"].includes(order.status) &&
                           adminCompleted ? (
-                            <div className="flex flex-col gap-1">
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setUploadModal({
-                                    action: "admin-upload-revision",
-                                    orderId: order.id,
-                                  })
-                                }
-                                className="w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center transition hover:bg-white/10"
-                              >
-                                Upload Revision
-                              </button>
-                              <span className="text-center text-xs text-white/45">
-                                Revision count: {revisionCount}
-                              </span>
-                            </div>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setUploadModal({
+                                  action: "admin-upload-revision",
+                                  orderId: order.id,
+                                })
+                              }
+                              className="w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center transition hover:bg-white/10"
+                            >
+                              Upload Revision
+                            </button>
                           ) : null}
 
                           {order.status === "READY_FOR_DOWNLOAD" ? (
@@ -817,23 +816,12 @@ export function OrderTable({
                     ) : order.status === "CANCELLED" ? (
                       <span className="text-red-400">Cancelled</span>
                     ) : order.status === "READY_FOR_DOWNLOAD" && adminCompleted ? (
-                      <div className="flex min-w-[220px] flex-col gap-2">
-                        <Link
-                          href={`/api/files/${adminCompleted.id}/download`}
-                          className="inline-block rounded-xl border border-white/15 bg-black/30 px-3 py-2 hover:bg-white/10"
-                        >
-                          Download
-                        </Link>
-
-                        {latestRevision ? (
-                          <Link
-                            href={`/api/files/${latestRevision.orderFile.id}/download`}
-                            className="inline-block rounded-xl border border-white/15 bg-black/30 px-3 py-2 hover:bg-white/10"
-                          >
-                            Download Latest Revision
-                          </Link>
-                        ) : null}
-                      </div>
+                      <Link
+                        href={`/api/files/${adminCompleted.id}/download`}
+                        className="inline-block rounded-xl border border-white/15 bg-black/30 px-3 py-2 hover:bg-white/10"
+                      >
+                        Download
+                      </Link>
                     ) : order.status === "AWAITING_PAYMENT" && adminCompleted ? (
                       <div className="flex min-w-[230px] flex-col gap-2">
                         <span className="text-amber-300/90">
