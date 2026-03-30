@@ -557,6 +557,14 @@ export function OrderTable({
   const [customerCancelOrderId, setCustomerCancelOrderId] = useState<string | null>(null);
   const [releaseOrderId, setReleaseOrderId] = useState<string | null>(null);
   const [uploadModal, setUploadModal] = useState<UploadModalState>(null);
+  const [expandedRevisionOrders, setExpandedRevisionOrders] = useState<Record<string, boolean>>({});
+
+  function toggleRevisionHistory(orderId: string) {
+    setExpandedRevisionOrders((prev) => ({
+      ...prev,
+      [orderId]: !prev[orderId],
+    }));
+  }
 
   return (
     <>
@@ -586,6 +594,8 @@ export function OrderTable({
                 (f) => f.kind === "CUSTOMER_PAYMENT_PROOF"
               );
               const latestRevision = order.revisions?.[0] || null;
+              const hasRevisionHistory = admin && order.revisions.length > 1;
+              const isRevisionHistoryExpanded = !!expandedRevisionOrders[order.id];
 
               const statusLabel = getStatusLabel(order.status);
               const statusBadgeClass = getStatusBadge(order.status);
@@ -721,30 +731,44 @@ export function OrderTable({
                         </div>
                       ) : null}
 
-                      {admin && order.revisions.length > 1 ? (
-                        <div className="rounded-xl border border-white/10 bg-black/25 p-3">
-                          <div className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-white/45">
-                            Revision History
-                          </div>
+                      {hasRevisionHistory ? (
+                        <div className="flex flex-col gap-2">
+                          <button
+                            type="button"
+                            onClick={() => toggleRevisionHistory(order.id)}
+                            className="inline-flex items-center justify-center rounded-xl border border-white/12 bg-white/[0.03] px-3 py-2 text-xs font-medium text-white/72 transition hover:border-white/20 hover:bg-white/[0.07] hover:text-white"
+                          >
+                            {isRevisionHistoryExpanded
+                              ? "Hide Revision History"
+                              : "View Revision History"}
+                          </button>
 
-                          <div className="space-y-3">
-                            {order.revisions.slice(1).map((revision) => (
-                              <div
-                                key={revision.id}
-                                className="rounded-lg border border-white/10 bg-black/30 p-3"
-                              >
-                                <Link
-                                  href={`/api/files/${revision.orderFile.id}/download`}
-                                  className="inline-block rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-sm hover:bg-white/10"
-                                >
-                                  Download Rev {revision.revisionNo}
-                                </Link>
-                                <div className="mt-2 text-xs text-white/45">
-                                  Remark: {revision.remark}
-                                </div>
+                          {isRevisionHistoryExpanded ? (
+                            <div className="rounded-xl border border-white/10 bg-black/25 p-3">
+                              <div className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-white/45">
+                                Revision History
                               </div>
-                            ))}
-                          </div>
+
+                              <div className="space-y-3">
+                                {order.revisions.slice(1).map((revision) => (
+                                  <div
+                                    key={revision.id}
+                                    className="rounded-lg border border-white/10 bg-black/30 p-3"
+                                  >
+                                    <Link
+                                      href={`/api/files/${revision.orderFile.id}/download`}
+                                      className="inline-block rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-sm hover:bg-white/10"
+                                    >
+                                      Download Rev {revision.revisionNo}
+                                    </Link>
+                                    <div className="mt-2 text-xs text-white/45">
+                                      Remark: {revision.remark}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ) : null}
                         </div>
                       ) : null}
                     </div>
