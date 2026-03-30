@@ -673,9 +673,7 @@ export function OrderTable({
                         >
                           Original File
                         </Link>
-                      ) : (
-                        <span className="text-white/40">No original file</span>
-                      )}
+                      ) : null}
 
                       {admin ? (
                         adminCompleted ? (
@@ -685,14 +683,7 @@ export function OrderTable({
                           >
                             Tuned File
                           </Link>
-                        ) : (
-                          <span className="text-white/40">
-                            {order.status === "IN_PROGRESS" ||
-                            order.status === "FILE_RECEIVED"
-                              ? "Tuning in progress"
-                              : "No tuned file"}
-                          </span>
-                        )
+                        ) : null
                       ) : order.status === "READY_FOR_DOWNLOAD" && adminCompleted ? (
                         <Link
                           href={`/api/files/${adminCompleted.id}/download`}
@@ -700,18 +691,7 @@ export function OrderTable({
                         >
                           Download Tuned File
                         </Link>
-                      ) : order.status === "AWAITING_PAYMENT" && adminCompleted ? (
-                        <span className="text-amber-300/90">
-                          Tuned file locked until payment is confirmed
-                        </span>
-                      ) : (
-                        <span className="text-white/40">
-                          {order.status === "IN_PROGRESS" ||
-                          order.status === "FILE_RECEIVED"
-                            ? "Tuning in progress"
-                            : "No tuned file"}
-                        </span>
-                      )}
+                      ) : null}
 
                       {paymentProof ? (
                         <Link
@@ -720,8 +700,6 @@ export function OrderTable({
                         >
                           Payment Slip
                         </Link>
-                      ) : admin ? (
-                        <span className="text-white/40">No payment proof</span>
                       ) : null}
 
                       {latestRevision ? (
@@ -741,8 +719,33 @@ export function OrderTable({
                             </span>
                           ) : null}
                         </div>
-                      ) : admin ? (
-                        <span className="text-white/40">No revision file</span>
+                      ) : null}
+
+                      {admin && order.revisions.length > 1 ? (
+                        <div className="rounded-xl border border-white/10 bg-black/25 p-3">
+                          <div className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-white/45">
+                            Revision History
+                          </div>
+
+                          <div className="space-y-3">
+                            {order.revisions.slice(1).map((revision) => (
+                              <div
+                                key={revision.id}
+                                className="rounded-lg border border-white/10 bg-black/30 p-3"
+                              >
+                                <Link
+                                  href={`/api/files/${revision.orderFile.id}/download`}
+                                  className="inline-block rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-sm hover:bg-white/10"
+                                >
+                                  Download Rev {revision.revisionNo}
+                                </Link>
+                                <div className="mt-2 text-xs text-white/45">
+                                  Remark: {revision.remark}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
                       ) : null}
                     </div>
                   </td>
