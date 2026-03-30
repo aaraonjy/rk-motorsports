@@ -12,7 +12,7 @@ import {
 } from "@prisma/client";
 import { formatCurrency } from "@/lib/utils";
 
-type OrderWithRelations = Order & {
+export type OrderWithRelations = Order & {
   user?: User;
   files: OrderFile[];
   revisions: (OrderRevision & { orderFile: OrderFile })[];

@@ -1,7 +1,7 @@
 import { getSessionUser } from "@/lib/auth";
 import { getAllOrders } from "@/lib/queries";
 import { redirect } from "next/navigation";
-import { OrderTable } from "@/components/order-table";
+import { OrderTable, type OrderWithRelations } from "@/components/order-table";
 
 type AdminPageProps = {
   searchParams?: Promise<{
@@ -19,7 +19,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const status = params.status || "ALL";
   const search = params.search || "";
 
-  const orders = await getAllOrders({ status, search });
+  const orders: OrderWithRelations[] = await getAllOrders({ status, search });
 
   return (
     <section className="section-pad">
