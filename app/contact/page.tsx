@@ -110,7 +110,7 @@ export default function ContactPage() {
                   src="https://www.google.com/maps?q=34%20Jalan%20Tembaga%20SD%205%2F2b%20Bandar%20Sri%20Damansara&output=embed"
                   width="100%"
                   height="100%"
-                  className="min-h-[420px] w-full"
+                  className="min-h-[420px] w-full invert hue-rotate-180 brightness-90 contrast-95"
                   loading="lazy"
                 ></iframe>
               </div>
