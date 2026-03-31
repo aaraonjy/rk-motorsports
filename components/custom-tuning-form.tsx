@@ -163,6 +163,12 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
     [derivedCapacity, manualCapacity]
   );
 
+  const shouldShowYearFallback =
+    !!selectedModelId && !derivedYearRange;
+
+  const shouldShowCapacityFallback =
+    !!selectedEngineId && !derivedCapacity;
+
   const selectedEcuBrandData = useMemo(
     () => (ecuBrand ? ecuTypes[ecuBrand] || [] : []),
     [ecuBrand, ecuTypes]
@@ -467,7 +473,7 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
               readOnly={!!derivedYearRange}
               required
             />
-            {!derivedYearRange ? (
+            {shouldShowYearFallback ? (
               <p className="mt-2 text-xs text-white/45">
                 Auto-fill unavailable for this model. Please enter manually.
               </p>
@@ -488,7 +494,7 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
               readOnly={!!derivedCapacity}
               required
             />
-            {!derivedCapacity ? (
+            {shouldShowCapacityFallback ? (
               <p className="mt-2 text-xs text-white/45">
                 Auto-fill unavailable for this engine. Please enter manually.
               </p>
