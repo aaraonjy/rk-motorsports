@@ -1,26 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-
-const baseTunes = [
-  { id: "stage1", name: "Stage 1 ECU Tune", price: 1200 },
-  { id: "stage2", name: "Stage 2 ECU Tune", price: 2000 },
-  { id: "custom", name: "Custom File Service", price: 2800 },
-];
-
-const addOns = [
-  { name: "Boosted Launch Control (2-Step)", price: 400 },
-  { name: "Rolling Anti-Lag (RAL)", price: 500 },
-  { name: "Pop & Bang / Flame Tuning", price: 300 },
-  { name: "Multi-Map Switching (On-The-Fly)", price: 600 },
-  { name: "EGR Off", price: 200 },
-  { name: "Lambda / Decat / O2 Off", price: 300 },
-  { name: "DTC Off", price: 200 },
-  { name: "Speed Limiter Removal", price: 200 },
-  { name: "Cold Start Delete", price: 200 },
-  { name: "MAF Off", price: 300 },
-  { name: "Start Stop Disable", price: 200 },
-];
+import { addOns, baseTunes, calculateAddOnTotal, getAddOnByName } from "@/lib/tuning-pricing";
 
 export default function PricingPage() {
   const [selectedTune, setSelectedTune] = useState<string | null>(null);
@@ -32,11 +13,7 @@ export default function PricingPage() {
   );
 
   const addOnTotal = useMemo(
-    () =>
-      selectedAddOns.reduce((total, selectedName) => {
-        const addOn = addOns.find((item) => item.name === selectedName);
-        return total + (addOn?.price || 0);
-      }, 0),
+    () => calculateAddOnTotal(selectedAddOns),
     [selectedAddOns]
   );
 
@@ -205,7 +182,7 @@ export default function PricingPage() {
               {selectedAddOns.length > 0 ? (
                 <ul className="mt-4 space-y-2 text-sm text-white/65">
                   {selectedAddOns.map((item) => {
-                    const addOn = addOns.find((option) => option.name === item);
+                    const addOn = getAddOnByName(item);
 
                     return (
                       <li key={item}>
