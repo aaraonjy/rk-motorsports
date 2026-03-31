@@ -2,6 +2,7 @@ export default function ContactPage() {
   return (
     <section className="pt-28 pb-20">
       <div className="container-rk max-w-6xl">
+        {/* HEADER */}
         <div className="mb-10">
           <h1 className="text-4xl font-bold text-white md:text-5xl">
             Contact Us
@@ -16,6 +17,7 @@ export default function ContactPage() {
         {/* SINGLE CARD */}
         <div className="rounded-[2rem] border border-white/10 bg-black/45 p-6 backdrop-blur-md md:p-10">
           <div className="grid gap-10 lg:grid-cols-[0.9fr_1.1fr]">
+            
             {/* LEFT INFO */}
             <div className="space-y-8">
               <div>
@@ -105,16 +107,20 @@ export default function ContactPage() {
                 </a>
               </div>
 
-              <div className="overflow-hidden rounded-[1.5rem] border border-white/10 shadow-[0_20px_80px_rgba(0,0,0,0.35)]">
+              <div className="relative overflow-hidden rounded-[1.5rem] border border-white/10 shadow-[0_20px_80px_rgba(0,0,0,0.35)]">
                 <iframe
                   src="https://www.google.com/maps?q=34%20Jalan%20Tembaga%20SD%205%2F2b%20Bandar%20Sri%20Damansara&output=embed"
                   width="100%"
                   height="100%"
-                  className="min-h-[420px] w-full invert hue-rotate-180 brightness-90 contrast-95"
+                  className="min-h-[420px] w-full invert hue-rotate-180 brightness-95 contrast-95"
                   loading="lazy"
                 ></iframe>
+
+                {/* subtle overlay */}
+                <div className="pointer-events-none absolute inset-0 bg-black/10" />
               </div>
             </div>
+
           </div>
         </div>
       </div>
