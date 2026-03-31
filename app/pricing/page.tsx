@@ -44,6 +44,22 @@ export default function PricingPage() {
     );
   }
 
+  const totalBoxClass = activeTune
+    ? activeTune.id === "stage1"
+      ? "border-[#ff3b57]/30 bg-[#ff3b57]/10"
+      : activeTune.id === "stage2"
+        ? "border-yellow-500/30 bg-yellow-500/10"
+        : "border-white/15 bg-white/[0.06]"
+    : "border-white/10 bg-white/[0.03]";
+
+  const totalLabelClass = activeTune
+    ? activeTune.id === "stage1"
+      ? "text-red-200/75"
+      : activeTune.id === "stage2"
+        ? "text-yellow-200/75"
+        : "text-white/60"
+    : "text-white/60";
+
   return (
     <section className="pt-28 pb-20">
       <div className="container-rk">
@@ -193,8 +209,8 @@ export default function PricingPage() {
               )}
             </div>
 
-            <div className="mt-6 rounded-2xl border border-white/10 bg-[#ff3b57]/10 p-6">
-              <p className="text-sm uppercase tracking-[0.2em] text-white/60">
+            <div className={`mt-6 rounded-2xl border p-6 ${totalBoxClass}`}>
+              <p className={`text-sm uppercase tracking-[0.2em] ${totalLabelClass}`}>
                 Total estimated price
               </p>
               <p className="mt-3 text-4xl font-bold text-white">
