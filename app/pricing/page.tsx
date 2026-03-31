@@ -3,20 +3,21 @@
 import { useMemo, useState } from "react";
 
 const baseTunes = [
-  { id: "stage1", name: "Stage 1 ECU Tune", price: 1500 },
-  { id: "stage2", name: "Stage 2 ECU Tune", price: 2200 },
-  { id: "custom", name: "Custom File Service", price: 1800 },
+  { id: "stage123", name: "Stage 1 / 2 / 3 Performance Tuning", price: 1500 },
+  { id: "custom", name: "Custom ECU Calibration", price: 1800 },
+  { id: "multimap", name: "Multi-Map Switching (On-The-Fly)", price: 1800 },
 ];
 
 const addOns = [
-  "EGR off",
+  "Boosted Launch Control (2-Step)",
+  "Rolling Anti-Lag (RAL)",
+  "Pop & Bang / Flame Tuning",
+  "EGR Off",
   "Lambda / Decat / O2 Off",
-  "Pops and Bangs",
-  "DTC off",
+  "DTC Off",
   "Speed Limiter Removal",
   "Cold Start Delete",
-  "Launch Control",
-  "MAF off",
+  "MAF Off",
   "Start Stop Disable",
 ];
 
