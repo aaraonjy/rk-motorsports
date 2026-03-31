@@ -14,14 +14,16 @@ const baseTunes = [
 ];
 
 const addOns = [
-  "EGR off",
+  "Boosted Launch Control (2-Step)",
+  "Rolling Anti-Lag (RAL)",
+  "Pop & Bang / Flame Tuning",
+  "Multi-Map Switching (On-The-Fly)",
+  "EGR Off",
   "Lambda / Decat / O2 Off",
-  "Pops and Bangs",
-  "DTC off",
+  "DTC Off",
   "Speed Limiter Removal",
   "Cold Start Delete",
-  "Launch Control",
-  "MAF off",
+  "MAF Off",
   "Start Stop Disable",
 ];
 
@@ -788,11 +790,10 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
                 Step 3
               </p>
               <h2 className="mt-3 text-2xl font-semibold text-white">
-                Select additional add-on
+                Select add-on services
               </h2>
               <p className="mt-3 text-white/65">
-                Optional. Expand this section only if you need extra add-on
-                services.
+                Add-on pricing may vary depending on the selected options.
               </p>
             </div>
 
@@ -807,51 +808,43 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
         </div>
 
         {isAddOnsOpen ? (
-          <>
-            <div className="mt-6">
-              <p className="text-white/65">
-                Each additional option costs RM {ADD_ON_PRICE}.
-              </p>
-            </div>
+          <div className="mt-8 grid gap-3">
+            {addOns.map((option) => {
+              const checked = selectedAddOns.includes(option);
 
-            <div className="mt-6 grid gap-3">
-              {addOns.map((option) => {
-                const checked = selectedAddOns.includes(option);
+              return (
+                <label
+                  key={option}
+                  className={`flex items-center justify-between rounded-2xl border px-5 py-4 transition ${
+                    checked
+                      ? "border-[#ff3b57] bg-[#ff3b57]/10"
+                      : "border-white/10 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.05]"
+                  } ${
+                    !selectedTune
+                      ? "cursor-not-allowed opacity-50"
+                      : "cursor-pointer"
+                  }`}
+                >
+                  <div className="flex items-center gap-4">
+                    <input
+                      type="checkbox"
+                      name="addOns"
+                      value={option}
+                      checked={checked}
+                      disabled={!selectedTune}
+                      onChange={() => toggleAddOn(option)}
+                      className="h-4 w-4 accent-[#ff3b57]"
+                    />
+                    <span className="text-white">{option}</span>
+                  </div>
 
-                return (
-                  <label
-                    key={option}
-                    className={`flex items-center justify-between rounded-2xl border px-5 py-4 transition ${
-                      checked
-                        ? "border-[#ff3b57] bg-[#ff3b57]/10"
-                        : "border-white/10 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.05]"
-                    } ${
-                      !selectedTune
-                        ? "cursor-not-allowed opacity-50"
-                        : "cursor-pointer"
-                    }`}
-                  >
-                    <div className="flex items-center gap-4">
-                      <input
-                        type="checkbox"
-                        name="addOns"
-                        value={option}
-                        checked={checked}
-                        disabled={!selectedTune}
-                        onChange={() => toggleAddOn(option)}
-                        className="h-4 w-4 accent-[#ff3b57]"
-                      />
-                      <span className="text-white">{option}</span>
-                    </div>
-
-                    <span className="text-sm font-medium text-white/70">
-                      RM {ADD_ON_PRICE}
-                    </span>
-                  </label>
-                );
-              })}
-            </div>
-          </>
+                  <span className="text-sm font-medium text-white/70">
+                    RM {ADD_ON_PRICE}
+                  </span>
+                </label>
+              );
+            })}
+          </div>
         ) : null}
 
         <div className="mt-12">
