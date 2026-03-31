@@ -77,12 +77,24 @@ export default function PricingPage() {
                     onClick={() => setSelectedTune(item.id)}
                     className={`rounded-2xl border p-5 text-left transition ${
                       isActive
-                        ? "border-[#ff3b57] bg-[#ff3b57]/15 shadow-[0_0_0_1px_rgba(255,59,87,0.35)]"
-                        : "border-white/10 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.06]"
+                        ? item.id === "stage1"
+                          ? "border-[#ff3b57] bg-[#ff3b57]/15 shadow-[0_0_0_1px_rgba(255,59,87,0.35)]"
+                          : item.id === "stage2"
+                            ? "border-yellow-500 bg-yellow-500/15 shadow-[0_0_0_1px_rgba(234,179,8,0.35)]"
+                            : "border-white/20 bg-white/10"
+                        : item.id === "stage1"
+                          ? "border-white/10 bg-white/[0.03] hover:border-[#ff3b57]/40 hover:bg-[#ff3b57]/10"
+                          : item.id === "stage2"
+                            ? "border-white/10 bg-white/[0.03] hover:border-yellow-500/40 hover:bg-yellow-500/10"
+                            : "border-white/10 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.06]"
                     }`}
                   >
-                    <p className="text-lg font-semibold text-white">{item.name}</p>
-                    <p className="mt-2 text-white/70">RM {item.price.toLocaleString()}</p>
+                    <p className="text-lg font-semibold text-white">
+                      {item.name}
+                    </p>
+                    <p className="mt-2 text-white/70">
+                      RM {item.price.toLocaleString()}
+                    </p>
                   </button>
                 );
               })}
@@ -96,7 +108,7 @@ export default function PricingPage() {
                 Select add-on services
               </h2>
               <p className="mt-3 text-white/65">
-                Each additional option costs RM {ADD_ON_PRICE}.
+                Add-on pricing may vary depending on the selected options.
               </p>
             </div>
 
