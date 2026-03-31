@@ -166,6 +166,9 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
   const shouldShowYearFallback = !!selectedModelId && !derivedYearRange;
   const shouldShowCapacityFallback = !!selectedEngineId && !derivedCapacity;
 
+  const isYearFieldEditable = shouldShowYearFallback;
+  const isCapacityFieldEditable = shouldShowCapacityFallback;
+
   const yearPlaceholder = shouldShowYearFallback
     ? "Enter year / range manually (e.g. 2015 - 2018)"
     : "Auto-filled from model";
@@ -469,9 +472,13 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
             <input
               className="input-rk"
               value={derivedYearRange || manualYearRange}
-              onChange={(e) => setManualYearRange(e.target.value)}
+              onChange={(e) => {
+                if (isYearFieldEditable) {
+                  setManualYearRange(e.target.value);
+                }
+              }}
               placeholder={yearPlaceholder}
-              readOnly={!!derivedYearRange}
+              readOnly={!isYearFieldEditable}
               required
             />
             {shouldShowYearFallback ? (
@@ -486,9 +493,13 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
             <input
               className="input-rk"
               value={derivedCapacity || manualCapacity}
-              onChange={(e) => setManualCapacity(e.target.value)}
+              onChange={(e) => {
+                if (isCapacityFieldEditable) {
+                  setManualCapacity(e.target.value);
+                }
+              }}
               placeholder={capacityPlaceholder}
-              readOnly={!!derivedCapacity}
+              readOnly={!isCapacityFieldEditable}
               required
             />
             {shouldShowCapacityFallback ? (
