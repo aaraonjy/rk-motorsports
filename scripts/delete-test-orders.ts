@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import { del } from "@vercel/blob";
 
 const prisma = new PrismaClient();
 
@@ -9,7 +10,18 @@ async function main() {
     where: { email },
     include: {
       orders: {
-        select: { id: true, orderNumber: true },
+        select: {
+          id: true,
+          orderNumber: true,
+          files: {
+            select: {
+              id: true,
+              storagePath: true,
+              fileName: true,
+              kind: true,
+            },
+          },
+        },
       },
     },
   });
@@ -27,7 +39,29 @@ async function main() {
   }
 
   console.log(`Found ${orderIds.length} order(s) for ${email}`);
-  console.log("Order numbers:", user.orders.map((o) => o.orderNumber).join(", "));
+  console.log(
+    "Order numbers:",
+    user.orders.map((o) => o.orderNumber).join(", ")
+  );
+
+  const blobPaths = user.orders
+    .flatMap((order) => order.files)
+    .map((file) => file.storagePath)
+    .filter(Boolean);
+
+  if (blobPaths.length > 0) {
+    console.log(`Deleting ${blobPaths.length} blob file(s)...`);
+
+    try {
+      await del(blobPaths);
+      console.log("Blob files deleted successfully.");
+    } catch (error) {
+      console.error("Failed to delete blob files:", error);
+      throw error;
+    }
+  } else {
+    console.log("No blob files found for these orders.");
+  }
 
   await prisma.orderFile.deleteMany({
     where: {
@@ -47,7 +81,7 @@ async function main() {
     },
   });
 
-  console.log(`Deleted all orders for ${email}`);
+  console.log(`Deleted all orders and uploaded files for ${email}`);
 }
 
 main()
