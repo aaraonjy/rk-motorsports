@@ -8,26 +8,24 @@ import fuelGradesData from "@/lib/fuel-grades.json";
 import wmiOptionsData from "@/lib/wmi-options.json";
 
 const baseTunes = [
-  { id: "stage1", name: "Stage 1 ECU Tune", price: 1500 },
-  { id: "stage2", name: "Stage 2 ECU Tune", price: 2200 },
-  { id: "custom", name: "Custom File Service", price: 1800 },
+  { id: "stage1", name: "Stage 1 ECU Tune", price: 1200 },
+  { id: "stage2", name: "Stage 2 ECU Tune", price: 2000 },
+  { id: "custom", name: "Custom File Service", price: 2800 },
 ];
 
 const addOns = [
-  "Boosted Launch Control (2-Step)",
-  "Rolling Anti-Lag (RAL)",
-  "Pop & Bang / Flame Tuning",
-  "Multi-Map Switching (On-The-Fly)",
-  "EGR Off",
-  "Lambda / Decat / O2 Off",
-  "DTC Off",
-  "Speed Limiter Removal",
-  "Cold Start Delete",
-  "MAF Off",
-  "Start Stop Disable",
+  { name: "Boosted Launch Control (2-Step)", price: 400 },
+  { name: "Rolling Anti-Lag (RAL)", price: 500 },
+  { name: "Pop & Bang / Flame Tuning", price: 300 },
+  { name: "Multi-Map Switching (On-The-Fly)", price: 600 },
+  { name: "EGR Off", price: 200 },
+  { name: "Lambda / Decat / O2 Off", price: 300 },
+  { name: "DTC Off", price: 200 },
+  { name: "Speed Limiter Removal", price: 200 },
+  { name: "Cold Start Delete", price: 200 },
+  { name: "MAF Off", price: 300 },
+  { name: "Start Stop Disable", price: 200 },
 ];
-
-const ADD_ON_PRICE = 300;
 
 type EngineOption = {
   id: string;
@@ -226,7 +224,15 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
     [selectedTune]
   );
 
-  const addOnTotal = selectedAddOns.length * ADD_ON_PRICE;
+  const addOnTotal = useMemo(
+    () =>
+      selectedAddOns.reduce((total, selectedName) => {
+        const addOn = addOns.find((item) => item.name === selectedName);
+        return total + (addOn?.price || 0);
+      }, 0),
+    [selectedAddOns]
+  );
+
   const estimatedTotal = (activeTune?.price || 0) + addOnTotal;
 
   useEffect(() => {
@@ -810,11 +816,11 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
         {isAddOnsOpen ? (
           <div className="mt-8 grid gap-3">
             {addOns.map((option) => {
-              const checked = selectedAddOns.includes(option);
+              const checked = selectedAddOns.includes(option.name);
 
               return (
                 <label
-                  key={option}
+                  key={option.name}
                   className={`flex items-center justify-between rounded-2xl border px-5 py-4 transition ${
                     checked
                       ? "border-[#ff3b57] bg-[#ff3b57]/10"
@@ -829,17 +835,17 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
                     <input
                       type="checkbox"
                       name="addOns"
-                      value={option}
+                      value={option.name}
                       checked={checked}
                       disabled={!selectedTune}
-                      onChange={() => toggleAddOn(option)}
+                      onChange={() => toggleAddOn(option.name)}
                       className="h-4 w-4 accent-[#ff3b57]"
                     />
-                    <span className="text-white">{option}</span>
+                    <span className="text-white">{option.name}</span>
                   </div>
 
                   <span className="text-sm font-medium text-white/70">
-                    RM {ADD_ON_PRICE}
+                    RM {option.price}
                   </span>
                 </label>
               );
@@ -993,9 +999,15 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
 
           {selectedAddOns.length > 0 ? (
             <ul className="mt-4 space-y-2 text-sm text-white/65">
-              {selectedAddOns.map((item) => (
-                <li key={item}>• {item}</li>
-              ))}
+              {selectedAddOns.map((item) => {
+                const addOn = addOns.find((option) => option.name === item);
+
+                return (
+                  <li key={item}>
+                    • {item} — RM {addOn?.price ?? 0}
+                  </li>
+                );
+              })}
             </ul>
           ) : (
             <p className="mt-4 text-sm text-white/50">
