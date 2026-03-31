@@ -163,11 +163,16 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
     [derivedCapacity, manualCapacity]
   );
 
-  const shouldShowYearFallback =
-    !!selectedModelId && !derivedYearRange;
+  const shouldShowYearFallback = !!selectedModelId && !derivedYearRange;
+  const shouldShowCapacityFallback = !!selectedEngineId && !derivedCapacity;
 
-  const shouldShowCapacityFallback =
-    !!selectedEngineId && !derivedCapacity;
+  const yearPlaceholder = shouldShowYearFallback
+    ? "Enter year / range manually (e.g. 2015 - 2018)"
+    : "Auto-filled from model";
+
+  const capacityPlaceholder = shouldShowCapacityFallback
+    ? "Enter engine capacity manually (e.g. 2000)"
+    : "Auto-filled from engine";
 
   const selectedEcuBrandData = useMemo(
     () => (ecuBrand ? ecuTypes[ecuBrand] || [] : []),
@@ -465,11 +470,7 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
               className="input-rk"
               value={derivedYearRange || manualYearRange}
               onChange={(e) => setManualYearRange(e.target.value)}
-              placeholder={
-                derivedYearRange
-                  ? "Auto-filled from model"
-                  : "Enter year / range manually (e.g. 2015 - 2018)"
-              }
+              placeholder={yearPlaceholder}
               readOnly={!!derivedYearRange}
               required
             />
@@ -486,11 +487,7 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
               className="input-rk"
               value={derivedCapacity || manualCapacity}
               onChange={(e) => setManualCapacity(e.target.value)}
-              placeholder={
-                derivedCapacity
-                  ? "Auto-filled from engine"
-                  : "Enter engine capacity manually (e.g. 2000)"
-              }
+              placeholder={capacityPlaceholder}
               readOnly={!!derivedCapacity}
               required
             />
