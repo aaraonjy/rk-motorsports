@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import carLibrary from "@/lib/car-library.json";
+import ecuTypesData from "@/lib/ecu-types.json";
 import ecuReadToolsData from "@/lib/ecu-read-tools.json";
 import fuelGradesData from "@/lib/fuel-grades.json";
 import wmiOptionsData from "@/lib/wmi-options.json";
@@ -53,6 +54,13 @@ type WmiOptionsFile = {
   options: string[];
 };
 
+type EcuTypeEntry = {
+  family: string;
+  models: string[];
+};
+
+type EcuTypesFile = Record<string, EcuTypeEntry[]>;
+
 type CustomTuningFormProps = {
   productId: string;
 };
@@ -84,6 +92,11 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
   const [selectedModelId, setSelectedModelId] = useState("");
   const [selectedEngineId, setSelectedEngineId] = useState("");
 
+  const [ecuBrand, setEcuBrand] = useState("");
+  const [ecuFamily, setEcuFamily] = useState("");
+  const [ecuModel, setEcuModel] = useState("");
+  const [ecuOther, setEcuOther] = useState("");
+
   const [ecuReadTool, setEcuReadTool] = useState("");
   const [ecuReadToolOther, setEcuReadToolOther] = useState("");
 
@@ -100,6 +113,9 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
       ),
     []
   );
+
+  const ecuTypes = useMemo(() => ecuTypesData as EcuTypesFile, []);
+  const ecuBrands = useMemo(() => Object.keys(ecuTypes), [ecuTypes]);
 
   const ecuReadTools = useMemo(
     () => (ecuReadToolsData as EcuReadToolsFile).tools || [],
@@ -153,6 +169,35 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
     [selectedEngineData]
   );
 
+  const selectedEcuBrandData = useMemo(
+    () => (ecuBrand ? ecuTypes[ecuBrand] || [] : []),
+    [ecuBrand, ecuTypes]
+  );
+
+  const availableEcuFamilies = useMemo(
+    () => selectedEcuBrandData.map((item) => item.family),
+    [selectedEcuBrandData]
+  );
+
+  const selectedEcuFamilyData = useMemo(
+    () =>
+      selectedEcuBrandData.find((item) => item.family === ecuFamily) || null,
+    [selectedEcuBrandData, ecuFamily]
+  );
+
+  const availableEcuModels = useMemo(
+    () => selectedEcuFamilyData?.models || [],
+    [selectedEcuFamilyData]
+  );
+
+  const finalEcuType = useMemo(() => {
+    if (ecuBrand === "Other") {
+      return ecuOther.trim();
+    }
+
+    return [ecuBrand, ecuFamily, ecuModel].filter(Boolean).join(" ").trim();
+  }, [ecuBrand, ecuFamily, ecuModel, ecuOther]);
+
   const finalEcuReadTool = useMemo(() => {
     if (ecuReadTool === "Other (Specify)") {
       return ecuReadToolOther.trim();
@@ -192,6 +237,18 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
   }, [selectedModelId]);
 
   useEffect(() => {
+    setEcuFamily("");
+    setEcuModel("");
+    if (ecuBrand !== "Other") {
+      setEcuOther("");
+    }
+  }, [ecuBrand]);
+
+  useEffect(() => {
+    setEcuModel("");
+  }, [ecuFamily]);
+
+  useEffect(() => {
     if (ecuReadTool !== "Other (Specify)") {
       setEcuReadToolOther("");
     }
@@ -223,9 +280,11 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
     !selectedEngineId ||
     !derivedYearRange ||
     !derivedCapacity ||
+    !finalEcuType ||
     !selectedTune ||
     !ecuReadTool ||
     !fuelGrade ||
+    (ecuBrand === "Other" && !ecuOther.trim()) ||
     (ecuReadTool === "Other (Specify)" && !ecuReadToolOther.trim()) ||
     (fuelGrade === "Other (Specify)" && !fuelGradeOther.trim()) ||
     (wmiOption === "Custom (Specify)" && !wmiOther.trim());
@@ -253,6 +312,7 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
       />
       <input type="hidden" name="vehicleYear" value={derivedYearRange} />
       <input type="hidden" name="engineCapacity" value={derivedCapacity} />
+      <input type="hidden" name="ecuType" value={finalEcuType} />
       <input type="hidden" name="ecuReadTool" value={finalEcuReadTool} />
       <input type="hidden" name="fuelGrade" value={finalFuelGrade} />
       <input
@@ -405,14 +465,126 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
             />
           </div>
 
-          <div>
+          <div className="md:col-span-3">
             <label className="label-rk">ECU Type</label>
-            <input
-              className="input-rk"
-              name="ecuType"
-              placeholder="e.g. Bosch MED17, MG1, EDC17"
-              required
-            />
+
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="relative">
+                <select
+                  className="input-rk appearance-none pr-12"
+                  value={ecuBrand}
+                  onChange={(e) => setEcuBrand(e.target.value)}
+                  required
+                >
+                  <option value="">Select ECU brand</option>
+                  {ecuBrands.map((brand) => (
+                    <option key={brand} value={brand}>
+                      {brand}
+                    </option>
+                  ))}
+                </select>
+
+                <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/50">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    className="h-5 w-5"
+                    aria-hidden="true"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.51a.75.75 0 0 1-1.08 0l-4.25-4.51a.75.75 0 0 1 .02-1.06Z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                </div>
+              </div>
+
+              <div className="relative">
+                <select
+                  className="input-rk appearance-none pr-12"
+                  value={ecuFamily}
+                  onChange={(e) => setEcuFamily(e.target.value)}
+                  disabled={!ecuBrand || ecuBrand === "Other"}
+                  required={ecuBrand !== "Other"}
+                >
+                  <option value="">
+                    {ecuBrand === "Other"
+                      ? "Not required"
+                      : "Select ECU family"}
+                  </option>
+                  {availableEcuFamilies.map((family) => (
+                    <option key={family} value={family}>
+                      {family}
+                    </option>
+                  ))}
+                </select>
+
+                <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/50">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    className="h-5 w-5"
+                    aria-hidden="true"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.51a.75.75 0 0 1-1.08 0l-4.25-4.51a.75.75 0 0 1 .02-1.06Z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                </div>
+              </div>
+
+              <div className="relative">
+                <select
+                  className="input-rk appearance-none pr-12"
+                  value={ecuModel}
+                  onChange={(e) => setEcuModel(e.target.value)}
+                  disabled={!ecuFamily || ecuBrand === "Other"}
+                >
+                  <option value="">
+                    {ecuBrand === "Other" ? "Not required" : "Select ECU model"}
+                  </option>
+                  {availableEcuModels.map((model) => (
+                    <option key={model} value={model}>
+                      {model}
+                    </option>
+                  ))}
+                </select>
+
+                <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/50">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    className="h-5 w-5"
+                    aria-hidden="true"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.51a.75.75 0 0 1-1.08 0l-4.25-4.51a.75.75 0 0 1 .02-1.06Z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            {ecuBrand === "Other" ? (
+              <div className="mt-4">
+                <label className="label-rk">Other ECU Type</label>
+                <input
+                  className="input-rk"
+                  value={ecuOther}
+                  onChange={(e) => setEcuOther(e.target.value)}
+                  placeholder="Specify ECU type"
+                  required
+                />
+              </div>
+            ) : null}
           </div>
 
           <div>
@@ -562,8 +734,8 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
         ) : null}
 
         <div className="mt-3 text-xs text-white/45">
-          Select brand, model, and engine from the list to avoid compatibility
-          mistakes and keep your order details consistent.
+          Select brand, model, engine, and ECU type from the list to keep your
+          order details consistent and reduce compatibility mistakes.
         </div>
 
         <div className="mt-12">
@@ -792,6 +964,10 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
               <p>
                 <span className="text-white/45">Engine:</span>{" "}
                 {selectedEngineData.name}
+              </p>
+              <p>
+                <span className="text-white/45">ECU Type:</span>{" "}
+                {finalEcuType || "-"}
               </p>
               <p>
                 <span className="text-white/45">ECU Read Tool:</span>{" "}

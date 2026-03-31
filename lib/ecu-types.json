@@ -1,0 +1,140 @@
+{
+  "Bosch": [
+    {
+      "family": "MED9",
+      "models": [
+        "MED9.1",
+        "MED9.5",
+        "MED9.6"
+      ]
+    },
+    {
+      "family": "MED17",
+      "models": [
+        "MED17.1",
+        "MED17.5",
+        "MED17.5.2",
+        "MED17.5.5",
+        "MED17.5.25"
+      ]
+    },
+    {
+      "family": "EDC15",
+      "models": [
+        "EDC15P",
+        "EDC15VM"
+      ]
+    },
+    {
+      "family": "EDC16",
+      "models": [
+        "EDC16U1",
+        "EDC16U31",
+        "EDC16CP34"
+      ]
+    },
+    {
+      "family": "EDC17",
+      "models": [
+        "EDC17CP14",
+        "EDC17CP20",
+        "EDC17C46",
+        "EDC17C64"
+      ]
+    },
+    {
+      "family": "MD1",
+      "models": [
+        "MD1CP001",
+        "MD1CP002",
+        "MD1CS003",
+        "MD1CS004"
+      ]
+    },
+    {
+      "family": "MG1",
+      "models": [
+        "MG1CS003",
+        "MG1CS011",
+        "MG1CS201",
+        "MG1CP002"
+      ]
+    }
+  ],
+  "Siemens / Continental": [
+    {
+      "family": "SIMOS",
+      "models": [
+        "SIMOS 3",
+        "SIMOS 7.1",
+        "SIMOS 10",
+        "SIMOS 12",
+        "SIMOS 18"
+      ]
+    },
+    {
+      "family": "SID",
+      "models": [
+        "SID201",
+        "SID206",
+        "SID208",
+        "SID211",
+        "SID212"
+      ]
+    }
+  ],
+  "Delphi": [
+    {
+      "family": "DCM",
+      "models": [
+        "DCM3.5",
+        "DCM6.2",
+        "DCM7.1",
+        "DCM7.2"
+      ]
+    },
+    {
+      "family": "MT",
+      "models": [
+        "MT05",
+        "MT20",
+        "MT80"
+      ]
+    }
+  ],
+  "Denso": [
+    {
+      "family": "Denso ECU",
+      "models": [
+        "Gen1",
+        "Gen2",
+        "Gen3",
+        "Gen4"
+      ]
+    }
+  ],
+  "Magneti Marelli": [
+    {
+      "family": "IAW",
+      "models": [
+        "IAW 5NF",
+        "IAW 6LP",
+        "IAW 8GM",
+        "IAW 9GF"
+      ]
+    },
+    {
+      "family": "MM ECU",
+      "models": [
+        "MJD6",
+        "MJD8"
+      ]
+    }
+  ],
+  "Other": [
+    {
+      "family": "Other / Unknown",
+      "models": []
+    }
+  ]
+}
