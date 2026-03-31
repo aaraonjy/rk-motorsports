@@ -3,32 +3,32 @@ import { Gauge, Wrench, Settings, Zap, Rocket, Flame } from "lucide-react";
 const services = [
   {
     title: "Stage 1 / 2 / 3 Performance Tuning",
-    desc: "Optimized ECU calibration for stock to fully modified setups. Increase power, torque, and throttle response with proven staged tuning solutions.",
+    desc: "Optimized ECU calibration from stock to fully modified setups. Increase power, torque, and throttle response.",
     icon: Gauge,
   },
   {
     title: "Custom ECU Calibration",
-    desc: "Tailored tuning based on your exact hardware setup, fuel type, and performance goals. Perfect for hybrid turbos, built engines, and advanced builds.",
+    desc: "Tailored tuning based on your hardware, fuel, and goals. Ideal for hybrid turbos and advanced builds.",
     icon: Wrench,
   },
   {
     title: "Multi-Map Switching (On-The-Fly)",
-    desc: "Switch between multiple maps using cruise control. Easily toggle between pump fuel, race fuel, valet mode, or crackle profiles anytime.",
+    desc: "Switch maps using cruise control. Toggle fuel types, valet mode, or crackle profiles instantly.",
     icon: Settings,
   },
   {
     title: "Boosted Launch Control (2-Step)",
-    desc: "Launch with pre-built boost for maximum acceleration. Improves 60ft times and delivers consistent, repeatable drag performance.",
+    desc: "Launch with pre-built boost for maximum acceleration. Consistent and repeatable drag performance.",
     icon: Zap,
   },
   {
     title: "Rolling Anti-Lag (RAL)",
-    desc: "Maintain boost while cruising or between pulls. Eliminates turbo lag and delivers instant power during roll racing.",
+    desc: "Maintain boost between pulls. Instant throttle response with reduced turbo lag.",
     icon: Rocket,
   },
   {
     title: "Pop & Bang / Flame Tuning",
-    desc: "Aggressive exhaust crackles and flame effects on deceleration. Customizable intensity for street or track presence.",
+    desc: "Aggressive crackles and flame effects on deceleration. Adjustable for street or track use.",
     icon: Flame,
   },
 ];
