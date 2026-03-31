@@ -1,35 +1,35 @@
-import { Gauge, Flame, Settings, Zap, Wrench, Rocket } from "lucide-react";
+import { Gauge, Wrench, Settings, Zap, Rocket, Flame } from "lucide-react";
 
 const services = [
   {
-    title: "Stage 1 Remap",
-    desc: "Optimized ECU calibration for stock vehicles improving power, torque, and throttle response.",
+    title: "Stage 1 / 2 / 3 Performance Tuning",
+    desc: "Optimized ECU calibration for stock to fully modified setups. Increase power, torque, and throttle response with proven staged tuning solutions.",
     icon: Gauge,
   },
   {
-    title: "Stage 2 / 3 Remap",
-    desc: "Custom tuning for modified setups including turbo upgrades, fueling, and exhaust systems.",
-    icon: Rocket,
+    title: "Custom ECU Calibration",
+    desc: "Tailored tuning based on your exact hardware setup, fuel type, and performance goals. Perfect for hybrid turbos, built engines, and advanced builds.",
+    icon: Wrench,
   },
   {
-    title: "DPF / EGR Solutions",
-    desc: "Software solutions to prevent common issues after hardware modifications.",
+    title: "Multi-Map Switching (On-The-Fly)",
+    desc: "Switch between multiple maps using cruise control. Easily toggle between pump fuel, race fuel, valet mode, or crackle profiles anytime.",
     icon: Settings,
   },
   {
-    title: "Pop & Bang / Flames",
-    desc: "Enhance exhaust sound with controlled pops, crackles, or flame tuning.",
-    icon: Flame,
-  },
-  {
-    title: "Launch Control",
-    desc: "Optimized launch strategy for faster acceleration and consistent performance.",
+    title: "Boosted Launch Control (2-Step)",
+    desc: "Launch with pre-built boost for maximum acceleration. Improves 60ft times and delivers consistent, repeatable drag performance.",
     icon: Zap,
   },
   {
-    title: "Custom ECU File",
-    desc: "Upload your ECU file and receive a fully custom-tuned calibration.",
-    icon: Wrench,
+    title: "Rolling Anti-Lag (RAL)",
+    desc: "Maintain boost while cruising or between pulls. Eliminates turbo lag and delivers instant power during roll racing.",
+    icon: Rocket,
+  },
+  {
+    title: "Pop & Bang / Flame Tuning",
+    desc: "Aggressive exhaust crackles and flame effects on deceleration. Customizable intensity for street or track presence.",
+    icon: Flame,
   },
 ];
 
@@ -47,7 +47,7 @@ export function HomeServices() {
             Professional ECU Tuning Services
           </h2>
 
-          <p className="mt-4 max-w-2xl mx-auto text-white/65 md:text-lg">
+          <p className="mt-4 mx-auto max-w-2xl text-white/65 md:text-lg">
             Explore our range of ECU and performance tuning services tailored for
             both daily drivers and high-performance builds.
           </p>
