@@ -16,25 +16,27 @@ export default function ContactPage() {
         <div className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr]">
           {/* LEFT INFO */}
           <div className="rounded-[2rem] border border-white/10 bg-black/45 p-6 backdrop-blur-md md:p-8">
-            <div className="space-y-5">
-              <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+            <div className="space-y-8">
+              <div>
                 <p className="text-sm uppercase tracking-[0.2em] text-white/45">
                   Business
                 </p>
-                <p className="mt-2 text-xl font-semibold text-white">
+                <p className="mt-3 text-2xl font-semibold text-white">
                   RK Motorsports
                 </p>
               </div>
 
-              <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+              <div className="h-px bg-white/10" />
+
+              <div>
                 <p className="text-sm uppercase tracking-[0.2em] text-white/45">
                   Phone / WhatsApp
                 </p>
-                <p className="mt-2 text-xl font-semibold text-white">
+                <p className="mt-3 text-2xl font-semibold text-white">
                   012-310 6132
                 </p>
 
-                <div className="mt-4 flex flex-wrap gap-3">
+                <div className="mt-5">
                   <a
                     href="https://wa.me/60123106132"
                     target="_blank"
@@ -43,23 +45,16 @@ export default function ContactPage() {
                   >
                     WhatsApp Us
                   </a>
-
-                  <a
-                    href="https://www.google.com/maps?q=34%20Jalan%20Tembaga%20SD%205%2F2b%20Bandar%20Sri%20Damansara"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center justify-center rounded-full border border-white/15 bg-white/[0.03] px-5 py-2.5 text-sm font-semibold text-white transition hover:border-white/25 hover:bg-white/[0.06]"
-                  >
-                    Open in Google Maps
-                  </a>
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+              <div className="h-px bg-white/10" />
+
+              <div>
                 <p className="text-sm uppercase tracking-[0.2em] text-white/45">
                   Address
                 </p>
-                <p className="mt-2 text-lg font-semibold leading-relaxed text-white">
+                <p className="mt-3 text-lg font-semibold leading-relaxed text-white">
                   34, Jalan Tembaga SD 5/2b,
                   <br />
                   Bandar Sri Damansara,
@@ -68,12 +63,14 @@ export default function ContactPage() {
                 </p>
               </div>
 
-              <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+              <div className="h-px bg-white/10" />
+
+              <div>
                 <p className="text-sm uppercase tracking-[0.2em] text-white/45">
                   Business Hours
                 </p>
 
-                <div className="mt-3 space-y-2 text-sm text-white/80">
+                <div className="mt-4 space-y-2 text-sm text-white/80">
                   <p>Monday – Friday: 1:00 PM – 12:00 AM</p>
                   <p>Saturday: 1:00 PM – 12:00 AM</p>
                   <p>Sunday: 1:00 PM – 7:00 PM</p>
@@ -81,7 +78,7 @@ export default function ContactPage() {
               </div>
             </div>
 
-            <p className="mt-5 text-sm leading-6 text-white/50">
+            <p className="mt-8 text-sm leading-6 text-white/50">
               * Please contact us before visiting to confirm availability.
             </p>
           </div>
