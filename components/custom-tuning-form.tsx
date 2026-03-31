@@ -73,6 +73,9 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
   const [selectedModelId, setSelectedModelId] = useState("");
   const [selectedEngineId, setSelectedEngineId] = useState("");
 
+  const [manualYearRange, setManualYearRange] = useState("");
+  const [manualCapacity, setManualCapacity] = useState("");
+
   const [ecuBrand, setEcuBrand] = useState("");
   const [ecuFamily, setEcuFamily] = useState("");
   const [ecuModel, setEcuModel] = useState("");
@@ -150,6 +153,16 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
     [selectedEngineData]
   );
 
+  const finalYearRange = useMemo(
+    () => derivedYearRange || manualYearRange.trim(),
+    [derivedYearRange, manualYearRange]
+  );
+
+  const finalCapacity = useMemo(
+    () => derivedCapacity || manualCapacity.trim(),
+    [derivedCapacity, manualCapacity]
+  );
+
   const selectedEcuBrandData = useMemo(
     () => (ecuBrand ? ecuTypes[ecuBrand] || [] : []),
     [ecuBrand, ecuTypes]
@@ -219,11 +232,19 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
   useEffect(() => {
     setSelectedModelId("");
     setSelectedEngineId("");
+    setManualYearRange("");
+    setManualCapacity("");
   }, [selectedBrand]);
 
   useEffect(() => {
     setSelectedEngineId("");
+    setManualYearRange("");
+    setManualCapacity("");
   }, [selectedModelId]);
+
+  useEffect(() => {
+    setManualCapacity("");
+  }, [selectedEngineId]);
 
   useEffect(() => {
     setEcuFamily("");
@@ -267,8 +288,8 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
     !selectedBrand ||
     !selectedModelId ||
     !selectedEngineId ||
-    !derivedYearRange ||
-    !derivedCapacity ||
+    !finalYearRange ||
+    !finalCapacity ||
     !finalEcuType ||
     !selectedTune ||
     !ecuReadTool ||
@@ -299,8 +320,8 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
         name="engineModel"
         value={selectedEngineData?.name || ""}
       />
-      <input type="hidden" name="vehicleYear" value={derivedYearRange} />
-      <input type="hidden" name="engineCapacity" value={derivedCapacity} />
+      <input type="hidden" name="vehicleYear" value={finalYearRange} />
+      <input type="hidden" name="engineCapacity" value={finalCapacity} />
       <input type="hidden" name="ecuType" value={finalEcuType} />
       <input type="hidden" name="ecuReadTool" value={finalEcuReadTool} />
       <input type="hidden" name="fuelGrade" value={finalFuelGrade} />
@@ -436,22 +457,42 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
             <label className="label-rk">Year / Range</label>
             <input
               className="input-rk"
-              value={derivedYearRange}
-              placeholder="Auto-filled from model"
-              readOnly
+              value={derivedYearRange || manualYearRange}
+              onChange={(e) => setManualYearRange(e.target.value)}
+              placeholder={
+                derivedYearRange
+                  ? "Auto-filled from model"
+                  : "Enter year / range manually (e.g. 2015 - 2018)"
+              }
+              readOnly={!!derivedYearRange}
               required
             />
+            {!derivedYearRange ? (
+              <p className="mt-2 text-xs text-white/45">
+                Auto-fill unavailable for this model. Please enter manually.
+              </p>
+            ) : null}
           </div>
 
           <div>
             <label className="label-rk">Engine Capacity (cc)</label>
             <input
               className="input-rk"
-              value={derivedCapacity}
-              placeholder="Auto-filled from engine"
-              readOnly
+              value={derivedCapacity || manualCapacity}
+              onChange={(e) => setManualCapacity(e.target.value)}
+              placeholder={
+                derivedCapacity
+                  ? "Auto-filled from engine"
+                  : "Enter engine capacity manually (e.g. 2000)"
+              }
+              readOnly={!!derivedCapacity}
               required
             />
+            {!derivedCapacity ? (
+              <p className="mt-2 text-xs text-white/45">
+                Auto-fill unavailable for this engine. Please enter manually.
+              </p>
+            ) : null}
           </div>
 
           <div className="md:col-span-3">
@@ -944,6 +985,14 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
               <p>
                 <span className="text-white/45">Engine:</span>{" "}
                 {selectedEngineData.name}
+              </p>
+              <p>
+                <span className="text-white/45">Year / Range:</span>{" "}
+                {finalYearRange || "-"}
+              </p>
+              <p>
+                <span className="text-white/45">Engine Capacity:</span>{" "}
+                {finalCapacity ? `${finalCapacity} cc` : "-"}
               </p>
               <p>
                 <span className="text-white/45">ECU Type:</span>{" "}
