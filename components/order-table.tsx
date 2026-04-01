@@ -543,7 +543,7 @@ function FileSection({
   const history = revisions.slice(1);
 
   return (
-    <div className="max-w-[260px] rounded-xl border border-white/10 bg-black/25 p-3">
+    <div className="w-full max-w-[190px] rounded-xl border border-white/10 bg-black/25 p-3">
       <div className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-white/45">
         {title}
       </div>
@@ -634,16 +634,16 @@ export function OrderTable({
   return (
     <>
       <div className="overflow-x-auto rounded-3xl border border-white/20 bg-black/60 shadow-xl shadow-black/40 backdrop-blur-md">
-        <table className="w-full text-left text-sm">
+        <table className="min-w-full table-fixed text-left text-sm">
           <thead className="bg-black/50 text-white/65">
             <tr>
               <th className="px-4 py-4 w-[140px]">Order</th>
-              {admin ? <th className="px-4 py-4 w-[150px]">Customer</th> : null}
-              <th className="px-4 py-4 min-w-[320px]">Vehicle</th>
-              <th className="px-4 py-4 w-[170px]">Status</th>
+              {admin ? <th className="px-4 py-4 w-[130px]">Customer</th> : null}
+              <th className="px-4 py-4">Vehicle</th>
+              <th className="px-4 py-4 w-[180px]">Status</th>
               <th className="px-4 py-4 w-[110px]">Amount</th>
-              <th className="px-4 py-4 w-[290px]">Files</th>
-              <th className="px-4 py-4 w-[240px]">Action</th>
+              <th className="px-4 py-4 w-[190px]">Files</th>
+              <th className="px-4 py-4 w-[170px]">Action</th>
             </tr>
           </thead>
 
@@ -716,8 +716,8 @@ export function OrderTable({
                     <VehicleDetails order={order} />
                   </td>
 
-                  <td className="px-4 py-4">
-                    <div className="flex min-w-[150px] flex-col items-start gap-3">
+                  <td className="px-4 py-4 align-top">
+                    <div className="flex flex-col items-start gap-3">
                       <span className={statusBadgeClass}>{statusLabel}</span>
 
                       {admin &&
@@ -766,12 +766,12 @@ export function OrderTable({
                     </div>
                   </td>
 
-                  <td className="px-4 py-4 whitespace-nowrap">
+                  <td className="px-4 py-4 whitespace-nowrap align-top">
                     {formatCurrency(order.totalAmount)}
                   </td>
 
-                  <td className="px-4 py-4">
-                    <div className="flex w-[260px] flex-col gap-3">
+                  <td className="px-4 py-4 align-top">
+                    <div className="flex w-full max-w-[190px] flex-col gap-3">
                       {needsEcu ? (
                         <FileSection
                           title="ECU"
@@ -805,113 +805,111 @@ export function OrderTable({
                     </div>
                   </td>
 
-                  <td className="px-4 py-4">
+                  <td className="px-4 py-4 align-top">
                     {admin ? (
                       order.status === "CANCELLED" ? (
                         <span className="text-red-400">Order Cancelled</span>
                       ) : (
-                        <div className="w-[220px]">
-                          <div className="flex flex-col gap-3">
-                            {needsEcu && !adminEcu ? (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setUploadModal({
-                                    action: "admin-upload-ecu",
-                                    orderId: order.id,
-                                  })
-                                }
-                                className="block w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center transition hover:bg-white/10"
-                              >
-                                Upload Tuned ECU
-                              </button>
-                            ) : null}
+                        <div className="flex w-full max-w-[170px] flex-col gap-2">
+                          {needsEcu && !adminEcu ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setUploadModal({
+                                  action: "admin-upload-ecu",
+                                  orderId: order.id,
+                                })
+                              }
+                              className="w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center text-sm transition hover:bg-white/10"
+                            >
+                              Upload Tuned ECU
+                            </button>
+                          ) : null}
 
-                            {needsTcu && !adminTcu ? (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setUploadModal({
-                                    action: "admin-upload-tcu",
-                                    orderId: order.id,
-                                  })
-                                }
-                                className="block w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center transition hover:bg-white/10"
-                              >
-                                Upload Tuned TCU
-                              </button>
-                            ) : null}
+                          {needsTcu && !adminTcu ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setUploadModal({
+                                  action: "admin-upload-tcu",
+                                  orderId: order.id,
+                                })
+                              }
+                              className="w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center text-sm transition hover:bg-white/10"
+                            >
+                              Upload Tuned TCU
+                            </button>
+                          ) : null}
 
-                            {["FILE_RECEIVED", "IN_PROGRESS", "AWAITING_PAYMENT"].includes(
-                              order.status
-                            ) ? (
-                              <button
-                                type="button"
-                                onClick={() => setCancelOrderId(order.id)}
-                                className="block w-full rounded-xl border border-red-500/40 px-3 py-2 text-center text-red-400 transition hover:bg-red-500/10"
-                              >
-                                Admin Cancel Order
-                              </button>
-                            ) : null}
+                          {["FILE_RECEIVED", "IN_PROGRESS", "AWAITING_PAYMENT"].includes(
+                            order.status
+                          ) ? (
+                            <button
+                              type="button"
+                              onClick={() => setCancelOrderId(order.id)}
+                              className="w-full rounded-xl border border-red-500/40 px-3 py-2 text-center text-sm text-red-400 transition hover:bg-red-500/10"
+                            >
+                              Admin Cancel Order
+                            </button>
+                          ) : null}
 
-                            {order.status === "AWAITING_PAYMENT" &&
-                            paymentProof &&
-                            hasAllAdminFiles ? (
-                              <button
-                                type="button"
-                                onClick={() => setReleaseOrderId(order.id)}
-                                className="block w-full rounded-xl border border-emerald-500/40 px-3 py-2 text-center text-emerald-400 transition hover:bg-emerald-500/10"
-                              >
-                                Confirm Payment & Release
-                              </button>
-                            ) : null}
+                          {order.status === "AWAITING_PAYMENT" &&
+                          paymentProof &&
+                          hasAllAdminFiles ? (
+                            <button
+                              type="button"
+                              onClick={() => setReleaseOrderId(order.id)}
+                              className="w-full rounded-xl border border-emerald-500/40 px-3 py-2 text-center text-sm text-emerald-400 transition hover:bg-emerald-500/10"
+                            >
+                              Confirm Payment & Release
+                            </button>
+                          ) : null}
 
-                            {["READY_FOR_DOWNLOAD", "COMPLETED"].includes(order.status) &&
-                            needsEcu &&
-                            adminEcu ? (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setUploadModal({
-                                    action: "admin-upload-revision-ecu",
-                                    orderId: order.id,
-                                  })
-                                }
-                                className="block w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center transition hover:bg-white/10"
-                              >
-                                Upload ECU Revision
-                              </button>
-                            ) : null}
+                          {["READY_FOR_DOWNLOAD", "COMPLETED"].includes(order.status) &&
+                          needsEcu &&
+                          adminEcu ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setUploadModal({
+                                  action: "admin-upload-revision-ecu",
+                                  orderId: order.id,
+                                })
+                              }
+                              className="w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center text-sm transition hover:bg-white/10"
+                            >
+                              Upload ECU Revision
+                            </button>
+                          ) : null}
 
-                            {["READY_FOR_DOWNLOAD", "COMPLETED"].includes(order.status) &&
-                            needsTcu &&
-                            adminTcu ? (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setUploadModal({
-                                    action: "admin-upload-revision-tcu",
-                                    orderId: order.id,
-                                  })
-                                }
-                                className="block w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center transition hover:bg-white/10"
-                              >
-                                Upload TCU Revision
-                              </button>
-                            ) : null}
+                          {["READY_FOR_DOWNLOAD", "COMPLETED"].includes(order.status) &&
+                          needsTcu &&
+                          adminTcu ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setUploadModal({
+                                  action: "admin-upload-revision-tcu",
+                                  orderId: order.id,
+                                })
+                              }
+                              className="w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center text-sm transition hover:bg-white/10"
+                            >
+                              Upload TCU Revision
+                            </button>
+                          ) : null}
 
-                            {order.status === "READY_FOR_DOWNLOAD" ? (
-                              <span className="inline-flex w-full items-center justify-center rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-center text-emerald-400">
-                                Download Released
-                              </span>
-                            ) : null}
-                          </div>
+                          {order.status === "READY_FOR_DOWNLOAD" ? (
+                            <span className="inline-flex w-full items-center justify-center rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-center text-sm text-emerald-400">
+                              Download Released
+                            </span>
+                          ) : null}
                         </div>
                       )
                     ) : order.status === "CANCELLED" ? (
                       <span className="text-red-400">Cancelled</span>
                     ) : order.status === "READY_FOR_DOWNLOAD" ? (
-                      <div className="flex min-w-[230px] flex-col gap-2">
+                      <div className="flex w-full max-w-[170px] flex-col gap-2">
                         {needsEcu && adminEcu ? (
                           <Link
                             href={`/api/files/${adminEcu.id}/download`}
@@ -931,7 +929,7 @@ export function OrderTable({
                         ) : null}
                       </div>
                     ) : order.status === "AWAITING_PAYMENT" && hasAllAdminFiles ? (
-                      <div className="flex min-w-[230px] flex-col gap-2">
+                      <div className="flex w-full max-w-[170px] flex-col gap-2">
                         <span className="text-amber-300/90">
                           Pending Payment
                         </span>
