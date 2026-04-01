@@ -14,8 +14,8 @@ export default async function CustomTuningPage() {
         <h1 className="text-4xl font-bold">Custom Tuning Request</h1>
 
         <p className="mt-5 max-w-3xl text-white/70 leading-relaxed">
-          Fill in your vehicle details, choose your tuning package, select any
-          additional options, and upload your original ECU file.
+          Fill in your vehicle details, choose ECU, TCU, or ECU + TCU tuning,
+          select any additional options, and upload your stock file(s).
           <br />
           Our team will review your request and contact you shortly after
           submission to confirm compatibility, pricing, and turnaround time.
@@ -36,7 +36,7 @@ export default async function CustomTuningPage() {
         ) : !user ? (
           <div className="card-rk mt-10 p-6">
             <p className="text-white/75">
-              Please log in or register before submitting your ECU file.
+              Please log in or register before submitting your tuning request.
             </p>
             <div className="mt-6 flex flex-wrap gap-4">
               <Link href="/login" className="btn-primary">

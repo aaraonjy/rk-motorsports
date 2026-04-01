@@ -4,6 +4,14 @@ import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { saveFile } from "@/lib/storage";
 
+function needsEcu(tuningType: string | null | undefined) {
+  return tuningType === "ECU" || tuningType === "ECU_TCU" || !tuningType;
+}
+
+function needsTcu(tuningType: string | null | undefined) {
+  return tuningType === "TCU" || tuningType === "ECU_TCU";
+}
+
 export async function POST(
   req: Request,
   ctx: { params: Promise<{ id: string }> }
@@ -13,16 +21,17 @@ export async function POST(
 
     const { id } = await ctx.params;
     const form = await req.formData();
-    const file = form.get("file");
 
-    if (!(file instanceof File) || file.size === 0) {
-      return NextResponse.redirect(new URL("/admin", req.url), 303);
-    }
+    const singleFile = form.get("file");
+    const target = String(form.get("target") || "").trim().toUpperCase();
+
+    const ecuFile = form.get("ecuFile");
+    const tcuFile = form.get("tcuFile");
 
     const order = await db.order.findUnique({
       where: { id },
       include: {
-        revisions: true,
+        files: true,
       },
     });
 
@@ -30,59 +39,110 @@ export async function POST(
       return NextResponse.redirect(new URL("/admin", req.url), 303);
     }
 
-    if (order.revisions.length > 0) {
+    const uploads: Array<{ kind: string; file: File }> = [];
+
+    if (singleFile instanceof File && singleFile.size > 0) {
+      uploads.push({
+        kind: target === "TCU" ? "ADMIN_TCU" : "ADMIN_ECU",
+        file: singleFile,
+      });
+    }
+
+    if (ecuFile instanceof File && ecuFile.size > 0) {
+      uploads.push({
+        kind: "ADMIN_ECU",
+        file: ecuFile,
+      });
+    }
+
+    if (tcuFile instanceof File && tcuFile.size > 0) {
+      uploads.push({
+        kind: "ADMIN_TCU",
+        file: tcuFile,
+      });
+    }
+
+    if (uploads.length === 0) {
       return NextResponse.redirect(new URL("/admin", req.url), 303);
     }
 
-    const saved = await saveFile(file, "admin-tuned");
+    for (const upload of uploads) {
+      const saved = await saveFile(
+        upload.file,
+        upload.kind === "ADMIN_TCU" ? "admin-tuned-tcu" : "admin-tuned-ecu"
+      );
 
-    const existingCompletedFile = await db.orderFile.findFirst({
-      where: {
-        orderId: id,
-        kind: "ADMIN_COMPLETED",
-      },
+      const existing = await db.orderFile.findFirst({
+        where: {
+          orderId: id,
+          kind: upload.kind,
+        },
+      });
+
+      if (existing) {
+        await db.orderFile.update({
+          where: { id: existing.id },
+          data: {
+            fileName: saved.fileName,
+            storagePath: saved.storagePath,
+            mimeType: saved.mimeType,
+          },
+        });
+      } else {
+        await db.orderFile.create({
+          data: {
+            orderId: id,
+            kind: upload.kind,
+            fileName: saved.fileName,
+            storagePath: saved.storagePath,
+            mimeType: saved.mimeType,
+          },
+        });
+      }
+    }
+
+    const refreshedFiles = await db.orderFile.findMany({
+      where: { orderId: id },
     });
 
-    if (existingCompletedFile) {
-      await db.orderFile.update({
-        where: { id: existingCompletedFile.id },
-        data: {
-          fileName: saved.fileName,
-          storagePath: saved.storagePath,
-          mimeType: saved.mimeType,
-        },
-      });
-    } else {
-      await db.orderFile.create({
-        data: {
-          orderId: id,
-          kind: "ADMIN_COMPLETED",
-          fileName: saved.fileName,
-          storagePath: saved.storagePath,
-          mimeType: saved.mimeType,
-        },
-      });
-    }
+    const hasRequiredEcu =
+      !needsEcu(order.tuningType) ||
+      refreshedFiles.some((f) => f.kind === "ADMIN_ECU") ||
+      refreshedFiles.some((f) => f.kind === "ADMIN_COMPLETED");
+
+    const hasRequiredTcu =
+      !needsTcu(order.tuningType) ||
+      refreshedFiles.some((f) => f.kind === "ADMIN_TCU");
+
+    const nextStatus =
+      hasRequiredEcu && hasRequiredTcu ? "AWAITING_PAYMENT" : "IN_PROGRESS";
 
     await db.order.update({
       where: { id },
       data: {
-        status: "AWAITING_PAYMENT",
+        status: nextStatus,
       },
     });
 
-    try {
-      await db.notification.create({
-        data: {
-          userId: order.userId,
-          type: "TUNED_FILE_READY",
-          title: "Tuned file ready",
-          message: "Your tuned file is ready, pending for payment.",
-          orderId: id,
-        },
-      });
-    } catch (err) {
-      console.error("Customer notification failed:", err);
+    if (nextStatus === "AWAITING_PAYMENT") {
+      try {
+        await db.notification.create({
+          data: {
+            userId: order.userId,
+            type: "TUNED_FILE_READY",
+            title: "Tuned file ready",
+            message:
+              order.tuningType === "ECU_TCU"
+                ? "Your tuned ECU and TCU files are ready, pending payment."
+                : order.tuningType === "TCU"
+                  ? "Your tuned TCU file is ready, pending payment."
+                  : "Your tuned ECU file is ready, pending payment.",
+            orderId: id,
+          },
+        });
+      } catch (err) {
+        console.error("Customer notification failed:", err);
+      }
     }
 
     revalidatePath("/admin");

@@ -1,0 +1,29 @@
+{
+  "name": "TCU Read Tools List",
+  "version": "1.0",
+  "description": "List of supported TCU reading and flashing tools for RK Motorsports platform",
+  "tools": [
+    "Alientech KESS3",
+    "Alientech K-TAG",
+    "Magic Motorsport FLEX",
+    "Magic Motorsport MAGPro2",
+    "Dimsport New Trasdata",
+    "Autotuner",
+    "CMD Flash",
+    "bFlash",
+    "PCM Flash",
+    "BitBox",
+    "Byteshooter",
+    "Scanmatik (J2534)",
+    "HP Tuners MPVI",
+    "FoxFlash",
+    "KT200",
+    "TGFlash",
+    "FGTech (Galletto)",
+    "KESS V2 (Limited TCU Support)",
+    "MPPS (Limited Support)",
+    "VCDS (Diagnostics / Adaptation Only)",
+    "ODIS Engineering",
+    "Other (Specify)"
+  ]
+}

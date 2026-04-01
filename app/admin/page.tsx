@@ -19,14 +19,17 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const status = params.status || "ALL";
   const search = params.search || "";
 
-  const orders = (await getAllOrders({ status, search })) as OrderWithRelations[];
+  const orders = (await getAllOrders({
+    status,
+    search,
+  })) as OrderWithRelations[];
 
   return (
     <section className="section-pad">
       <div className="container-rk">
         <h1 className="text-4xl font-bold">Admin Dashboard</h1>
         <p className="mt-4 text-white/70">
-          Review orders, uploaded files, and manage delivery workflow.
+          Review ECU / TCU orders, uploaded files, and manage delivery workflow.
         </p>
 
         <div className="mt-8 space-y-4">

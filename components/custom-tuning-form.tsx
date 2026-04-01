@@ -4,9 +4,20 @@ import { useEffect, useMemo, useState } from "react";
 import carLibrary from "@/lib/car-library.json";
 import ecuTypesData from "@/lib/ecu-types.json";
 import ecuReadToolsData from "@/lib/ecu-read-tools.json";
+import tcuTypesData from "@/lib/tcu-types.json";
+import tcuReadToolsData from "@/lib/tcu-read-tools.json";
 import fuelGradesData from "@/lib/fuel-grades.json";
 import wmiOptionsData from "@/lib/wmi-options.json";
-import { addOns, baseTunes } from "@/lib/tuning-pricing";
+import {
+  addOns,
+  calculateAddOnTotal,
+  calculateBaseTuneTotal,
+  ecuTunes,
+  getBundleLabel,
+  getRecommendedTcuStage,
+  tcuTunes,
+  type TuningTypeOption,
+} from "@/lib/tuning-pricing";
 
 type EngineOption = {
   id: string;
@@ -25,9 +36,10 @@ type BrandOption = {
 };
 
 type EcuReadToolsFile = {
-  name: string;
-  version: string;
-  description: string;
+  tools: string[];
+};
+
+type TcuReadToolsFile = {
   tools: string[];
 };
 
@@ -40,7 +52,13 @@ type EcuTypeEntry = {
   models: string[];
 };
 
+type TcuTypeEntry = {
+  family: string;
+  models: string[];
+};
+
 type EcuTypesFile = Record<string, EcuTypeEntry[]>;
+type TcuTypesFile = Record<string, TcuTypeEntry[]>;
 
 type CustomTuningFormProps = {
   productId: string;
@@ -64,8 +82,28 @@ function extractEngineCapacityCc(engineName: string) {
   return String(Math.round(liters * 1000));
 }
 
+function SelectArrow() {
+  return (
+    <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/50">
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 20 20"
+        fill="currentColor"
+        className="h-5 w-5"
+        aria-hidden="true"
+      >
+        <path
+          fillRule="evenodd"
+          d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.51a.75.75 0 0 1-1.08 0l-4.25-4.51a.75.75 0 0 1 .02-1.06Z"
+          clipRule="evenodd"
+        />
+      </svg>
+    </div>
+  );
+}
+
 export function CustomTuningForm({ productId }: CustomTuningFormProps) {
-  const [selectedTune, setSelectedTune] = useState<string>("");
+  const [tuningType, setTuningType] = useState<TuningTypeOption>("ECU");
   const [selectedAddOns, setSelectedAddOns] = useState<string[]>([]);
   const [isAddOnsOpen, setIsAddOnsOpen] = useState(false);
 
@@ -76,6 +114,9 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
   const [manualYearRange, setManualYearRange] = useState("");
   const [manualCapacity, setManualCapacity] = useState("");
 
+  const [ecuStage, setEcuStage] = useState("");
+  const [tcuStage, setTcuStage] = useState("");
+
   const [ecuBrand, setEcuBrand] = useState("");
   const [ecuFamily, setEcuFamily] = useState("");
   const [ecuModel, setEcuModel] = useState("");
@@ -83,6 +124,15 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
 
   const [ecuReadTool, setEcuReadTool] = useState("");
   const [ecuReadToolOther, setEcuReadToolOther] = useState("");
+
+  const [tcuBrand, setTcuBrand] = useState("");
+  const [tcuFamily, setTcuFamily] = useState("");
+  const [tcuModel, setTcuModel] = useState("");
+  const [tcuOther, setTcuOther] = useState("");
+  const [tcuVersion, setTcuVersion] = useState("");
+
+  const [tcuReadTool, setTcuReadTool] = useState("");
+  const [tcuReadToolOther, setTcuReadToolOther] = useState("");
 
   const [fuelGrade, setFuelGrade] = useState("");
   const [fuelGradeOther, setFuelGradeOther] = useState("");
@@ -101,13 +151,20 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
   const ecuTypes = useMemo(() => ecuTypesData as EcuTypesFile, []);
   const ecuBrands = useMemo(() => Object.keys(ecuTypes), [ecuTypes]);
 
+  const tcuTypes = useMemo(() => tcuTypesData as TcuTypesFile, []);
+  const tcuBrands = useMemo(() => Object.keys(tcuTypes), [tcuTypes]);
+
   const ecuReadTools = useMemo(
     () => (ecuReadToolsData as EcuReadToolsFile).tools || [],
     []
   );
 
-  const fuelGrades = useMemo(() => (fuelGradesData as string[]) || [], []);
+  const tcuReadTools = useMemo(
+    () => (tcuReadToolsData as TcuReadToolsFile).tools || [],
+    []
+  );
 
+  const fuelGrades = useMemo(() => (fuelGradesData as string[]) || [], []);
   const wmiOptions = useMemo(
     () =>
       ((wmiOptionsData as WmiOptionsFile).options || []).filter(
@@ -166,17 +223,6 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
   const shouldShowYearFallback = !!selectedModelId && !derivedYearRange;
   const shouldShowCapacityFallback = !!selectedEngineId && !derivedCapacity;
 
-  const isYearFieldEditable = shouldShowYearFallback;
-  const isCapacityFieldEditable = shouldShowCapacityFallback;
-
-  const yearPlaceholder = shouldShowYearFallback
-    ? "Enter year / range manually (e.g. 2015 - 2018)"
-    : "Auto-filled from model";
-
-  const capacityPlaceholder = shouldShowCapacityFallback
-    ? "Enter engine capacity manually (e.g. 2000)"
-    : "Auto-filled from engine";
-
   const selectedEcuBrandData = useMemo(
     () => (ecuBrand ? ecuTypes[ecuBrand] || [] : []),
     [ecuBrand, ecuTypes]
@@ -198,50 +244,66 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
     [selectedEcuFamilyData]
   );
 
-  const finalEcuType = useMemo(() => {
-    if (ecuBrand === "Other") {
-      return ecuOther.trim();
-    }
+  const selectedTcuBrandData = useMemo(
+    () => (tcuBrand ? tcuTypes[tcuBrand] || [] : []),
+    [tcuBrand, tcuTypes]
+  );
 
+  const availableTcuFamilies = useMemo(
+    () => selectedTcuBrandData.map((item) => item.family),
+    [selectedTcuBrandData]
+  );
+
+  const selectedTcuFamilyData = useMemo(
+    () =>
+      selectedTcuBrandData.find((item) => item.family === tcuFamily) || null,
+    [selectedTcuBrandData, tcuFamily]
+  );
+
+  const availableTcuModels = useMemo(
+    () => selectedTcuFamilyData?.models || [],
+    [selectedTcuFamilyData]
+  );
+
+  const shouldShowEcuSection =
+    tuningType === "ECU" || tuningType === "ECU_TCU";
+  const shouldShowTcuSection =
+    tuningType === "TCU" || tuningType === "ECU_TCU";
+
+  const finalEcuType = useMemo(() => {
+    if (!shouldShowEcuSection) return "";
+    if (ecuBrand === "Other") return ecuOther.trim();
     return [ecuBrand, ecuFamily, ecuModel].filter(Boolean).join(" ").trim();
-  }, [ecuBrand, ecuFamily, ecuModel, ecuOther]);
+  }, [shouldShowEcuSection, ecuBrand, ecuFamily, ecuModel, ecuOther]);
+
+  const finalTcuType = useMemo(() => {
+    if (!shouldShowTcuSection) return "";
+    if (tcuBrand === "Other") return tcuOther.trim();
+    return [tcuBrand, tcuFamily, tcuModel].filter(Boolean).join(" ").trim();
+  }, [shouldShowTcuSection, tcuBrand, tcuFamily, tcuModel, tcuOther]);
 
   const finalEcuReadTool = useMemo(() => {
-    if (ecuReadTool === "Other (Specify)") {
-      return ecuReadToolOther.trim();
-    }
+    if (!shouldShowEcuSection) return "";
+    if (ecuReadTool === "Other (Specify)") return ecuReadToolOther.trim();
     return ecuReadTool;
-  }, [ecuReadTool, ecuReadToolOther]);
+  }, [shouldShowEcuSection, ecuReadTool, ecuReadToolOther]);
+
+  const finalTcuReadTool = useMemo(() => {
+    if (!shouldShowTcuSection) return "";
+    if (tcuReadTool === "Other (Specify)") return tcuReadToolOther.trim();
+    return tcuReadTool;
+  }, [shouldShowTcuSection, tcuReadTool, tcuReadToolOther]);
 
   const finalFuelGrade = useMemo(() => {
-    if (fuelGrade === "Other (Specify)") {
-      return fuelGradeOther.trim();
-    }
+    if (fuelGrade === "Other (Specify)") return fuelGradeOther.trim();
     return fuelGrade;
   }, [fuelGrade, fuelGradeOther]);
 
   const finalWmiOption = useMemo(() => {
-    if (wmiOption === "Custom (Specify)") {
-      return wmiOther.trim();
-    }
+    if (!shouldShowEcuSection) return "";
+    if (wmiOption === "Custom (Specify)") return wmiOther.trim();
     return wmiOption;
-  }, [wmiOption, wmiOther]);
-
-  const activeTune = useMemo(
-    () => baseTunes.find((item) => item.id === selectedTune) || null,
-    [selectedTune]
-  );
-
-  const addOnTotal = useMemo(
-    () =>
-      selectedAddOns.reduce((total, selectedName) => {
-        const addOn = addOns.find((item) => item.name === selectedName);
-        return total + (addOn?.price || 0);
-      }, 0),
-    [selectedAddOns]
-  );
-
-  const estimatedTotal = (activeTune?.price || 0) + addOnTotal;
+  }, [shouldShowEcuSection, wmiOption, wmiOther]);
 
   useEffect(() => {
     setSelectedModelId("");
@@ -263,9 +325,7 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
   useEffect(() => {
     setEcuFamily("");
     setEcuModel("");
-    if (ecuBrand !== "Other") {
-      setEcuOther("");
-    }
+    if (ecuBrand !== "Other") setEcuOther("");
   }, [ecuBrand]);
 
   useEffect(() => {
@@ -273,22 +333,66 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
   }, [ecuFamily]);
 
   useEffect(() => {
-    if (ecuReadTool !== "Other (Specify)") {
-      setEcuReadToolOther("");
-    }
+    setTcuFamily("");
+    setTcuModel("");
+    if (tcuBrand !== "Other") setTcuOther("");
+  }, [tcuBrand]);
+
+  useEffect(() => {
+    setTcuModel("");
+  }, [tcuFamily]);
+
+  useEffect(() => {
+    if (ecuReadTool !== "Other (Specify)") setEcuReadToolOther("");
   }, [ecuReadTool]);
 
   useEffect(() => {
-    if (fuelGrade !== "Other (Specify)") {
-      setFuelGradeOther("");
-    }
+    if (tcuReadTool !== "Other (Specify)") setTcuReadToolOther("");
+  }, [tcuReadTool]);
+
+  useEffect(() => {
+    if (fuelGrade !== "Other (Specify)") setFuelGradeOther("");
   }, [fuelGrade]);
 
   useEffect(() => {
-    if (wmiOption !== "Custom (Specify)") {
+    if (wmiOption !== "Custom (Specify)") setWmiOther("");
+  }, [wmiOption]);
+
+  useEffect(() => {
+    if (tuningType === "ECU") {
+      setTcuStage("");
+      setTcuBrand("");
+      setTcuFamily("");
+      setTcuModel("");
+      setTcuOther("");
+      setTcuVersion("");
+      setTcuReadTool("");
+      setTcuReadToolOther("");
+    }
+
+    if (tuningType === "TCU") {
+      setEcuStage("");
+      setEcuBrand("");
+      setEcuFamily("");
+      setEcuModel("");
+      setEcuOther("");
+      setEcuReadTool("");
+      setEcuReadToolOther("");
+      setSelectedAddOns([]);
+      setWmiOption("");
       setWmiOther("");
     }
-  }, [wmiOption]);
+  }, [tuningType]);
+
+  useEffect(() => {
+    if (tuningType === "ECU_TCU" && ecuStage) {
+      const recommended = getRecommendedTcuStage(ecuStage);
+
+      if (recommended && !tcuStage) {
+        setTcuStage(recommended);
+      }
+    }
+  }, [ecuStage, tcuStage, tuningType]);
 
   function toggleAddOn(option: string) {
     setSelectedAddOns((prev) =>
@@ -298,18 +402,59 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
     );
   }
 
+  const baseTuneTotal = useMemo(
+    () =>
+      calculateBaseTuneTotal({
+        tuningType,
+        ecuStage,
+        tcuStage,
+      }),
+    [tuningType, ecuStage, tcuStage]
+  );
+
+  const addOnTotal = useMemo(
+    () => (shouldShowEcuSection ? calculateAddOnTotal(selectedAddOns) : 0),
+    [selectedAddOns, shouldShowEcuSection]
+  );
+
+  const estimatedTotal = baseTuneTotal + addOnTotal;
+
+  const selectedEcuTune = useMemo(
+    () => ecuTunes.find((item) => item.id === ecuStage) || null,
+    [ecuStage]
+  );
+
+  const selectedTcuTune = useMemo(
+    () => tcuTunes.find((item) => item.id === tcuStage) || null,
+    [tcuStage]
+  );
+
+  const selectedTuneLabel = useMemo(() => {
+    if (tuningType === "ECU") return selectedEcuTune?.name || "";
+    if (tuningType === "TCU") return selectedTcuTune?.name || "";
+    return getBundleLabel(ecuStage, tcuStage);
+  }, [tuningType, selectedEcuTune, selectedTcuTune, ecuStage, tcuStage]);
+
   const disableSubmit =
     !selectedBrand ||
     !selectedModelId ||
     !selectedEngineId ||
     !finalYearRange ||
     !finalCapacity ||
-    !finalEcuType ||
-    !selectedTune ||
-    !ecuReadTool ||
     !fuelGrade ||
-    (ecuBrand === "Other" && !ecuOther.trim()) ||
-    (ecuReadTool === "Other (Specify)" && !ecuReadToolOther.trim()) ||
+    (shouldShowEcuSection &&
+      (!ecuStage ||
+        !finalEcuType ||
+        !finalEcuReadTool ||
+        (ecuBrand === "Other" && !ecuOther.trim()) ||
+        (ecuReadTool === "Other (Specify)" && !ecuReadToolOther.trim()))) ||
+    (shouldShowTcuSection &&
+      (!tcuStage ||
+        !finalTcuType ||
+        !finalTcuReadTool ||
+        !tcuVersion.trim() ||
+        (tcuBrand === "Other" && !tcuOther.trim()) ||
+        (tcuReadTool === "Other (Specify)" && !tcuReadToolOther.trim()))) ||
     (fuelGrade === "Other (Specify)" && !fuelGradeOther.trim()) ||
     (wmiOption === "Custom (Specify)" && !wmiOther.trim());
 
@@ -321,7 +466,10 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
       className="grid gap-8 lg:grid-cols-[1.5fr_0.9fr]"
     >
       <input type="hidden" name="productId" value={productId} />
-      <input type="hidden" name="selectedTune" value={selectedTune} />
+      <input type="hidden" name="tuningType" value={tuningType} />
+      <input type="hidden" name="ecuStage" value={ecuStage} />
+      <input type="hidden" name="tcuStage" value={tcuStage} />
+      <input type="hidden" name="selectedTuneLabel" value={selectedTuneLabel} />
       <input type="hidden" name="estimatedTotal" value={estimatedTotal || ""} />
       <input type="hidden" name="vehicleBrand" value={selectedBrand} />
       <input
@@ -344,11 +492,63 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
         name="waterMethanolInjection"
         value={finalWmiOption}
       />
+      <input type="hidden" name="tcuType" value={finalTcuType} />
+      <input type="hidden" name="tcuReadTool" value={finalTcuReadTool} />
+      <input type="hidden" name="tcuVersion" value={tcuVersion.trim()} />
 
       <div className="rounded-[2rem] border border-white/10 bg-black/45 p-6 backdrop-blur-md md:p-8">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/45">
             Step 1
+          </p>
+          <h2 className="mt-3 text-2xl font-semibold text-white">
+            Select tuning type
+          </h2>
+          <p className="mt-3 text-white/65">
+            Choose ECU only, TCU only, or ECU + TCU package.
+          </p>
+        </div>
+
+        <div className="mt-8 grid gap-4 md:grid-cols-3">
+          {[
+            { id: "ECU", title: "ECU Only", sub: "Engine tuning only" },
+            { id: "TCU", title: "TCU Only", sub: "Transmission tuning only" },
+            {
+              id: "ECU_TCU",
+              title: "ECU + TCU",
+              sub: "Recommended full package",
+            },
+          ].map((option) => {
+            const active = tuningType === option.id;
+
+            return (
+              <label
+                key={option.id}
+                className={`cursor-pointer rounded-2xl border p-5 transition ${
+                  active
+                    ? "border-[#ff3b57] bg-[#ff3b57]/15 shadow-[0_0_0_1px_rgba(255,59,87,0.35)]"
+                    : "border-white/10 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.06]"
+                }`}
+              >
+                <input
+                  type="radio"
+                  className="sr-only"
+                  name="tuningTypeVisible"
+                  checked={active}
+                  onChange={() => setTuningType(option.id as TuningTypeOption)}
+                />
+                <p className="text-lg font-semibold text-white">
+                  {option.title}
+                </p>
+                <p className="mt-2 text-sm text-white/65">{option.sub}</p>
+              </label>
+            );
+          })}
+        </div>
+
+        <div className="mt-12">
+          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/45">
+            Step 2
           </p>
           <h2 className="mt-3 text-2xl font-semibold text-white">
             Select vehicle information
@@ -376,22 +576,7 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
                   </option>
                 ))}
               </select>
-
-              <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/50">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                  className="h-5 w-5"
-                  aria-hidden="true"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.51a.75.75 0 0 1-1.08 0l-4.25-4.51a.75.75 0 0 1 .02-1.06Z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-              </div>
+              <SelectArrow />
             </div>
           </div>
 
@@ -412,22 +597,7 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
                   </option>
                 ))}
               </select>
-
-              <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/50">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                  className="h-5 w-5"
-                  aria-hidden="true"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.51a.75.75 0 0 1-1.08 0l-4.25-4.51a.75.75 0 0 1 .02-1.06Z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-              </div>
+              <SelectArrow />
             </div>
           </div>
 
@@ -448,22 +618,7 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
                   </option>
                 ))}
               </select>
-
-              <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/50">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                  className="h-5 w-5"
-                  aria-hidden="true"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.51a.75.75 0 0 1-1.08 0l-4.25-4.51a.75.75 0 0 1 .02-1.06Z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-              </div>
+              <SelectArrow />
             </div>
           </div>
 
@@ -473,12 +628,16 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
               className="input-rk"
               value={derivedYearRange || manualYearRange}
               onChange={(e) => {
-                if (isYearFieldEditable) {
+                if (shouldShowYearFallback) {
                   setManualYearRange(e.target.value);
                 }
               }}
-              placeholder={yearPlaceholder}
-              readOnly={!isYearFieldEditable}
+              placeholder={
+                shouldShowYearFallback
+                  ? "Enter year / range manually"
+                  : "Auto-filled from model"
+              }
+              readOnly={!shouldShowYearFallback}
               required
             />
             {shouldShowYearFallback ? (
@@ -494,12 +653,16 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
               className="input-rk"
               value={derivedCapacity || manualCapacity}
               onChange={(e) => {
-                if (isCapacityFieldEditable) {
+                if (shouldShowCapacityFallback) {
                   setManualCapacity(e.target.value);
                 }
               }}
-              placeholder={capacityPlaceholder}
-              readOnly={!isCapacityFieldEditable}
+              placeholder={
+                shouldShowCapacityFallback
+                  ? "Enter engine capacity manually"
+                  : "Auto-filled from engine"
+              }
+              readOnly={!shouldShowCapacityFallback}
               required
             />
             {shouldShowCapacityFallback ? (
@@ -507,163 +670,6 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
                 Auto-fill unavailable for this engine. Please enter manually.
               </p>
             ) : null}
-          </div>
-
-          <div className="md:col-span-3">
-            <label className="label-rk">ECU Type</label>
-
-            <div className="grid gap-4 md:grid-cols-3">
-              <div className="relative">
-                <select
-                  className="input-rk appearance-none pr-12"
-                  value={ecuBrand}
-                  onChange={(e) => setEcuBrand(e.target.value)}
-                  required
-                >
-                  <option value="">Select ECU brand</option>
-                  {ecuBrands.map((brand) => (
-                    <option key={brand} value={brand}>
-                      {brand}
-                    </option>
-                  ))}
-                </select>
-
-                <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/50">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                    className="h-5 w-5"
-                    aria-hidden="true"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.51a.75.75 0 0 1-1.08 0l-4.25-4.51a.75.75 0 0 1 .02-1.06Z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                </div>
-              </div>
-
-              <div className="relative">
-                <select
-                  className="input-rk appearance-none pr-12"
-                  value={ecuFamily}
-                  onChange={(e) => setEcuFamily(e.target.value)}
-                  disabled={!ecuBrand || ecuBrand === "Other"}
-                  required={ecuBrand !== "Other"}
-                >
-                  <option value="">
-                    {ecuBrand === "Other"
-                      ? "Not required"
-                      : "Select ECU family"}
-                  </option>
-                  {availableEcuFamilies.map((family) => (
-                    <option key={family} value={family}>
-                      {family}
-                    </option>
-                  ))}
-                </select>
-
-                <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/50">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                    className="h-5 w-5"
-                    aria-hidden="true"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.51a.75.75 0 0 1-1.08 0l-4.25-4.51a.75.75 0 0 1 .02-1.06Z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                </div>
-              </div>
-
-              <div className="relative">
-                <select
-                  className="input-rk appearance-none pr-12"
-                  value={ecuModel}
-                  onChange={(e) => setEcuModel(e.target.value)}
-                  disabled={!ecuFamily || ecuBrand === "Other"}
-                >
-                  <option value="">
-                    {ecuBrand === "Other" ? "Not required" : "Select ECU model"}
-                  </option>
-                  {availableEcuModels.map((model) => (
-                    <option key={model} value={model}>
-                      {model}
-                    </option>
-                  ))}
-                </select>
-
-                <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/50">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                    className="h-5 w-5"
-                    aria-hidden="true"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.51a.75.75 0 0 1-1.08 0l-4.25-4.51a.75.75 0 0 1 .02-1.06Z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                </div>
-              </div>
-            </div>
-
-            {ecuBrand === "Other" ? (
-              <div className="mt-4">
-                <label className="label-rk">Other ECU Type</label>
-                <input
-                  className="input-rk"
-                  value={ecuOther}
-                  onChange={(e) => setEcuOther(e.target.value)}
-                  placeholder="Specify ECU type"
-                  required
-                />
-              </div>
-            ) : null}
-          </div>
-
-          <div>
-            <label className="label-rk">ECU Read Tool</label>
-            <div className="relative">
-              <select
-                className="input-rk appearance-none pr-12"
-                value={ecuReadTool}
-                onChange={(e) => setEcuReadTool(e.target.value)}
-                required
-              >
-                <option value="">Select read tool</option>
-                {ecuReadTools.map((tool) => (
-                  <option key={tool} value={tool}>
-                    {tool}
-                  </option>
-                ))}
-              </select>
-
-              <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/50">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                  className="h-5 w-5"
-                  aria-hidden="true"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.51a.75.75 0 0 1-1.08 0l-4.25-4.51a.75.75 0 0 1 .02-1.06Z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-              </div>
-            </div>
           </div>
 
           <div>
@@ -682,74 +688,10 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
                   </option>
                 ))}
               </select>
-
-              <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/50">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                  className="h-5 w-5"
-                  aria-hidden="true"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.51a.75.75 0 0 1-1.08 0l-4.25-4.51a.75.75 0 0 1 .02-1.06Z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <label className="label-rk">Water Methanol Injection</label>
-            <div className="relative">
-              <select
-                className={`input-rk appearance-none pr-12 ${
-                  !wmiOption ? "text-white/45" : "text-white"
-                }`}
-                value={wmiOption}
-                onChange={(e) => setWmiOption(e.target.value)}
-              >
-                <option value="">Optional</option>
-                {wmiOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-
-              <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/50">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                  className="h-5 w-5"
-                  aria-hidden="true"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.51a.75.75 0 0 1-1.08 0l-4.25-4.51a.75.75 0 0 1 .02-1.06Z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-              </div>
+              <SelectArrow />
             </div>
           </div>
         </div>
-
-        {ecuReadTool === "Other (Specify)" ? (
-          <div className="mt-6">
-            <label className="label-rk">Other ECU Read Tool</label>
-            <input
-              className="input-rk"
-              value={ecuReadToolOther}
-              onChange={(e) => setEcuReadToolOther(e.target.value)}
-              placeholder="Specify ECU read tool"
-              required
-            />
-          </div>
-        ) : null}
 
         {fuelGrade === "Other (Specify)" ? (
           <div className="mt-6">
@@ -764,140 +706,463 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
           </div>
         ) : null}
 
-        {wmiOption === "Custom (Specify)" ? (
-          <div className="mt-6">
-            <label className="label-rk">Custom Water Methanol Injection</label>
-            <input
-              className="input-rk"
-              value={wmiOther}
-              onChange={(e) => setWmiOther(e.target.value)}
-              placeholder="Specify WMI setup"
-              required
-            />
-          </div>
-        ) : null}
-
-        <div className="mt-3 text-xs text-white/45">
-          Select brand, model, engine, and ECU type from the list to keep your
-          order details consistent and reduce compatibility mistakes.
-        </div>
-
-        <div className="mt-12">
-          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/45">
-            Step 2
-          </p>
-          <h2 className="mt-3 text-2xl font-semibold text-white">
-            Select tuning package
-          </h2>
-          <p className="mt-3 text-white/65">
-            Select one base package before choosing additional options.
-          </p>
-        </div>
-
-        <div className="mt-8 grid gap-4 md:grid-cols-3">
-          {baseTunes.map((item) => {
-            const isActive = selectedTune === item.id;
-
-            return (
-              <label
-                key={item.id}
-                className={`cursor-pointer rounded-2xl border p-5 text-left transition ${
-                  isActive
-                    ? "border-[#ff3b57] bg-[#ff3b57]/15 shadow-[0_0_0_1px_rgba(255,59,87,0.35)]"
-                    : "border-white/10 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.06]"
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="tunePackage"
-                  value={item.name}
-                  checked={isActive}
-                  onChange={() => setSelectedTune(item.id)}
-                  className="sr-only"
-                  required
-                />
-                <p className="text-lg font-semibold text-white">{item.name}</p>
-                <p className="mt-2 text-white/70">
-                  RM {item.price.toLocaleString()}
-                </p>
-              </label>
-            );
-          })}
-        </div>
-
-        <div className="mt-12">
-          <div className="flex flex-col gap-4 rounded-2xl border border-white/10 bg-white/[0.03] p-5 md:flex-row md:items-center md:justify-between">
-            <div>
+        {shouldShowEcuSection ? (
+          <>
+            <div className="mt-12">
               <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/45">
                 Step 3
+              </p>
+              <h2 className="mt-3 text-2xl font-semibold text-white">
+                ECU tuning setup
+              </h2>
+            </div>
+
+            <div className="mt-8 grid gap-4 md:grid-cols-4">
+              {ecuTunes.map((item) => {
+                const isActive = ecuStage === item.id;
+
+                return (
+                  <label
+                    key={item.id}
+                    className={`cursor-pointer rounded-2xl border p-5 transition ${
+                      isActive
+                        ? "border-[#ff3b57] bg-[#ff3b57]/15 shadow-[0_0_0_1px_rgba(255,59,87,0.35)]"
+                        : "border-white/10 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.06]"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      className="sr-only"
+                      checked={isActive}
+                      onChange={() => setEcuStage(item.id)}
+                    />
+                    <p className="text-lg font-semibold text-white">
+                      {item.name}
+                    </p>
+                    <p className="mt-2 text-white/70">
+                      RM {item.price.toLocaleString()}
+                    </p>
+                  </label>
+                );
+              })}
+            </div>
+
+            <div className="mt-8 grid gap-6 md:grid-cols-3">
+              <div className="md:col-span-3">
+                <label className="label-rk">ECU Type</label>
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div className="relative">
+                    <select
+                      className="input-rk appearance-none pr-12"
+                      value={ecuBrand}
+                      onChange={(e) => setEcuBrand(e.target.value)}
+                      required
+                    >
+                      <option value="">Select ECU brand</option>
+                      {ecuBrands.map((brand) => (
+                        <option key={brand} value={brand}>
+                          {brand}
+                        </option>
+                      ))}
+                    </select>
+                    <SelectArrow />
+                  </div>
+
+                  <div className="relative">
+                    <select
+                      className="input-rk appearance-none pr-12"
+                      value={ecuFamily}
+                      onChange={(e) => setEcuFamily(e.target.value)}
+                      disabled={!ecuBrand || ecuBrand === "Other"}
+                    >
+                      <option value="">
+                        {ecuBrand === "Other"
+                          ? "Not required"
+                          : "Select ECU family"}
+                      </option>
+                      {availableEcuFamilies.map((family) => (
+                        <option key={family} value={family}>
+                          {family}
+                        </option>
+                      ))}
+                    </select>
+                    <SelectArrow />
+                  </div>
+
+                  <div className="relative">
+                    <select
+                      className="input-rk appearance-none pr-12"
+                      value={ecuModel}
+                      onChange={(e) => setEcuModel(e.target.value)}
+                      disabled={!ecuFamily || ecuBrand === "Other"}
+                    >
+                      <option value="">
+                        {ecuBrand === "Other"
+                          ? "Not required"
+                          : "Select ECU model"}
+                      </option>
+                      {availableEcuModels.map((model) => (
+                        <option key={model} value={model}>
+                          {model}
+                        </option>
+                      ))}
+                    </select>
+                    <SelectArrow />
+                  </div>
+                </div>
+
+                {ecuBrand === "Other" ? (
+                  <div className="mt-4">
+                    <label className="label-rk">Other ECU Type</label>
+                    <input
+                      className="input-rk"
+                      value={ecuOther}
+                      onChange={(e) => setEcuOther(e.target.value)}
+                      placeholder="Specify ECU type"
+                      required
+                    />
+                  </div>
+                ) : null}
+              </div>
+
+              <div>
+                <label className="label-rk">ECU Read Tool</label>
+                <div className="relative">
+                  <select
+                    className="input-rk appearance-none pr-12"
+                    value={ecuReadTool}
+                    onChange={(e) => setEcuReadTool(e.target.value)}
+                    required
+                  >
+                    <option value="">Select read tool</option>
+                    {ecuReadTools.map((tool) => (
+                      <option key={tool} value={tool}>
+                        {tool}
+                      </option>
+                    ))}
+                  </select>
+                  <SelectArrow />
+                </div>
+              </div>
+
+              <div>
+                <label className="label-rk">Water Methanol Injection</label>
+                <div className="relative">
+                  <select
+                    className={`input-rk appearance-none pr-12 ${
+                      !wmiOption ? "text-white/45" : "text-white"
+                    }`}
+                    value={wmiOption}
+                    onChange={(e) => setWmiOption(e.target.value)}
+                  >
+                    <option value="">Optional</option>
+                    {wmiOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                  <SelectArrow />
+                </div>
+              </div>
+            </div>
+
+            {ecuReadTool === "Other (Specify)" ? (
+              <div className="mt-6">
+                <label className="label-rk">Other ECU Read Tool</label>
+                <input
+                  className="input-rk"
+                  value={ecuReadToolOther}
+                  onChange={(e) => setEcuReadToolOther(e.target.value)}
+                  placeholder="Specify ECU read tool"
+                  required
+                />
+              </div>
+            ) : null}
+
+            {wmiOption === "Custom (Specify)" ? (
+              <div className="mt-6">
+                <label className="label-rk">
+                  Custom Water Methanol Injection
+                </label>
+                <input
+                  className="input-rk"
+                  value={wmiOther}
+                  onChange={(e) => setWmiOther(e.target.value)}
+                  placeholder="Specify WMI setup"
+                  required
+                />
+              </div>
+            ) : null}
+          </>
+        ) : null}
+
+        {shouldShowTcuSection ? (
+          <>
+            <div className="mt-12">
+              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/45">
+                Step {shouldShowEcuSection ? "4" : "3"}
+              </p>
+              <h2 className="mt-3 text-2xl font-semibold text-white">
+                TCU tuning setup
+              </h2>
+              {tuningType === "ECU_TCU" && ecuStage === "stage3" ? (
+                <p className="mt-3 text-sm text-amber-300/85">
+                  TCU Stage 2 is recommended by default for most Stage 3 ECU
+                  builds. You can manually switch to Custom if needed.
+                </p>
+              ) : null}
+            </div>
+
+            <div className="mt-8 grid gap-4 md:grid-cols-3">
+              {tcuTunes.map((item) => {
+                const isActive = tcuStage === item.id;
+                const isRecommended =
+                  getRecommendedTcuStage(ecuStage) === item.id &&
+                  tuningType === "ECU_TCU";
+
+                return (
+                  <label
+                    key={item.id}
+                    className={`cursor-pointer rounded-2xl border p-5 transition ${
+                      isActive
+                        ? "border-[#ff3b57] bg-[#ff3b57]/15 shadow-[0_0_0_1px_rgba(255,59,87,0.35)]"
+                        : "border-white/10 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.06]"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      className="sr-only"
+                      checked={isActive}
+                      onChange={() => setTcuStage(item.id)}
+                    />
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="text-lg font-semibold text-white">
+                        {item.name}
+                      </p>
+                      {isRecommended ? (
+                        <span className="rounded-full border border-amber-400/30 bg-amber-400/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-amber-300">
+                          Recommended
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className="mt-2 text-white/70">
+                      RM {item.price.toLocaleString()}
+                    </p>
+                  </label>
+                );
+              })}
+            </div>
+
+            <div className="mt-8 grid gap-6 md:grid-cols-3">
+              <div className="md:col-span-3">
+                <label className="label-rk">TCU Type / Transmission</label>
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div className="relative">
+                    <select
+                      className="input-rk appearance-none pr-12"
+                      value={tcuBrand}
+                      onChange={(e) => setTcuBrand(e.target.value)}
+                      required
+                    >
+                      <option value="">Select manufacturer</option>
+                      {tcuBrands.map((brand) => (
+                        <option key={brand} value={brand}>
+                          {brand}
+                        </option>
+                      ))}
+                    </select>
+                    <SelectArrow />
+                  </div>
+
+                  <div className="relative">
+                    <select
+                      className="input-rk appearance-none pr-12"
+                      value={tcuFamily}
+                      onChange={(e) => setTcuFamily(e.target.value)}
+                      disabled={!tcuBrand || tcuBrand === "Other"}
+                    >
+                      <option value="">
+                        {tcuBrand === "Other"
+                          ? "Not required"
+                          : "Select TCU family"}
+                      </option>
+                      {availableTcuFamilies.map((family) => (
+                        <option key={family} value={family}>
+                          {family}
+                        </option>
+                      ))}
+                    </select>
+                    <SelectArrow />
+                  </div>
+
+                  <div className="relative">
+                    <select
+                      className="input-rk appearance-none pr-12"
+                      value={tcuModel}
+                      onChange={(e) => setTcuModel(e.target.value)}
+                      disabled={!tcuFamily || tcuBrand === "Other"}
+                    >
+                      <option value="">
+                        {tcuBrand === "Other"
+                          ? "Not required"
+                          : "Select TCU model"}
+                      </option>
+                      {availableTcuModels.map((model) => (
+                        <option key={model} value={model}>
+                          {model}
+                        </option>
+                      ))}
+                    </select>
+                    <SelectArrow />
+                  </div>
+                </div>
+
+                {tcuBrand === "Other" ? (
+                  <div className="mt-4">
+                    <label className="label-rk">Other TCU Type</label>
+                    <input
+                      className="input-rk"
+                      value={tcuOther}
+                      onChange={(e) => setTcuOther(e.target.value)}
+                      placeholder="Specify TCU type / transmission"
+                      required
+                    />
+                  </div>
+                ) : null}
+              </div>
+
+              <div>
+                <label className="label-rk">TCU Read Tool</label>
+                <div className="relative">
+                  <select
+                    className="input-rk appearance-none pr-12"
+                    value={tcuReadTool}
+                    onChange={(e) => setTcuReadTool(e.target.value)}
+                    required
+                  >
+                    <option value="">Select TCU read tool</option>
+                    {tcuReadTools.map((tool) => (
+                      <option key={tool} value={tool}>
+                        {tool}
+                      </option>
+                    ))}
+                  </select>
+                  <SelectArrow />
+                </div>
+              </div>
+
+              <div>
+                <label className="label-rk">TCU Version / Software ID</label>
+                <input
+                  className="input-rk"
+                  value={tcuVersion}
+                  onChange={(e) => setTcuVersion(e.target.value)}
+                  placeholder="e.g. DQ381 Gen 2 / software ID"
+                  required
+                />
+              </div>
+            </div>
+
+            {tcuReadTool === "Other (Specify)" ? (
+              <div className="mt-6">
+                <label className="label-rk">Other TCU Read Tool</label>
+                <input
+                  className="input-rk"
+                  value={tcuReadToolOther}
+                  onChange={(e) => setTcuReadToolOther(e.target.value)}
+                  placeholder="Specify TCU read tool"
+                  required
+                />
+              </div>
+            ) : null}
+          </>
+        ) : null}
+
+        {shouldShowEcuSection ? (
+          <>
+            <div className="mt-12">
+              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/45">
+                Step {shouldShowTcuSection ? "5" : "4"}
               </p>
               <h2 className="mt-3 text-2xl font-semibold text-white">
                 Select add-on services
               </h2>
               <p className="mt-3 text-white/65">
-                Add-on pricing may vary depending on the selected options.
+                Add-on pricing applies to ECU tuning services.
               </p>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setIsAddOnsOpen((prev) => !prev)}
-              className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-medium text-white transition hover:border-white/20 hover:bg-white/[0.06]"
-            >
-              {isAddOnsOpen ? "Hide Add-On Services" : "Show Add-On Services"}
-            </button>
-          </div>
-        </div>
+            <div className="mt-6 flex flex-col gap-4 rounded-2xl border border-white/10 bg-white/[0.03] p-5 md:flex-row md:items-center md:justify-between">
+              <div>
+                <p className="text-sm text-white/65">
+                  Add-ons apply only when ECU tuning is included.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAddOnsOpen((prev) => !prev)}
+                className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-medium text-white transition hover:border-white/20 hover:bg-white/[0.06]"
+              >
+                {isAddOnsOpen ? "Hide Add-On Services" : "Show Add-On Services"}
+              </button>
+            </div>
 
-        {isAddOnsOpen ? (
-          <div className="mt-8 grid gap-3">
-            {addOns.map((option) => {
-              const checked = selectedAddOns.includes(option.name);
+            {isAddOnsOpen ? (
+              <div className="mt-8 grid gap-3">
+                {addOns.map((option) => {
+                  const checked = selectedAddOns.includes(option.name);
 
-              return (
-                <label
-                  key={option.name}
-                  className={`flex items-center justify-between rounded-2xl border px-5 py-4 transition ${
-                    checked
-                      ? "border-[#ff3b57] bg-[#ff3b57]/10"
-                      : "border-white/10 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.05]"
-                  } ${
-                    !selectedTune
-                      ? "cursor-not-allowed opacity-50"
-                      : "cursor-pointer"
-                  }`}
-                >
-                  <div className="flex items-center gap-4">
-                    <input
-                      type="checkbox"
-                      name="addOns"
-                      value={option.name}
-                      checked={checked}
-                      disabled={!selectedTune}
-                      onChange={() => toggleAddOn(option.name)}
-                      className="h-4 w-4 accent-[#ff3b57]"
-                    />
-                    <span className="text-white">{option.name}</span>
-                  </div>
+                  return (
+                    <label
+                      key={option.name}
+                      className={`flex items-center justify-between rounded-2xl border px-5 py-4 transition ${
+                        checked
+                          ? "border-[#ff3b57] bg-[#ff3b57]/10"
+                          : "border-white/10 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.05]"
+                      } ${
+                        !ecuStage ? "cursor-not-allowed opacity-50" : "cursor-pointer"
+                      }`}
+                    >
+                      <div className="flex items-center gap-4">
+                        <input
+                          type="checkbox"
+                          name="addOns"
+                          value={option.name}
+                          checked={checked}
+                          disabled={!ecuStage}
+                          onChange={() => toggleAddOn(option.name)}
+                          className="h-4 w-4 accent-[#ff3b57]"
+                        />
+                        <span className="text-white">{option.name}</span>
+                      </div>
 
-                  <span className="text-sm font-medium text-white/70">
-                    RM {option.price}
-                  </span>
-                </label>
-              );
-            })}
-          </div>
+                      <span className="text-sm font-medium text-white/70">
+                        RM {option.price}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            ) : null}
+          </>
         ) : null}
 
         <div className="mt-12">
           <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/45">
-            Step 4
+            Step{" "}
+            {shouldShowEcuSection && shouldShowTcuSection
+              ? "6"
+              : shouldShowEcuSection || shouldShowTcuSection
+                ? "5"
+                : "4"}
           </p>
           <h2 className="mt-3 text-2xl font-semibold text-white">
-            Upload ECU file
+            Upload stock file
+            {shouldShowEcuSection && shouldShowTcuSection ? "s" : ""}
           </h2>
           <p className="mt-3 text-white/65">
-            Please upload your original stock ECU file for review.
+            Please upload your original stock file for review.
           </p>
         </div>
 
@@ -913,19 +1178,40 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
           </p>
         </div>
 
-        <div className="mt-6">
-          <label className="label-rk">Original ECU File</label>
-          <input
-            className="input-rk cursor-pointer"
-            name="file"
-            type="file"
-            required
-          />
+        <div className="mt-6 grid gap-6 md:grid-cols-2">
+          {shouldShowEcuSection ? (
+            <div>
+              <label className="label-rk">Original ECU File</label>
+              <input
+                className="input-rk cursor-pointer"
+                name="ecuFile"
+                type="file"
+                required={shouldShowEcuSection}
+              />
+            </div>
+          ) : null}
+
+          {shouldShowTcuSection ? (
+            <div>
+              <label className="label-rk">Original TCU File</label>
+              <input
+                className="input-rk cursor-pointer"
+                name="tcuFile"
+                type="file"
+                required={shouldShowTcuSection}
+              />
+            </div>
+          ) : null}
         </div>
 
         <div className="mt-12">
           <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/45">
-            Step 5
+            Step{" "}
+            {shouldShowEcuSection && shouldShowTcuSection
+              ? "7"
+              : shouldShowEcuSection || shouldShowTcuSection
+                ? "6"
+                : "5"}
           </p>
           <h2 className="mt-3 text-2xl font-semibold text-white">Remarks</h2>
         </div>
@@ -935,14 +1221,14 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
           <textarea
             className="textarea-rk"
             name="remarks"
-            placeholder="e.g. tuned for RON97, upgraded intake, daily driving setup, aggressive burble, any special request not covered above"
+            placeholder="e.g. tuned for RON97, upgraded intake, daily driving setup, DSG focus on smoother shifting, any special request not covered above"
           />
         </div>
 
         <div className="mt-6 rounded-xl border border-white/10 bg-white/5 p-5 text-sm text-white/70">
           <p className="mb-2 font-semibold text-white">Important Notes</p>
           <ul className="space-y-1">
-            <li>• Your uploaded ECU file will be handled confidentially</li>
+            <li>• Your uploaded file(s) will be handled confidentially</li>
             <li>• We do not share customer files with third parties</li>
             <li>• All tuning requests are reviewed manually before work begins</li>
           </ul>
@@ -968,15 +1254,15 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
         </h2>
 
         <div className="mt-8 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
-          <p className="text-sm text-white/60">Selected tune</p>
+          <p className="text-sm text-white/60">Selected package</p>
 
-          {activeTune ? (
+          {selectedTuneLabel ? (
             <>
               <p className="mt-2 text-lg font-semibold text-white">
-                {activeTune.name}
+                {selectedTuneLabel}
               </p>
               <p className="mt-1 text-white/70">
-                RM {activeTune.price.toLocaleString()}
+                RM {baseTuneTotal.toLocaleString()}
               </p>
             </>
           ) : (
@@ -1008,22 +1294,58 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
                 <span className="text-white/45">Engine Capacity:</span>{" "}
                 {finalCapacity ? `${finalCapacity} cc` : "-"}
               </p>
-              <p>
-                <span className="text-white/45">ECU Type:</span>{" "}
-                {finalEcuType || "-"}
-              </p>
-              <p>
-                <span className="text-white/45">ECU Read Tool:</span>{" "}
-                {finalEcuReadTool || "-"}
-              </p>
+
+              {shouldShowEcuSection ? (
+                <>
+                  <p>
+                    <span className="text-white/45">ECU Stage:</span>{" "}
+                    {selectedEcuTune?.name || "-"}
+                  </p>
+                  <p>
+                    <span className="text-white/45">ECU Type:</span>{" "}
+                    {finalEcuType || "-"}
+                  </p>
+                  <p>
+                    <span className="text-white/45">ECU Read Tool:</span>{" "}
+                    {finalEcuReadTool || "-"}
+                  </p>
+                </>
+              ) : null}
+
+              {shouldShowTcuSection ? (
+                <>
+                  <p>
+                    <span className="text-white/45">TCU Stage:</span>{" "}
+                    {selectedTcuTune?.name || "-"}
+                  </p>
+                  <p>
+                    <span className="text-white/45">TCU Type:</span>{" "}
+                    {finalTcuType || "-"}
+                  </p>
+                  <p>
+                    <span className="text-white/45">TCU Read Tool:</span>{" "}
+                    {finalTcuReadTool || "-"}
+                  </p>
+                  <p>
+                    <span className="text-white/45">TCU Version:</span>{" "}
+                    {tcuVersion || "-"}
+                  </p>
+                </>
+              ) : null}
+
               <p>
                 <span className="text-white/45">Fuel Grade:</span>{" "}
                 {finalFuelGrade || "-"}
               </p>
-              <p>
-                <span className="text-white/45">Water Methanol Injection:</span>{" "}
-                {finalWmiOption || "Not selected"}
-              </p>
+
+              {shouldShowEcuSection ? (
+                <p>
+                  <span className="text-white/45">
+                    Water Methanol Injection:
+                  </span>{" "}
+                  {finalWmiOption || "Not selected"}
+                </p>
+              ) : null}
             </div>
           ) : (
             <p className="mt-3 text-sm text-white/50">
@@ -1032,40 +1354,42 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
           )}
         </div>
 
-        <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
-          <p className="text-sm text-white/60">Additional options</p>
-          <p className="mt-2 text-lg font-semibold text-white">
-            {selectedAddOns.length} selected
-          </p>
-          <p className="mt-1 text-white/70">
-            RM {addOnTotal.toLocaleString()}
-          </p>
-
-          {selectedAddOns.length > 0 ? (
-            <ul className="mt-4 space-y-2 text-sm text-white/65">
-              {selectedAddOns.map((item) => {
-                const addOn = addOns.find((option) => option.name === item);
-
-                return (
-                  <li key={item}>
-                    • {item} — RM {addOn?.price ?? 0}
-                  </li>
-                );
-              })}
-            </ul>
-          ) : (
-            <p className="mt-4 text-sm text-white/50">
-              No additional options selected.
+        {shouldShowEcuSection ? (
+          <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+            <p className="text-sm text-white/60">Additional options</p>
+            <p className="mt-2 text-lg font-semibold text-white">
+              {selectedAddOns.length} selected
             </p>
-          )}
-        </div>
+            <p className="mt-1 text-white/70">
+              RM {addOnTotal.toLocaleString()}
+            </p>
+
+            {selectedAddOns.length > 0 ? (
+              <ul className="mt-4 space-y-2 text-sm text-white/65">
+                {selectedAddOns.map((item) => {
+                  const addOn = addOns.find((option) => option.name === item);
+
+                  return (
+                    <li key={item}>
+                      • {item} — RM {addOn?.price ?? 0}
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <p className="mt-4 text-sm text-white/50">
+                No additional options selected.
+              </p>
+            )}
+          </div>
+        ) : null}
 
         <div className="mt-6 rounded-2xl border border-white/10 bg-[#ff3b57]/10 p-6">
           <p className="text-sm uppercase tracking-[0.2em] text-white/60">
             Total estimated price
           </p>
           <p className="mt-3 text-4xl font-bold text-white">
-            {activeTune ? (
+            {selectedTuneLabel ? (
               `RM ${estimatedTotal.toLocaleString()}`
             ) : (
               <span className="text-2xl font-semibold text-white/50">
@@ -1086,7 +1410,7 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
         </div>
 
         <p className="mt-6 text-sm leading-6 text-white/55">
-          Final price is subject to change after file review, ECU type
+          Final price is subject to change after file review, ECU / TCU
           verification, and vehicle setup complexity.
         </p>
       </div>

@@ -41,6 +41,12 @@ enum NotificationType {
   REVISION_READY
 }
 
+enum TuningType {
+  ECU
+  TCU
+  ECU_TCU
+}
+
 model User {
   id               String         @id @default(cuid())
   name             String
@@ -64,11 +70,11 @@ model VehicleBrand {
 }
 
 model VehicleModel {
-  id      String       @id @default(cuid())
+  id      String        @id @default(cuid())
   name    String
   slug    String
   brandId String
-  brand   VehicleBrand @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  brand   VehicleBrand  @relation(fields: [brandId], references: [id], onDelete: Cascade)
   years   VehicleYear[]
 
   @@unique([brandId, slug])
@@ -107,29 +113,40 @@ model Product {
 }
 
 model Order {
-  id             String           @id @default(cuid())
-  orderNumber    String           @unique
-  status         OrderStatus      @default(AWAITING_PAYMENT)
-  notes          String?
-  requestDetails String?
-  vehicleBrand   String?
-  vehicleModel   String?
-  engineModel    String?
-  engineCapacity String?
-  vehicleYear    String?
-  ecuType        String?
-  cancelledBy    CancelledBy?
-  cancelReason   String?
-  cancelledAt    DateTime?
-  totalAmount    Int              @default(0)
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
-  userId         String
-  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  items          OrderItem[]
-  files          OrderFile[]
-  revisions      OrderRevision[]
-  notifications  Notification[]
+  id                     String          @id @default(cuid())
+  orderNumber            String          @unique
+  status                 OrderStatus     @default(AWAITING_PAYMENT)
+  notes                  String?
+  requestDetails         String?
+  tuningType             TuningType      @default(ECU)
+  selectedTuneId         String?
+  selectedTuneLabel      String?
+  ecuStage               String?
+  tcuStage               String?
+  vehicleBrand           String?
+  vehicleModel           String?
+  engineModel            String?
+  engineCapacity         String?
+  vehicleYear            String?
+  ecuType                String?
+  ecuReadTool            String?
+  fuelGrade              String?
+  waterMethanolInjection String?
+  tcuType                String?
+  tcuVersion             String?
+  tcuReadTool            String?
+  cancelledBy            CancelledBy?
+  cancelReason           String?
+  cancelledAt            DateTime?
+  totalAmount            Int             @default(0)
+  createdAt              DateTime        @default(now())
+  updatedAt              DateTime        @updatedAt
+  userId                 String
+  user                   User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items                  OrderItem[]
+  files                  OrderFile[]
+  revisions              OrderRevision[]
+  notifications          Notification[]
 }
 
 model OrderItem {
@@ -155,17 +172,18 @@ model OrderFile {
 }
 
 model OrderRevision {
-  id          String    @id @default(cuid())
-  orderId     String
-  orderFileId String    @unique
-  revisionNo  Int
-  remark      String
-  createdAt   DateTime  @default(now())
+  id             String   @id @default(cuid())
+  orderId        String
+  orderFileId    String   @unique
+  revisionNo     Int
+  revisionTarget String?
+  remark         String
+  createdAt      DateTime @default(now())
 
-  order       Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  orderFile   OrderFile @relation(fields: [orderFileId], references: [id], onDelete: Cascade)
+  order     Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderFile OrderFile @relation(fields: [orderFileId], references: [id], onDelete: Cascade)
 
-  @@unique([orderId, revisionNo])
+  @@unique([orderId, revisionNo, revisionTarget])
   @@index([orderId, createdAt])
 }
 
@@ -180,8 +198,8 @@ model Notification {
   createdAt DateTime         @default(now())
   readAt    DateTime?
 
-  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  order     Order?           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  order Order? @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@index([userId, isRead, createdAt])
   @@index([orderId, createdAt])

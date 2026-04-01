@@ -1,0 +1,221 @@
+{
+  "Volkswagen Audi Group (VAG)": [
+    {
+      "family": "DQ200",
+      "models": [
+        "DQ200 Gen 1",
+        "DQ200 Gen 2"
+      ]
+    },
+    {
+      "family": "DQ250",
+      "models": [
+        "02E",
+        "DQ250 MQB",
+        "DQ250 PQ35"
+      ]
+    },
+    {
+      "family": "DQ381",
+      "models": [
+        "DQ381 Gen 1",
+        "DQ381 Gen 2"
+      ]
+    },
+    {
+      "family": "DQ500",
+      "models": [
+        "0BH",
+        "0BT"
+      ]
+    },
+    {
+      "family": "DL501",
+      "models": [
+        "0B5"
+      ]
+    },
+    {
+      "family": "AL551",
+      "models": [
+        "ZF 8HP55A",
+        "ZF 8HP90A"
+      ]
+    },
+    {
+      "family": "AISIN",
+      "models": [
+        "AQ250",
+        "AQ300",
+        "TF-60SN",
+        "TF-61SN",
+        "TF-80SC"
+      ]
+    }
+  ],
+  "BMW": [
+    {
+      "family": "ZF 6HP",
+      "models": [
+        "6HP19",
+        "6HP21",
+        "6HP26",
+        "6HP28"
+      ]
+    },
+    {
+      "family": "ZF 8HP",
+      "models": [
+        "8HP45",
+        "8HP50",
+        "8HP51",
+        "8HP70",
+        "8HP75",
+        "8HP76",
+        "8HP90",
+        "8HP95"
+      ]
+    },
+    {
+      "family": "DCT",
+      "models": [
+        "Getrag GS7D36SG",
+        "Getrag GS7D45SG"
+      ]
+    }
+  ],
+  "Mercedes-Benz": [
+    {
+      "family": "7G-Tronic",
+      "models": [
+        "722.9"
+      ]
+    },
+    {
+      "family": "9G-Tronic",
+      "models": [
+        "725.0"
+      ]
+    },
+    {
+      "family": "AMG Speedshift DCT",
+      "models": [
+        "7DCT"
+      ]
+    }
+  ],
+  "Porsche": [
+    {
+      "family": "PDK",
+      "models": [
+        "ZF 7DT45HL",
+        "ZF 7DT70HL",
+        "8DT"
+      ]
+    }
+  ],
+  "Ford": [
+    {
+      "family": "PowerShift",
+      "models": [
+        "6DCT250",
+        "6DCT450"
+      ]
+    },
+    {
+      "family": "10R80",
+      "models": [
+        "10R80"
+      ]
+    },
+    {
+      "family": "6R80",
+      "models": [
+        "6R80"
+      ]
+    }
+  ],
+  "General Motors": [
+    {
+      "family": "6L",
+      "models": [
+        "6L45",
+        "6L50",
+        "6L80",
+        "6L90"
+      ]
+    },
+    {
+      "family": "8L",
+      "models": [
+        "8L45",
+        "8L90"
+      ]
+    },
+    {
+      "family": "10L",
+      "models": [
+        "10L80",
+        "10L90"
+      ]
+    }
+  ],
+  "Toyota / Lexus": [
+    {
+      "family": "Aisin 6AT",
+      "models": [
+        "U660E",
+        "U760E"
+      ]
+    },
+    {
+      "family": "Aisin 8AT",
+      "models": [
+        "UA80E",
+        "AA81E"
+      ]
+    }
+  ],
+  "Hyundai / Kia": [
+    {
+      "family": "DCT",
+      "models": [
+        "D7UF1",
+        "D8LF1"
+      ]
+    },
+    {
+      "family": "AT",
+      "models": [
+        "A6LF",
+        "A8TR1"
+      ]
+    }
+  ],
+  "Nissan": [
+    {
+      "family": "CVT",
+      "models": [
+        "JF011E",
+        "JF015E",
+        "JF016E",
+        "JF017E"
+      ]
+    }
+  ],
+  "Volvo": [
+    {
+      "family": "Aisin",
+      "models": [
+        "TF-80SC",
+        "TG-81SC"
+      ]
+    }
+  ],
+  "Other": [
+    {
+      "family": "Other / Unknown",
+      "models": []
+    }
+  ]
+}

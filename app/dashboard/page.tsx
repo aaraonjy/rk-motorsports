@@ -16,7 +16,7 @@ export default async function DashboardPage() {
       <div className="container-rk">
         <h1 className="text-4xl font-bold">Customer Dashboard</h1>
         <p className="mt-4 text-white/70">
-          Track order status and download completed tuned files.
+          Track ECU / TCU order status and download completed tuned files.
         </p>
 
         <div className="mt-8 grid gap-4 lg:grid-cols-3">
@@ -65,7 +65,7 @@ export default async function DashboardPage() {
             <p className="mt-2 text-sm text-white/70">
               After payment, upload your transfer slip from the order row marked
               as pending payment. Our admin will verify it before releasing your
-              tuned file.
+              tuned file(s).
             </p>
           </div>
         </div>

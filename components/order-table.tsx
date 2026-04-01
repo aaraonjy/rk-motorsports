@@ -26,8 +26,10 @@ export type OrderWithRelations = Order & {
 type UploadModalState =
   | {
       action:
-        | "admin-upload"
-        | "admin-upload-revision"
+        | "admin-upload-ecu"
+        | "admin-upload-tcu"
+        | "admin-upload-revision-ecu"
+        | "admin-upload-revision-tcu"
         | "customer-upload-payment"
         | "customer-replace-payment";
       orderId: string;
@@ -87,63 +89,102 @@ function getRequestValue(details: string, key: string) {
   );
 }
 
-function VehicleDetails({
-  order,
-}: {
-  order: OrderWithRelations;
-}) {
-  const ecuReadTool = order.requestDetails
-    ? getRequestValue(order.requestDetails, "ECU Read Tool")
-    : "";
-  const fuelGrade = order.requestDetails
-    ? getRequestValue(order.requestDetails, "Fuel Grade")
-    : "";
-  const waterMethanolInjection = order.requestDetails
-    ? getRequestValue(order.requestDetails, "Water Methanol Injection")
-    : "";
+function getTuningTypeLabel(value?: string | null) {
+  if (value === "ECU_TCU") return "ECU + TCU";
+  if (value === "TCU") return "TCU";
+  return "ECU";
+}
 
+function getRevisionTargetLabel(value?: string | null) {
+  return (value || "ECU").toUpperCase() === "TCU" ? "TCU" : "ECU";
+}
+
+function VehicleDetails({ order }: { order: OrderWithRelations }) {
   return (
     <div className="space-y-1 text-sm leading-6">
+      <div>
+        <span className="text-white/45">Tuning Type:</span>{" "}
+        <span className="text-white/90">{getTuningTypeLabel(order.tuningType)}</span>
+      </div>
+
       <div>
         <span className="text-white/45">Brand:</span>{" "}
         <span className="text-white/90">{order.vehicleBrand || "-"}</span>
       </div>
+
       <div>
         <span className="text-white/45">Model / Generation:</span>{" "}
         <span className="text-white/90">{order.vehicleModel || "-"}</span>
       </div>
+
       <div>
         <span className="text-white/45">Engine / Variant:</span>{" "}
         <span className="text-white/90">{order.engineModel || "-"}</span>
       </div>
+
       <div>
         <span className="text-white/45">Year / Range:</span>{" "}
         <span className="text-white/90">{order.vehicleYear || "-"}</span>
       </div>
+
       {order.engineCapacity ? (
         <div>
           <span className="text-white/45">Capacity:</span>{" "}
           <span className="text-white/90">{order.engineCapacity}cc</span>
         </div>
       ) : null}
-      <div>
-        <span className="text-white/45">ECU Type:</span>{" "}
-        <span className="text-white/90">{order.ecuType || "-"}</span>
-      </div>
-      <div>
-        <span className="text-white/45">ECU Read Tool:</span>{" "}
-        <span className="text-white/90">{ecuReadTool || "-"}</span>
-      </div>
+
+      {(order.tuningType === "ECU" || order.tuningType === "ECU_TCU" || !order.tuningType) ? (
+        <>
+          <div>
+            <span className="text-white/45">ECU Stage:</span>{" "}
+            <span className="text-white/90">{order.ecuStage || "-"}</span>
+          </div>
+          <div>
+            <span className="text-white/45">ECU Type:</span>{" "}
+            <span className="text-white/90">{order.ecuType || "-"}</span>
+          </div>
+          <div>
+            <span className="text-white/45">ECU Read Tool:</span>{" "}
+            <span className="text-white/90">{order.ecuReadTool || "-"}</span>
+          </div>
+        </>
+      ) : null}
+
+      {(order.tuningType === "TCU" || order.tuningType === "ECU_TCU") ? (
+        <>
+          <div>
+            <span className="text-white/45">TCU Stage:</span>{" "}
+            <span className="text-white/90">{order.tcuStage || "-"}</span>
+          </div>
+          <div>
+            <span className="text-white/45">TCU Type:</span>{" "}
+            <span className="text-white/90">{order.tcuType || "-"}</span>
+          </div>
+          <div>
+            <span className="text-white/45">TCU Read Tool:</span>{" "}
+            <span className="text-white/90">{order.tcuReadTool || "-"}</span>
+          </div>
+          <div>
+            <span className="text-white/45">TCU Version:</span>{" "}
+            <span className="text-white/90">{order.tcuVersion || "-"}</span>
+          </div>
+        </>
+      ) : null}
+
       <div>
         <span className="text-white/45">Fuel Grade:</span>{" "}
-        <span className="text-white/90">{fuelGrade || "-"}</span>
+        <span className="text-white/90">{order.fuelGrade || "-"}</span>
       </div>
-      <div>
-        <span className="text-white/45">Water Methanol Injection:</span>{" "}
-        <span className="text-white/90">
-          {waterMethanolInjection || "Not selected"}
-        </span>
-      </div>
+
+      {(order.tuningType === "ECU" || order.tuningType === "ECU_TCU" || !order.tuningType) ? (
+        <div>
+          <span className="text-white/45">Water Methanol Injection:</span>{" "}
+          <span className="text-white/90">
+            {order.waterMethanolInjection || "Not selected"}
+          </span>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -158,15 +199,6 @@ function RequestDetailsModal({
   details: string;
 }) {
   if (!isOpen) return null;
-
-  const baseTune = getRequestValue(details, "Base Tune") || "Not specified";
-  const addOns = getRequestValue(details, "Add-ons") || "None";
-  const ecuReadTool =
-    getRequestValue(details, "ECU Read Tool") || "Not specified";
-  const fuelGrade = getRequestValue(details, "Fuel Grade") || "Not specified";
-  const waterMethanolInjection =
-    getRequestValue(details, "Water Methanol Injection") || "Not selected";
-  const remarks = getRequestValue(details, "Remarks") || "None";
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 px-4">
@@ -188,62 +220,10 @@ function RequestDetailsModal({
           </button>
         </div>
 
-        <div className="mt-5 grid gap-4">
-          <div className="rounded-xl border border-white/10 bg-black/40 p-4">
-            <p className="text-xs uppercase tracking-[0.2em] text-white/45">
-              Base tune
-            </p>
-            <p className="mt-2 text-base font-semibold text-white">
-              {baseTune}
-            </p>
-          </div>
-
-          <div className="rounded-xl border border-white/10 bg-black/40 p-4">
-            <p className="text-xs uppercase tracking-[0.2em] text-white/45">
-              Add-ons
-            </p>
-            <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-white/85">
-              {addOns}
-            </p>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="rounded-xl border border-white/10 bg-black/40 p-4">
-              <p className="text-xs uppercase tracking-[0.2em] text-white/45">
-                ECU Read Tool
-              </p>
-              <p className="mt-2 text-sm leading-7 text-white/85">
-                {ecuReadTool}
-              </p>
-            </div>
-
-            <div className="rounded-xl border border-white/10 bg-black/40 p-4">
-              <p className="text-xs uppercase tracking-[0.2em] text-white/45">
-                Fuel Grade
-              </p>
-              <p className="mt-2 text-sm leading-7 text-white/85">
-                {fuelGrade}
-              </p>
-            </div>
-          </div>
-
-          <div className="rounded-xl border border-white/10 bg-black/40 p-4">
-            <p className="text-xs uppercase tracking-[0.2em] text-white/45">
-              Water Methanol Injection
-            </p>
-            <p className="mt-2 text-sm leading-7 text-white/85">
-              {waterMethanolInjection}
-            </p>
-          </div>
-
-          <div className="rounded-xl border border-white/10 bg-black/40 p-4">
-            <p className="text-xs uppercase tracking-[0.2em] text-white/45">
-              Remarks
-            </p>
-            <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-white/85">
-              {remarks}
-            </p>
-          </div>
+        <div className="mt-5 rounded-xl border border-white/10 bg-black/40 p-4">
+          <pre className="whitespace-pre-wrap text-sm leading-7 text-white/85">
+            {details}
+          </pre>
         </div>
       </div>
     </div>
@@ -282,14 +262,13 @@ function AdminCancelModal({
         >
           <div>
             <label className="mb-2 block text-sm text-white/70">
-              Cancellation Reason{" "}
-              <span className="text-white/40">(optional)</span>
+              Cancellation Reason <span className="text-white/40">(optional)</span>
             </label>
             <textarea
               name="cancelReason"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              placeholder="e.g. Unsupported ECU, unreadable file, wrong file uploaded"
+              placeholder="e.g. Unsupported file, wrong file uploaded, incompatible setup"
               className="min-h-[110px] w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/30 hover:border-white/20 focus:border-white/25 disabled:cursor-not-allowed disabled:opacity-50"
               disabled={isSubmitting}
             />
@@ -393,7 +372,7 @@ function ReleaseOrderModal({
             Confirm Payment & Release
           </h3>
           <p className="mt-1 text-sm text-white/50">
-            This will confirm payment and release the tuned file for customer
+            This will confirm payment and release the tuned file(s) for customer
             download.
           </p>
         </div>
@@ -435,12 +414,7 @@ function UploadConfirmModal({
   onClose,
 }: {
   isOpen: boolean;
-  mode:
-    | "admin-upload"
-    | "admin-upload-revision"
-    | "customer-upload-payment"
-    | "customer-replace-payment"
-    | null;
+  mode: NonNullable<UploadModalState>["action"] | null;
   orderId: string | null;
   onClose: () => void;
 }) {
@@ -448,45 +422,53 @@ function UploadConfirmModal({
 
   if (!isOpen || !mode || !orderId) return null;
 
-  const isAdminUpload = mode === "admin-upload";
-  const isAdminRevision = mode === "admin-upload-revision";
+  const isAdminUploadEcu = mode === "admin-upload-ecu";
+  const isAdminUploadTcu = mode === "admin-upload-tcu";
+  const isAdminRevisionEcu = mode === "admin-upload-revision-ecu";
+  const isAdminRevisionTcu = mode === "admin-upload-revision-tcu";
   const isReplace = mode === "customer-replace-payment";
 
   const action =
-    mode === "admin-upload"
+    isAdminUploadEcu || isAdminUploadTcu
       ? `/api/admin/orders/${orderId}/upload`
-      : mode === "admin-upload-revision"
+      : isAdminRevisionEcu || isAdminRevisionTcu
         ? `/api/admin/orders/${orderId}/upload-revision`
         : `/api/orders/${orderId}/upload-payment`;
 
-  const title = isAdminUpload
-    ? "Upload Tuned File"
-    : isAdminRevision
-      ? "Upload Revision File"
-      : isReplace
-        ? "Replace Payment Slip"
-        : "Upload Payment Slip";
+  const title = isAdminUploadEcu
+    ? "Upload Tuned ECU File"
+    : isAdminUploadTcu
+      ? "Upload Tuned TCU File"
+      : isAdminRevisionEcu
+        ? "Upload ECU Revision"
+        : isAdminRevisionTcu
+          ? "Upload TCU Revision"
+          : isReplace
+            ? "Replace Payment Slip"
+            : "Upload Payment Slip";
 
-  const description = isAdminUpload
-    ? "Please confirm you want to upload this tuned file for the selected order."
-    : isAdminRevision
-      ? "Upload a new revision file for this order. Internal remark is required."
+  const buttonLabel =
+    isAdminRevisionEcu || isAdminRevisionTcu
+      ? "Upload Revision"
       : isReplace
-        ? "Please confirm you want to replace the current payment slip."
-        : "Please confirm you want to upload this payment slip.";
+        ? "Confirm Replace"
+        : "Confirm Upload";
 
-  const buttonLabel = isAdminRevision
-    ? "Upload Revision"
-    : isReplace
-      ? "Confirm Replace"
-      : "Confirm Upload";
+  const target =
+    isAdminUploadTcu || isAdminRevisionTcu
+      ? "TCU"
+      : isAdminUploadEcu || isAdminRevisionEcu
+        ? "ECU"
+        : "";
 
   return (
     <div className="fixed inset-0 z-[112] flex items-center justify-center bg-black/70 px-4">
       <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-zinc-950 p-6 shadow-2xl">
         <div>
           <h3 className="text-lg font-semibold text-white">{title}</h3>
-          <p className="mt-1 text-sm text-white/50">{description}</p>
+          <p className="mt-1 text-sm text-white/50">
+            Please confirm the upload for this order.
+          </p>
         </div>
 
         <form
@@ -495,16 +477,18 @@ function UploadConfirmModal({
           encType="multipart/form-data"
           className="mt-6 space-y-4"
         >
+          {target ? <input type="hidden" name="target" value={target} /> : null}
+
           <div>
             <input
               type="file"
-              name="file"
+              name={isAdminRevisionEcu || isAdminUploadEcu ? "ecuFile" : isAdminRevisionTcu || isAdminUploadTcu ? "tcuFile" : "file"}
               required
               className="block w-full text-xs text-white/80 file:mr-3 file:rounded-lg file:border file:border-white/15 file:bg-black/40 file:px-3 file:py-2 file:text-white hover:file:bg-white/10"
             />
           </div>
 
-          {isAdminRevision ? (
+          {isAdminRevisionEcu || isAdminRevisionTcu ? (
             <div>
               <label className="mb-2 block text-sm text-white/70">
                 Internal Remark <span className="text-red-300">*</span>
@@ -514,7 +498,7 @@ function UploadConfirmModal({
                 value={remark}
                 onChange={(e) => setRemark(e.target.value)}
                 required
-                placeholder="e.g. Reduced boost spike, adjusted fueling, fixed checksum issue"
+                placeholder="e.g. Adjusted torque request, refined shift logic, improved drivability"
                 className="min-h-[110px] w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/30 hover:border-white/20 focus:border-white/25"
               />
             </div>
@@ -545,6 +529,100 @@ function UploadConfirmModal({
   );
 }
 
+function FileSection({
+  title,
+  originalFile,
+  tunedFile,
+  revisions,
+  admin,
+  canDownloadTuned,
+}: {
+  title: string;
+  originalFile: OrderFile | null;
+  tunedFile: OrderFile | null;
+  revisions: (OrderRevision & { orderFile: OrderFile })[];
+  admin: boolean;
+  canDownloadTuned: boolean;
+}) {
+  const latestRevision = revisions[0] || null;
+  const history = revisions.slice(1);
+
+  return (
+    <div className="rounded-xl border border-white/10 bg-black/25 p-3">
+      <div className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-white/45">
+        {title}
+      </div>
+
+      <div className="flex flex-col gap-2">
+        {originalFile ? (
+          <Link
+            href={`/api/files/${originalFile.id}/download`}
+            className="inline-block rounded-xl border border-white/15 bg-black/30 px-3 py-2 hover:bg-white/10"
+          >
+            Original File
+          </Link>
+        ) : (
+          <span className="text-xs text-white/35">No original file</span>
+        )}
+
+        {tunedFile && (admin || canDownloadTuned) ? (
+          <Link
+            href={`/api/files/${tunedFile.id}/download`}
+            className="inline-block rounded-xl border border-white/15 bg-black/30 px-3 py-2 hover:bg-white/10"
+          >
+            {admin ? "Tuned File" : "Download Tuned File"}
+          </Link>
+        ) : null}
+
+        {latestRevision ? (
+          <div className="flex flex-col gap-1">
+            <Link
+              href={`/api/files/${latestRevision.orderFile.id}/download`}
+              className="inline-block rounded-xl border border-white/15 bg-black/30 px-3 py-2 hover:bg-white/10"
+            >
+              {admin ? "Latest Revision File" : "Download Latest Revision"}
+            </Link>
+            <span className="text-xs text-white/45">
+              Rev {latestRevision.revisionNo}
+            </span>
+            {admin ? (
+              <span className="text-xs text-white/45">
+                Remark: {latestRevision.remark}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
+
+        {history.length > 0 && admin ? (
+          <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-white/45">
+              Revision History
+            </div>
+            <div className="space-y-2">
+              {history.map((revision) => (
+                <div
+                  key={revision.id}
+                  className="rounded-lg border border-white/10 bg-black/30 p-3"
+                >
+                  <Link
+                    href={`/api/files/${revision.orderFile.id}/download`}
+                    className="inline-block rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-sm hover:bg-white/10"
+                  >
+                    Download Rev {revision.revisionNo}
+                  </Link>
+                  <div className="mt-2 text-xs text-white/45">
+                    Remark: {revision.remark}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 export function OrderTable({
   orders,
   admin = false,
@@ -557,14 +635,6 @@ export function OrderTable({
   const [customerCancelOrderId, setCustomerCancelOrderId] = useState<string | null>(null);
   const [releaseOrderId, setReleaseOrderId] = useState<string | null>(null);
   const [uploadModal, setUploadModal] = useState<UploadModalState>(null);
-  const [expandedRevisionOrders, setExpandedRevisionOrders] = useState<Record<string, boolean>>({});
-
-  function toggleRevisionHistory(orderId: string) {
-    setExpandedRevisionOrders((prev) => ({
-      ...prev,
-      [orderId]: !prev[orderId],
-    }));
-  }
 
   return (
     <>
@@ -584,21 +654,50 @@ export function OrderTable({
 
           <tbody>
             {orders.map((order) => {
-              const customerOriginal = order.files.find(
+              const tuningType = order.tuningType || "ECU";
+              const needsEcu = tuningType === "ECU" || tuningType === "ECU_TCU";
+              const needsTcu = tuningType === "TCU" || tuningType === "ECU_TCU";
+
+              const customerOriginalLegacy = order.files.find(
                 (f) => f.kind === "CUSTOMER_ORIGINAL"
               );
-              const adminCompleted = order.files.find(
-                (f) => f.kind === "ADMIN_COMPLETED"
-              );
+
+              const customerEcu =
+                order.files.find((f) => f.kind === "CUSTOMER_ECU") ||
+                (needsEcu ? customerOriginalLegacy || null : null);
+
+              const customerTcu =
+                order.files.find((f) => f.kind === "CUSTOMER_TCU") || null;
+
+              const adminEcu =
+                order.files.find((f) => f.kind === "ADMIN_ECU") ||
+                order.files.find((f) => f.kind === "ADMIN_COMPLETED") ||
+                null;
+
+              const adminTcu =
+                order.files.find((f) => f.kind === "ADMIN_TCU") || null;
+
               const paymentProof = order.files.find(
                 (f) => f.kind === "CUSTOMER_PAYMENT_PROOF"
               );
-              const latestRevision = order.revisions?.[0] || null;
-              const hasRevisionHistory = admin && order.revisions.length > 1;
-              const isRevisionHistoryExpanded = !!expandedRevisionOrders[order.id];
+
+              const ecuRevisions = order.revisions
+                .filter(
+                  (revision) => getRevisionTargetLabel(revision.revisionTarget) === "ECU"
+                )
+                .sort((a, b) => b.revisionNo - a.revisionNo);
+
+              const tcuRevisions = order.revisions
+                .filter(
+                  (revision) => getRevisionTargetLabel(revision.revisionTarget) === "TCU"
+                )
+                .sort((a, b) => b.revisionNo - a.revisionNo);
 
               const statusLabel = getStatusLabel(order.status);
               const statusBadgeClass = getStatusBadge(order.status);
+
+              const hasAllAdminFiles =
+                (!needsEcu || !!adminEcu) && (!needsTcu || !!adminTcu);
 
               return (
                 <tr
@@ -675,32 +774,27 @@ export function OrderTable({
                   </td>
 
                   <td className="px-4 py-4">
-                    <div className="flex min-w-[270px] flex-col gap-3">
-                      {customerOriginal ? (
-                        <Link
-                          href={`/api/files/${customerOriginal.id}/download`}
-                          className="inline-block rounded-xl border border-white/15 bg-black/30 px-3 py-2 hover:bg-white/10"
-                        >
-                          Original File
-                        </Link>
+                    <div className="flex min-w-[320px] flex-col gap-3">
+                      {needsEcu ? (
+                        <FileSection
+                          title="ECU"
+                          originalFile={customerEcu}
+                          tunedFile={adminEcu}
+                          revisions={ecuRevisions}
+                          admin={admin}
+                          canDownloadTuned={order.status === "READY_FOR_DOWNLOAD"}
+                        />
                       ) : null}
 
-                      {admin ? (
-                        adminCompleted ? (
-                          <Link
-                            href={`/api/files/${adminCompleted.id}/download`}
-                            className="inline-block rounded-xl border border-white/15 bg-black/30 px-3 py-2 hover:bg-white/10"
-                          >
-                            Tuned File
-                          </Link>
-                        ) : null
-                      ) : order.status === "READY_FOR_DOWNLOAD" && adminCompleted ? (
-                        <Link
-                          href={`/api/files/${adminCompleted.id}/download`}
-                          className="inline-block rounded-xl border border-white/15 bg-black/30 px-3 py-2 hover:bg-white/10"
-                        >
-                          Download Tuned File
-                        </Link>
+                      {needsTcu ? (
+                        <FileSection
+                          title="TCU"
+                          originalFile={customerTcu}
+                          tunedFile={adminTcu}
+                          revisions={tcuRevisions}
+                          admin={admin}
+                          canDownloadTuned={order.status === "READY_FOR_DOWNLOAD"}
+                        />
                       ) : null}
 
                       {paymentProof ? (
@@ -711,66 +805,6 @@ export function OrderTable({
                           Payment Slip
                         </Link>
                       ) : null}
-
-                      {latestRevision ? (
-                        <div className="flex flex-col gap-1">
-                          <Link
-                            href={`/api/files/${latestRevision.orderFile.id}/download`}
-                            className="inline-block rounded-xl border border-white/15 bg-black/30 px-3 py-2 hover:bg-white/10"
-                          >
-                            {admin ? "Latest Revision File" : "Download Latest Revision"}
-                          </Link>
-                          <span className="text-xs text-white/45">
-                            Rev {latestRevision.revisionNo}
-                          </span>
-                          {admin ? (
-                            <span className="text-xs text-white/45">
-                              Remark: {latestRevision.remark}
-                            </span>
-                          ) : null}
-                        </div>
-                      ) : null}
-
-                      {hasRevisionHistory ? (
-                        <div className="flex flex-col gap-2">
-                          <button
-                            type="button"
-                            onClick={() => toggleRevisionHistory(order.id)}
-                            className="inline-flex items-center justify-center rounded-xl border border-white/12 bg-white/[0.03] px-3 py-2 text-xs font-medium text-white/72 transition hover:border-white/20 hover:bg-white/[0.07] hover:text-white"
-                          >
-                            {isRevisionHistoryExpanded
-                              ? "Hide Revision History"
-                              : "View Revision History"}
-                          </button>
-
-                          {isRevisionHistoryExpanded ? (
-                            <div className="rounded-xl border border-white/10 bg-black/25 p-3">
-                              <div className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-white/45">
-                                Revision History
-                              </div>
-
-                              <div className="space-y-3">
-                                {order.revisions.slice(1).map((revision) => (
-                                  <div
-                                    key={revision.id}
-                                    className="rounded-lg border border-white/10 bg-black/30 p-3"
-                                  >
-                                    <Link
-                                      href={`/api/files/${revision.orderFile.id}/download`}
-                                      className="inline-block rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-sm hover:bg-white/10"
-                                    >
-                                      Download Rev {revision.revisionNo}
-                                    </Link>
-                                    <div className="mt-2 text-xs text-white/45">
-                                      Remark: {revision.remark}
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          ) : null}
-                        </div>
-                      ) : null}
                     </div>
                   </td>
 
@@ -780,18 +814,33 @@ export function OrderTable({
                         <span className="text-red-400">Order Cancelled</span>
                       ) : (
                         <div className="flex w-full min-w-[220px] max-w-[260px] flex-col gap-3">
-                          {!adminCompleted ? (
+                          {needsEcu && !adminEcu ? (
                             <button
                               type="button"
                               onClick={() =>
                                 setUploadModal({
-                                  action: "admin-upload",
+                                  action: "admin-upload-ecu",
                                   orderId: order.id,
                                 })
                               }
                               className="w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center transition hover:bg-white/10"
                             >
-                              Upload Tuned File
+                              Upload Tuned ECU
+                            </button>
+                          ) : null}
+
+                          {needsTcu && !adminTcu ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setUploadModal({
+                                  action: "admin-upload-tcu",
+                                  orderId: order.id,
+                                })
+                              }
+                              className="w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center transition hover:bg-white/10"
+                            >
+                              Upload Tuned TCU
                             </button>
                           ) : null}
 
@@ -807,7 +856,9 @@ export function OrderTable({
                             </button>
                           ) : null}
 
-                          {order.status === "AWAITING_PAYMENT" && paymentProof ? (
+                          {order.status === "AWAITING_PAYMENT" &&
+                          paymentProof &&
+                          hasAllAdminFiles ? (
                             <button
                               type="button"
                               onClick={() => setReleaseOrderId(order.id)}
@@ -818,18 +869,36 @@ export function OrderTable({
                           ) : null}
 
                           {["READY_FOR_DOWNLOAD", "COMPLETED"].includes(order.status) &&
-                          adminCompleted ? (
+                          needsEcu &&
+                          adminEcu ? (
                             <button
                               type="button"
                               onClick={() =>
                                 setUploadModal({
-                                  action: "admin-upload-revision",
+                                  action: "admin-upload-revision-ecu",
                                   orderId: order.id,
                                 })
                               }
                               className="w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center transition hover:bg-white/10"
                             >
-                              Upload Revision
+                              Upload ECU Revision
+                            </button>
+                          ) : null}
+
+                          {["READY_FOR_DOWNLOAD", "COMPLETED"].includes(order.status) &&
+                          needsTcu &&
+                          adminTcu ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setUploadModal({
+                                  action: "admin-upload-revision-tcu",
+                                  orderId: order.id,
+                                })
+                              }
+                              className="w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center transition hover:bg-white/10"
+                            >
+                              Upload TCU Revision
                             </button>
                           ) : null}
 
@@ -842,14 +911,27 @@ export function OrderTable({
                       )
                     ) : order.status === "CANCELLED" ? (
                       <span className="text-red-400">Cancelled</span>
-                    ) : order.status === "READY_FOR_DOWNLOAD" && adminCompleted ? (
-                      <Link
-                        href={`/api/files/${adminCompleted.id}/download`}
-                        className="inline-block rounded-xl border border-white/15 bg-black/30 px-3 py-2 hover:bg-white/10"
-                      >
-                        Download
-                      </Link>
-                    ) : order.status === "AWAITING_PAYMENT" && adminCompleted ? (
+                    ) : order.status === "READY_FOR_DOWNLOAD" ? (
+                      <div className="flex min-w-[230px] flex-col gap-2">
+                        {needsEcu && adminEcu ? (
+                          <Link
+                            href={`/api/files/${adminEcu.id}/download`}
+                            className="rounded-xl border border-white/15 bg-black/30 px-3 py-2 hover:bg-white/10"
+                          >
+                            Download ECU
+                          </Link>
+                        ) : null}
+
+                        {needsTcu && adminTcu ? (
+                          <Link
+                            href={`/api/files/${adminTcu.id}/download`}
+                            className="rounded-xl border border-white/15 bg-black/30 px-3 py-2 hover:bg-white/10"
+                          >
+                            Download TCU
+                          </Link>
+                        ) : null}
+                      </div>
+                    ) : order.status === "AWAITING_PAYMENT" && hasAllAdminFiles ? (
                       <div className="flex min-w-[230px] flex-col gap-2">
                         <span className="text-amber-300/90">
                           Pending Payment

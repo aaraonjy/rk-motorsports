@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
+import { db } from "@/lib/db";
 import { saveFile } from "@/lib/storage";
-import { createAdminNotification } from "@/lib/notifications";
 
 export async function POST(
   req: Request,
@@ -10,44 +9,37 @@ export async function POST(
 ) {
   try {
     const user = await getSessionUser();
+    const { id } = await ctx.params;
+
     if (!user) {
       return NextResponse.redirect(new URL("/login", req.url), 303);
     }
 
-    const { id } = await ctx.params;
+    const formData = await req.formData();
+    const file = formData.get("file");
 
-    const order = await db.order.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        userId: true,
-        orderNumber: true,
-      },
-    });
-
-    if (!order || order.userId !== user.id) {
-      return NextResponse.json({ message: "Forbidden" }, { status: 403 });
-    }
-
-    const form = await req.formData();
-    const file = form.get("file");
-
-    if (!(file instanceof File)) {
+    if (!(file instanceof File) || file.size === 0) {
       return NextResponse.redirect(new URL("/dashboard", req.url), 303);
     }
 
-    const saved = await saveFile(file, "payment-proof");
-
-    const existing = await db.orderFile.findFirst({
-      where: {
-        orderId: id,
-        kind: "CUSTOMER_PAYMENT_PROOF",
-      },
+    const order = await db.order.findUnique({
+      where: { id },
+      include: { files: true },
     });
 
-    if (existing) {
+    if (!order || order.userId !== user.id) {
+      return NextResponse.redirect(new URL("/dashboard", req.url), 303);
+    }
+
+    const existingPayment = order.files.find(
+      (f) => f.kind === "CUSTOMER_PAYMENT_PROOF"
+    );
+
+    const saved = await saveFile(file, "customer-payment-proof");
+
+    if (existingPayment) {
       await db.orderFile.update({
-        where: { id: existing.id },
+        where: { id: existingPayment.id },
         data: {
           fileName: saved.fileName,
           storagePath: saved.storagePath,
@@ -57,7 +49,7 @@ export async function POST(
     } else {
       await db.orderFile.create({
         data: {
-          orderId: id,
+          orderId: order.id,
           kind: "CUSTOMER_PAYMENT_PROOF",
           fileName: saved.fileName,
           storagePath: saved.storagePath,
@@ -66,20 +58,34 @@ export async function POST(
       });
     }
 
+    await db.order.update({
+      where: { id: order.id },
+      data: {
+        status: "AWAITING_PAYMENT",
+      },
+    });
+
     try {
-      await createAdminNotification({
-        type: "PAYMENT_UPLOADED",
-        title: "Payment Received",
-	message: `${user.name} uploaded payment proof.`,
-        orderId: id,
+      const admins = await db.user.findMany({
+        where: { role: "ADMIN" },
       });
-    } catch (error) {
-      console.error("Notification creation failed:", error);
+
+      await db.notification.createMany({
+        data: admins.map((admin) => ({
+          userId: admin.id,
+          type: "PAYMENT_UPLOADED",
+          title: "Payment slip uploaded",
+          message: `${user.name} uploaded payment proof.`,
+          orderId: order.id,
+        })),
+      });
+    } catch (err) {
+      console.error("Admin notification failed:", err);
     }
 
     return NextResponse.redirect(new URL("/dashboard", req.url), 303);
   } catch (error) {
-    console.error("POST /api/orders/[id]/upload-payment failed:", error);
+    console.error("Upload payment failed:", error);
     return NextResponse.redirect(new URL("/dashboard", req.url), 303);
   }
 }
