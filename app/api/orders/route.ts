@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
 import { generateOrderNumber } from "@/lib/utils";
 import { saveFile } from "@/lib/storage";
+import { createAdminNotification } from "@/lib/notifications";
 
 const tunePrices: Record<string, number> = {
   "Stage 1 ECU Tune": 1500,
@@ -82,10 +83,11 @@ export async function POST(req: Request) {
     const requestDetails = requestDetailsLines.join("\n");
 
     const saved = await saveFile(file, "customer-original");
+    const orderNumber = generateOrderNumber();
 
-    await db.order.create({
+    const order = await db.order.create({
       data: {
-        orderNumber: generateOrderNumber(),
+        orderNumber,
         userId: user.id,
         totalAmount: finalTotal,
         requestDetails,
@@ -112,6 +114,13 @@ export async function POST(req: Request) {
           },
         },
       },
+    });
+
+    await createAdminNotification({
+      type: "ORDER_SUBMITTED",
+      title: "New order submitted",
+      message: `${user.name} submitted a new tuning order.`,
+      orderId: order.id,
     });
 
     return NextResponse.redirect(new URL("/dashboard", req.url), 303);

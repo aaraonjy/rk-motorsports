@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getSessionUser } from "@/lib/auth";
 import Image from "next/image";
+import { AdminNotificationBell } from "@/components/admin-notification-bell";
 
 const nav = [
   ["Services", "/#services"],
@@ -45,12 +46,15 @@ export async function SiteHeader() {
           <div className="flex items-center gap-4 text-sm">
             {user ? (
               <>
+                {user.role === "ADMIN" ? <AdminNotificationBell /> : null}
+
                 <Link
                   href={user.role === "ADMIN" ? "/admin" : "/dashboard"}
                   className="text-white/75 transition hover:text-white"
                 >
                   {user.role === "ADMIN" ? "Admin" : "Dashboard"}
                 </Link>
+
                 <form action="/api/auth/logout" method="post">
                   <button
                     type="submit"

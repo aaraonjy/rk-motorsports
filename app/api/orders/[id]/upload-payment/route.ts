@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
 import { saveFile } from "@/lib/storage";
+import { createAdminNotification } from "@/lib/notifications";
 
 export async function POST(
   req: Request,
@@ -17,6 +18,10 @@ export async function POST(
 
     const order = await db.order.findUnique({
       where: { id },
+      select: {
+        id: true,
+        userId: true,
+      },
     });
 
     if (!order || order.userId !== user.id) {
@@ -32,7 +37,6 @@ export async function POST(
 
     const saved = await saveFile(file, "payment-proof");
 
-    // overwrite if already exists
     const existing = await db.orderFile.findFirst({
       where: {
         orderId: id,
@@ -61,9 +65,16 @@ export async function POST(
       });
     }
 
+    await createAdminNotification({
+      type: "PAYMENT_UPLOADED",
+      title: "Payment slip uploaded",
+      message: `${user.name} uploaded a payment slip.`,
+      orderId: id,
+    });
+
     return NextResponse.redirect(new URL("/dashboard", req.url), 303);
   } catch (error) {
-    console.error(error);
+    console.error("POST /api/orders/[id]/upload-payment failed:", error);
     return NextResponse.redirect(new URL("/dashboard", req.url), 303);
   }
 }
