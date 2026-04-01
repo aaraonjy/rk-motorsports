@@ -14,6 +14,7 @@ import {
   tcuTunes,
   tuningTypeOptions,
   type TuningTypeOption,
+  type TuneOption,
 } from "@/lib/tuning-pricing";
 
 function getTuningTypeCardClasses(
@@ -118,6 +119,56 @@ function getTotalLabelClass(
   if (tuningType === "ECU") return "text-sky-200/80";
   if (tuningType === "TCU") return "text-violet-200/80";
   return "text-red-200/80";
+}
+
+function getPrimaryTag(item: TuneOption) {
+  return item.suitableFor?.[0] || "";
+}
+
+function PricingTuneCard({
+  item,
+  active,
+  onClick,
+  className,
+  badge,
+}: {
+  item: TuneOption;
+  active: boolean;
+  onClick: () => void;
+  className: string;
+  badge?: React.ReactNode;
+}) {
+  const primaryDescription = item.description?.[0] || "";
+  const primaryTag = getPrimaryTag(item);
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-2xl border p-5 text-left transition ${className}`}
+    >
+      <div className="flex min-h-[240px] flex-col">
+        <div className="flex items-start justify-between gap-3">
+          <p className="text-lg font-semibold text-white">{item.name}</p>
+          {badge}
+        </div>
+
+        <p className="mt-2 text-white/70">RM {item.price.toLocaleString()}</p>
+
+        <p className="mt-4 min-h-[72px] text-sm leading-6 text-white/65">
+          {primaryDescription}
+        </p>
+
+        <div className="mt-auto pt-4">
+          {primaryTag ? (
+            <span className="inline-flex rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/60">
+              {primaryTag}
+            </span>
+          ) : null}
+        </div>
+      </div>
+    </button>
+  );
 }
 
 export default function PricingPage() {
@@ -266,30 +317,13 @@ export default function PricingPage() {
                     const isActive = ecuStage === item.id;
 
                     return (
-                      <button
+                      <PricingTuneCard
                         key={item.id}
-                        type="button"
+                        item={item}
+                        active={isActive}
                         onClick={() => setEcuStage(item.id)}
-                        className={`rounded-2xl border p-5 text-left transition ${getEcuTuneCardClasses(
-                          item.id,
-                          isActive
-                        )}`}
-                      >
-                        <div className="flex h-full flex-col">
-                          <p className="text-lg font-semibold text-white">
-                            {item.name}
-                          </p>
-                          <p className="mt-2 text-white/70">
-                            RM {item.price.toLocaleString()}
-                          </p>
-                          <p className="mt-3 text-sm leading-6 text-white/65">
-                            {item.description?.[0]}
-                          </p>
-                          <p className="mt-3 text-xs uppercase tracking-[0.16em] text-white/40">
-                            {(item.suitableFor || []).join(" • ")}
-                          </p>
-                        </div>
-                      </button>
+                        className={getEcuTuneCardClasses(item.id, isActive)}
+                      />
                     );
                   })}
                 </div>
@@ -321,38 +355,20 @@ export default function PricingPage() {
                       getRecommendedTcuStage(ecuStage) === item.id;
 
                     return (
-                      <button
+                      <PricingTuneCard
                         key={item.id}
-                        type="button"
+                        item={item}
+                        active={isActive}
                         onClick={() => setTcuStage(item.id)}
-                        className={`rounded-2xl border p-5 text-left transition ${getTcuTuneCardClasses(
-                          item.id,
-                          isActive
-                        )}`}
-                      >
-                        <div className="flex h-full flex-col">
-                          <div className="flex items-start justify-between gap-3">
-                            <p className="text-lg font-semibold text-white">
-                              {item.name}
-                            </p>
-                            {isRecommended ? (
-                              <span className="rounded-full border border-amber-400/30 bg-amber-400/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-amber-300">
-                                Recommended
-                              </span>
-                            ) : null}
-                          </div>
-
-                          <p className="mt-2 text-white/70">
-                            RM {item.price.toLocaleString()}
-                          </p>
-                          <p className="mt-3 text-sm leading-6 text-white/65">
-                            {item.description?.[0]}
-                          </p>
-                          <p className="mt-3 text-xs uppercase tracking-[0.16em] text-white/40">
-                            {(item.suitableFor || []).join(" • ")}
-                          </p>
-                        </div>
-                      </button>
+                        className={getTcuTuneCardClasses(item.id, isActive)}
+                        badge={
+                          isRecommended ? (
+                            <span className="rounded-full border border-amber-400/30 bg-amber-400/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-amber-300">
+                              Recommended
+                            </span>
+                          ) : undefined
+                        }
+                      />
                     );
                   })}
                 </div>
