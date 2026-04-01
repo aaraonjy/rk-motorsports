@@ -194,6 +194,52 @@ function getSummaryLabelClass(
   return "text-red-200/80";
 }
 
+function getSummaryHeading(tuningType: TuningTypeOption) {
+  if (tuningType === "ECU_TCU") return "Selected package";
+  return "Selected tune";
+}
+
+function getEmptySummaryText(tuningType: TuningTypeOption) {
+  if (tuningType === "ECU") return "No ECU tune selected";
+  if (tuningType === "TCU") return "No TCU tune selected";
+  return "No package selected";
+}
+
+function getEmptyTotalText(tuningType: TuningTypeOption) {
+  if (tuningType === "ECU") return "Select an ECU tune";
+  if (tuningType === "TCU") return "Select a TCU tune";
+  return "Select a package";
+}
+
+function getRemarksPlaceholder(tuningType: TuningTypeOption) {
+  if (tuningType === "ECU") {
+    return "e.g. tuned for RON97, upgraded intake, daily driving setup, smoother throttle response, any special ECU-related request not covered above";
+  }
+
+  if (tuningType === "TCU") {
+    return "e.g. smoother daily shifting, faster gear change, higher clutch pressure, revised shift points, any special TCU / gearbox request not covered above";
+  }
+
+  return "e.g. tuned for RON97, upgraded intake, daily driving setup, DSG focus on smoother shifting, any special request not covered above";
+}
+
+function getTcuVersionPlaceholder(tcuFamily: string, tcuModel: string) {
+  if (tcuFamily && tcuModel) {
+    return `Enter ${tcuModel} software ID / version manually`;
+  }
+  if (tcuFamily) {
+    return `Enter ${tcuFamily} software ID / version manually`;
+  }
+  return "Enter TCU software ID / version manually, e.g. DQ381 Gen 2 / 0DL300012A";
+}
+
+function getTcuVersionHelpText(tcuFamily: string, tcuModel: string) {
+  if (tcuFamily || tcuModel) {
+    return "Manual input is recommended because the same TCU family can have multiple software versions.";
+  }
+  return "Manual input is required to avoid incorrect auto-filled TCU software data.";
+}
+
 function TuneCard({
   item,
   active,
@@ -215,7 +261,7 @@ function TuneCard({
 
   return (
     <label
-      className={`cursor-pointer rounded-2xl border p-5 transition duration-200 hover:scale-[1.01] ${getTuneCardClass(
+      className={`flex min-h-[240px] cursor-pointer flex-col rounded-2xl border p-5 transition duration-200 hover:scale-[1.01] ${getTuneCardClass(
         kind,
         item.id,
         active
@@ -235,19 +281,17 @@ function TuneCard({
 
       <p className="mt-2 text-white/75">RM {item.price.toLocaleString()}</p>
 
-      {primaryDescription ? (
-        <p className="mt-3 text-sm leading-6 text-white/60">
-          {primaryDescription}
-        </p>
-      ) : null}
+      <p className="mt-3 min-h-[72px] text-sm leading-6 text-white/60">
+        {primaryDescription}
+      </p>
 
-      {suitableLabel ? (
-        <div className="mt-4">
+      <div className="mt-auto pt-4">
+        {suitableLabel ? (
           <span className="inline-flex rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/60">
             {suitableLabel}
           </span>
-        </div>
-      ) : null}
+        ) : null}
+      </div>
     </label>
   );
 }
@@ -1189,12 +1233,11 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
                   className="input-rk"
                   value={tcuVersion}
                   onChange={(e) => setTcuVersion(e.target.value)}
-                  placeholder="Manual entry required, e.g. DQ381 Gen 2 / 0DL300012A"
+                  placeholder={getTcuVersionPlaceholder(tcuFamily, tcuModel)}
                   required
                 />
                 <p className="mt-2 text-xs text-white/45">
-                  Manual input is required to avoid incorrect auto-filled TCU
-                  software data.
+                  {getTcuVersionHelpText(tcuFamily, tcuModel)}
                 </p>
               </div>
             </div>
@@ -1356,7 +1399,7 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
           <textarea
             className="textarea-rk"
             name="remarks"
-            placeholder="e.g. tuned for RON97, upgraded intake, daily driving setup, DSG focus on smoother shifting, any special request not covered above"
+            placeholder={getRemarksPlaceholder(tuningType)}
           />
         </div>
 
@@ -1389,7 +1432,7 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
         </h2>
 
         <div className="mt-8 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
-          <p className="text-sm text-white/60">Selected package</p>
+          <p className="text-sm text-white/60">{getSummaryHeading(tuningType)}</p>
 
           {selectedTuneLabel ? (
             <>
@@ -1401,7 +1444,7 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
               </p>
             </>
           ) : (
-            <p className="mt-2 text-white/50">No tuning package selected</p>
+            <p className="mt-2 text-white/50">{getEmptySummaryText(tuningType)}</p>
           )}
         </div>
 
@@ -1538,7 +1581,7 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
               `RM ${estimatedTotal.toLocaleString()}`
             ) : (
               <span className="text-2xl font-semibold text-white/50">
-                Select a package
+                {getEmptyTotalText(tuningType)}
               </span>
             )}
           </p>
