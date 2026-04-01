@@ -46,7 +46,7 @@ export async function SiteHeader() {
           <div className="flex items-center gap-4 text-sm">
             {user ? (
               <>
-                {user.role === "ADMIN" ? <AdminNotificationBell /> : null}
+                <AdminNotificationBell />
 
                 <Link
                   href={user.role === "ADMIN" ? "/admin" : "/dashboard"}

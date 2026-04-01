@@ -154,17 +154,15 @@ export function AdminNotificationBell() {
           <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
             <div>
               <p className="text-sm font-semibold text-white">Notifications</p>
-              <p className="text-xs text-white/45">
-                {data.unreadCount} unread
-              </p>
+              <p className="text-xs text-white/45">{data.unreadCount} unread</p>
             </div>
 
             <Link
-              href="/admin"
+              href="/dashboard"
               onClick={() => setOpen(false)}
               className="text-xs text-white/55 transition hover:text-white"
             >
-              Admin Dashboard
+              View Dashboard
             </Link>
           </div>
 

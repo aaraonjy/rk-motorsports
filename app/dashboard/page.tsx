@@ -3,7 +3,6 @@ import { getRecentOrdersForUser } from "@/lib/queries";
 import { redirect } from "next/navigation";
 import { OrderTable } from "@/components/order-table";
 import { paymentConfig } from "@/lib/payment-config";
-import { CustomerNotificationPanel } from "@/components/customer-notification-panel";
 
 export default async function DashboardPage() {
   const user = await getSessionUser();
@@ -19,10 +18,6 @@ export default async function DashboardPage() {
         <p className="mt-4 text-white/70">
           Track order status and download completed tuned files.
         </p>
-
-        <div className="mt-8">
-          <CustomerNotificationPanel />
-        </div>
 
         <div className="mt-8 grid gap-4 lg:grid-cols-3">
           <div className="card-rk p-6 lg:col-span-2">
