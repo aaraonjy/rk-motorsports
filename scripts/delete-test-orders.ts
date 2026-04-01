@@ -4,47 +4,35 @@ import { del } from "@vercel/blob";
 const prisma = new PrismaClient();
 
 async function main() {
-  const email = "test@gmail.com";
-
-  const user = await prisma.user.findUnique({
-    where: { email },
-    include: {
-      orders: {
+  const orders = await prisma.order.findMany({
+    select: {
+      id: true,
+      orderNumber: true,
+      files: {
         select: {
           id: true,
-          orderNumber: true,
-          files: {
-            select: {
-              id: true,
-              storagePath: true,
-              fileName: true,
-              kind: true,
-            },
-          },
+          storagePath: true,
+          fileName: true,
+          kind: true,
         },
       },
     },
   });
 
-  if (!user) {
-    console.log(`User not found: ${email}`);
+  if (orders.length === 0) {
+    console.log("No orders found.");
     return;
   }
 
-  const orderIds = user.orders.map((order) => order.id);
+  const orderIds = orders.map((order) => order.id);
 
-  if (orderIds.length === 0) {
-    console.log(`No orders found for ${email}`);
-    return;
-  }
-
-  console.log(`Found ${orderIds.length} order(s) for ${email}`);
+  console.log(`Found ${orders.length} order(s).`);
   console.log(
     "Order numbers:",
-    user.orders.map((o) => o.orderNumber).join(", ")
+    orders.map((o) => o.orderNumber).join(", ")
   );
 
-  const blobPaths = user.orders
+  const blobPaths = orders
     .flatMap((order) => order.files)
     .map((file) => file.storagePath)
     .filter(Boolean);
@@ -81,7 +69,7 @@ async function main() {
     },
   });
 
-  console.log(`Deleted all orders and uploaded files for ${email}`);
+  console.log("Deleted all orders, order items, and uploaded files.");
 }
 
 main()
