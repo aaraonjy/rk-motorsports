@@ -120,7 +120,7 @@ export async function POST(req: Request) {
       await createAdminNotification({
         type: "ORDER_SUBMITTED",
         title: "New Order received",
-        message: `${user.name} submitted order ${order.orderNumber}.`,
+	message: `${user.name} submitted a new order.`,
         orderId: order.id,
       });
     } catch (error) {

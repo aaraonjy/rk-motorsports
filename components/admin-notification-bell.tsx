@@ -155,7 +155,7 @@ export function AdminNotificationBell() {
             <div>
               <p className="text-sm font-semibold text-white">Notifications</p>
               <p className="text-xs text-white/45">
-                {data.unreadCount} unread • auto refresh every 20s
+                {data.unreadCount} unread
               </p>
             </div>
 
