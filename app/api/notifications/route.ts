@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/auth";
+import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 
 export async function GET() {
   try {
-    const admin = await requireAdmin();
+    const user = await requireUser();
 
     const notifications = await db.notification.findMany({
-      where: { userId: admin.id },
+      where: { userId: user.id },
       orderBy: { createdAt: "desc" },
       take: 10,
       include: {
@@ -22,7 +22,7 @@ export async function GET() {
 
     const unreadCount = await db.notification.count({
       where: {
-        userId: admin.id,
+        userId: user.id,
         isRead: false,
       },
     });
@@ -36,9 +36,12 @@ export async function GET() {
         createdAt: item.createdAt,
         orderId: item.order?.id ?? null,
         orderNumber: item.order?.orderNumber ?? null,
-        href: item.order?.orderNumber
-          ? `/admin?search=${encodeURIComponent(item.order.orderNumber)}`
-          : "/admin",
+        href:
+          user.role === "ADMIN"
+            ? item.order?.orderNumber
+              ? `/admin?search=${encodeURIComponent(item.order.orderNumber)}`
+              : "/admin"
+            : "/dashboard",
       })),
       unreadCount,
     });

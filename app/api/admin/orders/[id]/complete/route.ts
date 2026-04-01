@@ -22,10 +22,31 @@ export async function POST(
       return NextResponse.redirect(new URL("/admin", req.url), 303);
     }
 
+    const order = await db.order.findUnique({
+      where: { id },
+      select: { userId: true },
+    });
+
     await db.order.update({
       where: { id },
       data: { status: "READY_FOR_DOWNLOAD" },
     });
+
+    try {
+      if (order) {
+        await db.notification.create({
+          data: {
+            userId: order.userId,
+            type: "PAYMENT_CONFIRMED",
+            title: "Payment received",
+            message: "Payment received, tuned file ready to download.",
+            orderId: id,
+          },
+        });
+      }
+    } catch (err) {
+      console.error("Customer notification failed:", err);
+    }
 
     return NextResponse.redirect(new URL("/admin", req.url), 303);
   } catch (error) {

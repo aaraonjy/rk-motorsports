@@ -36,6 +36,9 @@ enum CancelledBy {
 enum NotificationType {
   ORDER_SUBMITTED
   PAYMENT_UPLOADED
+  TUNED_FILE_READY
+  PAYMENT_CONFIRMED
+  REVISION_READY
 }
 
 model User {

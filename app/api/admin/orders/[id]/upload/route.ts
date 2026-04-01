@@ -71,6 +71,20 @@ export async function POST(
       },
     });
 
+    try {
+      await db.notification.create({
+        data: {
+          userId: order.userId,
+          type: "TUNED_FILE_READY",
+          title: "Tuned file ready",
+          message: "Your tuned file is ready, pending for payment.",
+          orderId: id,
+        },
+      });
+    } catch (err) {
+      console.error("Customer notification failed:", err);
+    }
+
     revalidatePath("/admin");
     revalidatePath("/dashboard");
 

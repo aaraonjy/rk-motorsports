@@ -66,6 +66,20 @@ export async function POST(
       },
     });
 
+    try {
+      await db.notification.create({
+        data: {
+          userId: order.userId,
+          type: "REVISION_READY",
+          title: "Revision ready",
+          message: "Revision tune file is available to download.",
+          orderId: id,
+        },
+      });
+    } catch (err) {
+      console.error("Customer notification failed:", err);
+    }
+
     revalidatePath("/admin");
     revalidatePath("/dashboard");
 

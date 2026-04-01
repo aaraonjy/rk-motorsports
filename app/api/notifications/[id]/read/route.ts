@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/auth";
+import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 
 export async function POST(
@@ -7,7 +7,7 @@ export async function POST(
   ctx: { params: Promise<{ id: string }> }
 ) {
   try {
-    const admin = await requireAdmin();
+    const user = await requireUser();
     const { id } = await ctx.params;
 
     const notification = await db.notification.findUnique({
@@ -19,7 +19,7 @@ export async function POST(
       },
     });
 
-    if (!notification || notification.userId !== admin.id) {
+    if (!notification || notification.userId !== user.id) {
       return NextResponse.json({ message: "Not found" }, { status: 404 });
     }
 
