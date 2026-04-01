@@ -206,9 +206,9 @@ function getEmptySummaryText(tuningType: TuningTypeOption) {
 }
 
 function getEmptyTotalText(tuningType: TuningTypeOption) {
-  if (tuningType === "ECU") return "Select an ECU tune";
-  if (tuningType === "TCU") return "Select a TCU tune";
-  return "Select a package";
+  if (tuningType === "ECU") return "Select ECU tune";
+  if (tuningType === "TCU") return "Select TCU tune";
+  return "Select ECU and TCU stages";
 }
 
 function getRemarksPlaceholder(tuningType: TuningTypeOption) {
