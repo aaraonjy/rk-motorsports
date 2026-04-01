@@ -543,7 +543,7 @@ function FileSection({
   const history = revisions.slice(1);
 
   return (
-    <div className="rounded-xl border border-white/10 bg-black/25 p-3">
+    <div className="max-w-[260px] rounded-xl border border-white/10 bg-black/25 p-3">
       <div className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-white/45">
         {title}
       </div>
@@ -634,16 +634,16 @@ export function OrderTable({
   return (
     <>
       <div className="overflow-x-auto rounded-3xl border border-white/20 bg-black/60 shadow-xl shadow-black/40 backdrop-blur-md">
-        <table className="w-full min-w-[1500px] text-left text-sm">
+        <table className="w-full text-left text-sm">
           <thead className="bg-black/50 text-white/65">
             <tr>
-              <th className="px-4 py-4 min-w-[140px]">Order</th>
-              {admin ? <th className="px-4 py-4 min-w-[140px]">Customer</th> : null}
+              <th className="px-4 py-4 w-[140px]">Order</th>
+              {admin ? <th className="px-4 py-4 w-[150px]">Customer</th> : null}
               <th className="px-4 py-4 min-w-[320px]">Vehicle</th>
-              <th className="px-4 py-4 min-w-[170px]">Status</th>
-              <th className="px-4 py-4 min-w-[110px]">Amount</th>
-              <th className="px-4 py-4 min-w-[360px]">Files</th>
-              <th className="px-4 py-4 min-w-[300px]">Action</th>
+              <th className="px-4 py-4 w-[170px]">Status</th>
+              <th className="px-4 py-4 w-[110px]">Amount</th>
+              <th className="px-4 py-4 w-[290px]">Files</th>
+              <th className="px-4 py-4 w-[240px]">Action</th>
             </tr>
           </thead>
 
@@ -771,7 +771,7 @@ export function OrderTable({
                   </td>
 
                   <td className="px-4 py-4">
-                    <div className="flex min-w-[340px] flex-col gap-3">
+                    <div className="flex w-[260px] flex-col gap-3">
                       {needsEcu ? (
                         <FileSection
                           title="ECU"
@@ -810,7 +810,7 @@ export function OrderTable({
                       order.status === "CANCELLED" ? (
                         <span className="text-red-400">Order Cancelled</span>
                       ) : (
-                        <div className="w-full min-w-[280px] max-w-[320px]">
+                        <div className="w-[220px]">
                           <div className="flex flex-col gap-3">
                             {needsEcu && !adminEcu ? (
                               <button
