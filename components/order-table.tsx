@@ -78,17 +78,6 @@ function getStatusLabel(status: string) {
   }
 }
 
-function getRequestValue(details: string, key: string) {
-  return (
-    details
-      .split("\n")
-      .map((line) => line.trim())
-      .find((line) => line.startsWith(`${key}:`))
-      ?.replace(`${key}:`, "")
-      .trim() || ""
-  );
-}
-
 function getTuningTypeLabel(value?: string | null) {
   if (value === "ECU_TCU") return "ECU + TCU";
   if (value === "TCU") return "TCU";
@@ -134,7 +123,7 @@ function VehicleDetails({ order }: { order: OrderWithRelations }) {
         </div>
       ) : null}
 
-      {(order.tuningType === "ECU" || order.tuningType === "ECU_TCU" || !order.tuningType) ? (
+      {order.tuningType === "ECU" || order.tuningType === "ECU_TCU" || !order.tuningType ? (
         <>
           <div>
             <span className="text-white/45">ECU Stage:</span>{" "}
@@ -151,7 +140,7 @@ function VehicleDetails({ order }: { order: OrderWithRelations }) {
         </>
       ) : null}
 
-      {(order.tuningType === "TCU" || order.tuningType === "ECU_TCU") ? (
+      {order.tuningType === "TCU" || order.tuningType === "ECU_TCU" ? (
         <>
           <div>
             <span className="text-white/45">TCU Stage:</span>{" "}
@@ -177,7 +166,7 @@ function VehicleDetails({ order }: { order: OrderWithRelations }) {
         <span className="text-white/90">{order.fuelGrade || "-"}</span>
       </div>
 
-      {(order.tuningType === "ECU" || order.tuningType === "ECU_TCU" || !order.tuningType) ? (
+      {order.tuningType === "ECU" || order.tuningType === "ECU_TCU" || !order.tuningType ? (
         <div>
           <span className="text-white/45">Water Methanol Injection:</span>{" "}
           <span className="text-white/90">
@@ -482,7 +471,13 @@ function UploadConfirmModal({
           <div>
             <input
               type="file"
-              name={isAdminRevisionEcu || isAdminUploadEcu ? "ecuFile" : isAdminRevisionTcu || isAdminUploadTcu ? "tcuFile" : "file"}
+              name={
+                isAdminRevisionEcu || isAdminUploadEcu
+                  ? "ecuFile"
+                  : isAdminRevisionTcu || isAdminUploadTcu
+                    ? "tcuFile"
+                    : "file"
+              }
               required
               className="block w-full text-xs text-white/80 file:mr-3 file:rounded-lg file:border file:border-white/15 file:bg-black/40 file:px-3 file:py-2 file:text-white hover:file:bg-white/10"
             />
@@ -647,8 +642,8 @@ export function OrderTable({
               <th className="px-4 py-4">Vehicle</th>
               <th className="px-4 py-4">Status</th>
               <th className="px-4 py-4">Amount</th>
-              <th className="px-4 py-4">Files</th>
-              <th className="px-4 py-4">Action</th>
+              <th className="px-4 py-4 min-w-[340px]">Files</th>
+              <th className="px-4 py-4 min-w-[260px]">Action</th>
             </tr>
           </thead>
 
@@ -683,13 +678,15 @@ export function OrderTable({
 
               const ecuRevisions = order.revisions
                 .filter(
-                  (revision) => getRevisionTargetLabel(revision.revisionTarget) === "ECU"
+                  (revision) =>
+                    getRevisionTargetLabel(revision.revisionTarget) === "ECU"
                 )
                 .sort((a, b) => b.revisionNo - a.revisionNo);
 
               const tcuRevisions = order.revisions
                 .filter(
-                  (revision) => getRevisionTargetLabel(revision.revisionTarget) === "TCU"
+                  (revision) =>
+                    getRevisionTargetLabel(revision.revisionTarget) === "TCU"
                 )
                 .sort((a, b) => b.revisionNo - a.revisionNo);
 
@@ -769,7 +766,7 @@ export function OrderTable({
                     </div>
                   </td>
 
-                  <td className="px-4 py-4">
+                  <td className="px-4 py-4 whitespace-nowrap">
                     {formatCurrency(order.totalAmount)}
                   </td>
 
@@ -813,7 +810,7 @@ export function OrderTable({
                       order.status === "CANCELLED" ? (
                         <span className="text-red-400">Order Cancelled</span>
                       ) : (
-                        <div className="flex w-full min-w-[220px] max-w-[260px] flex-col gap-3">
+                        <div className="flex min-w-[240px] max-w-[280px] flex-col items-stretch gap-3">
                           {needsEcu && !adminEcu ? (
                             <button
                               type="button"

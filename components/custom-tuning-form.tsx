@@ -223,21 +223,24 @@ function getRemarksPlaceholder(tuningType: TuningTypeOption) {
   return "e.g. tuned for RON97, upgraded intake, daily driving setup, DSG focus on smoother shifting, any special request not covered above";
 }
 
-function getTcuVersionPlaceholder(tcuFamily: string, tcuModel: string) {
-  if (tcuFamily && tcuModel) {
-    return `Enter ${tcuModel} software ID / version manually`;
-  }
-  if (tcuFamily) {
-    return `Enter ${tcuFamily} software ID / version manually`;
-  }
-  return "Enter TCU software ID / version manually, e.g. DQ381 Gen 2 / 0DL300012A";
+function getTcuVersionPlaceholder() {
+  return "e.g. DQ381 Gen 2 / 0DL300012A";
 }
 
-function getTcuVersionHelpText(tcuFamily: string, tcuModel: string) {
-  if (tcuFamily || tcuModel) {
-    return "Manual input is recommended because the same TCU family can have multiple software versions.";
+function getTcuVersionHelpText() {
+  return "Enter the gearbox software ID / version manually if available.";
+}
+
+function getFinalPriceNote(tuningType: TuningTypeOption) {
+  if (tuningType === "ECU") {
+    return "Final price is subject to change after file review, ECU verification, and vehicle setup complexity.";
   }
-  return "Manual input is required to avoid incorrect auto-filled TCU software data.";
+
+  if (tuningType === "TCU") {
+    return "Final price is subject to change after file review, TCU verification, and vehicle setup complexity.";
+  }
+
+  return "Final price is subject to change after file review, ECU / TCU verification, and vehicle setup complexity.";
 }
 
 function TuneCard({
@@ -463,6 +466,7 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
     tuningType === "ECU" || tuningType === "ECU_TCU";
   const shouldShowTcuSection =
     tuningType === "TCU" || tuningType === "ECU_TCU";
+  const shouldShowFuelGrade = tuningType !== "TCU";
 
   const finalEcuType = useMemo(() => {
     if (!shouldShowEcuSection) return "";
@@ -489,9 +493,10 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
   }, [shouldShowTcuSection, tcuReadTool, tcuReadToolOther]);
 
   const finalFuelGrade = useMemo(() => {
+    if (!shouldShowFuelGrade) return "";
     if (fuelGrade === "Other (Specify)") return fuelGradeOther.trim();
     return fuelGrade;
-  }, [fuelGrade, fuelGradeOther]);
+  }, [shouldShowFuelGrade, fuelGrade, fuelGradeOther]);
 
   const finalWmiOption = useMemo(() => {
     if (!shouldShowEcuSection) return "";
@@ -575,6 +580,8 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
       setSelectedAddOns([]);
       setWmiOption("");
       setWmiOther("");
+      setFuelGrade("");
+      setFuelGradeOther("");
     }
   }, [tuningType]);
 
@@ -645,7 +652,7 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
     !selectedEngineId ||
     !finalYearRange ||
     !finalCapacity ||
-    !fuelGrade ||
+    (shouldShowFuelGrade && !fuelGrade) ||
     (shouldShowEcuSection &&
       (!ecuStage ||
         !finalEcuType ||
@@ -659,7 +666,9 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
         !tcuVersion.trim() ||
         (tcuBrand === "Other" && !tcuOther.trim()) ||
         (tcuReadTool === "Other (Specify)" && !tcuReadToolOther.trim()))) ||
-    (fuelGrade === "Other (Specify)" && !fuelGradeOther.trim()) ||
+    (shouldShowFuelGrade &&
+      fuelGrade === "Other (Specify)" &&
+      !fuelGradeOther.trim()) ||
     (wmiOption === "Custom (Specify)" && !wmiOther.trim());
 
   return (
@@ -762,7 +771,7 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
           </p>
         </div>
 
-        <div className="mt-8 grid gap-6 md:grid-cols-3">
+        <div className={`mt-8 grid gap-6 ${shouldShowFuelGrade ? "md:grid-cols-3" : "md:grid-cols-2"}`}>
           <div>
             <label className="label-rk">Vehicle Brand</label>
             <div className="relative">
@@ -875,28 +884,30 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
             ) : null}
           </div>
 
-          <div>
-            <label className="label-rk">Fuel Grade</label>
-            <div className="relative">
-              <select
-                className="input-rk appearance-none pr-12"
-                value={fuelGrade}
-                onChange={(e) => setFuelGrade(e.target.value)}
-                required
-              >
-                <option value="">Select fuel grade</option>
-                {fuelGrades.map((grade) => (
-                  <option key={grade} value={grade}>
-                    {grade}
-                  </option>
-                ))}
-              </select>
-              <SelectArrow />
+          {shouldShowFuelGrade ? (
+            <div>
+              <label className="label-rk">Fuel Grade</label>
+              <div className="relative">
+                <select
+                  className="input-rk appearance-none pr-12"
+                  value={fuelGrade}
+                  onChange={(e) => setFuelGrade(e.target.value)}
+                  required
+                >
+                  <option value="">Select fuel grade</option>
+                  {fuelGrades.map((grade) => (
+                    <option key={grade} value={grade}>
+                      {grade}
+                    </option>
+                  ))}
+                </select>
+                <SelectArrow />
+              </div>
             </div>
-          </div>
+          ) : null}
         </div>
 
-        {fuelGrade === "Other (Specify)" ? (
+        {shouldShowFuelGrade && fuelGrade === "Other (Specify)" ? (
           <div className="mt-6">
             <label className="label-rk">Other Fuel Grade</label>
             <input
@@ -1233,11 +1244,11 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
                   className="input-rk"
                   value={tcuVersion}
                   onChange={(e) => setTcuVersion(e.target.value)}
-                  placeholder={getTcuVersionPlaceholder(tcuFamily, tcuModel)}
+                  placeholder={getTcuVersionPlaceholder()}
                   required
                 />
                 <p className="mt-2 text-xs text-white/45">
-                  {getTcuVersionHelpText(tcuFamily, tcuModel)}
+                  {getTcuVersionHelpText()}
                 </p>
               </div>
             </div>
@@ -1511,10 +1522,12 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
                 </>
               ) : null}
 
-              <p>
-                <span className="text-white/45">Fuel Grade:</span>{" "}
-                {finalFuelGrade || "-"}
-              </p>
+              {shouldShowFuelGrade ? (
+                <p>
+                  <span className="text-white/45">Fuel Grade:</span>{" "}
+                  {finalFuelGrade || "-"}
+                </p>
+              ) : null}
 
               {shouldShowEcuSection ? (
                 <p>
@@ -1598,8 +1611,7 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
         </div>
 
         <p className="mt-6 text-sm leading-6 text-white/55">
-          Final price is subject to change after file review, ECU / TCU
-          verification, and vehicle setup complexity.
+          {getFinalPriceNote(tuningType)}
         </p>
       </div>
     </form>
