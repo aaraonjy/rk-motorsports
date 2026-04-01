@@ -17,6 +17,7 @@ import {
   getRecommendedTcuStage,
   tcuTunes,
   type TuningTypeOption,
+  type TuneOption,
 } from "@/lib/tuning-pricing";
 
 type EngineOption = {
@@ -99,6 +100,155 @@ function SelectArrow() {
         />
       </svg>
     </div>
+  );
+}
+
+function getTuningTypeCardClass(
+  optionId: TuningTypeOption,
+  active: boolean
+): string {
+  if (active) {
+    if (optionId === "ECU") {
+      return "border-sky-500 bg-sky-500/15 shadow-[0_0_0_1px_rgba(14,165,233,0.35)]";
+    }
+    if (optionId === "TCU") {
+      return "border-violet-500 bg-violet-500/15 shadow-[0_0_0_1px_rgba(139,92,246,0.35)]";
+    }
+    return "border-[#ff3b57] bg-[#ff3b57]/15 shadow-[0_0_0_1px_rgba(255,59,87,0.35)]";
+  }
+
+  if (optionId === "ECU") {
+    return "border-white/10 bg-white/[0.03] hover:border-sky-500/40 hover:bg-sky-500/10";
+  }
+  if (optionId === "TCU") {
+    return "border-white/10 bg-white/[0.03] hover:border-violet-500/40 hover:bg-violet-500/10";
+  }
+  return "border-white/10 bg-white/[0.03] hover:border-[#ff3b57]/40 hover:bg-[#ff3b57]/10";
+}
+
+function getTuneCardClass(kind: "ecu" | "tcu", itemId: string, active: boolean) {
+  if (kind === "ecu") {
+    if (active) {
+      if (itemId === "stage1") {
+        return "border-sky-500 bg-sky-500/15 shadow-[0_0_0_1px_rgba(14,165,233,0.35)]";
+      }
+      if (itemId === "stage2") {
+        return "border-amber-500 bg-amber-500/15 shadow-[0_0_0_1px_rgba(245,158,11,0.35)]";
+      }
+      if (itemId === "stage3") {
+        return "border-[#ff3b57] bg-[#ff3b57]/15 shadow-[0_0_0_1px_rgba(255,59,87,0.35)]";
+      }
+      return "border-fuchsia-500 bg-fuchsia-500/15 shadow-[0_0_0_1px_rgba(217,70,239,0.35)]";
+    }
+
+    if (itemId === "stage1") {
+      return "border-white/10 bg-white/[0.03] hover:border-sky-500/40 hover:bg-sky-500/10";
+    }
+    if (itemId === "stage2") {
+      return "border-white/10 bg-white/[0.03] hover:border-amber-500/40 hover:bg-amber-500/10";
+    }
+    if (itemId === "stage3") {
+      return "border-white/10 bg-white/[0.03] hover:border-[#ff3b57]/40 hover:bg-[#ff3b57]/10";
+    }
+    return "border-white/10 bg-white/[0.03] hover:border-fuchsia-500/40 hover:bg-fuchsia-500/10";
+  }
+
+  if (active) {
+    if (itemId === "stage1") {
+      return "border-violet-500 bg-violet-500/15 shadow-[0_0_0_1px_rgba(139,92,246,0.35)]";
+    }
+    if (itemId === "stage2") {
+      return "border-orange-500 bg-orange-500/15 shadow-[0_0_0_1px_rgba(249,115,22,0.35)]";
+    }
+    return "border-fuchsia-500 bg-fuchsia-500/15 shadow-[0_0_0_1px_rgba(217,70,239,0.35)]";
+  }
+
+  if (itemId === "stage1") {
+    return "border-white/10 bg-white/[0.03] hover:border-violet-500/40 hover:bg-violet-500/10";
+  }
+  if (itemId === "stage2") {
+    return "border-white/10 bg-white/[0.03] hover:border-orange-500/40 hover:bg-orange-500/10";
+  }
+  return "border-white/10 bg-white/[0.03] hover:border-fuchsia-500/40 hover:bg-fuchsia-500/10";
+}
+
+function getSummaryBoxClass(tuningType: TuningTypeOption, hasSelection: boolean) {
+  if (!hasSelection) return "border-white/10 bg-white/[0.03]";
+
+  if (tuningType === "ECU") {
+    return "border-sky-500/30 bg-sky-500/10";
+  }
+  if (tuningType === "TCU") {
+    return "border-violet-500/30 bg-violet-500/10";
+  }
+  return "border-[#ff3b57]/30 bg-[#ff3b57]/10";
+}
+
+function getSummaryLabelClass(
+  tuningType: TuningTypeOption,
+  hasSelection: boolean
+) {
+  if (!hasSelection) return "text-white/60";
+  if (tuningType === "ECU") return "text-sky-200/80";
+  if (tuningType === "TCU") return "text-violet-200/80";
+  return "text-red-200/80";
+}
+
+function TuneCard({
+  item,
+  active,
+  onSelect,
+  kind,
+  badge,
+}: {
+  item: TuneOption;
+  active: boolean;
+  onSelect: () => void;
+  kind: "ecu" | "tcu";
+  badge?: React.ReactNode;
+}) {
+  const primaryDescription = item.description?.[0] || "";
+  const suitableLabel =
+    item.suitableFor && item.suitableFor.length > 0
+      ? item.suitableFor[0]
+      : undefined;
+
+  return (
+    <label
+      className={`cursor-pointer rounded-2xl border p-5 transition duration-200 hover:scale-[1.01] ${getTuneCardClass(
+        kind,
+        item.id,
+        active
+      )}`}
+    >
+      <input
+        type="radio"
+        className="sr-only"
+        checked={active}
+        onChange={onSelect}
+      />
+
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-lg font-semibold text-white">{item.name}</p>
+        {badge}
+      </div>
+
+      <p className="mt-2 text-white/75">RM {item.price.toLocaleString()}</p>
+
+      {primaryDescription ? (
+        <p className="mt-3 text-sm leading-6 text-white/60">
+          {primaryDescription}
+        </p>
+      ) : null}
+
+      {suitableLabel ? (
+        <div className="mt-4">
+          <span className="inline-flex rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/60">
+            {suitableLabel}
+          </span>
+        </div>
+      ) : null}
+    </label>
   );
 }
 
@@ -430,8 +580,18 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
   );
 
   const selectedTuneLabel = useMemo(() => {
-    if (tuningType === "ECU") return selectedEcuTune?.name || "";
-    if (tuningType === "TCU") return selectedTcuTune?.name || "";
+    if (tuningType === "ECU") {
+      return selectedEcuTune?.name || "";
+    }
+
+    if (tuningType === "TCU") {
+      return selectedTcuTune?.name || "";
+    }
+
+    if (!selectedEcuTune || !selectedTcuTune) {
+      return "";
+    }
+
     return getBundleLabel(ecuStage, tcuStage);
   }, [tuningType, selectedEcuTune, selectedTcuTune, ecuStage, tcuStage]);
 
@@ -524,11 +684,10 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
             return (
               <label
                 key={option.id}
-                className={`cursor-pointer rounded-2xl border p-5 transition ${
+                className={`cursor-pointer rounded-2xl border p-5 transition ${getTuningTypeCardClass(
+                  option.id as TuningTypeOption,
                   active
-                    ? "border-[#ff3b57] bg-[#ff3b57]/15 shadow-[0_0_0_1px_rgba(255,59,87,0.35)]"
-                    : "border-white/10 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.06]"
-                }`}
+                )}`}
               >
                 <input
                   type="radio"
@@ -722,27 +881,13 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
                 const isActive = ecuStage === item.id;
 
                 return (
-                  <label
+                  <TuneCard
                     key={item.id}
-                    className={`cursor-pointer rounded-2xl border p-5 transition ${
-                      isActive
-                        ? "border-[#ff3b57] bg-[#ff3b57]/15 shadow-[0_0_0_1px_rgba(255,59,87,0.35)]"
-                        : "border-white/10 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.06]"
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      className="sr-only"
-                      checked={isActive}
-                      onChange={() => setEcuStage(item.id)}
-                    />
-                    <p className="text-lg font-semibold text-white">
-                      {item.name}
-                    </p>
-                    <p className="mt-2 text-white/70">
-                      RM {item.price.toLocaleString()}
-                    </p>
-                  </label>
+                    item={item}
+                    active={isActive}
+                    onSelect={() => setEcuStage(item.id)}
+                    kind="ecu"
+                  />
                 );
               })}
             </div>
@@ -922,34 +1067,20 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
                   tuningType === "ECU_TCU";
 
                 return (
-                  <label
+                  <TuneCard
                     key={item.id}
-                    className={`cursor-pointer rounded-2xl border p-5 transition ${
-                      isActive
-                        ? "border-[#ff3b57] bg-[#ff3b57]/15 shadow-[0_0_0_1px_rgba(255,59,87,0.35)]"
-                        : "border-white/10 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.06]"
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      className="sr-only"
-                      checked={isActive}
-                      onChange={() => setTcuStage(item.id)}
-                    />
-                    <div className="flex items-start justify-between gap-3">
-                      <p className="text-lg font-semibold text-white">
-                        {item.name}
-                      </p>
-                      {isRecommended ? (
+                    item={item}
+                    active={isActive}
+                    onSelect={() => setTcuStage(item.id)}
+                    kind="tcu"
+                    badge={
+                      isRecommended ? (
                         <span className="rounded-full border border-amber-400/30 bg-amber-400/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-amber-300">
                           Recommended
                         </span>
-                      ) : null}
-                    </div>
-                    <p className="mt-2 text-white/70">
-                      RM {item.price.toLocaleString()}
-                    </p>
-                  </label>
+                      ) : undefined
+                    }
+                  />
                 );
               })}
             </div>
@@ -1058,9 +1189,13 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
                   className="input-rk"
                   value={tcuVersion}
                   onChange={(e) => setTcuVersion(e.target.value)}
-                  placeholder="e.g. DQ381 Gen 2 / software ID"
+                  placeholder="Manual entry required, e.g. DQ381 Gen 2 / 0DL300012A"
                   required
                 />
+                <p className="mt-2 text-xs text-white/45">
+                  Manual input is required to avoid incorrect auto-filled TCU
+                  software data.
+                </p>
               </div>
             </div>
 
@@ -1384,8 +1519,18 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
           </div>
         ) : null}
 
-        <div className="mt-6 rounded-2xl border border-white/10 bg-[#ff3b57]/10 p-6">
-          <p className="text-sm uppercase tracking-[0.2em] text-white/60">
+        <div
+          className={`mt-6 rounded-2xl border p-6 ${getSummaryBoxClass(
+            tuningType,
+            !!selectedTuneLabel
+          )}`}
+        >
+          <p
+            className={`text-sm uppercase tracking-[0.2em] ${getSummaryLabelClass(
+              tuningType,
+              !!selectedTuneLabel
+            )}`}
+          >
             Total estimated price
           </p>
           <p className="mt-3 text-4xl font-bold text-white">
