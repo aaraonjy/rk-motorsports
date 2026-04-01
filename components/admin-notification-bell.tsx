@@ -20,6 +20,8 @@ type NotificationsResponse = {
   unreadCount: number;
 };
 
+const REFRESH_INTERVAL_MS = 20_000;
+
 function formatRelativeTime(value: string) {
   const date = new Date(value);
   const diffMs = Date.now() - date.getTime();
@@ -46,8 +48,10 @@ export function AdminNotificationBell() {
     unreadCount: 0,
   });
 
-  async function loadNotifications() {
+  async function loadNotifications(showLoader = false) {
     try {
+      if (showLoader) setLoading(true);
+
       const res = await fetch("/api/notifications", {
         method: "GET",
         cache: "no-store",
@@ -60,12 +64,18 @@ export function AdminNotificationBell() {
     } catch (error) {
       console.error("Failed to load notifications:", error);
     } finally {
-      setLoading(false);
+      if (showLoader) setLoading(false);
     }
   }
 
   useEffect(() => {
-    loadNotifications();
+    loadNotifications(true);
+
+    const interval = window.setInterval(() => {
+      loadNotifications(false);
+    }, REFRESH_INTERVAL_MS);
+
+    return () => window.clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -95,10 +105,7 @@ export function AdminNotificationBell() {
         });
 
         setData((prev) => ({
-          unreadCount: Math.max(
-            0,
-            prev.unreadCount - (item.isRead ? 0 : 1)
-          ),
+          unreadCount: Math.max(0, prev.unreadCount - 1),
           notifications: prev.notifications.map((notification) =>
             notification.id === item.id
               ? { ...notification, isRead: true }
@@ -143,12 +150,12 @@ export function AdminNotificationBell() {
       </button>
 
       {open ? (
-        <div className="absolute right-0 top-12 z-[70] w-[360px] overflow-hidden rounded-2xl border border-white/10 bg-[#0b0b0c]/95 shadow-2xl backdrop-blur-xl">
+        <div className="absolute right-0 top-12 z-[70] w-[380px] overflow-hidden rounded-2xl border border-white/10 bg-[#0b0b0c]/95 shadow-2xl backdrop-blur-xl">
           <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
             <div>
               <p className="text-sm font-semibold text-white">Notifications</p>
               <p className="text-xs text-white/45">
-                {data.unreadCount} unread
+                {data.unreadCount} unread • auto refresh every 20s
               </p>
             </div>
 

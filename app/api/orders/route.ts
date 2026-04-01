@@ -11,6 +11,14 @@ const tunePrices: Record<string, number> = {
   "Custom File Service": 1800,
 };
 
+function formatVehicleLabel(
+  vehicleBrand: string,
+  vehicleModel: string,
+  vehicleYear: string
+) {
+  return [vehicleBrand, vehicleModel, vehicleYear].filter(Boolean).join(" ");
+}
+
 export async function POST(req: Request) {
   try {
     const form = await req.formData();
@@ -116,12 +124,22 @@ export async function POST(req: Request) {
       },
     });
 
-    await createAdminNotification({
-      type: "ORDER_SUBMITTED",
-      title: "New order submitted",
-      message: `${user.name} submitted a new tuning order.`,
-      orderId: order.id,
-    });
+    const vehicleLabel = formatVehicleLabel(
+      vehicleBrand,
+      vehicleModel,
+      vehicleYear
+    );
+
+    try {
+      await createAdminNotification({
+        type: "ORDER_SUBMITTED",
+        title: "New tuning request received",
+        message: `${user.name} submitted order ${order.orderNumber} for ${vehicleLabel}.`,
+        orderId: order.id,
+      });
+    } catch (error) {
+      console.error("Notification creation failed:", error);
+    }
 
     return NextResponse.redirect(new URL("/dashboard", req.url), 303);
   } catch (error) {

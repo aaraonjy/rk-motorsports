@@ -21,6 +21,7 @@ export async function POST(
       select: {
         id: true,
         userId: true,
+        orderNumber: true,
       },
     });
 
@@ -65,12 +66,16 @@ export async function POST(
       });
     }
 
-    await createAdminNotification({
-      type: "PAYMENT_UPLOADED",
-      title: "Payment slip uploaded",
-      message: `${user.name} uploaded a payment slip.`,
-      orderId: id,
-    });
+    try {
+      await createAdminNotification({
+        type: "PAYMENT_UPLOADED",
+        title: "Payment proof uploaded",
+        message: `${user.name} uploaded payment proof for ${order.orderNumber}.`,
+        orderId: id,
+      });
+    } catch (error) {
+      console.error("Notification creation failed:", error);
+    }
 
     return NextResponse.redirect(new URL("/dashboard", req.url), 303);
   } catch (error) {
