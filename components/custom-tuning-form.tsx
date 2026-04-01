@@ -349,7 +349,10 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
   const ecuBrands = useMemo(() => Object.keys(ecuTypes), [ecuTypes]);
 
   const tcuTypes = useMemo(() => tcuTypesData as TcuTypesFile, []);
-  const tcuBrands = useMemo(() => Object.keys(tcuTypes), [tcuTypes]);
+  const tcuBrands = useMemo(
+    () => Object.keys(tcuTypes).sort((a, b) => a.localeCompare(b)),
+    [tcuTypes]
+  );
 
   const ecuReadTools = useMemo(
     () => (ecuReadToolsData as EcuReadToolsFile).tools || [],
@@ -357,7 +360,10 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
   );
 
   const tcuReadTools = useMemo(
-    () => (tcuReadToolsData as TcuReadToolsFile).tools || [],
+    () =>
+      ((tcuReadToolsData as TcuReadToolsFile).tools || [])
+        .slice()
+        .sort((a, b) => a.localeCompare(b)),
     []
   );
 
@@ -447,7 +453,10 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
   );
 
   const availableTcuFamilies = useMemo(
-    () => selectedTcuBrandData.map((item) => item.family),
+    () =>
+      selectedTcuBrandData
+        .map((item) => item.family)
+        .sort((a, b) => a.localeCompare(b)),
     [selectedTcuBrandData]
   );
 
@@ -458,7 +467,10 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
   );
 
   const availableTcuModels = useMemo(
-    () => selectedTcuFamilyData?.models || [],
+    () =>
+      (selectedTcuFamilyData?.models || [])
+        .slice()
+        .sort((a, b) => a.localeCompare(b)),
     [selectedTcuFamilyData]
   );
 
@@ -771,7 +783,11 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
           </p>
         </div>
 
-        <div className={`mt-8 grid gap-6 ${shouldShowFuelGrade ? "md:grid-cols-3" : "md:grid-cols-2"}`}>
+        <div
+          className={`mt-8 grid gap-6 ${
+            shouldShowFuelGrade ? "md:grid-cols-3" : "md:grid-cols-2"
+          }`}
+        >
           <div>
             <label className="label-rk">Vehicle Brand</label>
             <div className="relative">
