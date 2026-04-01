@@ -11,14 +11,6 @@ const tunePrices: Record<string, number> = {
   "Custom File Service": 1800,
 };
 
-function formatVehicleLabel(
-  vehicleBrand: string,
-  vehicleModel: string,
-  vehicleYear: string
-) {
-  return [vehicleBrand, vehicleModel, vehicleYear].filter(Boolean).join(" ");
-}
-
 export async function POST(req: Request) {
   try {
     const form = await req.formData();
@@ -124,17 +116,11 @@ export async function POST(req: Request) {
       },
     });
 
-    const vehicleLabel = formatVehicleLabel(
-      vehicleBrand,
-      vehicleModel,
-      vehicleYear
-    );
-
     try {
       await createAdminNotification({
         type: "ORDER_SUBMITTED",
-        title: "New tuning request received",
-        message: `${user.name} submitted order ${order.orderNumber} for ${vehicleLabel}.`,
+        title: "New Order received",
+        message: `${user.name} submitted order ${order.orderNumber}.`,
         orderId: order.id,
       });
     } catch (error) {

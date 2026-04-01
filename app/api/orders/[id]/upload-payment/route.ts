@@ -69,7 +69,7 @@ export async function POST(
     try {
       await createAdminNotification({
         type: "PAYMENT_UPLOADED",
-        title: "Payment proof uploaded",
+        title: "Payment Received",
         message: `${user.name} uploaded payment proof for ${order.orderNumber}.`,
         orderId: id,
       });
