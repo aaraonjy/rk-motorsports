@@ -634,16 +634,16 @@ export function OrderTable({
   return (
     <>
       <div className="overflow-x-auto rounded-3xl border border-white/20 bg-black/60 shadow-xl shadow-black/40 backdrop-blur-md">
-        <table className="min-w-full text-left text-sm">
+        <table className="w-full min-w-[1500px] text-left text-sm">
           <thead className="bg-black/50 text-white/65">
             <tr>
-              <th className="px-4 py-4">Order</th>
-              {admin ? <th className="px-4 py-4">Customer</th> : null}
-              <th className="px-4 py-4">Vehicle</th>
-              <th className="px-4 py-4">Status</th>
-              <th className="px-4 py-4">Amount</th>
-              <th className="px-4 py-4 min-w-[340px]">Files</th>
-              <th className="px-4 py-4 min-w-[260px]">Action</th>
+              <th className="px-4 py-4 min-w-[140px]">Order</th>
+              {admin ? <th className="px-4 py-4 min-w-[140px]">Customer</th> : null}
+              <th className="px-4 py-4 min-w-[320px]">Vehicle</th>
+              <th className="px-4 py-4 min-w-[170px]">Status</th>
+              <th className="px-4 py-4 min-w-[110px]">Amount</th>
+              <th className="px-4 py-4 min-w-[360px]">Files</th>
+              <th className="px-4 py-4 min-w-[300px]">Action</th>
             </tr>
           </thead>
 
@@ -702,14 +702,14 @@ export function OrderTable({
                   className="border-t border-white/10 align-top transition-colors hover:bg-white/[0.03]"
                 >
                   <td className="px-4 py-4">
-                    <div className="font-semibold">{order.orderNumber}</div>
+                    <div className="font-semibold break-words">{order.orderNumber}</div>
                     <div className="text-white/45">
                       {new Date(order.createdAt).toLocaleDateString()}
                     </div>
                   </td>
 
                   {admin ? (
-                    <td className="px-4 py-4">{order.user?.email}</td>
+                    <td className="px-4 py-4 break-words">{order.user?.email}</td>
                   ) : null}
 
                   <td className="px-4 py-4">
@@ -771,7 +771,7 @@ export function OrderTable({
                   </td>
 
                   <td className="px-4 py-4">
-                    <div className="flex min-w-[320px] flex-col gap-3">
+                    <div className="flex min-w-[340px] flex-col gap-3">
                       {needsEcu ? (
                         <FileSection
                           title="ECU"
@@ -810,100 +810,102 @@ export function OrderTable({
                       order.status === "CANCELLED" ? (
                         <span className="text-red-400">Order Cancelled</span>
                       ) : (
-                        <div className="flex min-w-[240px] max-w-[280px] flex-col items-stretch gap-3">
-                          {needsEcu && !adminEcu ? (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setUploadModal({
-                                  action: "admin-upload-ecu",
-                                  orderId: order.id,
-                                })
-                              }
-                              className="w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center transition hover:bg-white/10"
-                            >
-                              Upload Tuned ECU
-                            </button>
-                          ) : null}
+                        <div className="w-full min-w-[280px] max-w-[320px]">
+                          <div className="flex flex-col gap-3">
+                            {needsEcu && !adminEcu ? (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setUploadModal({
+                                    action: "admin-upload-ecu",
+                                    orderId: order.id,
+                                  })
+                                }
+                                className="block w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center transition hover:bg-white/10"
+                              >
+                                Upload Tuned ECU
+                              </button>
+                            ) : null}
 
-                          {needsTcu && !adminTcu ? (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setUploadModal({
-                                  action: "admin-upload-tcu",
-                                  orderId: order.id,
-                                })
-                              }
-                              className="w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center transition hover:bg-white/10"
-                            >
-                              Upload Tuned TCU
-                            </button>
-                          ) : null}
+                            {needsTcu && !adminTcu ? (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setUploadModal({
+                                    action: "admin-upload-tcu",
+                                    orderId: order.id,
+                                  })
+                                }
+                                className="block w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center transition hover:bg-white/10"
+                              >
+                                Upload Tuned TCU
+                              </button>
+                            ) : null}
 
-                          {["FILE_RECEIVED", "IN_PROGRESS", "AWAITING_PAYMENT"].includes(
-                            order.status
-                          ) ? (
-                            <button
-                              type="button"
-                              onClick={() => setCancelOrderId(order.id)}
-                              className="w-full rounded-xl border border-red-500/40 px-3 py-2 text-center text-red-400 transition hover:bg-red-500/10"
-                            >
-                              Admin Cancel Order
-                            </button>
-                          ) : null}
+                            {["FILE_RECEIVED", "IN_PROGRESS", "AWAITING_PAYMENT"].includes(
+                              order.status
+                            ) ? (
+                              <button
+                                type="button"
+                                onClick={() => setCancelOrderId(order.id)}
+                                className="block w-full rounded-xl border border-red-500/40 px-3 py-2 text-center text-red-400 transition hover:bg-red-500/10"
+                              >
+                                Admin Cancel Order
+                              </button>
+                            ) : null}
 
-                          {order.status === "AWAITING_PAYMENT" &&
-                          paymentProof &&
-                          hasAllAdminFiles ? (
-                            <button
-                              type="button"
-                              onClick={() => setReleaseOrderId(order.id)}
-                              className="w-full rounded-xl border border-emerald-500/40 px-3 py-2 text-center text-emerald-400 transition hover:bg-emerald-500/10"
-                            >
-                              Confirm Payment & Release
-                            </button>
-                          ) : null}
+                            {order.status === "AWAITING_PAYMENT" &&
+                            paymentProof &&
+                            hasAllAdminFiles ? (
+                              <button
+                                type="button"
+                                onClick={() => setReleaseOrderId(order.id)}
+                                className="block w-full rounded-xl border border-emerald-500/40 px-3 py-2 text-center text-emerald-400 transition hover:bg-emerald-500/10"
+                              >
+                                Confirm Payment & Release
+                              </button>
+                            ) : null}
 
-                          {["READY_FOR_DOWNLOAD", "COMPLETED"].includes(order.status) &&
-                          needsEcu &&
-                          adminEcu ? (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setUploadModal({
-                                  action: "admin-upload-revision-ecu",
-                                  orderId: order.id,
-                                })
-                              }
-                              className="w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center transition hover:bg-white/10"
-                            >
-                              Upload ECU Revision
-                            </button>
-                          ) : null}
+                            {["READY_FOR_DOWNLOAD", "COMPLETED"].includes(order.status) &&
+                            needsEcu &&
+                            adminEcu ? (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setUploadModal({
+                                    action: "admin-upload-revision-ecu",
+                                    orderId: order.id,
+                                  })
+                                }
+                                className="block w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center transition hover:bg-white/10"
+                              >
+                                Upload ECU Revision
+                              </button>
+                            ) : null}
 
-                          {["READY_FOR_DOWNLOAD", "COMPLETED"].includes(order.status) &&
-                          needsTcu &&
-                          adminTcu ? (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setUploadModal({
-                                  action: "admin-upload-revision-tcu",
-                                  orderId: order.id,
-                                })
-                              }
-                              className="w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center transition hover:bg-white/10"
-                            >
-                              Upload TCU Revision
-                            </button>
-                          ) : null}
+                            {["READY_FOR_DOWNLOAD", "COMPLETED"].includes(order.status) &&
+                            needsTcu &&
+                            adminTcu ? (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setUploadModal({
+                                    action: "admin-upload-revision-tcu",
+                                    orderId: order.id,
+                                  })
+                                }
+                                className="block w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center transition hover:bg-white/10"
+                              >
+                                Upload TCU Revision
+                              </button>
+                            ) : null}
 
-                          {order.status === "READY_FOR_DOWNLOAD" ? (
-                            <span className="inline-flex w-full items-center justify-center rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-center text-emerald-400">
-                              Download Released
-                            </span>
-                          ) : null}
+                            {order.status === "READY_FOR_DOWNLOAD" ? (
+                              <span className="inline-flex w-full items-center justify-center rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-center text-emerald-400">
+                                Download Released
+                              </span>
+                            ) : null}
+                          </div>
                         </div>
                       )
                     ) : order.status === "CANCELLED" ? (
