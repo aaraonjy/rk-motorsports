@@ -211,7 +211,7 @@ export function getRecommendedTcuStage(ecuStage: string): TuneStage | "" {
   if (ecuStage === "stage1") return "stage1";
   if (ecuStage === "stage2") return "stage2";
   if (ecuStage === "stage3") return "stage2";
-  if (ecuStage === "custom") return "custom";
+  if (ecuStage === "custom") return "stage2";
   return "";
 }
 
