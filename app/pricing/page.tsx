@@ -148,9 +148,10 @@ function PricingTuneCard({
       className={`rounded-2xl border p-5 text-left transition ${className}`}
     >
       <div className="flex min-h-[240px] flex-col">
-        <div className="flex items-start justify-between gap-3">
+        <div>
           <p className="text-lg font-semibold text-white">{item.name}</p>
-          {badge}
+
+          {badge ? <div className="mt-2">{badge}</div> : null}
         </div>
 
         <p className="mt-2 text-white/70">RM {item.price.toLocaleString()}</p>
@@ -257,13 +258,14 @@ export default function PricingPage() {
       <div className="container-rk">
         <h1 className="text-4xl font-bold text-white md:text-5xl">Pricing</h1>
 
-        <p className="mt-4 max-w-3xl text-white/70 leading-relaxed">
+        <p className="mt-4 max-w-3xl leading-relaxed text-white/70">
           Select ECU, TCU, or ECU + TCU to estimate your total price.
         </p>
 
-	<p className="mt-2 max-w-3xl text-white/70 leading-relaxed">
-  	  Final pricing may vary depending on vehicle model, ECU/TCU type, and tuning complexity.
-	</p>
+        <p className="mt-2 max-w-3xl leading-relaxed text-white/70">
+          Final pricing may vary depending on vehicle model, ECU/TCU type, and
+          tuning complexity.
+        </p>
 
         <div className="mt-12 grid gap-8 lg:grid-cols-[1.5fr_0.9fr]">
           <div className="rounded-[2rem] border border-white/10 bg-black/45 p-6 backdrop-blur-md md:p-8">
@@ -365,7 +367,7 @@ export default function PricingPage() {
                         className={getTcuTuneCardClasses(item.id, isActive)}
                         badge={
                           isRecommended ? (
-                            <span className="rounded-full border border-amber-400/30 bg-amber-400/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-amber-300">
+                            <span className="inline-flex w-fit rounded-full border border-amber-400/30 bg-amber-400/10 px-2 py-[2px] text-[9px] font-semibold uppercase tracking-[0.14em] text-amber-300">
                               Recommended
                             </span>
                           ) : undefined
@@ -402,7 +404,11 @@ export default function PricingPage() {
                           checked
                             ? "border-[#ff3b57] bg-[#ff3b57]/10"
                             : "border-white/10 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.05]"
-                        } ${!ecuStage ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}
+                        } ${
+                          !ecuStage
+                            ? "cursor-not-allowed opacity-50"
+                            : "cursor-pointer"
+                        }`}
                       >
                         <div className="flex items-center gap-4">
                           <input
@@ -517,12 +523,12 @@ export default function PricingPage() {
 
             <p className="mt-6 text-sm leading-6 text-white/55">
               This is an estimated price only. Final quotation may vary based on{" "}
-	      {tuningType === "ECU"
+              {tuningType === "ECU"
                 ? "ECU type"
                 : tuningType === "TCU"
-                ? "TCU type"
-                : "ECU / TCU type"}
-	      , vehicle setup, and requested tuning complexity.
+                  ? "TCU type"
+                  : "ECU / TCU type"}
+              , vehicle setup, and requested tuning complexity.
             </p>
           </div>
         </div>
