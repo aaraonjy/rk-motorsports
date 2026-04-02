@@ -369,11 +369,16 @@ function TuneCard({
         onChange={onSelect}
       />
 
-      <div className="flex items-start justify-between gap-3">
+      <div>
         <p className="text-lg font-semibold text-white">{item.name}</p>
-        {badge}
+		
+        {badge ? (
+		  <div className="mt-2">
+		    {badge}
+		  </div>
+		) : null}
       </div>
-
+	  
       <p className="mt-2 text-white/75">RM {item.price.toLocaleString()}</p>
 
       <p className="mt-3 min-h-[72px] text-sm leading-6 text-white/60">
