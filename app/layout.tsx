@@ -7,6 +7,9 @@ import { WhatsAppButton } from "@/components/whatsapp-button";
 export const metadata: Metadata = {
   title: "RK Motorsports",
   description: "Custom ECU tuning workflow portal.",
+  icons: {
+    icon: "/icon.png",
+  },
 };
 
 export default function RootLayout({
