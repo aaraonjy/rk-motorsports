@@ -442,6 +442,7 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
   const [currentEcuSetupStage, setCurrentEcuSetupStage] =
     useState<EcuSetupStage | "">("");
   const [turboType, setTurboType] = useState<TurboSetupOption | "">("");
+  const [turboOther, setTurboOther] = useState("");
 
   const [ecuBrand, setEcuBrand] = useState("");
   const [ecuFamily, setEcuFamily] = useState("");
@@ -661,6 +662,11 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
     return wmiOption;
   }, [shouldShowEcuSection, wmiOption, wmiOther]);
 
+  const finalTurboSetup = useMemo(() => {
+    if (turboType === "other") return turboOther.trim();
+    return turboType;
+  }, [turboType, turboOther]);
+
   useEffect(() => {
     setSelectedModelId("");
     setSelectedEngineId("");
@@ -715,6 +721,10 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
   }, [wmiOption]);
 
   useEffect(() => {
+    if (turboType !== "other") setTurboOther("");
+  }, [turboType]);
+
+  useEffect(() => {
     if (tuningType === "ECU") {
       setTcuStage("");
       setTcuBrand("");
@@ -726,6 +736,7 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
       setTcuReadToolOther("");
       setCurrentEcuSetupStage("");
       setTurboType("");
+      setTurboOther("");
     }
 
     if (tuningType === "TCU") {
@@ -863,10 +874,14 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
       (!ecuStage ||
         !finalEcuType ||
         !finalEcuReadTool ||
-        (shouldShowTurboSetupInEcuSection && !turboType) ||
+        (shouldShowTurboSetupInEcuSection &&
+          (!turboType || (turboType === "other" && !turboOther.trim()))) ||
         (ecuBrand === "Other" && !ecuOther.trim()) ||
         (ecuReadTool === "Other (Specify)" && !ecuReadToolOther.trim()))) ||
-    (shouldShowTcuPreSetup && (!currentEcuSetupStage || !turboType)) ||
+    (shouldShowTcuPreSetup &&
+      (!currentEcuSetupStage ||
+        !turboType ||
+        (turboType === "other" && !turboOther.trim()))) ||
     (shouldShowTcuSection &&
       (!tcuStage ||
         !finalTcuType ||
@@ -895,7 +910,7 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
         name="currentEcuSetupStage"
         value={currentEcuSetupStage}
       />
-      <input type="hidden" name="turboType" value={turboType} />
+      <input type="hidden" name="turboType" value={finalTurboSetup} />
       <input type="hidden" name="selectedTuneLabel" value={selectedTuneLabel} />
       <input type="hidden" name="estimatedTotal" value={estimatedTotal || ""} />
       <input type="hidden" name="vehicleBrand" value={selectedBrand} />
@@ -1184,6 +1199,19 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
                 </select>
                 <SelectArrow />
               </div>
+
+              {turboType === "other" ? (
+                <div className="mt-4">
+                  <label className="label-rk">Other Turbo Setup</label>
+                  <input
+                    className="input-rk"
+                    value={turboOther}
+                    onChange={(e) => setTurboOther(e.target.value)}
+                    placeholder="e.g. custom turbo setup, OEM swap, supercharger, or not sure"
+                    required
+                  />
+                </div>
+              ) : null}
             </div>
           </>
         ) : null}
@@ -1234,6 +1262,19 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
                   </select>
                   <SelectArrow />
                 </div>
+
+                {turboType === "other" ? (
+                  <div className="mt-4">
+                    <label className="label-rk">Other Turbo Setup</label>
+                    <input
+                      className="input-rk"
+                      value={turboOther}
+                      onChange={(e) => setTurboOther(e.target.value)}
+                      placeholder="e.g. custom turbo setup, OEM swap, supercharger, or not sure"
+                      required
+                    />
+                  </div>
+                ) : null}
               </div>
             ) : null}
 
@@ -1785,8 +1826,10 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
                   </p>
                   <p>
                     <span className="text-white/45">Turbo Setup:</span>{" "}
-                    {turboSetupOptions.find((item) => item.id === turboType)
-                      ?.name || "-"}
+                    {turboType === "other"
+                      ? turboOther || "-"
+                      : turboSetupOptions.find((item) => item.id === turboType)
+                          ?.name || "-"}
                   </p>
                 </>
               ) : null}
@@ -1800,8 +1843,10 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
                   {shouldShowTurboSetupInEcuSection ? (
                     <p>
                       <span className="text-white/45">Turbo Setup:</span>{" "}
-                      {turboSetupOptions.find((item) => item.id === turboType)
-                        ?.name || "-"}
+                      {turboType === "other"
+                        ? turboOther || "-"
+                        : turboSetupOptions.find((item) => item.id === turboType)
+                            ?.name || "-"}
                     </p>
                   ) : null}
                   <p>
