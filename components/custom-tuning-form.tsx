@@ -80,27 +80,27 @@ const currentEcuSetupOptions: Array<{
   {
     id: "stock",
     name: "Stock",
-    shortDescription: "Factory setup",
+    shortDescription: "Factory calibration",
   },
   {
     id: "stage1",
     name: "Stage 1",
-    shortDescription: "Mild setup",
+    shortDescription: "Mild performance setup",
   },
   {
     id: "stage2",
     name: "Stage 2",
-    shortDescription: "Bolt-on setup",
+    shortDescription: "Bolt-on performance setup",
   },
   {
     id: "stage3",
     name: "Stage 3",
-    shortDescription: "High power",
+    shortDescription: "High-performance build setup",
   },
   {
     id: "custom",
     name: "Custom",
-    shortDescription: "Not sure / custom",
+    shortDescription: "Custom or unknown setup",
   },
 ];
 
