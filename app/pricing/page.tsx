@@ -516,8 +516,13 @@ export default function PricingPage() {
             </div>
 
             <p className="mt-6 text-sm leading-6 text-white/55">
-              This is an estimated price only. Final quotation may vary based on
-              ECU / TCU type, vehicle setup, and requested tuning complexity.
+              This is an estimated price only. Final quotation may vary based on{" "}
+	      {tuningType === "ECU"
+                ? "ECU type"
+                : tuningType === "TCU"
+                ? "TCU type"
+                : "ECU / TCU type"}
+	      , vehicle setup, and requested tuning complexity.
             </p>
           </div>
         </div>
