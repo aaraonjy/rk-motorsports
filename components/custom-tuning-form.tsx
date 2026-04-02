@@ -14,7 +14,6 @@ import {
   calculateBaseTuneTotal,
   ecuTunes,
   getBundleLabel,
-  getRecommendedTcuStage,
   tcuTunes,
   type TuningTypeOption,
   type TuneOption,
@@ -64,6 +63,78 @@ type TcuTypesFile = Record<string, TcuTypeEntry[]>;
 type CustomTuningFormProps = {
   productId: string;
 };
+
+type EcuSetupStage = "stock" | "stage1" | "stage2" | "stage3" | "custom";
+type TurboSetupOption =
+  | "stock"
+  | "oem_upgrade"
+  | "hybrid"
+  | "big_turbo"
+  | "other";
+
+const currentEcuSetupOptions: Array<{
+  id: EcuSetupStage;
+  name: string;
+  description: string;
+}> = [
+  {
+    id: "stock",
+    name: "Stock",
+    description: "Currently running stock ECU calibration",
+  },
+  {
+    id: "stage1",
+    name: "Stage 1",
+    description: "Mild ECU tune for stock or lightly modified setup",
+  },
+  {
+    id: "stage2",
+    name: "Stage 2",
+    description: "Higher performance setup with supporting mods",
+  },
+  {
+    id: "stage3",
+    name: "Stage 3",
+    description: "High-output performance setup",
+  },
+  {
+    id: "custom",
+    name: "Custom Tune",
+    description: "Custom tune or not sure about current setup",
+  },
+];
+
+const turboSetupOptions: Array<{
+  id: TurboSetupOption;
+  name: string;
+  description: string;
+}> = [
+  {
+    id: "stock",
+    name: "Stock Turbo",
+    description: "Original factory turbocharger",
+  },
+  {
+    id: "oem_upgrade",
+    name: "OEM Upgrade / Larger OEM Turbo",
+    description: "Larger OEM-based turbo setup",
+  },
+  {
+    id: "hybrid",
+    name: "Hybrid Turbo",
+    description: "Modified hybrid turbocharger",
+  },
+  {
+    id: "big_turbo",
+    name: "Big Turbo",
+    description: "Large-frame or high-output turbo setup",
+  },
+  {
+    id: "other",
+    name: "Others",
+    description: "Custom or uncommon turbo configuration",
+  },
+];
 
 function extractYearRange(modelName: string) {
   const match = modelName.match(/(19|20)\d{2}\s*-\s*((19|20)\d{2}|->)/);
@@ -172,6 +243,50 @@ function getTuneCardClass(kind: "ecu" | "tcu", itemId: string, active: boolean) 
   return "border-white/10 bg-white/[0.03] hover:border-fuchsia-500/40 hover:bg-fuchsia-500/10";
 }
 
+function getSetupCardClass(
+  kind: "ecu_setup" | "turbo",
+  itemId: string,
+  active: boolean
+) {
+  if (kind === "ecu_setup") {
+    if (active) {
+      if (itemId === "stock") {
+        return "border-slate-400/60 bg-slate-400/10 shadow-[0_0_0_1px_rgba(148,163,184,0.22)]";
+      }
+      if (itemId === "stage1") {
+        return "border-sky-500 bg-sky-500/15 shadow-[0_0_0_1px_rgba(14,165,233,0.35)]";
+      }
+      if (itemId === "stage2") {
+        return "border-amber-500 bg-amber-500/15 shadow-[0_0_0_1px_rgba(245,158,11,0.35)]";
+      }
+      if (itemId === "stage3") {
+        return "border-[#ff3b57] bg-[#ff3b57]/15 shadow-[0_0_0_1px_rgba(255,59,87,0.35)]";
+      }
+      return "border-fuchsia-500 bg-fuchsia-500/15 shadow-[0_0_0_1px_rgba(217,70,239,0.35)]";
+    }
+
+    return "border-white/10 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.06]";
+  }
+
+  if (active) {
+    if (itemId === "stock") {
+      return "border-slate-400/60 bg-slate-400/10 shadow-[0_0_0_1px_rgba(148,163,184,0.22)]";
+    }
+    if (itemId === "oem_upgrade") {
+      return "border-sky-500 bg-sky-500/15 shadow-[0_0_0_1px_rgba(14,165,233,0.35)]";
+    }
+    if (itemId === "hybrid") {
+      return "border-amber-500 bg-amber-500/15 shadow-[0_0_0_1px_rgba(245,158,11,0.35)]";
+    }
+    if (itemId === "big_turbo") {
+      return "border-[#ff3b57] bg-[#ff3b57]/15 shadow-[0_0_0_1px_rgba(255,59,87,0.35)]";
+    }
+    return "border-fuchsia-500 bg-fuchsia-500/15 shadow-[0_0_0_1px_rgba(217,70,239,0.35)]";
+  }
+
+  return "border-white/10 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.06]";
+}
+
 function getSummaryBoxClass(tuningType: TuningTypeOption, hasSelection: boolean) {
   if (!hasSelection) return "border-white/10 bg-white/[0.03]";
 
@@ -243,6 +358,28 @@ function getFinalPriceNote(tuningType: TuningTypeOption) {
   return "Final price is subject to change after file review, ECU / TCU verification, and vehicle setup complexity.";
 }
 
+function getSmartRecommendedTcuStage(
+  setupStage: EcuSetupStage | "",
+  turboType: TurboSetupOption | ""
+): "stage1" | "stage2" | "custom" | "" {
+  if (setupStage === "stock" || setupStage === "stage1") {
+    return "stage1";
+  }
+
+  if (setupStage === "stage2" || setupStage === "stage3") {
+    return "stage2";
+  }
+
+  if (setupStage === "custom") {
+    if (turboType === "big_turbo") {
+      return "custom";
+    }
+    return "stage2";
+  }
+
+  return "";
+}
+
 function TuneCard({
   item,
   active,
@@ -299,6 +436,42 @@ function TuneCard({
   );
 }
 
+function SetupCard({
+  title,
+  description,
+  active,
+  onSelect,
+  kind,
+  itemId,
+}: {
+  title: string;
+  description: string;
+  active: boolean;
+  onSelect: () => void;
+  kind: "ecu_setup" | "turbo";
+  itemId: string;
+}) {
+  return (
+    <label
+      className={`flex min-h-[148px] cursor-pointer flex-col rounded-2xl border p-5 transition duration-200 hover:scale-[1.01] ${getSetupCardClass(
+        kind,
+        itemId,
+        active
+      )}`}
+    >
+      <input
+        type="radio"
+        className="sr-only"
+        checked={active}
+        onChange={onSelect}
+      />
+
+      <p className="text-lg font-semibold text-white">{title}</p>
+      <p className="mt-3 text-sm leading-6 text-white/60">{description}</p>
+    </label>
+  );
+}
+
 export function CustomTuningForm({ productId }: CustomTuningFormProps) {
   const [tuningType, setTuningType] = useState<TuningTypeOption>("ECU");
   const [selectedAddOns, setSelectedAddOns] = useState<string[]>([]);
@@ -313,6 +486,10 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
 
   const [ecuStage, setEcuStage] = useState("");
   const [tcuStage, setTcuStage] = useState("");
+
+  const [currentEcuSetupStage, setCurrentEcuSetupStage] =
+    useState<EcuSetupStage | "">("");
+  const [turboType, setTurboType] = useState<TurboSetupOption | "">("");
 
   const [ecuBrand, setEcuBrand] = useState("");
   const [ecuFamily, setEcuFamily] = useState("");
@@ -493,6 +670,8 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
   const shouldShowTcuSection =
     tuningType === "TCU" || tuningType === "ECU_TCU";
   const shouldShowFuelGrade = tuningType !== "TCU";
+  const shouldShowTcuPreSetup = tuningType === "TCU";
+  const shouldShowTurboSetupInEcuSection = tuningType === "ECU_TCU";
 
   const finalEcuType = useMemo(() => {
     if (!shouldShowEcuSection) return "";
@@ -593,6 +772,8 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
       setTcuVersion("");
       setTcuReadTool("");
       setTcuReadToolOther("");
+      setCurrentEcuSetupStage("");
+      setTurboType("");
     }
 
     if (tuningType === "TCU") {
@@ -609,17 +790,43 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
       setFuelGrade("");
       setFuelGradeOther("");
     }
+
+    if (tuningType === "ECU_TCU") {
+      setCurrentEcuSetupStage("");
+    }
   }, [tuningType]);
 
   useEffect(() => {
-    if (tuningType === "ECU_TCU" && ecuStage) {
-      const recommended = getRecommendedTcuStage(ecuStage);
+    if (tuningType === "TCU") {
+      const recommended = getSmartRecommendedTcuStage(
+        currentEcuSetupStage,
+        turboType
+      );
 
-      if (recommended && !tcuStage) {
+      if (recommended) {
         setTcuStage(recommended);
       }
     }
-  }, [ecuStage, tcuStage, tuningType]);
+  }, [currentEcuSetupStage, turboType, tuningType]);
+
+  useEffect(() => {
+    if (tuningType === "ECU_TCU") {
+      const setupStage = (
+        ecuStage === "stage1" ||
+        ecuStage === "stage2" ||
+        ecuStage === "stage3" ||
+        ecuStage === "custom"
+          ? ecuStage
+          : ""
+      ) as EcuSetupStage | "";
+
+      const recommended = getSmartRecommendedTcuStage(setupStage, turboType);
+
+      if (recommended) {
+        setTcuStage(recommended);
+      }
+    }
+  }, [ecuStage, turboType, tuningType]);
 
   function toggleAddOn(option: string) {
     setSelectedAddOns((prev) =>
@@ -656,6 +863,27 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
     [tcuStage]
   );
 
+  const recommendedTcuStageForDisplay = useMemo(() => {
+    if (tuningType === "TCU") {
+      return getSmartRecommendedTcuStage(currentEcuSetupStage, turboType);
+    }
+
+    if (tuningType === "ECU_TCU") {
+      const setupStage = (
+        ecuStage === "stage1" ||
+        ecuStage === "stage2" ||
+        ecuStage === "stage3" ||
+        ecuStage === "custom"
+          ? ecuStage
+          : ""
+      ) as EcuSetupStage | "";
+
+      return getSmartRecommendedTcuStage(setupStage, turboType);
+    }
+
+    return "";
+  }, [tuningType, currentEcuSetupStage, ecuStage, turboType]);
+
   const selectedTuneLabel = useMemo(() => {
     if (tuningType === "ECU") {
       return selectedEcuTune?.name || "";
@@ -683,8 +911,10 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
       (!ecuStage ||
         !finalEcuType ||
         !finalEcuReadTool ||
+        (shouldShowTurboSetupInEcuSection && !turboType) ||
         (ecuBrand === "Other" && !ecuOther.trim()) ||
         (ecuReadTool === "Other (Specify)" && !ecuReadToolOther.trim()))) ||
+    (shouldShowTcuPreSetup && (!currentEcuSetupStage || !turboType)) ||
     (shouldShowTcuSection &&
       (!tcuStage ||
         !finalTcuType ||
@@ -708,6 +938,12 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
       <input type="hidden" name="tuningType" value={tuningType} />
       <input type="hidden" name="ecuStage" value={ecuStage} />
       <input type="hidden" name="tcuStage" value={tcuStage} />
+      <input
+        type="hidden"
+        name="currentEcuSetupStage"
+        value={currentEcuSetupStage}
+      />
+      <input type="hidden" name="turboType" value={turboType} />
       <input type="hidden" name="selectedTuneLabel" value={selectedTuneLabel} />
       <input type="hidden" name="estimatedTotal" value={estimatedTotal || ""} />
       <input type="hidden" name="vehicleBrand" value={selectedBrand} />
@@ -950,6 +1186,54 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
           </div>
         ) : null}
 
+        {shouldShowTcuPreSetup ? (
+          <>
+            <div className="mt-12">
+              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/45">
+                Step 3
+              </p>
+              <h2 className="mt-3 text-2xl font-semibold text-white">
+                ECU tuning setup
+              </h2>
+              <p className="mt-3 text-white/65">
+                Select your current ECU stage and turbo setup first, so we can
+                recommend the suitable TCU tune.
+              </p>
+            </div>
+
+            <div className="mt-8 grid gap-4 md:grid-cols-5">
+              {currentEcuSetupOptions.map((item) => (
+                <SetupCard
+                  key={item.id}
+                  title={item.name}
+                  description={item.description}
+                  active={currentEcuSetupStage === item.id}
+                  onSelect={() => setCurrentEcuSetupStage(item.id)}
+                  kind="ecu_setup"
+                  itemId={item.id}
+                />
+              ))}
+            </div>
+
+            <div className="mt-8">
+              <label className="label-rk">Turbo Setup</label>
+              <div className="mt-4 grid gap-4 md:grid-cols-5">
+                {turboSetupOptions.map((item) => (
+                  <SetupCard
+                    key={item.id}
+                    title={item.name}
+                    description={item.description}
+                    active={turboType === item.id}
+                    onSelect={() => setTurboType(item.id)}
+                    kind="turbo"
+                    itemId={item.id}
+                  />
+                ))}
+              </div>
+            </div>
+          </>
+        ) : null}
+
         {shouldShowEcuSection ? (
           <>
             <div className="mt-12">
@@ -976,6 +1260,25 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
                 );
               })}
             </div>
+
+            {shouldShowTurboSetupInEcuSection ? (
+              <div className="mt-8">
+                <label className="label-rk">Turbo Setup</label>
+                <div className="mt-4 grid gap-4 md:grid-cols-5">
+                  {turboSetupOptions.map((item) => (
+                    <SetupCard
+                      key={item.id}
+                      title={item.name}
+                      description={item.description}
+                      active={turboType === item.id}
+                      onSelect={() => setTurboType(item.id)}
+                      kind="turbo"
+                      itemId={item.id}
+                    />
+                  ))}
+                </div>
+              </div>
+            ) : null}
 
             <div className="mt-8 grid gap-6 md:grid-cols-3">
               <div className="md:col-span-3">
@@ -1131,15 +1434,16 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
           <>
             <div className="mt-12">
               <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/45">
-                Step {shouldShowEcuSection ? "4" : "3"}
+                Step {shouldShowEcuSection ? "4" : "4"}
               </p>
               <h2 className="mt-3 text-2xl font-semibold text-white">
                 TCU tuning setup
               </h2>
-              {tuningType === "ECU_TCU" && ecuStage === "stage3" ? (
+
+              {recommendedTcuStageForDisplay ? (
                 <p className="mt-3 text-sm text-amber-300/85">
-                  TCU Stage 2 is recommended by default for most Stage 3 ECU
-                  builds. You can manually switch to Custom if needed.
+                  Recommended TCU tune selected automatically based on ECU setup
+                  and turbo setup. You can still change it manually if needed.
                 </p>
               ) : null}
             </div>
@@ -1147,9 +1451,7 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
             <div className="mt-8 grid gap-4 md:grid-cols-3">
               {tcuTunes.map((item) => {
                 const isActive = tcuStage === item.id;
-                const isRecommended =
-                  getRecommendedTcuStage(ecuStage) === item.id &&
-                  tuningType === "ECU_TCU";
+                const isRecommended = recommendedTcuStageForDisplay === item.id;
 
                 return (
                   <TuneCard
@@ -1516,12 +1818,35 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
                 {finalCapacity ? `${finalCapacity} cc` : "-"}
               </p>
 
+              {tuningType === "TCU" ? (
+                <>
+                  <p>
+                    <span className="text-white/45">Current ECU Setup:</span>{" "}
+                    {currentEcuSetupOptions.find(
+                      (item) => item.id === currentEcuSetupStage
+                    )?.name || "-"}
+                  </p>
+                  <p>
+                    <span className="text-white/45">Turbo Setup:</span>{" "}
+                    {turboSetupOptions.find((item) => item.id === turboType)
+                      ?.name || "-"}
+                  </p>
+                </>
+              ) : null}
+
               {shouldShowEcuSection ? (
                 <>
                   <p>
                     <span className="text-white/45">ECU Stage:</span>{" "}
                     {selectedEcuTune?.name || "-"}
                   </p>
+                  {shouldShowTurboSetupInEcuSection ? (
+                    <p>
+                      <span className="text-white/45">Turbo Setup:</span>{" "}
+                      {turboSetupOptions.find((item) => item.id === turboType)
+                        ?.name || "-"}
+                    </p>
+                  ) : null}
                   <p>
                     <span className="text-white/45">ECU Type:</span>{" "}
                     {finalEcuType || "-"}

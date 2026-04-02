@@ -1,5 +1,12 @@
 export type TuneStage = "stage1" | "stage2" | "stage3" | "custom";
 export type TuningTypeOption = "ECU" | "TCU" | "ECU_TCU";
+export type EcuReferenceStage = "stock" | "stage1" | "stage2" | "stage3" | "custom";
+export type TurboSetupOption =
+  | "stock_turbo"
+  | "oem_upgrade"
+  | "hybrid_turbo"
+  | "big_turbo"
+  | "other";
 
 export type TuneOption = {
   id: TuneStage;
@@ -34,6 +41,49 @@ export const tuningTypeOptions: Array<{
     title: "ECU + TCU",
     sub: "Recommended full package",
   },
+];
+
+export const ecuReferenceStages: Array<{
+  id: EcuReferenceStage;
+  name: string;
+  description: string;
+}> = [
+  {
+    id: "stock",
+    name: "Stock",
+    description: "Factory ECU tune / no ECU tuning yet",
+  },
+  {
+    id: "stage1",
+    name: "Stage 1",
+    description: "Mild ECU tune for stock or lightly modified setup",
+  },
+  {
+    id: "stage2",
+    name: "Stage 2",
+    description: "ECU tune with supporting hardware upgrades",
+  },
+  {
+    id: "stage3",
+    name: "Stage 3",
+    description: "Higher output ECU tune for serious performance builds",
+  },
+  {
+    id: "custom",
+    name: "Custom Tune",
+    description: "Custom tune or not sure about the current ECU setup",
+  },
+];
+
+export const turboSetupOptions: Array<{
+  id: TurboSetupOption;
+  name: string;
+}> = [
+  { id: "stock_turbo", name: "Stock Turbo" },
+  { id: "oem_upgrade", name: "OEM Upgrade / Larger OEM Turbo" },
+  { id: "hybrid_turbo", name: "Hybrid Turbo" },
+  { id: "big_turbo", name: "Big Turbo" },
+  { id: "other", name: "Others" },
 ];
 
 export const ecuTunes: TuneOption[] = [
@@ -162,6 +212,29 @@ export function getRecommendedTcuStage(ecuStage: string): TuneStage | "" {
   if (ecuStage === "stage2") return "stage2";
   if (ecuStage === "stage3") return "stage2";
   if (ecuStage === "custom") return "custom";
+  return "";
+}
+
+export function getSmartRecommendedTcuStage(
+  ecuStage: string,
+  turboType?: string
+): TuneStage | "" {
+  if (ecuStage === "stock" || ecuStage === "stage1") {
+    return "stage1";
+  }
+
+  if (ecuStage === "stage2" || ecuStage === "stage3") {
+    return "stage2";
+  }
+
+  if (ecuStage === "custom") {
+    if (turboType === "big_turbo") {
+      return "custom";
+    }
+
+    return "stage2";
+  }
+
   return "";
 }
 
