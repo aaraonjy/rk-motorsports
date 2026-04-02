@@ -80,7 +80,7 @@ const currentEcuSetupOptions: Array<{
   {
     id: "stock",
     name: "Stock",
-    shortDescription: "Factory calibration",
+    shortDescription: "Factory calibration setup",
   },
   {
     id: "stage1",
