@@ -349,23 +349,37 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
   const ecuBrands = useMemo(() => Object.keys(ecuTypes), [ecuTypes]);
 
   const tcuTypes = useMemo(() => tcuTypesData as TcuTypesFile, []);
-  const tcuBrands = useMemo(
-    () => Object.keys(tcuTypes).sort((a, b) => a.localeCompare(b)),
-    [tcuTypes]
-  );
+  const tcuBrands = useMemo(() => {
+    const brands = Object.keys(tcuTypes);
+    const sorted = brands
+      .filter((brand) => brand !== "Other")
+      .sort((a, b) => a.localeCompare(b));
+
+    if (brands.includes("Other")) {
+      sorted.push("Other");
+    }
+
+    return sorted;
+  }, [tcuTypes]);
 
   const ecuReadTools = useMemo(
     () => (ecuReadToolsData as EcuReadToolsFile).tools || [],
     []
   );
 
-  const tcuReadTools = useMemo(
-    () =>
-      ((tcuReadToolsData as TcuReadToolsFile).tools || [])
-        .slice()
-        .sort((a, b) => a.localeCompare(b)),
-    []
-  );
+  const tcuReadTools = useMemo(() => {
+    const tools = (tcuReadToolsData as TcuReadToolsFile).tools || [];
+    const sorted = tools
+      .filter((tool) => tool !== "Other (Specify)")
+      .slice()
+      .sort((a, b) => a.localeCompare(b));
+
+    if (tools.includes("Other (Specify)")) {
+      sorted.push("Other (Specify)");
+    }
+
+    return sorted;
+  }, []);
 
   const fuelGrades = useMemo(() => (fuelGradesData as string[]) || [], []);
   const wmiOptions = useMemo(
@@ -1326,7 +1340,9 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
                           ? "border-[#ff3b57] bg-[#ff3b57]/10"
                           : "border-white/10 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.05]"
                       } ${
-                        !ecuStage ? "cursor-not-allowed opacity-50" : "cursor-pointer"
+                        !ecuStage
+                          ? "cursor-not-allowed opacity-50"
+                          : "cursor-pointer"
                       }`}
                     >
                       <div className="flex items-center gap-4">
