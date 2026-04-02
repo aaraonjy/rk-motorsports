@@ -15,7 +15,8 @@ export default async function CustomTuningPage() {
 
         <p className="mt-5 max-w-3xl text-white/70 leading-relaxed">
 	  Enter your vehicle details, choose ECU only, TCU only, or ECU + TCU tuning, and upload your stock file(s).
-          <br />
+        </p>
+	<p className="mt-3 max-w-3xl text-white/70 leading-relaxed">
 	  Our team will review your request and confirm compatibility, pricing, and turnaround time after submission.
         </p>
 
