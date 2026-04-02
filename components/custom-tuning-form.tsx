@@ -75,65 +75,44 @@ type TurboSetupOption =
 const currentEcuSetupOptions: Array<{
   id: EcuSetupStage;
   name: string;
-  description: string;
+  shortDescription: string;
 }> = [
   {
     id: "stock",
     name: "Stock",
-    description: "Currently running stock ECU calibration",
+    shortDescription: "Factory calibration",
   },
   {
     id: "stage1",
     name: "Stage 1",
-    description: "Mild ECU tune for stock or lightly modified setup",
+    shortDescription: "Light tune",
   },
   {
     id: "stage2",
     name: "Stage 2",
-    description: "Higher performance setup with supporting mods",
+    shortDescription: "Supporting mods",
   },
   {
     id: "stage3",
     name: "Stage 3",
-    description: "High-output performance setup",
+    shortDescription: "High-output setup",
   },
   {
     id: "custom",
     name: "Custom Tune",
-    description: "Custom tune or not sure about current setup",
+    shortDescription: "Custom / not sure",
   },
 ];
 
 const turboSetupOptions: Array<{
   id: TurboSetupOption;
   name: string;
-  description: string;
 }> = [
-  {
-    id: "stock",
-    name: "Stock Turbo",
-    description: "Original factory turbocharger",
-  },
-  {
-    id: "oem_upgrade",
-    name: "OEM Upgrade / Larger OEM Turbo",
-    description: "Larger OEM-based turbo setup",
-  },
-  {
-    id: "hybrid",
-    name: "Hybrid Turbo",
-    description: "Modified hybrid turbocharger",
-  },
-  {
-    id: "big_turbo",
-    name: "Big Turbo",
-    description: "Large-frame or high-output turbo setup",
-  },
-  {
-    id: "other",
-    name: "Others",
-    description: "Custom or uncommon turbo configuration",
-  },
+  { id: "stock", name: "Stock Turbo" },
+  { id: "oem_upgrade", name: "OEM Upgrade / Larger OEM Turbo" },
+  { id: "hybrid", name: "Hybrid Turbo" },
+  { id: "big_turbo", name: "Big Turbo" },
+  { id: "other", name: "Others" },
 ];
 
 function extractYearRange(modelName: string) {
@@ -243,42 +222,18 @@ function getTuneCardClass(kind: "ecu" | "tcu", itemId: string, active: boolean) 
   return "border-white/10 bg-white/[0.03] hover:border-fuchsia-500/40 hover:bg-fuchsia-500/10";
 }
 
-function getSetupCardClass(
-  kind: "ecu_setup" | "turbo",
-  itemId: string,
-  active: boolean
-) {
-  if (kind === "ecu_setup") {
-    if (active) {
-      if (itemId === "stock") {
-        return "border-slate-400/60 bg-slate-400/10 shadow-[0_0_0_1px_rgba(148,163,184,0.22)]";
-      }
-      if (itemId === "stage1") {
-        return "border-sky-500 bg-sky-500/15 shadow-[0_0_0_1px_rgba(14,165,233,0.35)]";
-      }
-      if (itemId === "stage2") {
-        return "border-amber-500 bg-amber-500/15 shadow-[0_0_0_1px_rgba(245,158,11,0.35)]";
-      }
-      if (itemId === "stage3") {
-        return "border-[#ff3b57] bg-[#ff3b57]/15 shadow-[0_0_0_1px_rgba(255,59,87,0.35)]";
-      }
-      return "border-fuchsia-500 bg-fuchsia-500/15 shadow-[0_0_0_1px_rgba(217,70,239,0.35)]";
-    }
-
-    return "border-white/10 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.06]";
-  }
-
+function getSetupCardClass(itemId: string, active: boolean) {
   if (active) {
     if (itemId === "stock") {
       return "border-slate-400/60 bg-slate-400/10 shadow-[0_0_0_1px_rgba(148,163,184,0.22)]";
     }
-    if (itemId === "oem_upgrade") {
+    if (itemId === "stage1") {
       return "border-sky-500 bg-sky-500/15 shadow-[0_0_0_1px_rgba(14,165,233,0.35)]";
     }
-    if (itemId === "hybrid") {
+    if (itemId === "stage2") {
       return "border-amber-500 bg-amber-500/15 shadow-[0_0_0_1px_rgba(245,158,11,0.35)]";
     }
-    if (itemId === "big_turbo") {
+    if (itemId === "stage3") {
       return "border-[#ff3b57] bg-[#ff3b57]/15 shadow-[0_0_0_1px_rgba(255,59,87,0.35)]";
     }
     return "border-fuchsia-500 bg-fuchsia-500/15 shadow-[0_0_0_1px_rgba(217,70,239,0.35)]";
@@ -436,25 +391,22 @@ function TuneCard({
   );
 }
 
-function SetupCard({
+function CompactSetupCard({
   title,
   description,
   active,
   onSelect,
-  kind,
   itemId,
 }: {
   title: string;
   description: string;
   active: boolean;
   onSelect: () => void;
-  kind: "ecu_setup" | "turbo";
   itemId: string;
 }) {
   return (
     <label
-      className={`flex min-h-[148px] cursor-pointer flex-col rounded-2xl border p-5 transition duration-200 hover:scale-[1.01] ${getSetupCardClass(
-        kind,
+      className={`flex min-h-[112px] cursor-pointer flex-col justify-center rounded-2xl border p-4 transition duration-200 hover:scale-[1.01] ${getSetupCardClass(
         itemId,
         active
       )}`}
@@ -467,7 +419,7 @@ function SetupCard({
       />
 
       <p className="text-lg font-semibold text-white">{title}</p>
-      <p className="mt-3 text-sm leading-6 text-white/60">{description}</p>
+      <p className="mt-2 text-sm leading-5 text-white/60">{description}</p>
     </label>
   );
 }
@@ -1196,39 +1148,41 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
                 ECU tuning setup
               </h2>
               <p className="mt-3 text-white/65">
-                Select your current ECU stage and turbo setup first, so we can
-                recommend the suitable TCU tune.
+                Select your current ECU stage first. Then choose your turbo
+                setup so we can recommend the suitable TCU tune.
               </p>
             </div>
 
-            <div className="mt-8 grid gap-4 md:grid-cols-5">
+            <div className="mt-6 grid gap-4 md:grid-cols-5">
               {currentEcuSetupOptions.map((item) => (
-                <SetupCard
+                <CompactSetupCard
                   key={item.id}
                   title={item.name}
-                  description={item.description}
+                  description={item.shortDescription}
                   active={currentEcuSetupStage === item.id}
                   onSelect={() => setCurrentEcuSetupStage(item.id)}
-                  kind="ecu_setup"
                   itemId={item.id}
                 />
               ))}
             </div>
 
-            <div className="mt-8">
+            <div className="mt-6 max-w-md">
               <label className="label-rk">Turbo Setup</label>
-              <div className="mt-4 grid gap-4 md:grid-cols-5">
-                {turboSetupOptions.map((item) => (
-                  <SetupCard
-                    key={item.id}
-                    title={item.name}
-                    description={item.description}
-                    active={turboType === item.id}
-                    onSelect={() => setTurboType(item.id)}
-                    kind="turbo"
-                    itemId={item.id}
-                  />
-                ))}
+              <div className="relative mt-2">
+                <select
+                  className="input-rk appearance-none pr-12"
+                  value={turboType}
+                  onChange={(e) => setTurboType(e.target.value as TurboSetupOption)}
+                  required
+                >
+                  <option value="">Select turbo setup</option>
+                  {turboSetupOptions.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name}
+                    </option>
+                  ))}
+                </select>
+                <SelectArrow />
               </div>
             </div>
           </>
@@ -1262,20 +1216,23 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
             </div>
 
             {shouldShowTurboSetupInEcuSection ? (
-              <div className="mt-8">
+              <div className="mt-6 max-w-md">
                 <label className="label-rk">Turbo Setup</label>
-                <div className="mt-4 grid gap-4 md:grid-cols-5">
-                  {turboSetupOptions.map((item) => (
-                    <SetupCard
-                      key={item.id}
-                      title={item.name}
-                      description={item.description}
-                      active={turboType === item.id}
-                      onSelect={() => setTurboType(item.id)}
-                      kind="turbo"
-                      itemId={item.id}
-                    />
-                  ))}
+                <div className="relative mt-2">
+                  <select
+                    className="input-rk appearance-none pr-12"
+                    value={turboType}
+                    onChange={(e) => setTurboType(e.target.value as TurboSetupOption)}
+                    required
+                  >
+                    <option value="">Select turbo setup</option>
+                    {turboSetupOptions.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.name}
+                      </option>
+                    ))}
+                  </select>
+                  <SelectArrow />
                 </div>
               </div>
             ) : null}
@@ -1434,7 +1391,7 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
           <>
             <div className="mt-12">
               <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/45">
-                Step {shouldShowEcuSection ? "4" : "4"}
+                Step 4
               </p>
               <h2 className="mt-3 text-2xl font-semibold text-white">
                 TCU tuning setup
