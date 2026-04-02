@@ -2,28 +2,28 @@ import { Gauge, Wrench, Settings, Zap, Rocket, Flame } from "lucide-react";
 
 const services = [
   {
-    title: "Stage 1 / 2 / 3 Performance Tuning",
-    desc: "Optimized ECU calibration from stock to fully modified setups. Increase power, torque, and throttle response.",
+    title: "Stage 1 / 2 / 3 ECU Tuning",
+    desc: "Optimized ECU calibration from stock to fully modified setups. Improve power, torque, and throttle response.",
     icon: Gauge,
   },
   {
     title: "Custom ECU Calibration",
-    desc: "Tailored tuning based on your hardware, fuel, and goals. Ideal for hybrid turbos and advanced builds.",
+    desc: "Tailored tuning based on your hardware, fuel type, and performance goals. Ideal for hybrid turbos and advanced setups.",
     icon: Wrench,
+  },
+  {
+    title: "TCU Performance Tuning",
+    desc: "Optimize shift speed, clutch pressure, and torque limits for smoother and faster gear changes.",
+    icon: Settings,
+  },
+  {
+    title: "ECU + TCU Package",
+    desc: "Combined engine and transmission tuning for maximum performance, drivability, and optimized power delivery.",
+    icon: Zap,
   },
   {
     title: "Multi-Map Switching (On-The-Fly)",
     desc: "Switch maps using cruise control. Toggle fuel types, valet mode, or crackle profiles instantly.",
-    icon: Settings,
-  },
-  {
-    title: "Boosted Launch Control (2-Step)",
-    desc: "Launch with pre-built boost for maximum acceleration. Consistent and repeatable drag performance.",
-    icon: Zap,
-  },
-  {
-    title: "Rolling Anti-Lag (RAL)",
-    desc: "Maintain boost between pulls. Instant throttle response with reduced turbo lag.",
     icon: Rocket,
   },
   {
@@ -44,12 +44,12 @@ export function HomeServices() {
           </p>
 
           <h2 className="mt-4 text-3xl font-bold md:text-5xl">
-            Professional ECU Tuning Services
+            Professional ECU & TCU Tuning Services
           </h2>
 
           <p className="mt-4 mx-auto max-w-2xl text-white/65 md:text-lg">
-            Explore our range of ECU and performance tuning services tailored for
-            both daily drivers and high-performance builds.
+            Explore our range of ECU and TCU tuning services tailored for daily
+            drivers, performance street cars, and high-performance builds.
           </p>
         </div>
 
