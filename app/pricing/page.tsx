@@ -194,15 +194,20 @@ export default function PricingPage() {
     }
   }, [tuningType]);
 
-  useEffect(() => {
-    if (tuningType === "ECU_TCU" && ecuStage) {
-      const recommended = getRecommendedTcuStage(ecuStage);
+	useEffect(() => {
+		if (tuningType === "ECU_TCU") {
+			if (!ecuStage) {
+				setTcuStage("");
+				return;
+			}
 
-      if (recommended && !tcuStage) {
-        setTcuStage(recommended);
-      }
-    }
-  }, [ecuStage, tcuStage, tuningType]);
+			const recommended = getRecommendedTcuStage(ecuStage);
+
+			if (recommended) {
+				setTcuStage(recommended);
+			}
+		}
+	}, [ecuStage, tuningType]);
 
   const selectedEcuTune = useMemo(
     () => ecuTunes.find((item) => item.id === ecuStage) || null,
