@@ -16,7 +16,7 @@ export function Hero() {
       <div className="absolute bottom-0 left-0 right-0 h-40 bg-gradient-to-b from-transparent to-[#0a0a0a]" />
 
       <div className="container-rk relative z-10 flex flex-col items-center justify-center py-20 text-center md:py-24">
-        <h1 className="max-w-5xl text-4xl font-bold leading-[1.05] text-white drop-shadow-[0_8px_30px_rgba(0,0,0,0.45)] md:text-6xl xl:text-7xl">
+        <h1 className="max-w-4xl text-4xl font-bold leading-[1.02] tracking-tight text-white drop-shadow-[0_8px_30px_rgba(0,0,0,0.45)] md:text-5xl xl:text-6xl">
           Unlock Your Vehicle&apos;s True Performance
         </h1>
 

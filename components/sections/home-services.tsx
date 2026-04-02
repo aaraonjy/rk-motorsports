@@ -35,10 +35,10 @@ const services = [
 
 export function HomeServices() {
   return (
-    <section id="services" className="py-20 md:py-24">
+    <section id="services" className="py-12 md:py-14">
       <div className="container-rk">
         {/* Header */}
-        <div className="mb-12 text-center">
+        <div className="mb-10 text-center">
           <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/45">
             Services
           </p>
