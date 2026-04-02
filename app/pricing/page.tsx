@@ -257,11 +257,13 @@ export default function PricingPage() {
       <div className="container-rk">
         <h1 className="text-4xl font-bold text-white md:text-5xl">Pricing</h1>
 
-        <p className="mt-4 max-w-3xl text-white/70">
-          Select ECU only, TCU only, or ECU + TCU package to estimate your total
-          price. Final quotation may still vary depending on vehicle model, ECU
-          / TCU type, and tuning complexity.
+        <p className="mt-4 max-w-3xl text-white/70 leading-relaxed">
+          Select ECU, TCU, or ECU + TCU to estimate your total price.
         </p>
+
+	<p className="mt-2 max-w-3xl text-white/70 leading-relaxed">
+  	  Final pricing may vary depending on vehicle model, ECU/TCU type, and tuning complexity.
+	</p>
 
         <div className="mt-12 grid gap-8 lg:grid-cols-[1.5fr_0.9fr]">
           <div className="rounded-[2rem] border border-white/10 bg-black/45 p-6 backdrop-blur-md md:p-8">
