@@ -118,7 +118,7 @@ export async function POST(
     await db.order.update({
       where: { id },
       data: {
-        status: "IN_PROGRESS",
+        status: "READY_FOR_DOWNLOAD",
       },
     });
 

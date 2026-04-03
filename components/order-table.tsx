@@ -602,7 +602,7 @@ function FileSection({
           </Link>
         ) : null}
 
-        {latestRevision ? (
+        {latestRevision && (admin || canDownloadTuned) ? (
           <div className="flex flex-col gap-1">
             <Link
               href={`/api/files/${latestRevision.orderFile.id}/download`}
@@ -729,6 +729,20 @@ export function OrderTable({
               const hasAllAdminFiles =
                 (!needsEcu || !!adminEcu) && (!needsTcu || !!adminTcu);
 
+              const customerCanDownload =
+                order.status === "READY_FOR_DOWNLOAD" ||
+                order.status === "COMPLETED";
+
+              const customerPaymentStatusLabel =
+                order.status === "AWAITING_PAYMENT" && paymentProof
+                  ? "Payment Uploaded"
+                  : statusLabel;
+
+              const customerPaymentStatusClass =
+                order.status === "AWAITING_PAYMENT" && paymentProof
+                  ? "inline-flex min-w-[122px] items-center justify-center rounded-full border border-cyan-500/30 bg-cyan-500/15 px-3 py-1 text-center text-xs font-semibold text-cyan-300"
+                  : statusBadgeClass;
+
               return (
                 <tr
                   key={order.id}
@@ -751,13 +765,23 @@ export function OrderTable({
 
                   <td className="px-4 py-4 align-top">
                     <div className="flex flex-col items-start gap-3">
-                      <span className={statusBadgeClass}>{statusLabel}</span>
+                      <span className={admin ? statusBadgeClass : customerPaymentStatusClass}>
+                        {admin ? statusLabel : customerPaymentStatusLabel}
+                      </span>
 
                       {admin &&
                       order.status === "AWAITING_PAYMENT" &&
                       !paymentProof ? (
                         <div className="text-sm text-amber-300/90">
                           Waiting for payment proof
+                        </div>
+                      ) : null}
+
+                      {!admin &&
+                      order.status === "AWAITING_PAYMENT" &&
+                      paymentProof ? (
+                        <div className="text-sm text-cyan-300/90">
+                          Payment slip uploaded
                         </div>
                       ) : null}
 
@@ -812,7 +836,7 @@ export function OrderTable({
                           tunedFile={adminEcu}
                           revisions={ecuRevisions}
                           admin={admin}
-                          canDownloadTuned={order.status === "READY_FOR_DOWNLOAD"}
+                          canDownloadTuned={customerCanDownload}
                         />
                       ) : null}
 
@@ -823,7 +847,7 @@ export function OrderTable({
                           tunedFile={adminTcu}
                           revisions={tcuRevisions}
                           admin={admin}
-                          canDownloadTuned={order.status === "READY_FOR_DOWNLOAD"}
+                          canDownloadTuned={customerCanDownload}
                         />
                       ) : null}
 
@@ -941,32 +965,8 @@ export function OrderTable({
                       )
                     ) : order.status === "CANCELLED" ? (
                       <span className="text-red-400">Cancelled</span>
-                    ) : order.status === "READY_FOR_DOWNLOAD" ? (
-                      <div className="flex w-full max-w-[170px] flex-col gap-2">
-                        {needsEcu && adminEcu ? (
-                          <Link
-                            href={`/api/files/${adminEcu.id}/download`}
-                            className="rounded-xl border border-white/15 bg-black/30 px-3 py-2 hover:bg-white/10"
-                          >
-                            Download ECU
-                          </Link>
-                        ) : null}
-
-                        {needsTcu && adminTcu ? (
-                          <Link
-                            href={`/api/files/${adminTcu.id}/download`}
-                            className="rounded-xl border border-white/15 bg-black/30 px-3 py-2 hover:bg-white/10"
-                          >
-                            Download TCU
-                          </Link>
-                        ) : null}
-                      </div>
                     ) : order.status === "AWAITING_PAYMENT" && hasAllAdminFiles ? (
                       <div className="flex w-full max-w-[170px] flex-col gap-2">
-                        <span className="text-amber-300/90">
-                          Pending Payment
-                        </span>
-
                         {paymentProof ? (
                           <>
                             <span className="text-emerald-300/90">
@@ -1000,8 +1000,7 @@ export function OrderTable({
                           </button>
                         )}
                       </div>
-                    ) : order.status === "FILE_RECEIVED" ||
-                      order.status === "IN_PROGRESS" ? (
+                    ) : ["FILE_RECEIVED", "IN_PROGRESS"].includes(order.status) ? (
                       <button
                         type="button"
                         onClick={() => setCustomerCancelOrderId(order.id)}
@@ -1010,7 +1009,7 @@ export function OrderTable({
                         Cancel Order
                       </button>
                     ) : (
-                      <span className="text-white/40">Waiting for file</span>
+                      <span className="text-white/40">No action required</span>
                     )}
                   </td>
                 </tr>
