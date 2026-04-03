@@ -90,10 +90,12 @@ export async function POST(req: Request) {
         !(tcuFile instanceof File) ||
         tcuFile.size === 0);
 
+    const missingFuelGrade = requiresEcu && !fuelGrade;
+
     if (
       !product ||
       missingVehicleData ||
-      !fuelGrade ||
+      missingFuelGrade ||
       missingEcuData ||
       missingTcuData
     ) {

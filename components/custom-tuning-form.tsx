@@ -652,7 +652,7 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
     tuningType === "TCU" || tuningType === "ECU_TCU";
   const shouldShowFuelGrade = tuningType !== "TCU";
   const shouldShowTcuPreSetup = tuningType === "TCU";
-  const shouldShowTurboSetupInEcuSection = tuningType === "ECU_TCU";
+  const shouldShowTurboSetupInEcuSection = shouldShowEcuSection;
 
   const finalEcuType = useMemo(() => {
     if (!shouldShowEcuSection) return "";
