@@ -201,6 +201,7 @@ export default function PricingPage() {
   const [ecuStage, setEcuStage] = useState("");
   const [tcuStage, setTcuStage] = useState("");
   const [selectedAddOns, setSelectedAddOns] = useState<string[]>([]);
+  const [isAddOnsOpen, setIsAddOnsOpen] = useState(false);
 
   const shouldShowEcuSection =
     tuningType === "ECU" || tuningType === "ECU_TCU";
@@ -217,6 +218,7 @@ export default function PricingPage() {
     if (tuningType === "TCU") {
       setEcuStage("");
       setSelectedAddOns([]);
+      setIsAddOnsOpen(false);
     }
   }, [tuningType]);
 
@@ -425,53 +427,70 @@ export default function PricingPage() {
                   </p>
                 </div>
 
-                <div className="mt-8 space-y-8">
-                  {addOnGroups.map((group) => (
-                    <div key={group.title}>
-                      <div className="mb-4">
-                        <p className="text-sm font-semibold uppercase tracking-[0.22em] text-white/45">
-                          {group.title}
-                        </p>
-                      </div>
-
-                      <div className="grid gap-3">
-                        {group.items.map((option) => {
-                          const checked = selectedAddOns.includes(option.name);
-
-                          return (
-                            <label
-                              key={option.name}
-                              className={`flex items-center justify-between rounded-2xl border px-5 py-4 transition ${
-                                checked
-                                  ? "border-[#ff3b57] bg-[#ff3b57]/10"
-                                  : "border-white/10 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.05]"
-                              } ${
-                                !ecuStage
-                                  ? "cursor-not-allowed opacity-50"
-                                  : "cursor-pointer"
-                              }`}
-                            >
-                              <div className="flex items-center gap-4">
-                                <input
-                                  type="checkbox"
-                                  checked={checked}
-                                  disabled={!ecuStage}
-                                  onChange={() => toggleAddOn(option.name)}
-                                  className="h-4 w-4 accent-[#ff3b57]"
-                                />
-                                <span className="text-white">{option.name}</span>
-                              </div>
-
-                              <span className="text-sm font-medium text-white/70">
-                                RM {option.price}
-                              </span>
-                            </label>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ))}
+                <div className="mt-6 flex flex-col gap-4 rounded-2xl border border-white/10 bg-white/[0.03] p-5 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <p className="text-sm text-white/65">
+                      Add-ons apply only when ECU tuning is included.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsAddOnsOpen((prev) => !prev)}
+                    className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-medium text-white transition hover:border-white/20 hover:bg-white/[0.06]"
+                  >
+                    {isAddOnsOpen ? "Hide Add-On Services" : "Show Add-On Services"}
+                  </button>
                 </div>
+
+                {isAddOnsOpen ? (
+                  <div className="mt-8 space-y-8">
+                    {addOnGroups.map((group) => (
+                      <div key={group.title}>
+                        <div className="mb-4">
+                          <p className="text-sm font-semibold uppercase tracking-[0.22em] text-white/45">
+                            {group.title}
+                          </p>
+                        </div>
+
+                        <div className="grid gap-3">
+                          {group.items.map((option) => {
+                            const checked = selectedAddOns.includes(option.name);
+
+                            return (
+                              <label
+                                key={option.name}
+                                className={`flex items-center justify-between rounded-2xl border px-5 py-4 transition ${
+                                  checked
+                                    ? "border-[#ff3b57] bg-[#ff3b57]/10"
+                                    : "border-white/10 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.05]"
+                                } ${
+                                  !ecuStage
+                                    ? "cursor-not-allowed opacity-50"
+                                    : "cursor-pointer"
+                                }`}
+                              >
+                                <div className="flex items-center gap-4">
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    disabled={!ecuStage}
+                                    onChange={() => toggleAddOn(option.name)}
+                                    className="h-4 w-4 accent-[#ff3b57]"
+                                  />
+                                  <span className="text-white">{option.name}</span>
+                                </div>
+
+                                <span className="text-sm font-medium text-white/70">
+                                  RM {option.price}
+                                </span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
               </>
             ) : null}
           </div>
