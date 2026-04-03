@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { useRouter } from "next/navigation";
 import carLibrary from "@/lib/car-library.json";
 
 type Engine = {
@@ -26,145 +26,200 @@ type VehicleSearchPayload = {
   engine: string;
 };
 
-type SelectFieldProps = {
-  defaultLabel: string;
-  options: string[];
-  value: string;
-  onChange: (value: string) => void;
-  disabled?: boolean;
+type VehicleSelectorProps = {
+  onSearch: (data: VehicleSearchPayload) => void;
 };
 
-function SelectField({
-  defaultLabel,
-  options,
-  value,
-  onChange,
-  disabled = false,
-}: SelectFieldProps) {
+function SelectArrow() {
   return (
-    <div className="relative">
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        disabled={disabled}
-        className="w-full appearance-none rounded-full border border-white/10 bg-black/80 px-6 py-4 pr-14 text-white outline-none transition hover:border-white/25 disabled:cursor-not-allowed disabled:opacity-50"
+    <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/60">
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 20 20"
+        fill="currentColor"
+        className="h-5 w-5"
+        aria-hidden="true"
       >
-        <option value="" disabled hidden>
-          {defaultLabel}
-        </option>
-        {options.map((option) => (
-          <option key={option} value={option}>
-            {option}
-          </option>
-        ))}
-      </select>
-
-      <ChevronDown className="pointer-events-none absolute right-5 top-1/2 h-5 w-5 -translate-y-1/2 text-white/70" />
+        <path
+          fillRule="evenodd"
+          d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.51a.75.75 0 0 1-1.08 0l-4.25-4.51a.75.75 0 0 1 .02-1.06Z"
+          clipRule="evenodd"
+        />
+      </svg>
     </div>
   );
 }
 
-export function VehicleSelector({
-  onSearch,
-}: {
-  onSearch?: (data: VehicleSearchPayload) => void;
-}) {
+export function VehicleSelector({ onSearch }: VehicleSelectorProps) {
+  const router = useRouter();
   const library = carLibrary as Make[];
 
-  const [brand, setBrand] = useState("");
-  const [model, setModel] = useState("");
-  const [engine, setEngine] = useState("");
+  const [selectedMake, setSelectedMake] = useState("");
+  const [selectedModelId, setSelectedModelId] = useState("");
+  const [selectedEngineId, setSelectedEngineId] = useState("");
+  const [error, setError] = useState("");
 
-  const brandOptions = useMemo(
-    () => library.map((item) => item.make).sort((a, b) => a.localeCompare(b)),
-    [library]
+  const availableMakes = useMemo(() => library, [library]);
+
+  const selectedMakeEntry = useMemo(
+    () => availableMakes.find((item) => item.make === selectedMake) || null,
+    [availableMakes, selectedMake]
   );
 
-  const selectedMake = useMemo(
-    () => library.find((item) => item.make === brand),
-    [library, brand]
+  const availableModels = useMemo(
+    () => selectedMakeEntry?.models || [],
+    [selectedMakeEntry]
   );
 
-  const modelOptions = useMemo(
-    () =>
-      selectedMake
-        ? selectedMake.models
-            .map((item) => item.name)
-            .sort((a, b) => a.localeCompare(b))
-        : [],
-    [selectedMake]
+  const selectedModelEntry = useMemo(
+    () => availableModels.find((item) => item.id === selectedModelId) || null,
+    [availableModels, selectedModelId]
   );
 
-  const selectedModel = useMemo(
-    () => selectedMake?.models.find((item) => item.name === model),
-    [selectedMake, model]
+  const availableEngines = useMemo(
+    () => selectedModelEntry?.engines || [],
+    [selectedModelEntry]
   );
 
-  const engineOptions = useMemo(
-    () =>
-      selectedModel
-        ? selectedModel.engines
-            .map((item) => item.name)
-            .sort((a, b) => a.localeCompare(b))
-        : [],
-    [selectedModel]
+  const selectedEngineEntry = useMemo(
+    () => availableEngines.find((item) => item.id === selectedEngineId) || null,
+    [availableEngines, selectedEngineId]
   );
 
   useEffect(() => {
-    setModel("");
-    setEngine("");
-  }, [brand]);
+    setSelectedModelId("");
+    setSelectedEngineId("");
+  }, [selectedMake]);
 
   useEffect(() => {
-    setEngine("");
-  }, [model]);
+    setSelectedEngineId("");
+  }, [selectedModelId]);
 
-  const handleSearch = () => {
-    if (!brand || !model || !engine || !onSearch) return;
-    onSearch({ make: brand, model, engine });
-  };
+  function getPayload(): VehicleSearchPayload | null {
+    if (!selectedMakeEntry || !selectedModelEntry || !selectedEngineEntry) {
+      return null;
+    }
+
+    return {
+      make: selectedMakeEntry.make,
+      model: selectedModelEntry.name,
+      engine: selectedEngineEntry.name,
+    };
+  }
+
+  function handleFindFile() {
+    setError("");
+
+    const payload = getPayload();
+
+    if (!payload) {
+      setError("Please select vehicle brand, model, and engine first.");
+      return;
+    }
+
+    const searchParams = new URLSearchParams({
+      make: payload.make,
+      model: payload.model,
+      engine: payload.engine,
+    });
+
+    router.push(`/shop?${searchParams.toString()}`);
+  }
+
+  function handleRequestCustomTune() {
+    setError("");
+
+    const payload = getPayload();
+
+    if (!payload) {
+      setError("Please select vehicle brand, model, and engine first.");
+      return;
+    }
+
+    onSearch(payload);
+    router.push("/custom-tuning");
+  }
 
   return (
-    <section className="pb-10">
-      <div className="rounded-[1.75rem] border border-white/10 bg-white/[0.03] p-6">
-        <div className="grid gap-4 md:grid-cols-3">
-          <SelectField
-            defaultLabel="Brand"
-            options={brandOptions}
-            value={brand}
-            onChange={setBrand}
-          />
-
-          <SelectField
-            defaultLabel="Model"
-            options={modelOptions}
-            value={model}
-            onChange={setModel}
-            disabled={!brand}
-          />
-
-          <SelectField
-            defaultLabel="Engine"
-            options={engineOptions}
-            value={engine}
-            onChange={setEngine}
-            disabled={!model}
-          />
+    <div className="rounded-[2rem] border border-white/10 bg-white/[0.03] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.22)] backdrop-blur-sm md:p-8">
+      <div className="grid gap-4 md:grid-cols-3">
+        <div className="relative">
+          <select
+            className="w-full appearance-none rounded-full border border-white/10 bg-black/65 px-6 py-4 pr-12 text-base text-white outline-none transition hover:border-white/20 focus:border-white/25"
+            value={selectedMake}
+            onChange={(e) => setSelectedMake(e.target.value)}
+          >
+            <option value="">Select brand</option>
+            {availableMakes.map((item) => (
+              <option key={item.make} value={item.make}>
+                {item.make}
+              </option>
+            ))}
+          </select>
+          <SelectArrow />
         </div>
 
-        {onSearch ? (
-          <div className="mt-6 flex justify-start">
-            <button
-              type="button"
-              onClick={handleSearch}
-              disabled={!brand || !model || !engine}
-              className="rounded-full bg-red-600 px-8 py-4 text-sm font-semibold uppercase tracking-[0.18em] text-white transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Find Performance Estimate
-            </button>
-          </div>
-        ) : null}
+        <div className="relative">
+          <select
+            className="w-full appearance-none rounded-full border border-white/10 bg-black/65 px-6 py-4 pr-12 text-base text-white outline-none transition hover:border-white/20 focus:border-white/25 disabled:cursor-not-allowed disabled:opacity-50"
+            value={selectedModelId}
+            onChange={(e) => setSelectedModelId(e.target.value)}
+            disabled={!selectedMake}
+          >
+            <option value="">Select model</option>
+            {availableModels.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.name}
+              </option>
+            ))}
+          </select>
+          <SelectArrow />
+        </div>
+
+        <div className="relative">
+          <select
+            className="w-full appearance-none rounded-full border border-white/10 bg-black/65 px-6 py-4 pr-12 text-base text-white outline-none transition hover:border-white/20 focus:border-white/25 disabled:cursor-not-allowed disabled:opacity-50"
+            value={selectedEngineId}
+            onChange={(e) => setSelectedEngineId(e.target.value)}
+            disabled={!selectedModelId}
+          >
+            <option value="">Select engine</option>
+            {availableEngines.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.name}
+              </option>
+            ))}
+          </select>
+          <SelectArrow />
+        </div>
       </div>
-    </section>
+
+      {error ? (
+        <div className="mt-4 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
+          <div className="font-semibold uppercase tracking-[0.18em] text-red-300/80">
+            Selection Required
+          </div>
+          <p className="mt-2 leading-6">{error}</p>
+        </div>
+      ) : null}
+
+      <div className="mt-8 flex flex-wrap items-center gap-4">
+        <button
+          type="button"
+          onClick={handleFindFile}
+          className="rounded-full bg-[#ff3b57] px-8 py-4 text-sm font-semibold uppercase tracking-[0.18em] text-white transition hover:bg-[#ff526b]"
+        >
+          Find a File
+        </button>
+
+        <button
+          type="button"
+          onClick={handleRequestCustomTune}
+          className="rounded-full border border-white/20 bg-white/5 px-8 py-4 text-sm font-semibold uppercase tracking-[0.18em] text-white transition hover:bg-white/10"
+        >
+          Request Custom Tune
+        </button>
+      </div>
+    </div>
   );
 }
