@@ -27,7 +27,7 @@ type VehicleSearchPayload = {
 };
 
 type VehicleSelectorProps = {
-  onSearch?: (data: VehicleSearchPayload) => void; // ✅ now optional
+  onSearch?: (data: VehicleSearchPayload) => void;
 };
 
 function SelectArrow() {
@@ -98,10 +98,8 @@ export function VehicleSelector({ onSearch }: VehicleSelectorProps) {
     };
   }
 
-  // ✅ FIXED: Find file navigation
   function handleFindFile() {
     setError("");
-
     const payload = getPayload();
 
     if (!payload) {
@@ -118,10 +116,8 @@ export function VehicleSelector({ onSearch }: VehicleSelectorProps) {
     router.push(`/shop?${params.toString()}`);
   }
 
-  // ✅ SAFE: works even if onSearch is not provided
   function handleRequestCustomTune() {
     setError("");
-
     const payload = getPayload();
 
     if (!payload) {
@@ -133,13 +129,18 @@ export function VehicleSelector({ onSearch }: VehicleSelectorProps) {
       onSearch(payload);
     }
 
-    router.push("/custom-tuning");
+    const params = new URLSearchParams({
+      make: payload.make,
+      model: payload.model,
+      engine: payload.engine,
+    });
+
+    router.push(`/custom-tuning?${params.toString()}`);
   }
 
   return (
     <div className="rounded-[2rem] border border-white/10 bg-white/[0.03] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.22)] backdrop-blur-sm md:p-8">
       <div className="grid gap-4 md:grid-cols-3">
-        {/* Make */}
         <div className="relative">
           <select
             className="w-full appearance-none rounded-full border border-white/10 bg-black/65 px-6 py-4 pr-12 text-white"
@@ -156,7 +157,6 @@ export function VehicleSelector({ onSearch }: VehicleSelectorProps) {
           <SelectArrow />
         </div>
 
-        {/* Model */}
         <div className="relative">
           <select
             className="w-full appearance-none rounded-full border border-white/10 bg-black/65 px-6 py-4 pr-12 text-white disabled:opacity-50"
@@ -174,7 +174,6 @@ export function VehicleSelector({ onSearch }: VehicleSelectorProps) {
           <SelectArrow />
         </div>
 
-        {/* Engine */}
         <div className="relative">
           <select
             className="w-full appearance-none rounded-full border border-white/10 bg-black/65 px-6 py-4 pr-12 text-white disabled:opacity-50"
@@ -193,16 +192,15 @@ export function VehicleSelector({ onSearch }: VehicleSelectorProps) {
         </div>
       </div>
 
-      {/* Error */}
-      {error && (
+      {error ? (
         <div className="mt-4 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
           {error}
         </div>
-      )}
+      ) : null}
 
-      {/* Buttons */}
       <div className="mt-8 flex flex-wrap gap-4">
         <button
+          type="button"
           onClick={handleFindFile}
           className="rounded-full bg-red-600 px-8 py-4 text-sm font-semibold uppercase tracking-[0.18em] text-white hover:bg-red-500"
         >
@@ -210,6 +208,7 @@ export function VehicleSelector({ onSearch }: VehicleSelectorProps) {
         </button>
 
         <button
+          type="button"
           onClick={handleRequestCustomTune}
           className="rounded-full border border-white/20 bg-white/5 px-8 py-4 text-sm font-semibold uppercase tracking-[0.18em] text-white hover:bg-white/10"
         >

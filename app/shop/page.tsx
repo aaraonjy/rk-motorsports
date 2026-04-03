@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { VehicleSelector } from "@/components/vehicle-selector";
 
 export default function ShopPage() {
@@ -22,22 +21,6 @@ export default function ShopPage() {
           </div>
 
           <VehicleSelector />
-
-          <div className="mt-8 flex flex-wrap gap-4">
-            <Link
-              href="#"
-              className="inline-flex rounded-full bg-[#ff3b57] px-8 py-4 text-sm font-semibold uppercase tracking-[0.18em] text-white transition hover:bg-[#ff2444]"
-            >
-              Find a File
-            </Link>
-
-            <Link
-              href="/custom-tuning"
-              className="inline-flex rounded-full border border-white/20 bg-white/10 px-8 py-4 text-sm font-semibold uppercase tracking-[0.18em] text-white transition hover:bg-white/20"
-            >
-              Request Custom Tune
-            </Link>
-          </div>
         </div>
       </div>
     </section>
