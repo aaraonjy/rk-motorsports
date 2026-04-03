@@ -578,13 +578,10 @@ function RevisionFiles({
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
-        className="flex w-full items-center justify-between gap-3 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-left text-sm text-white/85 transition hover:bg-white/10"
+        className="flex w-full items-center justify-center rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white/85 transition hover:bg-white/10"
       >
         <span className="font-medium">
-          {admin ? "Revision Files" : "Download Revision File"}
-        </span>
-        <span className="shrink-0 text-xs text-white/45">
-          {isOpen ? "Hide" : "Show"}
+          {admin ? "Revision Files" : "Download Rev File"}
         </span>
       </button>
 
