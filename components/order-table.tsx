@@ -557,6 +557,60 @@ function UploadConfirmModal({
   );
 }
 
+function RevisionFiles({
+  title,
+  revisions,
+  admin,
+  canDownload,
+}: {
+  title: string;
+  revisions: (OrderRevision & { orderFile: OrderFile })[];
+  admin: boolean;
+  canDownload: boolean;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  if (revisions.length === 0) return null;
+  if (!admin && !canDownload) return null;
+
+  return (
+    <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+      <button
+        type="button"
+        onClick={() => setIsOpen((prev) => !prev)}
+        className="flex w-full items-center justify-between rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-left text-sm text-white/85 transition hover:bg-white/10"
+      >
+        <span>{title}</span>
+        <span className="text-xs text-white/45">{isOpen ? "Hide" : "Show"}</span>
+      </button>
+
+      {isOpen ? (
+        <div className="mt-3 space-y-2">
+          {revisions.map((revision) => (
+            <div
+              key={revision.id}
+              className="rounded-lg border border-white/10 bg-black/30 p-3"
+            >
+              <Link
+                href={`/api/files/${revision.orderFile.id}/download`}
+                className="inline-block rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-sm hover:bg-white/10"
+              >
+                {admin ? `Download Rev ${revision.revisionNo}` : `Rev ${revision.revisionNo}`}
+              </Link>
+
+              {admin ? (
+                <div className="mt-2 text-xs text-white/45">
+                  Remark: {revision.remark}
+                </div>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function FileSection({
   title,
   originalFile,
@@ -573,7 +627,6 @@ function FileSection({
   canDownloadTuned: boolean;
 }) {
   const latestRevision = revisions[0] || null;
-  const history = revisions.slice(1);
 
   return (
     <div className="w-full max-w-[190px] rounded-xl border border-white/10 bg-black/25 p-3">
@@ -603,49 +656,20 @@ function FileSection({
         ) : null}
 
         {latestRevision && (admin || canDownloadTuned) ? (
-          <div className="flex flex-col gap-1">
-            <Link
-              href={`/api/files/${latestRevision.orderFile.id}/download`}
-              className="inline-block rounded-xl border border-white/15 bg-black/30 px-3 py-2 hover:bg-white/10"
-            >
-              {admin ? "Latest Revision File" : "Download Latest Revision"}
-            </Link>
-            <span className="text-xs text-white/45">
-              Rev {latestRevision.revisionNo}
-            </span>
-            {admin ? (
-              <span className="text-xs text-white/45">
-                Remark: {latestRevision.remark}
-              </span>
-            ) : null}
-          </div>
+          <Link
+            href={`/api/files/${latestRevision.orderFile.id}/download`}
+            className="inline-block rounded-xl border border-white/15 bg-black/30 px-3 py-2 hover:bg-white/10"
+          >
+            {admin ? "Latest Revision File" : "Download Latest Revision"}
+          </Link>
         ) : null}
 
-        {history.length > 0 && admin ? (
-          <div className="rounded-xl border border-white/10 bg-black/20 p-3">
-            <div className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-white/45">
-              Revision History
-            </div>
-            <div className="space-y-2">
-              {history.map((revision) => (
-                <div
-                  key={revision.id}
-                  className="rounded-lg border border-white/10 bg-black/30 p-3"
-                >
-                  <Link
-                    href={`/api/files/${revision.orderFile.id}/download`}
-                    className="inline-block rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-sm hover:bg-white/10"
-                  >
-                    Download Rev {revision.revisionNo}
-                  </Link>
-                  <div className="mt-2 text-xs text-white/45">
-                    Remark: {revision.remark}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : null}
+        <RevisionFiles
+          title="Revision Files"
+          revisions={revisions}
+          admin={admin}
+          canDownload={canDownloadTuned}
+        />
       </div>
     </div>
   );
@@ -743,6 +767,16 @@ export function OrderTable({
                   ? "inline-flex min-w-[122px] items-center justify-center rounded-full border border-cyan-500/30 bg-cyan-500/15 px-3 py-1 text-center text-xs font-semibold text-cyan-300"
                   : statusBadgeClass;
 
+              const adminPaymentStatusLabel =
+                order.status === "AWAITING_PAYMENT" && paymentProof
+                  ? "Payment Received"
+                  : statusLabel;
+
+              const adminPaymentStatusClass =
+                order.status === "AWAITING_PAYMENT" && paymentProof
+                  ? "inline-flex min-w-[122px] items-center justify-center rounded-full border border-cyan-500/30 bg-cyan-500/15 px-3 py-1 text-center text-xs font-semibold text-cyan-300"
+                  : statusBadgeClass;
+
               return (
                 <tr
                   key={order.id}
@@ -765,8 +799,8 @@ export function OrderTable({
 
                   <td className="px-4 py-4 align-top">
                     <div className="flex flex-col items-start gap-3">
-                      <span className={admin ? statusBadgeClass : customerPaymentStatusClass}>
-                        {admin ? statusLabel : customerPaymentStatusLabel}
+                      <span className={admin ? adminPaymentStatusClass : customerPaymentStatusClass}>
+                        {admin ? adminPaymentStatusLabel : customerPaymentStatusLabel}
                       </span>
 
                       {admin &&
@@ -777,11 +811,11 @@ export function OrderTable({
                         </div>
                       ) : null}
 
-                      {!admin &&
+                      {admin &&
                       order.status === "AWAITING_PAYMENT" &&
                       paymentProof ? (
                         <div className="text-sm text-cyan-300/90">
-                          Payment slip uploaded
+                          Awaiting admin release
                         </div>
                       ) : null}
 
@@ -968,23 +1002,18 @@ export function OrderTable({
                     ) : order.status === "AWAITING_PAYMENT" && hasAllAdminFiles ? (
                       <div className="flex w-full max-w-[170px] flex-col gap-2">
                         {paymentProof ? (
-                          <>
-                            <span className="text-emerald-300/90">
-                              Payment Slip Uploaded
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setUploadModal({
-                                  action: "customer-replace-payment",
-                                  orderId: order.id,
-                                })
-                              }
-                              className="rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-white/80 hover:bg-white/10"
-                            >
-                              Replace Payment Slip
-                            </button>
-                          </>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setUploadModal({
+                                action: "customer-replace-payment",
+                                orderId: order.id,
+                              })
+                            }
+                            className="rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-white/80 hover:bg-white/10"
+                          >
+                            Replace Payment Slip
+                          </button>
                         ) : (
                           <button
                             type="button"
