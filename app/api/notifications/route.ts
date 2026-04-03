@@ -33,7 +33,7 @@ export async function GET() {
         title: item.title,
         message: item.message,
         isRead: item.isRead,
-        createdAt: item.createdAt,
+        createdAt: item.createdAt.toISOString(),
         orderId: item.order?.id ?? null,
         orderNumber: item.order?.orderNumber ?? null,
         href:

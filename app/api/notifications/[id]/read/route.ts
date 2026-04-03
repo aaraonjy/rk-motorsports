@@ -33,7 +33,7 @@ export async function POST(
       });
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, isRead: true });
   } catch (error) {
     console.error("POST /api/notifications/[id]/read failed:", error);
     return NextResponse.json(

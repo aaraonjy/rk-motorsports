@@ -43,6 +43,7 @@ export function AdminNotificationBell() {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [submittingId, setSubmittingId] = useState<string | null>(null);
+  const [markingAll, setMarkingAll] = useState(false);
   const [data, setData] = useState<NotificationsResponse>({
     notifications: [],
     unreadCount: 0,
@@ -100,18 +101,21 @@ export function AdminNotificationBell() {
       setSubmittingId(item.id);
 
       if (!item.isRead) {
-        await fetch(`/api/notifications/${item.id}/read`, {
+        const res = await fetch(`/api/notifications/${item.id}/read`, {
           method: "POST",
+          cache: "no-store",
         });
 
-        setData((prev) => ({
-          unreadCount: Math.max(0, prev.unreadCount - 1),
-          notifications: prev.notifications.map((notification) =>
-            notification.id === item.id
-              ? { ...notification, isRead: true }
-              : notification
-          ),
-        }));
+        if (res.ok) {
+          setData((prev) => ({
+            unreadCount: Math.max(0, prev.unreadCount - (item.isRead ? 0 : 1)),
+            notifications: prev.notifications.map((notification) =>
+              notification.id === item.id
+                ? { ...notification, isRead: true }
+                : notification
+            ),
+          }));
+        }
       }
 
       setOpen(false);
@@ -121,6 +125,31 @@ export function AdminNotificationBell() {
       console.error("Failed to open notification:", error);
     } finally {
       setSubmittingId(null);
+    }
+  }
+
+  async function handleMarkAllAsRead() {
+    try {
+      setMarkingAll(true);
+
+      const res = await fetch("/api/notifications/mark-all-read", {
+        method: "POST",
+        cache: "no-store",
+      });
+
+      if (!res.ok) return;
+
+      setData((prev) => ({
+        unreadCount: 0,
+        notifications: prev.notifications.map((notification) => ({
+          ...notification,
+          isRead: true,
+        })),
+      }));
+    } catch (error) {
+      console.error("Failed to mark all notifications as read:", error);
+    } finally {
+      setMarkingAll(false);
     }
   }
 
@@ -151,19 +180,32 @@ export function AdminNotificationBell() {
 
       {open ? (
         <div className="absolute right-0 top-12 z-[70] w-[380px] overflow-hidden rounded-2xl border border-white/10 bg-[#0b0b0c]/95 shadow-2xl backdrop-blur-xl">
-          <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+          <div className="flex items-start justify-between gap-3 border-b border-white/10 px-4 py-3">
             <div>
               <p className="text-sm font-semibold text-white">Notifications</p>
               <p className="text-xs text-white/45">{data.unreadCount} unread</p>
             </div>
 
-            <Link
-              href="/dashboard"
-              onClick={() => setOpen(false)}
-              className="text-xs text-white/55 transition hover:text-white"
-            >
-              View Dashboard
-            </Link>
+            <div className="flex items-center gap-3">
+              {data.unreadCount > 0 ? (
+                <button
+                  type="button"
+                  onClick={handleMarkAllAsRead}
+                  disabled={markingAll}
+                  className="text-xs text-white/55 transition hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {markingAll ? "Marking..." : "Mark all as read"}
+                </button>
+              ) : null}
+
+              <Link
+                href="/dashboard"
+                onClick={() => setOpen(false)}
+                className="text-xs text-white/55 transition hover:text-white"
+              >
+                View Dashboard
+              </Link>
+            </div>
           </div>
 
           <div className="max-h-[420px] overflow-y-auto">
@@ -182,8 +224,8 @@ export function AdminNotificationBell() {
                     <button
                       type="button"
                       onClick={() => handleNotificationClick(item)}
-                      disabled={submittingId === item.id}
-                      className={`w-full px-4 py-4 text-left transition hover:bg-white/5 ${
+                      disabled={submittingId === item.id || markingAll}
+                      className={`w-full px-4 py-4 text-left transition hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-70 ${
                         item.isRead ? "bg-transparent" : "bg-white/[0.04]"
                       }`}
                     >
