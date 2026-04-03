@@ -52,7 +52,7 @@ export async function POST(
   });
 
   return NextResponse.redirect(
-    new URL("/admin?success=admin_order_cancelled", req.url),
+    new URL(`/admin?success=admin_order_cancelled&t=${Date.now()}`, req.url),
     303
   );
 }

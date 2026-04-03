@@ -171,7 +171,7 @@ export async function POST(
     revalidatePath("/dashboard");
 
     return NextResponse.redirect(
-      new URL(`/admin?success=${getUploadSuccess(uploads)}`, req.url),
+      new URL(`/admin?success=${getUploadSuccess(uploads)}&t=${Date.now()}`, req.url),
       303
     );
   } catch (error) {

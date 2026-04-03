@@ -44,7 +44,7 @@ export async function POST(
   });
 
   return NextResponse.redirect(
-    new URL("/dashboard?success=order_cancelled", req.url),
+    new URL(`/dashboard?success=order_cancelled&t=${Date.now()}`, req.url),
     303
   );
 }
