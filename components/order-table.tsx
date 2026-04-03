@@ -558,12 +558,10 @@ function UploadConfirmModal({
 }
 
 function RevisionFiles({
-  title,
   revisions,
   admin,
   canDownload,
 }: {
-  title: string;
   revisions: (OrderRevision & { orderFile: OrderFile })[];
   admin: boolean;
   canDownload: boolean;
@@ -573,20 +571,26 @@ function RevisionFiles({
   if (revisions.length === 0) return null;
   if (!admin && !canDownload) return null;
 
+  const orderedRevisions = [...revisions].sort((a, b) => a.revisionNo - b.revisionNo);
+
   return (
     <div className="rounded-xl border border-white/10 bg-black/20 p-3">
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
-        className="flex w-full items-center justify-between rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-left text-sm text-white/85 transition hover:bg-white/10"
+        className="flex w-full items-center justify-between gap-3 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-left text-sm text-white/85 transition hover:bg-white/10"
       >
-        <span>{title}</span>
-        <span className="text-xs text-white/45">{isOpen ? "Hide" : "Show"}</span>
+        <span className="font-medium">
+          {admin ? "Revision Files" : "Download Revision File"}
+        </span>
+        <span className="shrink-0 text-xs text-white/45">
+          {isOpen ? "Hide" : "Show"}
+        </span>
       </button>
 
       {isOpen ? (
         <div className="mt-3 space-y-2">
-          {revisions.map((revision) => (
+          {orderedRevisions.map((revision) => (
             <div
               key={revision.id}
               className="rounded-lg border border-white/10 bg-black/30 p-3"
@@ -626,8 +630,6 @@ function FileSection({
   admin: boolean;
   canDownloadTuned: boolean;
 }) {
-  const latestRevision = revisions[0] || null;
-
   return (
     <div className="w-full max-w-[190px] rounded-xl border border-white/10 bg-black/25 p-3">
       <div className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-white/45">
@@ -655,17 +657,7 @@ function FileSection({
           </Link>
         ) : null}
 
-        {latestRevision && (admin || canDownloadTuned) ? (
-          <Link
-            href={`/api/files/${latestRevision.orderFile.id}/download`}
-            className="inline-block rounded-xl border border-white/15 bg-black/30 px-3 py-2 hover:bg-white/10"
-          >
-            {admin ? "Latest Revision File" : "Download Latest Revision"}
-          </Link>
-        ) : null}
-
         <RevisionFiles
-          title="Revision Files"
           revisions={revisions}
           admin={admin}
           canDownload={canDownloadTuned}
