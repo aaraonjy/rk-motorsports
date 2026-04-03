@@ -3,11 +3,17 @@ import { getAllOrders } from "@/lib/queries";
 import { redirect } from "next/navigation";
 import { OrderTable, type OrderWithRelations } from "@/components/order-table";
 import { ClearSuccessParam } from "@/components/clear-success-param";
+import { PaginationControls } from "@/components/pagination-controls";
 
 type AdminPageProps = {
   searchParams?: Promise<{
     status?: string;
     search?: string;
+    customerEmail?: string;
+    tuningType?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    page?: string;
     success?: string;
   }>;
 };
@@ -88,7 +94,9 @@ function Banner({ data }: { data: NonNullable<BannerState> }) {
 
   return (
     <div className={`mt-6 rounded-2xl border p-4 ${toneClass}`}>
-      <div className={`text-sm font-semibold uppercase tracking-[0.18em] ${eyebrowClass}`}>
+      <div
+        className={`text-sm font-semibold uppercase tracking-[0.18em] ${eyebrowClass}`}
+      >
         {data.title}
       </div>
       <p className="mt-2 text-sm leading-6">{data.message}</p>
@@ -104,12 +112,29 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const params = (await searchParams) || {};
   const status = params.status || "ALL";
   const search = params.search || "";
+  const customerEmail = params.customerEmail || "";
+  const tuningType = params.tuningType || "ALL";
+  const dateFrom = params.dateFrom || "";
+  const dateTo = params.dateTo || "";
+  const page = Math.max(1, Number(params.page || "1") || 1);
   const banner = getAdminBanner(params.success);
 
-  const orders = (await getAllOrders({
+  const result = (await getAllOrders({
     status,
     search,
-  })) as OrderWithRelations[];
+    customerEmail,
+    tuningType,
+    dateFrom,
+    dateTo,
+    page,
+    pageSize: 5,
+  })) as {
+    orders: OrderWithRelations[];
+    totalCount: number;
+    currentPage: number;
+    pageSize: number;
+    totalPages: number;
+  };
 
   return (
     <section className="section-pad">
@@ -125,15 +150,11 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         <div className="mt-8 space-y-4">
           <div className="card-rk p-6 text-white/75">
             <p>
-              Search by order number or filter by status to manage customer
-              orders more efficiently.
+              Search by order number, customer email, status, tuning type, or date range to manage customer orders more efficiently.
             </p>
           </div>
 
-          <form
-            method="get"
-            className="card-rk grid gap-4 p-6 md:grid-cols-[1fr_220px_auto]"
-          >
+          <form method="get" className="card-rk grid gap-4 p-6 md:grid-cols-2 xl:grid-cols-3">
             <div>
               <label className="mb-2 block text-sm text-white/65">
                 Search Order Number
@@ -143,6 +164,19 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 name="search"
                 defaultValue={search}
                 placeholder="e.g. RK-20260328-2017"
+                className="w-full rounded-xl border border-white/15 bg-black/50 px-4 py-3 text-white outline-none placeholder:text-white/35"
+              />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm text-white/65">
+                Customer Email
+              </label>
+              <input
+                type="text"
+                name="customerEmail"
+                defaultValue={customerEmail}
+                placeholder="e.g. customer@email.com"
                 className="w-full rounded-xl border border-white/15 bg-black/50 px-4 py-3 text-white outline-none placeholder:text-white/35"
               />
             </div>
@@ -185,7 +219,66 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               </div>
             </div>
 
-            <div className="flex items-end gap-3">
+            <div>
+              <label className="mb-2 block text-sm text-white/65">
+                Tuning Type
+              </label>
+              <div className="relative">
+                <select
+                  name="tuningType"
+                  defaultValue={tuningType}
+                  className="w-full appearance-none rounded-xl border border-white/15 bg-black/50 px-4 py-3 pr-12 text-white outline-none"
+                >
+                  <option value="ALL">All Tuning Types</option>
+                  <option value="ECU">ECU</option>
+                  <option value="TCU">TCU</option>
+                  <option value="ECU_TCU">ECU + TCU</option>
+                </select>
+
+                <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/60">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    className="h-5 w-5"
+                    aria-hidden="true"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.51a.75.75 0 0 1-1.08 0l-4.25-4.51a.75.75 0 0 1 .02-1.06Z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm text-white/65">
+                Date From
+              </label>
+              <input
+                type="date"
+                name="dateFrom"
+                defaultValue={dateFrom}
+                className="w-full rounded-xl border border-white/15 bg-black/50 px-4 py-3 text-white outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm text-white/65">
+                Date To
+              </label>
+              <input
+                type="date"
+                name="dateTo"
+                defaultValue={dateTo}
+                className="w-full rounded-xl border border-white/15 bg-black/50 px-4 py-3 text-white outline-none"
+              />
+            </div>
+
+            <div className="md:col-span-2 xl:col-span-3 flex flex-wrap items-end gap-3">
+              <input type="hidden" name="page" value="1" />
               <button
                 type="submit"
                 className="rounded-xl border border-white/15 bg-black/30 px-4 py-3 hover:bg-white/10"
@@ -201,7 +294,22 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             </div>
           </form>
 
-          <OrderTable orders={orders} admin />
+          <OrderTable orders={result.orders} admin />
+
+          <PaginationControls
+            currentPage={result.currentPage}
+            totalPages={result.totalPages}
+            basePath="/admin"
+            params={{
+              status: status !== "ALL" ? status : undefined,
+              search: search || undefined,
+              customerEmail: customerEmail || undefined,
+              tuningType: tuningType !== "ALL" ? tuningType : undefined,
+              dateFrom: dateFrom || undefined,
+              dateTo: dateTo || undefined,
+              success: params.success,
+            }}
+          />
         </div>
       </div>
     </section>

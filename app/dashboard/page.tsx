@@ -4,9 +4,13 @@ import { redirect } from "next/navigation";
 import { OrderTable } from "@/components/order-table";
 import { paymentConfig } from "@/lib/payment-config";
 import { ClearSuccessParam } from "@/components/clear-success-param";
+import { PaginationControls } from "@/components/pagination-controls";
 
 type DashboardPageProps = {
-  searchParams?: Promise<{ success?: string }>;
+  searchParams?: Promise<{
+    success?: string;
+    page?: string;
+  }>;
 };
 
 type BannerState =
@@ -78,7 +82,9 @@ function Banner({ data }: { data: NonNullable<BannerState> }) {
 
   return (
     <div className={`mt-6 rounded-2xl border p-4 ${toneClass}`}>
-      <div className={`text-sm font-semibold uppercase tracking-[0.18em] ${eyebrowClass}`}>
+      <div
+        className={`text-sm font-semibold uppercase tracking-[0.18em] ${eyebrowClass}`}
+      >
         {data.title}
       </div>
       <p className="mt-2 text-sm leading-6">{data.message}</p>
@@ -95,8 +101,12 @@ export default async function DashboardPage({
 
   const params = (await searchParams) || {};
   const banner = getCustomerBanner(params.success);
+  const page = Math.max(1, Number(params.page || "1") || 1);
 
-  const orders = await getRecentOrdersForUser(user.id);
+  const result = await getRecentOrdersForUser(user.id, {
+    page,
+    pageSize: 5,
+  });
 
   return (
     <section className="section-pad">
@@ -161,7 +171,15 @@ export default async function DashboardPage({
         </div>
 
         <div className="mt-8">
-          <OrderTable orders={orders} />
+          <OrderTable orders={result.orders} />
+          <PaginationControls
+            currentPage={result.currentPage}
+            totalPages={result.totalPages}
+            basePath="/dashboard"
+            params={{
+              success: params.success,
+            }}
+          />
         </div>
       </div>
     </section>
