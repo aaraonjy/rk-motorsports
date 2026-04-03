@@ -27,7 +27,7 @@ type VehicleSearchPayload = {
 };
 
 type VehicleSelectorProps = {
-  onSearch: (data: VehicleSearchPayload) => void;
+  onSearch?: (data: VehicleSearchPayload) => void; // ✅ now optional
 };
 
 function SelectArrow() {
@@ -38,7 +38,6 @@ function SelectArrow() {
         viewBox="0 0 20 20"
         fill="currentColor"
         className="h-5 w-5"
-        aria-hidden="true"
       >
         <path
           fillRule="evenodd"
@@ -59,27 +58,19 @@ export function VehicleSelector({ onSearch }: VehicleSelectorProps) {
   const [selectedEngineId, setSelectedEngineId] = useState("");
   const [error, setError] = useState("");
 
-  const availableMakes = useMemo(() => library, [library]);
-
   const selectedMakeEntry = useMemo(
-    () => availableMakes.find((item) => item.make === selectedMake) || null,
-    [availableMakes, selectedMake]
+    () => library.find((item) => item.make === selectedMake) || null,
+    [library, selectedMake]
   );
 
-  const availableModels = useMemo(
-    () => selectedMakeEntry?.models || [],
-    [selectedMakeEntry]
-  );
+  const availableModels = selectedMakeEntry?.models || [];
 
   const selectedModelEntry = useMemo(
     () => availableModels.find((item) => item.id === selectedModelId) || null,
     [availableModels, selectedModelId]
   );
 
-  const availableEngines = useMemo(
-    () => selectedModelEntry?.engines || [],
-    [selectedModelEntry]
-  );
+  const availableEngines = selectedModelEntry?.engines || [];
 
   const selectedEngineEntry = useMemo(
     () => availableEngines.find((item) => item.id === selectedEngineId) || null,
@@ -107,6 +98,7 @@ export function VehicleSelector({ onSearch }: VehicleSelectorProps) {
     };
   }
 
+  // ✅ FIXED: Find file navigation
   function handleFindFile() {
     setError("");
 
@@ -117,15 +109,16 @@ export function VehicleSelector({ onSearch }: VehicleSelectorProps) {
       return;
     }
 
-    const searchParams = new URLSearchParams({
+    const params = new URLSearchParams({
       make: payload.make,
       model: payload.model,
       engine: payload.engine,
     });
 
-    router.push(`/shop?${searchParams.toString()}`);
+    router.push(`/shop?${params.toString()}`);
   }
 
+  // ✅ SAFE: works even if onSearch is not provided
   function handleRequestCustomTune() {
     setError("");
 
@@ -136,21 +129,25 @@ export function VehicleSelector({ onSearch }: VehicleSelectorProps) {
       return;
     }
 
-    onSearch(payload);
+    if (onSearch) {
+      onSearch(payload);
+    }
+
     router.push("/custom-tuning");
   }
 
   return (
     <div className="rounded-[2rem] border border-white/10 bg-white/[0.03] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.22)] backdrop-blur-sm md:p-8">
       <div className="grid gap-4 md:grid-cols-3">
+        {/* Make */}
         <div className="relative">
           <select
-            className="w-full appearance-none rounded-full border border-white/10 bg-black/65 px-6 py-4 pr-12 text-base text-white outline-none transition hover:border-white/20 focus:border-white/25"
+            className="w-full appearance-none rounded-full border border-white/10 bg-black/65 px-6 py-4 pr-12 text-white"
             value={selectedMake}
             onChange={(e) => setSelectedMake(e.target.value)}
           >
             <option value="">Select brand</option>
-            {availableMakes.map((item) => (
+            {library.map((item) => (
               <option key={item.make} value={item.make}>
                 {item.make}
               </option>
@@ -159,9 +156,10 @@ export function VehicleSelector({ onSearch }: VehicleSelectorProps) {
           <SelectArrow />
         </div>
 
+        {/* Model */}
         <div className="relative">
           <select
-            className="w-full appearance-none rounded-full border border-white/10 bg-black/65 px-6 py-4 pr-12 text-base text-white outline-none transition hover:border-white/20 focus:border-white/25 disabled:cursor-not-allowed disabled:opacity-50"
+            className="w-full appearance-none rounded-full border border-white/10 bg-black/65 px-6 py-4 pr-12 text-white disabled:opacity-50"
             value={selectedModelId}
             onChange={(e) => setSelectedModelId(e.target.value)}
             disabled={!selectedMake}
@@ -176,9 +174,10 @@ export function VehicleSelector({ onSearch }: VehicleSelectorProps) {
           <SelectArrow />
         </div>
 
+        {/* Engine */}
         <div className="relative">
           <select
-            className="w-full appearance-none rounded-full border border-white/10 bg-black/65 px-6 py-4 pr-12 text-base text-white outline-none transition hover:border-white/20 focus:border-white/25 disabled:cursor-not-allowed disabled:opacity-50"
+            className="w-full appearance-none rounded-full border border-white/10 bg-black/65 px-6 py-4 pr-12 text-white disabled:opacity-50"
             value={selectedEngineId}
             onChange={(e) => setSelectedEngineId(e.target.value)}
             disabled={!selectedModelId}
@@ -194,28 +193,25 @@ export function VehicleSelector({ onSearch }: VehicleSelectorProps) {
         </div>
       </div>
 
-      {error ? (
+      {/* Error */}
+      {error && (
         <div className="mt-4 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
-          <div className="font-semibold uppercase tracking-[0.18em] text-red-300/80">
-            Selection Required
-          </div>
-          <p className="mt-2 leading-6">{error}</p>
+          {error}
         </div>
-      ) : null}
+      )}
 
-      <div className="mt-8 flex flex-wrap items-center gap-4">
+      {/* Buttons */}
+      <div className="mt-8 flex flex-wrap gap-4">
         <button
-          type="button"
           onClick={handleFindFile}
-          className="rounded-full bg-[#ff3b57] px-8 py-4 text-sm font-semibold uppercase tracking-[0.18em] text-white transition hover:bg-[#ff526b]"
+          className="rounded-full bg-red-600 px-8 py-4 text-sm font-semibold uppercase tracking-[0.18em] text-white hover:bg-red-500"
         >
           Find a File
         </button>
 
         <button
-          type="button"
           onClick={handleRequestCustomTune}
-          className="rounded-full border border-white/20 bg-white/5 px-8 py-4 text-sm font-semibold uppercase tracking-[0.18em] text-white transition hover:bg-white/10"
+          className="rounded-full border border-white/20 bg-white/5 px-8 py-4 text-sm font-semibold uppercase tracking-[0.18em] text-white hover:bg-white/10"
         >
           Request Custom Tune
         </button>
