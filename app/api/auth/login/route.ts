@@ -3,19 +3,46 @@ import { createSession, verifyPassword } from "@/lib/auth";
 import { db } from "@/lib/db";
 
 export async function POST(req: Request) {
-  const form = await req.formData();
-  const email = String(form.get("email") || "").trim().toLowerCase();
-  const password = String(form.get("password") || "");
+  try {
+    const form = await req.formData();
+    const email = String(form.get("email") || "").trim().toLowerCase();
+    const password = String(form.get("password") || "");
 
-  const user = await db.user.findUnique({ where: { email } });
-  if (!user) return NextResponse.redirect(new URL("/login", req.url));
+    if (!email || !password) {
+      return NextResponse.json(
+        { ok: false, error: "Email and password are required." },
+        { status: 400 }
+      );
+    }
 
-  const ok = await verifyPassword(password, user.passwordHash);
-  if (!ok) return NextResponse.redirect(new URL("/login", req.url));
+    const user = await db.user.findUnique({ where: { email } });
 
-  await createSession(user.id);
-  return NextResponse.redirect(
-    new URL(user.role === "ADMIN" ? "/admin" : "/dashboard", req.url),
-    303
-  );
+    if (!user) {
+      return NextResponse.json(
+        { ok: false, error: "Invalid email or password." },
+        { status: 401 }
+      );
+    }
+
+    const ok = await verifyPassword(password, user.passwordHash);
+
+    if (!ok) {
+      return NextResponse.json(
+        { ok: false, error: "Invalid email or password." },
+        { status: 401 }
+      );
+    }
+
+    await createSession(user.id);
+
+    return NextResponse.json({
+      ok: true,
+      redirectTo: user.role === "ADMIN" ? "/admin" : "/dashboard",
+    });
+  } catch {
+    return NextResponse.json(
+      { ok: false, error: "Unable to login right now. Please try again." },
+      { status: 500 }
+    );
+  }
 }
