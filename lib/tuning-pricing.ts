@@ -170,17 +170,13 @@ export const tcuTunes: TuneOption[] = [
 ];
 
 const rawAddOns: AddOn[] = [
+  { name: "Pop & Bang / Flame Tuning", price: 300 },
   { name: "Boosted Launch Control (2-Step)", price: 400 },
   { name: "Rolling Anti-Lag (RAL)", price: 500 },
-  { name: "Pop & Bang / Flame Tuning", price: 300 },
   { name: "Multi-Map Switching (On-The-Fly)", price: 600 },
-  { name: "EGR Off", price: 200 },
-  { name: "Lambda / Decat / O2 Off", price: 300 },
-  { name: "DTC Off", price: 200 },
+  { name: "DSG Fart (Only for DSG Gearbox)", price: 300 },
   { name: "Speed Limiter Removal", price: 200 },
-  { name: "Cold Start Delete", price: 200 },
-  { name: "MAF Off", price: 300 },
-  { name: "Start Stop Disable", price: 200 },
+  { name: "Immo Off", price: 300 },
 ];
 
 export const addOns: AddOn[] = [...rawAddOns].sort((a, b) => {

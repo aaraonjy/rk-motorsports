@@ -13,6 +13,7 @@ import {
   getTuningTypeLabel,
   tcuTunes,
   tuningTypeOptions,
+  type AddOn,
   type TuningTypeOption,
   type TuneOption,
 } from "@/lib/tuning-pricing";
@@ -125,6 +126,29 @@ function getPrimaryTag(item: TuneOption) {
   return item.suitableFor?.[0] || "";
 }
 
+function getAddOnGroups(options: AddOn[]) {
+  const performanceNames = new Set([
+    "Pop & Bang / Flame Tuning",
+    "Boosted Launch Control (2-Step)",
+    "Rolling Anti-Lag (RAL)",
+    "Multi-Map Switching (On-The-Fly)",
+    "DSG Fart (Only for DSG Gearbox)",
+  ]);
+
+  const utilityNames = new Set(["Speed Limiter Removal"]);
+  const advancedNames = new Set(["Immo Off"]);
+
+  const performance = options.filter((item) => performanceNames.has(item.name));
+  const utility = options.filter((item) => utilityNames.has(item.name));
+  const advanced = options.filter((item) => advancedNames.has(item.name));
+
+  return [
+    { title: "Performance Add-ons", items: performance },
+    { title: "Utility", items: utility },
+    { title: "Advanced / Special", items: advanced },
+  ].filter((group) => group.items.length > 0);
+}
+
 function PricingTuneCard({
   item,
   active,
@@ -183,6 +207,8 @@ export default function PricingPage() {
   const shouldShowTcuSection =
     tuningType === "TCU" || tuningType === "ECU_TCU";
 
+  const addOnGroups = useMemo(() => getAddOnGroups(addOns), []);
+
   useEffect(() => {
     if (tuningType === "ECU") {
       setTcuStage("");
@@ -194,20 +220,20 @@ export default function PricingPage() {
     }
   }, [tuningType]);
 
-	useEffect(() => {
-		if (tuningType === "ECU_TCU") {
-			if (!ecuStage) {
-				setTcuStage("");
-				return;
-			}
+  useEffect(() => {
+    if (tuningType === "ECU_TCU") {
+      if (!ecuStage) {
+        setTcuStage("");
+        return;
+      }
 
-			const recommended = getRecommendedTcuStage(ecuStage);
+      const recommended = getRecommendedTcuStage(ecuStage);
 
-			if (recommended) {
-				setTcuStage(recommended);
-			}
-		}
-	}, [ecuStage, tuningType]);
+      if (recommended) {
+        setTcuStage(recommended);
+      }
+    }
+  }, [ecuStage, tuningType]);
 
   const selectedEcuTune = useMemo(
     () => ecuTunes.find((item) => item.id === ecuStage) || null,
@@ -259,7 +285,7 @@ export default function PricingPage() {
   }
 
   return (
-    <section className="pt-28 pb-20">
+    <section className="pb-20 pt-28">
       <div className="container-rk">
         <h1 className="text-4xl font-bold text-white md:text-5xl">Pricing</h1>
 
@@ -348,10 +374,11 @@ export default function PricingPage() {
                   <h2 className="mt-3 text-2xl font-semibold text-white">
                     Select TCU stage
                   </h2>
-                  {tuningType === "ECU_TCU" && ecuStage === "stage3" ? (
+                  {(tuningType === "ECU_TCU" || tuningType === "TCU") &&
+                  getRecommendedTcuStage(ecuStage) ? (
                     <p className="mt-3 text-sm text-amber-300/85">
-                      TCU Stage 2 is recommended by default for most Stage 3 ECU
-                      builds. You can manually switch to Custom if needed.
+                      Recommended TCU tune is selected automatically based on
+                      the ECU stage. You can still change it manually if needed.
                     </p>
                   ) : null}
                 </div>
@@ -398,40 +425,52 @@ export default function PricingPage() {
                   </p>
                 </div>
 
-                <div className="mt-8 grid gap-3">
-                  {addOns.map((option) => {
-                    const checked = selectedAddOns.includes(option.name);
+                <div className="mt-8 space-y-8">
+                  {addOnGroups.map((group) => (
+                    <div key={group.title}>
+                      <div className="mb-4">
+                        <p className="text-sm font-semibold uppercase tracking-[0.22em] text-white/45">
+                          {group.title}
+                        </p>
+                      </div>
 
-                    return (
-                      <label
-                        key={option.name}
-                        className={`flex items-center justify-between rounded-2xl border px-5 py-4 transition ${
-                          checked
-                            ? "border-[#ff3b57] bg-[#ff3b57]/10"
-                            : "border-white/10 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.05]"
-                        } ${
-                          !ecuStage
-                            ? "cursor-not-allowed opacity-50"
-                            : "cursor-pointer"
-                        }`}
-                      >
-                        <div className="flex items-center gap-4">
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            disabled={!ecuStage}
-                            onChange={() => toggleAddOn(option.name)}
-                            className="h-4 w-4 accent-[#ff3b57]"
-                          />
-                          <span className="text-white">{option.name}</span>
-                        </div>
+                      <div className="grid gap-3">
+                        {group.items.map((option) => {
+                          const checked = selectedAddOns.includes(option.name);
 
-                        <span className="text-sm font-medium text-white/70">
-                          RM {option.price}
-                        </span>
-                      </label>
-                    );
-                  })}
+                          return (
+                            <label
+                              key={option.name}
+                              className={`flex items-center justify-between rounded-2xl border px-5 py-4 transition ${
+                                checked
+                                  ? "border-[#ff3b57] bg-[#ff3b57]/10"
+                                  : "border-white/10 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.05]"
+                              } ${
+                                !ecuStage
+                                  ? "cursor-not-allowed opacity-50"
+                                  : "cursor-pointer"
+                              }`}
+                            >
+                              <div className="flex items-center gap-4">
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  disabled={!ecuStage}
+                                  onChange={() => toggleAddOn(option.name)}
+                                  className="h-4 w-4 accent-[#ff3b57]"
+                                />
+                                <span className="text-white">{option.name}</span>
+                              </div>
+
+                              <span className="text-sm font-medium text-white/70">
+                                RM {option.price}
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </>
             ) : null}

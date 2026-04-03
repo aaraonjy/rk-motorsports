@@ -15,6 +15,7 @@ import {
   ecuTunes,
   getBundleLabel,
   tcuTunes,
+  type AddOn,
   type TuningTypeOption,
   type TuneOption,
 } from "@/lib/tuning-pricing";
@@ -371,14 +372,10 @@ function TuneCard({
 
       <div>
         <p className="text-lg font-semibold text-white">{item.name}</p>
-		
-        {badge ? (
-		  <div className="mt-2">
-		    {badge}
-		  </div>
-		) : null}
+
+        {badge ? <div className="mt-2">{badge}</div> : null}
       </div>
-	  
+
       <p className="mt-2 text-white/75">RM {item.price.toLocaleString()}</p>
 
       <p className="mt-3 min-h-[72px] text-sm leading-6 text-white/60">
@@ -427,6 +424,29 @@ function CompactSetupCard({
       <p className="mt-2 text-sm leading-5 text-white/60">{description}</p>
     </label>
   );
+}
+
+function getAddOnGroups(options: AddOn[]) {
+  const performanceNames = new Set([
+    "Pop & Bang / Flame Tuning",
+    "Boosted Launch Control (2-Step)",
+    "Rolling Anti-Lag (RAL)",
+    "Multi-Map Switching (On-The-Fly)",
+    "DSG Fart (Only for DSG Gearbox)",
+  ]);
+
+  const utilityNames = new Set(["Speed Limiter Removal"]);
+  const advancedNames = new Set(["Immo Off"]);
+
+  const performance = options.filter((item) => performanceNames.has(item.name));
+  const utility = options.filter((item) => utilityNames.has(item.name));
+  const advanced = options.filter((item) => advancedNames.has(item.name));
+
+  return [
+    { title: "Performance Add-ons", items: performance },
+    { title: "Utility", items: utility },
+    { title: "Advanced / Special", items: advanced },
+  ].filter((group) => group.items.length > 0);
 }
 
 export function CustomTuningForm({ productId }: CustomTuningFormProps) {
@@ -851,6 +871,8 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
 
     return "";
   }, [tuningType, currentEcuSetupStage, ecuStage, turboType]);
+
+  const addOnGroups = useMemo(() => getAddOnGroups(addOns), []);
 
   const selectedTuneLabel = useMemo(() => {
     if (tuningType === "ECU") {
@@ -1465,7 +1487,7 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
                     kind="tcu"
                     badge={
                       isRecommended ? (
-                        <span className="rounded-full border border-amber-400/30 bg-amber-400/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-amber-300">
+                        <span className="inline-flex w-fit rounded-full border border-amber-400/30 bg-amber-400/10 px-2 py-[2px] text-[9px] font-semibold uppercase tracking-[0.14em] text-amber-300">
                           Recommended
                         </span>
                       ) : undefined
@@ -1633,42 +1655,54 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
             </div>
 
             {isAddOnsOpen ? (
-              <div className="mt-8 grid gap-3">
-                {addOns.map((option) => {
-                  const checked = selectedAddOns.includes(option.name);
+              <div className="mt-8 space-y-8">
+                {addOnGroups.map((group) => (
+                  <div key={group.title}>
+                    <div className="mb-4">
+                      <p className="text-sm font-semibold uppercase tracking-[0.22em] text-white/45">
+                        {group.title}
+                      </p>
+                    </div>
 
-                  return (
-                    <label
-                      key={option.name}
-                      className={`flex items-center justify-between rounded-2xl border px-5 py-4 transition ${
-                        checked
-                          ? "border-[#ff3b57] bg-[#ff3b57]/10"
-                          : "border-white/10 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.05]"
-                      } ${
-                        !ecuStage
-                          ? "cursor-not-allowed opacity-50"
-                          : "cursor-pointer"
-                      }`}
-                    >
-                      <div className="flex items-center gap-4">
-                        <input
-                          type="checkbox"
-                          name="addOns"
-                          value={option.name}
-                          checked={checked}
-                          disabled={!ecuStage}
-                          onChange={() => toggleAddOn(option.name)}
-                          className="h-4 w-4 accent-[#ff3b57]"
-                        />
-                        <span className="text-white">{option.name}</span>
-                      </div>
+                    <div className="grid gap-3">
+                      {group.items.map((option) => {
+                        const checked = selectedAddOns.includes(option.name);
 
-                      <span className="text-sm font-medium text-white/70">
-                        RM {option.price}
-                      </span>
-                    </label>
-                  );
-                })}
+                        return (
+                          <label
+                            key={option.name}
+                            className={`flex items-center justify-between rounded-2xl border px-5 py-4 transition ${
+                              checked
+                                ? "border-[#ff3b57] bg-[#ff3b57]/10"
+                                : "border-white/10 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.05]"
+                            } ${
+                              !ecuStage
+                                ? "cursor-not-allowed opacity-50"
+                                : "cursor-pointer"
+                            }`}
+                          >
+                            <div className="flex items-center gap-4">
+                              <input
+                                type="checkbox"
+                                name="addOns"
+                                value={option.name}
+                                checked={checked}
+                                disabled={!ecuStage}
+                                onChange={() => toggleAddOn(option.name)}
+                                className="h-4 w-4 accent-[#ff3b57]"
+                              />
+                              <span className="text-white">{option.name}</span>
+                            </div>
+
+                            <span className="text-sm font-medium text-white/70">
+                              RM {option.price}
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : null}
           </>
