@@ -574,25 +574,25 @@ function RevisionFiles({
   const orderedRevisions = [...revisions].sort((a, b) => a.revisionNo - b.revisionNo);
 
   return (
-    <div className="rounded-xl border border-white/10 bg-black/20 p-3">
-			<button
-       type="button"
-       onClick={() => setIsOpen((prev) => !prev)}
-       className="inline-block w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center text-sm hover:bg-white/10"
+    <div>
+      <button
+        type="button"
+        onClick={() => setIsOpen((prev) => !prev)}
+        className="inline-block w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-left hover:bg-white/10"
       >
-       {admin ? "Revision Files" : "Rev File"}
+        {admin ? "Revision Files" : "Rev File"}
       </button>
 
       {isOpen ? (
-        <div className="mt-3 space-y-2">
+        <div className="mt-2 space-y-2">
           {orderedRevisions.map((revision) => (
             <div
               key={revision.id}
-              className="rounded-lg border border-white/10 bg-black/30 p-3"
+              className="rounded-xl border border-white/10 bg-black/20 p-3"
             >
               <Link
                 href={`/api/files/${revision.orderFile.id}/download`}
-                className="inline-block rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-sm hover:bg-white/10"
+                className="inline-block w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-left text-sm hover:bg-white/10"
               >
                 {admin ? `Download Rev ${revision.revisionNo}` : `Rev ${revision.revisionNo}`}
               </Link>
