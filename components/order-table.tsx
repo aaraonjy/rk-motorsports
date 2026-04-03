@@ -575,14 +575,12 @@ function RevisionFiles({
 
   return (
     <div className="rounded-xl border border-white/10 bg-black/20 p-3">
-      <button
-        type="button"
-        onClick={() => setIsOpen((prev) => !prev)}
-        className="flex w-full items-center justify-center rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white/85 transition hover:bg-white/10"
+			<button
+       type="button"
+       onClick={() => setIsOpen((prev) => !prev)}
+       className="inline-block w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center text-sm hover:bg-white/10"
       >
-        <span className="font-medium">
-          {admin ? "Revision Files" : "Rev File"}
-        </span>
+       {admin ? "Revision Files" : "Rev File"}
       </button>
 
       {isOpen ? (
