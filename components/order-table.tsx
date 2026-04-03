@@ -581,7 +581,7 @@ function RevisionFiles({
         className="flex w-full items-center justify-center rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white/85 transition hover:bg-white/10"
       >
         <span className="font-medium">
-          {admin ? "Revision Files" : "Download Rev File"}
+          {admin ? "Revision Files" : "Rev File"}
         </span>
       </button>
 
@@ -650,7 +650,7 @@ function FileSection({
             href={`/api/files/${tunedFile.id}/download`}
             className="inline-block rounded-xl border border-white/15 bg-black/30 px-3 py-2 hover:bg-white/10"
           >
-            {admin ? "Tuned File" : "Download Tuned File"}
+            {admin ? "Tuned File" : "Tuned File"}
           </Link>
         ) : null}
 
