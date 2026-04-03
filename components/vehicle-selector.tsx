@@ -107,6 +107,19 @@ export function VehicleSelector({ onSearch }: VehicleSelectorProps) {
       return;
     }
 
+    if (onSearch) {
+      onSearch(payload);
+
+      const resultSection = document.getElementById("find-a-file-result");
+      if (resultSection) {
+        setTimeout(() => {
+          resultSection.scrollIntoView({ behavior: "smooth", block: "start" });
+        }, 100);
+      }
+
+      return;
+    }
+
     const params = new URLSearchParams({
       make: payload.make,
       model: payload.model,
@@ -123,10 +136,6 @@ export function VehicleSelector({ onSearch }: VehicleSelectorProps) {
     if (!payload) {
       setError("Please select vehicle brand, model, and engine first.");
       return;
-    }
-
-    if (onSearch) {
-      onSearch(payload);
     }
 
     const params = new URLSearchParams({

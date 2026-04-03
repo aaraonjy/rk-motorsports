@@ -50,8 +50,11 @@ function parsePower(engineName: string) {
 
 export default function HomePage() {
   const [result, setResult] = useState<ResultData | null>(null);
+  const [hasSearched, setHasSearched] = useState(false);
 
   const handleSearch = (data: VehicleSearchPayload) => {
+    setHasSearched(true);
+
     const library = carLibrary as Make[];
 
     const makeEntry = library.find((item) => item.make === data.make);
@@ -78,10 +81,8 @@ export default function HomePage() {
 
   return (
     <main className="bg-black text-white">
-      {/* SECTION 1 */}
       <Hero />
 
-      {/* SECTION 2 */}
       <section className="bg-[#0a0a0a] py-20 md:py-24">
         <div className="container-rk">
           <div className="mx-auto max-w-5xl rounded-[2rem] border border-white/10 bg-[#111111] p-8 shadow-[0_20px_80px_rgba(0,0,0,0.35)] md:p-12">
@@ -103,60 +104,67 @@ export default function HomePage() {
 
             <VehicleSelector onSearch={handleSearch} />
 
-            {result && (
-              <div className="mt-8 rounded-2xl border border-white/10 bg-[#151515] p-6 text-white md:p-8">
-                <div className="mb-6">
-                  <p className="text-xs font-semibold uppercase tracking-[0.28em] text-white/40">
-                    Performance Preview
+            <div id="find-a-file-result">
+              {result && (
+                <div className="mt-8 rounded-2xl border border-white/10 bg-[#151515] p-6 text-white md:p-8">
+                  <div className="mb-6">
+                    <p className="text-xs font-semibold uppercase tracking-[0.28em] text-white/40">
+                      Performance Preview
+                    </p>
+                    <h3 className="mt-3 text-xl font-bold md:text-2xl">
+                      {result.name}
+                    </h3>
+                  </div>
+
+                  <div className="grid gap-4 text-center md:grid-cols-3">
+                    <div className="rounded-2xl border border-white/10 bg-black/35 p-5">
+                      <p className="text-sm text-white/55">Stock</p>
+                      <p className="mt-3 text-3xl font-semibold">
+                        {result.stockHp} HP
+                      </p>
+                      <p className="mt-2 text-base text-white/70">
+                        {result.stockTorque} Nm
+                      </p>
+                    </div>
+
+                    <div className="rounded-2xl border border-red-500/25 bg-red-500/10 p-5">
+                      <p className="text-sm text-red-200/80">Stage 1</p>
+                      <p className="mt-3 text-3xl font-semibold text-red-300">
+                        {result.stage1Hp} HP
+                      </p>
+                      <p className="mt-2 text-base text-red-200/85">
+                        {result.stage1Torque} Nm
+                      </p>
+                    </div>
+
+                    <div className="rounded-2xl border border-amber-500/25 bg-amber-500/10 p-5">
+                      <p className="text-sm text-amber-200/80">Stage 2</p>
+                      <p className="mt-3 text-3xl font-semibold text-amber-300">
+                        {result.stage2Hp} HP
+                      </p>
+                      <p className="mt-2 text-base text-amber-200/85">
+                        {result.stage2Torque} Nm
+                      </p>
+                    </div>
+                  </div>
+
+                  <p className="mt-6 text-sm leading-6 text-white/45">
+                    Estimated values only. Actual results depend on hardware,
+                    fuel quality, ECU type, and tuning conditions.
                   </p>
-                  <h3 className="mt-3 text-xl font-bold md:text-2xl">
-                    {result.name}
-                  </h3>
                 </div>
+              )}
 
-                <div className="grid gap-4 text-center md:grid-cols-3">
-                  <div className="rounded-2xl border border-white/10 bg-black/35 p-5">
-                    <p className="text-sm text-white/55">Stock</p>
-                    <p className="mt-3 text-3xl font-semibold">
-                      {result.stockHp} HP
-                    </p>
-                    <p className="mt-2 text-base text-white/70">
-                      {result.stockTorque} Nm
-                    </p>
-                  </div>
-
-                  <div className="rounded-2xl border border-red-500/25 bg-red-500/10 p-5">
-                    <p className="text-sm text-red-200/80">Stage 1</p>
-                    <p className="mt-3 text-3xl font-semibold text-red-300">
-                      {result.stage1Hp} HP
-                    </p>
-                    <p className="mt-2 text-base text-red-200/85">
-                      {result.stage1Torque} Nm
-                    </p>
-                  </div>
-
-                  <div className="rounded-2xl border border-amber-500/25 bg-amber-500/10 p-5">
-                    <p className="text-sm text-amber-200/80">Stage 2</p>
-                    <p className="mt-3 text-3xl font-semibold text-amber-300">
-                      {result.stage2Hp} HP
-                    </p>
-                    <p className="mt-2 text-base text-amber-200/85">
-                      {result.stage2Torque} Nm
-                    </p>
-                  </div>
+              {hasSearched && !result && (
+                <div className="mt-8 rounded-2xl border border-yellow-500/20 bg-yellow-500/10 p-6 text-sm text-yellow-100">
+                  No matching file result found for the selected vehicle.
                 </div>
-
-                <p className="mt-6 text-sm leading-6 text-white/45">
-                  Estimated values only. Actual results depend on hardware,
-                  fuel quality, ECU type, and tuning conditions.
-                </p>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
       </section>
 
-      {/* SECTION 3 */}
       <section id="services" className="bg-[#121212] py-20 md:py-24">
         <div className="container-rk">
           <div className="rounded-[2rem] border border-white/10 bg-[#171717] p-6 shadow-[0_20px_80px_rgba(0,0,0,0.28)] md:p-8">
