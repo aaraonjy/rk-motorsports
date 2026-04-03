@@ -12,6 +12,8 @@ import {
 } from "@prisma/client";
 import { formatCurrency } from "@/lib/utils";
 
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+
 export type OrderWithRelations = Order & {
   user?: User;
   files: OrderFile[];
@@ -408,6 +410,7 @@ function UploadConfirmModal({
   onClose: () => void;
 }) {
   const [remark, setRemark] = useState("");
+  const [fileError, setFileError] = useState<string | null>(null);
 
   if (!isOpen || !mode || !orderId) return null;
 
@@ -465,6 +468,11 @@ function UploadConfirmModal({
           method="post"
           encType="multipart/form-data"
           className="mt-6 space-y-4"
+          onSubmit={(e) => {
+            if (fileError) {
+              e.preventDefault();
+            }
+          }}
         >
           {target ? <input type="hidden" name="target" value={target} /> : null}
 
@@ -480,7 +488,30 @@ function UploadConfirmModal({
               }
               required
               className="block w-full text-xs text-white/80 file:mr-3 file:rounded-lg file:border file:border-white/15 file:bg-black/40 file:px-3 file:py-2 file:text-white hover:file:bg-white/10"
+              onChange={(e) => {
+                const file = e.target.files?.[0] || null;
+
+                if (!file) {
+                  setFileError(null);
+                  return;
+                }
+
+                if (file.size > MAX_FILE_SIZE) {
+                  setFileError(
+                    "File size limit exceeded. Maximum allowed size is 10MB."
+                  );
+                  e.target.value = "";
+                  return;
+                }
+
+                setFileError(null);
+              }}
             />
+            {fileError ? (
+              <p className="mt-2 text-sm font-medium text-red-400">
+                {fileError}
+              </p>
+            ) : null}
           </div>
 
           {isAdminRevisionEcu || isAdminRevisionTcu ? (
@@ -504,6 +535,7 @@ function UploadConfirmModal({
               type="button"
               onClick={() => {
                 setRemark("");
+                setFileError(null);
                 onClose();
               }}
               className="rounded-xl border border-white/15 px-4 py-2.5 text-sm text-white/75 transition hover:bg-white/10 hover:text-white"
@@ -513,7 +545,8 @@ function UploadConfirmModal({
 
             <button
               type="submit"
-              className="rounded-xl border border-white/15 px-4 py-2.5 text-sm text-white transition hover:bg-white/10"
+              disabled={!!fileError}
+              className="rounded-xl border border-white/15 px-4 py-2.5 text-sm text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {buttonLabel}
             </button>
