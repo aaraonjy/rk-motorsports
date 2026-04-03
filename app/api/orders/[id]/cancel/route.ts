@@ -43,5 +43,8 @@ export async function POST(
     },
   });
 
-  return NextResponse.redirect(new URL("/dashboard", req.url), 303);
+  return NextResponse.redirect(
+    new URL("/dashboard?success=order_cancelled", req.url),
+    303
+  );
 }

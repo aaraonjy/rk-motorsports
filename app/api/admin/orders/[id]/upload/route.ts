@@ -16,6 +16,15 @@ function needsTcu(tuningType: string | null | undefined) {
   return tuningType === "TCU" || tuningType === "ECU_TCU";
 }
 
+function getUploadSuccess(uploads: Array<{ kind: string; file: File }>) {
+  const hasEcu = uploads.some((upload) => upload.kind === "ADMIN_ECU");
+  const hasTcu = uploads.some((upload) => upload.kind === "ADMIN_TCU");
+
+  if (hasEcu && hasTcu) return "tuned_files_uploaded";
+  if (hasTcu) return "tuned_tcu_uploaded";
+  return "tuned_ecu_uploaded";
+}
+
 export async function POST(
   req: Request,
   ctx: { params: Promise<{ id: string }> }
@@ -161,7 +170,10 @@ export async function POST(
     revalidatePath("/admin");
     revalidatePath("/dashboard");
 
-    return NextResponse.redirect(new URL("/admin", req.url), 303);
+    return NextResponse.redirect(
+      new URL(`/admin?success=${getUploadSuccess(uploads)}`, req.url),
+      303
+    );
   } catch (error) {
     console.error("POST /api/admin/orders/[id]/upload failed:", error);
     return NextResponse.redirect(new URL("/admin", req.url), 303);

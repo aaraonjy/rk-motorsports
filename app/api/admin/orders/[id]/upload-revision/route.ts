@@ -8,6 +8,17 @@ import {
   validateSingleUploadFile,
 } from "@/lib/storage";
 
+function getRevisionSuccess(
+  uploads: Array<{ kind: string; file: File; target: string }>
+) {
+  const hasEcu = uploads.some((upload) => upload.target === "ECU");
+  const hasTcu = uploads.some((upload) => upload.target === "TCU");
+
+  if (hasEcu && hasTcu) return "revision_files_uploaded";
+  if (hasTcu) return "revision_tcu_uploaded";
+  return "revision_ecu_uploaded";
+}
+
 export async function POST(
   req: Request,
   ctx: { params: Promise<{ id: string }> }
@@ -144,7 +155,10 @@ export async function POST(
     revalidatePath("/admin");
     revalidatePath("/dashboard");
 
-    return NextResponse.redirect(new URL("/admin", req.url), 303);
+    return NextResponse.redirect(
+      new URL(`/admin?success=${getRevisionSuccess(revisionUploads)}`, req.url),
+      303
+    );
   } catch (error) {
     console.error("POST /api/admin/orders/[id]/upload-revision failed:", error);
     return NextResponse.redirect(new URL("/admin", req.url), 303);

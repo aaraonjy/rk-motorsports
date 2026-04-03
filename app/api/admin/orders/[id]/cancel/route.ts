@@ -51,5 +51,8 @@ export async function POST(
     },
   });
 
-  return NextResponse.redirect(new URL("/admin", req.url), 303);
+  return NextResponse.redirect(
+    new URL("/admin?success=admin_order_cancelled", req.url),
+    303
+  );
 }

@@ -7,8 +7,43 @@ type AdminPageProps = {
   searchParams?: Promise<{
     status?: string;
     search?: string;
+    success?: string;
   }>;
 };
+
+function getAdminSuccessMessage(success?: string) {
+  switch (success) {
+    case "tuned_ecu_uploaded":
+      return "Tuned ECU file uploaded successfully.";
+    case "tuned_tcu_uploaded":
+      return "Tuned TCU file uploaded successfully.";
+    case "tuned_files_uploaded":
+      return "Tuned ECU and TCU files uploaded successfully.";
+    case "revision_ecu_uploaded":
+      return "ECU revision file uploaded successfully.";
+    case "revision_tcu_uploaded":
+      return "TCU revision file uploaded successfully.";
+    case "revision_files_uploaded":
+      return "ECU and TCU revision files uploaded successfully.";
+    case "order_released":
+      return "Download released successfully.";
+    case "admin_order_cancelled":
+      return "Order cancelled successfully.";
+    default:
+      return null;
+  }
+}
+
+function SuccessBanner({ message }: { message: string }) {
+  return (
+    <div className="mt-6 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-emerald-200">
+      <div className="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-300/80">
+        Success
+      </div>
+      <p className="mt-2 text-sm leading-6">{message}</p>
+    </div>
+  );
+}
 
 export default async function AdminPage({ searchParams }: AdminPageProps) {
   const user = await getSessionUser();
@@ -18,6 +53,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const params = (await searchParams) || {};
   const status = params.status || "ALL";
   const search = params.search || "";
+  const successMessage = getAdminSuccessMessage(params.success);
 
   const orders = (await getAllOrders({
     status,
@@ -31,6 +67,8 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         <p className="mt-4 text-white/70">
           Review ECU / TCU orders, uploaded files, and manage delivery workflow.
         </p>
+
+        {successMessage ? <SuccessBanner message={successMessage} /> : null}
 
         <div className="mt-8 space-y-4">
           <div className="card-rk p-6 text-white/75">

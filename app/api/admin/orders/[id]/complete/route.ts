@@ -69,7 +69,10 @@ export async function POST(
       console.error("Customer notification failed:", err);
     }
 
-    return NextResponse.redirect(new URL("/admin", req.url), 303);
+    return NextResponse.redirect(
+      new URL("/admin?success=order_released", req.url),
+      303
+    );
   } catch (error) {
     console.error("POST /api/admin/orders/[id]/complete failed:", error);
     return NextResponse.redirect(new URL("/login", req.url), 303);

@@ -360,11 +360,11 @@ function ReleaseOrderModal({
       <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-zinc-950 p-6 shadow-2xl">
         <div>
           <h3 className="text-lg font-semibold text-white">
-            Confirm Payment & Release
+            Release Download
           </h3>
           <p className="mt-1 text-sm text-white/50">
-            This will confirm payment and release the tuned file(s) for customer
-            download.
+            Proceed only after you have manually verified the payment. This will
+            release the tuned file(s) for customer download.
           </p>
         </div>
 
@@ -389,7 +389,7 @@ function ReleaseOrderModal({
               disabled={isSubmitting}
               className="rounded-xl border border-emerald-500/40 px-4 py-2.5 text-sm text-emerald-300 transition hover:bg-emerald-500/10 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {isSubmitting ? "Releasing..." : "Confirm & Release"}
+              {isSubmitting ? "Releasing..." : "Release Download"}
             </button>
           </div>
         </form>
@@ -580,7 +580,7 @@ function RevisionFiles({
         onClick={() => setIsOpen((prev) => !prev)}
         className="inline-block w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-left hover:bg-white/10"
       >
-        {admin ? "Rev File" : "Rev File"}
+        {admin ? "Revision Files" : "Rev File"}
       </button>
 
       {isOpen ? (
@@ -648,7 +648,7 @@ function FileSection({
             href={`/api/files/${tunedFile.id}/download`}
             className="inline-block rounded-xl border border-white/15 bg-black/30 px-3 py-2 hover:bg-white/10"
           >
-            {admin ? "Tuned File" : "Tuned File"}
+            Tuned File
           </Link>
         ) : null}
 
@@ -800,9 +800,19 @@ export function OrderTable({
 
                       {admin &&
                       order.status === "AWAITING_PAYMENT" &&
-                      paymentProof ? (
+                      paymentProof &&
+                      hasAllAdminFiles ? (
+                        <div className="text-sm text-emerald-300/90">
+                          Ready to Release
+                        </div>
+                      ) : null}
+
+                      {!admin &&
+                      order.status === "AWAITING_PAYMENT" &&
+                      paymentProof &&
+                      hasAllAdminFiles ? (
                         <div className="text-sm text-cyan-300/90">
-                          Awaiting admin release
+                          Awaiting Admin Release
                         </div>
                       ) : null}
 
@@ -939,7 +949,7 @@ export function OrderTable({
                               onClick={() => setReleaseOrderId(order.id)}
                               className="w-full rounded-xl border border-emerald-500/40 px-3 py-2 text-center text-sm text-emerald-400 transition hover:bg-emerald-500/10"
                             >
-                              Confirm Payment & Release
+                              Release Download
                             </button>
                           ) : null}
 

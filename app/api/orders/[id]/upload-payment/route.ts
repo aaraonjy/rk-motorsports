@@ -89,7 +89,12 @@ export async function POST(
       console.error("Admin notification failed:", err);
     }
 
-    return NextResponse.redirect(new URL("/dashboard", req.url), 303);
+    const success = existingPayment ? "payment_replaced" : "payment_uploaded";
+
+    return NextResponse.redirect(
+      new URL(`/dashboard?success=${success}`, req.url),
+      303
+    );
   } catch (error) {
     console.error("Upload payment failed:", error);
     return NextResponse.redirect(new URL("/dashboard", req.url), 303);

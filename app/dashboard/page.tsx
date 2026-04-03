@@ -4,10 +4,51 @@ import { redirect } from "next/navigation";
 import { OrderTable } from "@/components/order-table";
 import { paymentConfig } from "@/lib/payment-config";
 
-export default async function DashboardPage() {
+type DashboardPageProps = {
+  searchParams?: Promise<{
+    success?: string;
+  }>;
+};
+
+function getCustomerSuccessMessage(success?: string) {
+  switch (success) {
+    case "order_submitted_ecu":
+      return "ECU tuning request submitted successfully. Your order has been received and is now under review.";
+    case "order_submitted_tcu":
+      return "TCU tuning request submitted successfully. Your order has been received and is now under review.";
+    case "order_submitted_ecu_tcu":
+      return "ECU + TCU tuning request submitted successfully. Your order has been received and is now under review.";
+    case "payment_uploaded":
+      return "Payment slip uploaded successfully. Our admin will review it before releasing your file(s).";
+    case "payment_replaced":
+      return "Payment slip replaced successfully. Our admin will review the updated slip before releasing your file(s).";
+    case "order_cancelled":
+      return "Order cancelled successfully.";
+    default:
+      return null;
+  }
+}
+
+function SuccessBanner({ message }: { message: string }) {
+  return (
+    <div className="mt-6 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-emerald-200">
+      <div className="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-300/80">
+        Success
+      </div>
+      <p className="mt-2 text-sm leading-6">{message}</p>
+    </div>
+  );
+}
+
+export default async function DashboardPage({
+  searchParams,
+}: DashboardPageProps) {
   const user = await getSessionUser();
   if (!user) redirect("/login");
   if (user.role === "ADMIN") redirect("/admin");
+
+  const params = (await searchParams) || {};
+  const successMessage = getCustomerSuccessMessage(params.success);
 
   const orders = await getRecentOrdersForUser(user.id);
 
@@ -18,6 +59,8 @@ export default async function DashboardPage() {
         <p className="mt-4 text-white/70">
           Track ECU / TCU order status and download completed tuned files.
         </p>
+
+        {successMessage ? <SuccessBanner message={successMessage} /> : null}
 
         <div className="mt-8 grid gap-4 lg:grid-cols-3">
           <div className="card-rk p-6 lg:col-span-2">

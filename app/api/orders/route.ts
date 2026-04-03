@@ -19,6 +19,18 @@ function normalizeTuningType(value: string) {
   return "ECU";
 }
 
+function getOrderSubmittedRedirectPath(tuningType: string) {
+  if (tuningType === "TCU") {
+    return "/dashboard?success=order_submitted_tcu";
+  }
+
+  if (tuningType === "ECU_TCU") {
+    return "/dashboard?success=order_submitted_ecu_tcu";
+  }
+
+  return "/dashboard?success=order_submitted_ecu";
+}
+
 export async function POST(req: Request) {
   try {
     const form = await req.formData();
@@ -145,7 +157,7 @@ export async function POST(req: Request) {
       `ECU Read Tool: ${ecuReadTool || "Not selected"}`,
       `TCU Read Tool: ${tcuReadTool || "Not selected"}`,
       `TCU Version: ${tcuVersion || "Not selected"}`,
-      `Fuel Grade: ${fuelGrade}`,
+      `Fuel Grade: ${fuelGrade || "Not selected"}`,
       `Water Methanol Injection: ${waterMethanolInjection || "Not selected"}`,
       `Remarks: ${remarks || "None"}`,
     ];
@@ -203,7 +215,7 @@ export async function POST(req: Request) {
         vehicleYear,
         ecuType: ecuType || null,
         ecuReadTool: ecuReadTool || null,
-        fuelGrade,
+        fuelGrade: fuelGrade || null,
         waterMethanolInjection: waterMethanolInjection || null,
         tcuType: tcuType || null,
         tcuReadTool: tcuReadTool || null,
@@ -233,7 +245,10 @@ export async function POST(req: Request) {
       console.error("Notification creation failed:", error);
     }
 
-    return NextResponse.redirect(new URL("/dashboard", req.url), 303);
+    return NextResponse.redirect(
+      new URL(getOrderSubmittedRedirectPath(tuningType), req.url),
+      303
+    );
   } catch (error) {
     console.error("POST /api/orders failed:", error);
     return NextResponse.json(
