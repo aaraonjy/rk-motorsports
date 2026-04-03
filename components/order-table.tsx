@@ -580,7 +580,7 @@ function RevisionFiles({
         onClick={() => setIsOpen((prev) => !prev)}
         className="inline-block w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-left hover:bg-white/10"
       >
-        {admin ? "Revision Files" : "Rev File"}
+        {admin ? "Rev File" : "Rev File"}
       </button>
 
       {isOpen ? (
