@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { saveFile } from "@/lib/storage";
+import {
+  saveFile,
+  validatePackageUploadFiles,
+  validateSingleUploadFile,
+} from "@/lib/storage";
 
 export async function POST(
   req: Request,
@@ -15,8 +19,6 @@ export async function POST(
     const form = await req.formData();
 
     const remark = String(form.get("remark") || "").trim();
-    const revisionTarget = String(form.get("target") || "ECU").toUpperCase();
-
     const ecuFile = form.get("ecuFile");
     const tcuFile = form.get("tcuFile");
 
@@ -55,6 +57,17 @@ export async function POST(
 
     if (revisionUploads.length === 0) {
       return NextResponse.redirect(new URL("/admin", req.url), 303);
+    }
+
+    const validationMessage =
+      revisionUploads.length > 1
+        ? validatePackageUploadFiles(
+            revisionUploads.map((upload) => upload.file)
+          )
+        : validateSingleUploadFile(revisionUploads[0].file);
+
+    if (validationMessage) {
+      return NextResponse.json({ error: validationMessage }, { status: 400 });
     }
 
     for (const upload of revisionUploads) {

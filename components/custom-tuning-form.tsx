@@ -73,6 +73,8 @@ type TurboSetupOption =
   | "big_turbo"
   | "other";
 
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+
 const currentEcuSetupOptions: Array<{
   id: EcuSetupStage;
   name: string;
@@ -453,6 +455,7 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
   const [tuningType, setTuningType] = useState<TuningTypeOption>("ECU");
   const [selectedAddOns, setSelectedAddOns] = useState<string[]>([]);
   const [isAddOnsOpen, setIsAddOnsOpen] = useState(false);
+  const [fileError, setFileError] = useState<string | null>(null);
 
   const [selectedBrand, setSelectedBrand] = useState("");
   const [selectedModelId, setSelectedModelId] = useState("");
@@ -692,6 +695,16 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
     return turboType;
   }, [turboType, turboOther]);
 
+  function validateFile(file: File | null) {
+    if (!file) return null;
+
+    if (file.size > MAX_FILE_SIZE) {
+      return "File size limit exceeded. Maximum allowed size is 10MB.";
+    }
+
+    return null;
+  }
+
   useEffect(() => {
     setSelectedModelId("");
     setSelectedEngineId("");
@@ -750,6 +763,8 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
   }, [turboType]);
 
   useEffect(() => {
+    setFileError(null);
+
     if (tuningType === "ECU") {
       setTcuStage("");
       setTcuBrand("");
@@ -891,6 +906,7 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
   }, [tuningType, selectedEcuTune, selectedTcuTune, ecuStage, tcuStage]);
 
   const disableSubmit =
+    !!fileError ||
     !selectedBrand ||
     !selectedModelId ||
     !selectedEngineId ||
@@ -1747,6 +1763,18 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
                 name="ecuFile"
                 type="file"
                 required={shouldShowEcuSection}
+                onChange={(e) => {
+                  const file = e.target.files?.[0] || null;
+                  const error = validateFile(file);
+
+                  if (error) {
+                    setFileError(error);
+                    e.target.value = "";
+                    return;
+                  }
+
+                  setFileError(null);
+                }}
               />
             </div>
           ) : null}
@@ -1759,10 +1787,26 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
                 name="tcuFile"
                 type="file"
                 required={shouldShowTcuSection}
+                onChange={(e) => {
+                  const file = e.target.files?.[0] || null;
+                  const error = validateFile(file);
+
+                  if (error) {
+                    setFileError(error);
+                    e.target.value = "";
+                    return;
+                  }
+
+                  setFileError(null);
+                }}
               />
             </div>
           ) : null}
         </div>
+
+        {fileError ? (
+          <p className="mt-3 text-sm font-medium text-red-400">{fileError}</p>
+        ) : null}
 
         <div className="mt-12">
           <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/45">

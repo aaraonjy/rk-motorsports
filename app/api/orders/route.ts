@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
 import { generateOrderNumber } from "@/lib/utils";
-import { saveFile } from "@/lib/storage";
+import {
+  saveFile,
+  validatePackageUploadFiles,
+  validateSingleUploadFile,
+} from "@/lib/storage";
 import { createAdminNotification } from "@/lib/notifications";
 import {
   calculateAddOnTotal,
@@ -94,6 +98,27 @@ export async function POST(req: Request) {
       missingTcuData
     ) {
       return NextResponse.redirect(new URL("/custom-tuning", req.url), 303);
+    }
+
+    const uploadFiles: File[] = [];
+
+    if (requiresEcu && ecuFile instanceof File && ecuFile.size > 0) {
+      uploadFiles.push(ecuFile);
+    }
+
+    if (requiresTcu && tcuFile instanceof File && tcuFile.size > 0) {
+      uploadFiles.push(tcuFile);
+    }
+
+    const validationMessage =
+      uploadFiles.length > 1
+        ? validatePackageUploadFiles(uploadFiles)
+        : uploadFiles.length === 1
+          ? validateSingleUploadFile(uploadFiles[0])
+          : null;
+
+    if (validationMessage) {
+      return NextResponse.json({ error: validationMessage }, { status: 400 });
     }
 
     const calculatedBaseTotal = calculateBaseTuneTotal({

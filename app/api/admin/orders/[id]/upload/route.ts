@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { saveFile } from "@/lib/storage";
+import {
+  saveFile,
+  validatePackageUploadFiles,
+  validateSingleUploadFile,
+} from "@/lib/storage";
 
 function needsEcu(tuningType: string | null | undefined) {
   return tuningType === "ECU" || tuningType === "ECU_TCU" || !tuningType;
@@ -64,6 +68,15 @@ export async function POST(
 
     if (uploads.length === 0) {
       return NextResponse.redirect(new URL("/admin", req.url), 303);
+    }
+
+    const validationMessage =
+      uploads.length > 1
+        ? validatePackageUploadFiles(uploads.map((upload) => upload.file))
+        : validateSingleUploadFile(uploads[0].file);
+
+    if (validationMessage) {
+      return NextResponse.json({ error: validationMessage }, { status: 400 });
     }
 
     for (const upload of uploads) {

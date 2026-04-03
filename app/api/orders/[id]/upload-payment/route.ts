@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { saveFile } from "@/lib/storage";
+import { saveFile, validateSingleUploadFile } from "@/lib/storage";
 
 export async function POST(
   req: Request,
@@ -20,6 +20,12 @@ export async function POST(
 
     if (!(file instanceof File) || file.size === 0) {
       return NextResponse.redirect(new URL("/dashboard", req.url), 303);
+    }
+
+    const validationMessage = validateSingleUploadFile(file);
+
+    if (validationMessage) {
+      return NextResponse.json({ error: validationMessage }, { status: 400 });
     }
 
     const order = await db.order.findUnique({
