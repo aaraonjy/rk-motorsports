@@ -543,6 +543,7 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
   const [fuelGrade, setFuelGrade] = useState("");
   const [fuelGradeOther, setFuelGradeOther] = useState("");
 
+  const [hasWmiInstalled, setHasWmiInstalled] = useState(false);
   const [wmiOption, setWmiOption] = useState("");
   const [wmiOther, setWmiOther] = useState("");
 
@@ -717,7 +718,11 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
     selectedEcuSetupStage === "stage3" || selectedEcuSetupStage === "custom";
   const shouldShowWmiInEcuSection =
     shouldShowEcuSection &&
-    (selectedEcuSetupStage === "stage2" || selectedEcuSetupStage === "custom");
+    (
+      selectedEcuSetupStage === "stage2" ||
+      selectedEcuSetupStage === "stage3" ||
+      selectedEcuSetupStage === "custom"
+    );
   const shouldRequireTurboSpec =
     turboType === "hybrid" || turboType === "big_turbo" || turboType === "other";
   const shouldShowTcuTurboSetup =
@@ -756,10 +761,10 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
   }, [shouldShowFuelGrade, fuelGrade, fuelGradeOther]);
 
   const finalWmiOption = useMemo(() => {
-    if (!shouldShowEcuSection) return "";
+    if (!shouldShowEcuSection || !hasWmiInstalled) return "";
     if (wmiOption === "Custom (Specify)") return wmiOther.trim();
     return wmiOption;
-  }, [shouldShowEcuSection, wmiOption, wmiOther]);
+  }, [shouldShowEcuSection, hasWmiInstalled, wmiOption, wmiOther]);
 
   const finalTurboSetup = useMemo(() => {
     if (turboType === "other") {
@@ -853,10 +858,18 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
 
   useEffect(() => {
     if (!shouldShowWmiInEcuSection) {
+      setHasWmiInstalled(false);
+      setHasWmiInstalled(false);
+      setWmiOption("");
+      setWmiOther("");
+      return;
+    }
+
+    if (!hasWmiInstalled) {
       setWmiOption("");
       setWmiOther("");
     }
-  }, [shouldShowWmiInEcuSection]);
+  }, [shouldShowWmiInEcuSection, hasWmiInstalled]);
 
   useEffect(() => {
     if (turboType !== "other") setTurboOther("");
@@ -1092,7 +1105,9 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
     (shouldShowFuelGrade &&
       fuelGrade === "Other (Specify)" &&
       !fuelGradeOther.trim()) ||
-    (wmiOption === "Custom (Specify)" && !wmiOther.trim());
+    (hasWmiInstalled &&
+      wmiOption === "Custom (Specify)" &&
+      !wmiOther.trim());
 
   return (
     <form
@@ -1570,37 +1585,61 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
                   {shouldShowWmiInEcuSection ? (
                     <div className="mt-8">
                       <label className="label-rk">Water Methanol Injection</label>
-                      <div className="relative mt-2">
-                        <select
-                          className={`input-rk appearance-none pr-12 ${
-                            !wmiOption ? "text-white/45" : "text-white"
-                          }`}
-                          value={wmiOption}
-                          onChange={(e) => setWmiOption(e.target.value)}
-                        >
-                          <option value="">Optional</option>
-                          {wmiOptions.map((option) => (
-                            <option key={option} value={option}>
-                              {option}
-                            </option>
-                          ))}
-                        </select>
-                        <SelectArrow />
-                      </div>
 
-                      {wmiOption === "Custom (Specify)" ? (
-                        <div className="mt-6">
-                          <label className="label-rk">
-                            Custom Water Methanol Injection
-                          </label>
-                          <input
-                            className="input-rk"
-                            value={wmiOther}
-                            onChange={(e) => setWmiOther(e.target.value)}
-                            placeholder="Specify WMI setup"
-                            required
-                          />
-                        </div>
+                      <label
+                        className={`mt-3 flex items-center gap-3 rounded-2xl border px-4 py-3 transition ${
+                          hasWmiInstalled
+                            ? "border-cyan-500/35 bg-cyan-500/10"
+                            : "border-white/10 bg-black/20 hover:border-white/20 hover:bg-white/[0.05]"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={hasWmiInstalled}
+                          onChange={(e) => setHasWmiInstalled(e.target.checked)}
+                          className="h-4 w-4 accent-cyan-400"
+                        />
+                        <span className="text-sm text-white">
+                          WMI kit installed
+                        </span>
+                      </label>
+
+                      {hasWmiInstalled ? (
+                        <>
+                          <div className="relative mt-4">
+                            <select
+                              className={`input-rk appearance-none pr-12 ${
+                                !wmiOption ? "text-white/45" : "text-white"
+                              }`}
+                              value={wmiOption}
+                              onChange={(e) => setWmiOption(e.target.value)}
+                              required
+                            >
+                              <option value="">Select WMI ratio / setup</option>
+                              {wmiOptions.map((option) => (
+                                <option key={option} value={option}>
+                                  {option}
+                                </option>
+                              ))}
+                            </select>
+                            <SelectArrow />
+                          </div>
+
+                          {wmiOption === "Custom (Specify)" ? (
+                            <div className="mt-6">
+                              <label className="label-rk">
+                                Custom Water Methanol Injection
+                              </label>
+                              <input
+                                className="input-rk"
+                                value={wmiOther}
+                                onChange={(e) => setWmiOther(e.target.value)}
+                                placeholder="Specify WMI setup"
+                                required
+                              />
+                            </div>
+                          ) : null}
+                        </>
                       ) : null}
                     </div>
                   ) : null}
