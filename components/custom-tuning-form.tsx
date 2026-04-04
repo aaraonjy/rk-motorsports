@@ -430,9 +430,9 @@ function TuneCard({
         {primaryDescription}
       </p>
 
-      <div className="mt-auto pt-4">
+      <div className="mt-auto pt-4 flex justify-center">
         {suitableLabel ? (
-          <span className="inline-flex rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/60">
+          <span className="inline-flex min-w-[140px] justify-center rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/60 text-center">
             {suitableLabel}
           </span>
         ) : null}
