@@ -111,32 +111,12 @@ const turboSetupOptions: Array<{
   id: TurboSetupOption;
   name: string;
 }> = [
-  { id: "stock", name: "Stock" },
-  { id: "oem_upgrade", name: "OEM+" },
-  { id: "hybrid", name: "Hybrid" },
+  { id: "stock", name: "Stock Turbo" },
+  { id: "oem_upgrade", name: "OEM Upgrade / Larger OEM Turbo" },
+  { id: "hybrid", name: "Hybrid Turbo" },
   { id: "big_turbo", name: "Big Turbo" },
   { id: "other", name: "Others" },
 ];
-
-const basicHardwareModOptions = [
-  "Intake",
-  "Intercooler",
-  "Downpipe",
-  "Exhaust system",
-] as const;
-
-const fuelSystemOptions = [
-  "Injectors",
-  "HPFP upgrade",
-  "LPFP upgrade",
-] as const;
-
-const engineModOptions = [
-  "Forged piston",
-  "Forged conrod",
-  "Built engine",
-] as const;
-
 
 function extractYearRange(modelName: string) {
   const match = modelName.match(/(19|20)\d{2}\s*-\s*((19|20)\d{2}|->)/);
@@ -358,32 +338,6 @@ function getSmartRecommendedTcuStage(
   return "";
 }
 
-
-function formatLabelList(values: string[]) {
-  return values.length > 0 ? values.join(", ") : "";
-}
-
-function getTurboDisplayLabel(
-  turboType: TurboSetupOption | "",
-  turboOther: string,
-  turboSpec: string
-) {
-  const baseLabel =
-    turboType === "other"
-      ? turboOther.trim()
-      : turboSetupOptions.find((item) => item.id === turboType)?.name || "";
-
-  if (!baseLabel) return "";
-  if (
-    (turboType === "hybrid" || turboType === "big_turbo" || turboType === "other") &&
-    turboSpec.trim()
-  ) {
-    return `${baseLabel} (${turboSpec.trim()})`;
-  }
-
-  return baseLabel;
-}
-
 function TuneCard({
   item,
   active,
@@ -517,12 +471,6 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
     useState<EcuSetupStage | "">("");
   const [turboType, setTurboType] = useState<TurboSetupOption | "">("");
   const [turboOther, setTurboOther] = useState("");
-  const [turboSpec, setTurboSpec] = useState("");
-  const [hardwareMods, setHardwareMods] = useState<string[]>([]);
-  const [fuelSystemMods, setFuelSystemMods] = useState<string[]>([]);
-  const [engineMods, setEngineMods] = useState<string[]>([]);
-  const [engineModsOther, setEngineModsOther] = useState("");
-  const [additionalDetails, setAdditionalDetails] = useState("");
 
   const [ecuBrand, setEcuBrand] = useState("");
   const [ecuFamily, setEcuFamily] = useState("");
@@ -704,21 +652,10 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
     tuningType === "TCU" || tuningType === "ECU_TCU";
   const shouldShowFuelGrade = tuningType !== "TCU";
   const shouldShowTcuPreSetup = tuningType === "TCU";
-  const shouldShowTurboSetupInEcuSection = shouldShowEcuSection;
-  const selectedEcuSetupStage = (currentEcuSetupStage || ecuStage) as EcuSetupStage | "";
-  const shouldShowDynamicEcuMods = shouldShowEcuSection && !!selectedEcuSetupStage;
-  const shouldShowFullHardwareMods =
-    selectedEcuSetupStage === "stage2" ||
-    selectedEcuSetupStage === "stage3" ||
-    selectedEcuSetupStage === "custom";
-  const shouldShowEngineMods =
-    selectedEcuSetupStage === "stage3" || selectedEcuSetupStage === "custom";
-  const shouldRequireTurboSpec =
-    turboType === "hybrid" || turboType === "big_turbo" || turboType === "other";
-  const shouldShowTcuTurboSetup =
-    currentEcuSetupStage === "stage2" ||
-    currentEcuSetupStage === "stage3" ||
-    currentEcuSetupStage === "custom";
+  const shouldShowTurboSetupInEcuSection =
+    shouldShowEcuSection &&
+    selectedEcuSetupStage !== "stage1" &&
+    selectedEcuSetupStage !== "stock";
 
   const finalEcuType = useMemo(() => {
     if (!shouldShowEcuSection) return "";
@@ -757,29 +694,11 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
   }, [shouldShowEcuSection, wmiOption, wmiOther]);
 
   const finalTurboSetup = useMemo(() => {
-    if (turboType === "other") return turboOther.trim();
+    if (turboType === "other") {
+      return shouldShowTcuPreSetup ? turboOther.trim() : turboSpec.trim();
+    }
     return turboType;
-  }, [turboType, turboOther]);
-
-  const finalHardwareMods = useMemo(
-    () => formatLabelList(hardwareMods),
-    [hardwareMods]
-  );
-
-  const finalFuelSystemMods = useMemo(
-    () => formatLabelList(fuelSystemMods),
-    [fuelSystemMods]
-  );
-
-  const finalEngineMods = useMemo(
-    () => formatLabelList(engineMods),
-    [engineMods]
-  );
-
-  const finalTurboDisplay = useMemo(
-    () => getTurboDisplayLabel(turboType, turboOther, turboSpec),
-    [turboType, turboOther, turboSpec]
-  );
+  }, [turboType, turboOther, turboSpec, shouldShowTcuPreSetup]);
 
   function validateFile(file: File | null) {
     if (!file) return null;
@@ -846,21 +765,7 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
 
   useEffect(() => {
     if (turboType !== "other") setTurboOther("");
-    if (turboType !== "hybrid" && turboType !== "big_turbo" && turboType !== "other") {
-      setTurboSpec("");
-    }
   }, [turboType]);
-
-  useEffect(() => {
-    if (!shouldShowFullHardwareMods) {
-      setFuelSystemMods([]);
-    }
-
-    if (!shouldShowEngineMods) {
-      setEngineMods([]);
-      setEngineModsOther("");
-    }
-  }, [shouldShowFullHardwareMods, shouldShowEngineMods]);
 
   useEffect(() => {
     setFileError(null);
@@ -877,12 +782,6 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
       setCurrentEcuSetupStage("");
       setTurboType("");
       setTurboOther("");
-      setTurboSpec("");
-      setHardwareMods([]);
-      setFuelSystemMods([]);
-      setEngineMods([]);
-      setEngineModsOther("");
-      setAdditionalDetails("");
     }
 
     if (tuningType === "TCU") {
@@ -906,6 +805,16 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
   }, [tuningType]);
 
   useEffect(() => {
+    if (
+      shouldShowEcuSection &&
+      (selectedEcuSetupStage === "stock" || selectedEcuSetupStage === "stage1")
+    ) {
+      setTurboType("");
+      setTurboSpec("");
+    }
+  }, [selectedEcuSetupStage, shouldShowEcuSection]);
+
+  useEffect(() => {
     if (tuningType === "TCU") {
       const recommended = getSmartRecommendedTcuStage(
         currentEcuSetupStage,
@@ -914,16 +823,6 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
 
       if (recommended) {
         setTcuStage(recommended);
-      }
-
-      if (
-        currentEcuSetupStage === "stock" ||
-        currentEcuSetupStage === "stage1" ||
-        !currentEcuSetupStage
-      ) {
-        setTurboType("");
-        setTurboOther("");
-        setTurboSpec("");
       }
     }
   }, [currentEcuSetupStage, turboType, tuningType]);
@@ -949,14 +848,6 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
 
   function toggleAddOn(option: string) {
     setSelectedAddOns((prev) =>
-      prev.includes(option)
-        ? prev.filter((item) => item !== option)
-        : [...prev, option]
-    );
-  }
-
-  function toggleSelection(option: string, setter: (value: string[] | ((prev: string[]) => string[])) => void) {
-    setter((prev) =>
       prev.includes(option)
         ? prev.filter((item) => item !== option)
         : [...prev, option]
@@ -1042,20 +933,13 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
         !finalEcuType ||
         !finalEcuReadTool ||
         (shouldShowTurboSetupInEcuSection &&
-          (!turboType ||
-            (turboType === "other" && !turboOther.trim()) ||
-            (shouldRequireTurboSpec && !turboSpec.trim()))) ||
+          (!turboType || (turboType === "other" && !turboOther.trim()))) ||
         (ecuBrand === "Other" && !ecuOther.trim()) ||
-        (ecuReadTool === "Other (Specify)" && !ecuReadToolOther.trim()) ||
-        (shouldShowEngineMods &&
-          engineMods.includes("Others") &&
-          !engineModsOther.trim()))) ||
+        (ecuReadTool === "Other (Specify)" && !ecuReadToolOther.trim()))) ||
     (shouldShowTcuPreSetup &&
       (!currentEcuSetupStage ||
-        (shouldShowTcuTurboSetup &&
-          (!turboType ||
-            (turboType === "other" && !turboOther.trim()) ||
-            (shouldRequireTurboSpec && !turboSpec.trim()))))) ||
+        !turboType ||
+        (turboType === "other" && !turboOther.trim()))) ||
     (shouldShowTcuSection &&
       (!tcuStage ||
         !finalTcuType ||
@@ -1085,12 +969,6 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
         value={currentEcuSetupStage}
       />
       <input type="hidden" name="turboType" value={finalTurboSetup} />
-      <input type="hidden" name="turboSpec" value={turboSpec.trim()} />
-      <input type="hidden" name="hardwareMods" value={finalHardwareMods} />
-      <input type="hidden" name="fuelSystemMods" value={finalFuelSystemMods} />
-      <input type="hidden" name="engineMods" value={finalEngineMods} />
-      <input type="hidden" name="engineModsOther" value={engineModsOther.trim()} />
-      <input type="hidden" name="additionalDetails" value={additionalDetails.trim()} />
       <input type="hidden" name="selectedTuneLabel" value={selectedTuneLabel} />
       <input type="hidden" name="estimatedTotal" value={estimatedTotal || ""} />
       <input type="hidden" name="vehicleBrand" value={selectedBrand} />
@@ -1343,7 +1221,8 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
                 ECU tuning setup
               </h2>
               <p className="mt-3 text-white/65">
-                Select your current ECU stage so we can recommend the suitable TCU tune.
+                Select your current ECU stage first. Then choose your turbo
+                setup so we can recommend the suitable TCU tune.
               </p>
             </div>
 
@@ -1360,55 +1239,25 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
               ))}
             </div>
 
-            {shouldShowTcuTurboSetup ? (
-              <div className="mt-6 grid gap-6 md:grid-cols-2">
-                <div>
-                  <label className="label-rk">Turbo Setup</label>
-                  <div className="relative mt-2">
-                    <select
-                      className="input-rk appearance-none pr-12"
-                      value={turboType}
-                      onChange={(e) => setTurboType(e.target.value as TurboSetupOption)}
-                      required
-                    >
-                      <option value="">Select turbo setup</option>
-                      {turboSetupOptions.map((item) => (
-                        <option key={item.id} value={item.id}>
-                          {item.name}
-                        </option>
-                      ))}
-                    </select>
-                    <SelectArrow />
-                  </div>
-                </div>
-
-                {shouldRequireTurboSpec ? (
-                  <div>
-                    <label className="label-rk">Turbo Spec</label>
-                    <input
-                      className="input-rk"
-                      value={turboSpec}
-                      onChange={(e) => setTurboSpec(e.target.value)}
-                      placeholder="e.g. G30-660"
-                      required
-                    />
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
-
-            {shouldShowTcuTurboSetup && turboType === "other" ? (
-              <div className="mt-6">
-                <label className="label-rk">Other Turbo Setup</label>
-                <input
-                  className="input-rk"
-                  value={turboOther}
-                  onChange={(e) => setTurboOther(e.target.value)}
-                  placeholder="Specify turbo setup"
+            <div className="mt-6 max-w-md">
+              <label className="label-rk">Turbo Setup</label>
+              <div className="relative mt-2">
+                <select
+                  className="input-rk appearance-none pr-12"
+                  value={turboType}
+                  onChange={(e) => setTurboType(e.target.value as TurboSetupOption)}
                   required
-                />
+                >
+                  <option value="">Select turbo setup</option>
+                  {turboSetupOptions.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name}
+                    </option>
+                  ))}
+                </select>
+                <SelectArrow />
               </div>
-            ) : null}
+            </div>
           </>
         ) : null}
 
@@ -1439,196 +1288,40 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
               })}
             </div>
 
-            {shouldShowDynamicEcuMods ? (
-              <div className="mt-8 space-y-8">
-                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
-                  <div className="mb-5">
-                    <h3 className="text-lg font-semibold text-white">Hardware Mods</h3>
+            {shouldShowTurboSetupInEcuSection ? (
+              <div className="mt-6 grid gap-6 md:grid-cols-2">
+                <div>
+                  <label className="label-rk">Turbo Setup</label>
+                  <div className="relative mt-2">
+                    <select
+                      className="input-rk appearance-none pr-12"
+                      value={turboType}
+                      onChange={(e) => setTurboType(e.target.value as TurboSetupOption)}
+                      required
+                    >
+                      <option value="">Select turbo setup</option>
+                      {turboSetupOptions.map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.name}
+                        </option>
+                      ))}
+                    </select>
+                    <SelectArrow />
                   </div>
-
-                  <div className="grid gap-3 md:grid-cols-2">
-                    {basicHardwareModOptions.map((option) => {
-                      const checked = hardwareMods.includes(option);
-
-                      return (
-                        <label
-                          key={option}
-                          className={`flex items-center justify-between rounded-2xl border px-4 py-3 transition ${
-                            checked
-                              ? "border-sky-500/35 bg-sky-500/10"
-                              : "border-white/10 bg-black/20 hover:border-white/20 hover:bg-white/[0.05]"
-                          }`}
-                        >
-                          <div className="flex items-center gap-3">
-                            <input
-                              type="checkbox"
-                              checked={checked}
-                              onChange={() => toggleSelection(option, setHardwareMods)}
-                              className="h-4 w-4 accent-sky-500"
-                            />
-                            <span className="text-sm text-white">{option}</span>
-                          </div>
-                        </label>
-                      );
-                    })}
-                  </div>
-
-                  <div className="mt-6 grid gap-6 md:grid-cols-2">
-                    <div>
-                      <label className="label-rk">Turbo Setup</label>
-                      <div className="relative mt-2">
-                        <select
-                          className="input-rk appearance-none pr-12"
-                          value={turboType}
-                          onChange={(e) => setTurboType(e.target.value as TurboSetupOption)}
-                          required
-                        >
-                          <option value="">Select turbo setup</option>
-                          {turboSetupOptions.map((item) => (
-                            <option key={item.id} value={item.id}>
-                              {item.name}
-                            </option>
-                          ))}
-                        </select>
-                        <SelectArrow />
-                      </div>
-                    </div>
-
-                    {shouldRequireTurboSpec ? (
-                      <div>
-                        <label className="label-rk">Turbo Spec</label>
-                        <input
-                          className="input-rk"
-                          value={turboSpec}
-                          onChange={(e) => setTurboSpec(e.target.value)}
-                          placeholder="e.g. G30-660"
-                          required
-                        />
-                      </div>
-                    ) : null}
-                  </div>
-
-                  {turboType === "other" ? (
-                    <div className="mt-6">
-                      <label className="label-rk">Other Turbo Setup</label>
-                      <input
-                        className="input-rk"
-                        value={turboOther}
-                        onChange={(e) => setTurboOther(e.target.value)}
-                        placeholder="Specify turbo setup"
-                        required
-                      />
-                    </div>
-                  ) : null}
-
-                  {shouldShowFullHardwareMods ? (
-                    <div className="mt-8">
-                      <div className="mb-4">
-                        <h4 className="text-base font-semibold text-white">Fuel System</h4>
-                      </div>
-
-                      <div className="grid gap-3 md:grid-cols-3">
-                        {fuelSystemOptions.map((option) => {
-                          const checked = fuelSystemMods.includes(option);
-
-                          return (
-                            <label
-                              key={option}
-                              className={`flex items-center gap-3 rounded-2xl border px-4 py-3 transition ${
-                                checked
-                                  ? "border-amber-500/35 bg-amber-500/10"
-                                  : "border-white/10 bg-black/20 hover:border-white/20 hover:bg-white/[0.05]"
-                              }`}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={checked}
-                                onChange={() => toggleSelection(option, setFuelSystemMods)}
-                                className="h-4 w-4 accent-amber-500"
-                              />
-                              <span className="text-sm text-white">{option}</span>
-                            </label>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ) : null}
                 </div>
 
-                {shouldShowEngineMods ? (
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
-                    <div className="mb-5">
-                      <h3 className="text-lg font-semibold text-white">Engine Mods</h3>
-                    </div>
-
-                    <div className="grid gap-3 md:grid-cols-2">
-                      {engineModOptions.map((option) => {
-                        const checked = engineMods.includes(option);
-
-                        return (
-                          <label
-                            key={option}
-                            className={`flex items-center gap-3 rounded-2xl border px-4 py-3 transition ${
-                              checked
-                                ? "border-[#ff3b57]/35 bg-[#ff3b57]/10"
-                                : "border-white/10 bg-black/20 hover:border-white/20 hover:bg-white/[0.05]"
-                            }`}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={checked}
-                              onChange={() => toggleSelection(option, setEngineMods)}
-                              className="h-4 w-4 accent-[#ff3b57]"
-                            />
-                            <span className="text-sm text-white">{option}</span>
-                          </label>
-                        );
-                      })}
-
-                      <label
-                        className={`flex items-center gap-3 rounded-2xl border px-4 py-3 transition ${
-                          engineMods.includes("Others")
-                            ? "border-[#ff3b57]/35 bg-[#ff3b57]/10"
-                            : "border-white/10 bg-black/20 hover:border-white/20 hover:bg-white/[0.05]"
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={engineMods.includes("Others")}
-                          onChange={() => toggleSelection("Others", setEngineMods)}
-                          className="h-4 w-4 accent-[#ff3b57]"
-                        />
-                        <span className="text-sm text-white">Others</span>
-                      </label>
-                    </div>
-
-                    {engineMods.includes("Others") ? (
-                      <div className="mt-6">
-                        <label className="label-rk">Other Engine Mods</label>
-                        <textarea
-                          className="textarea-rk"
-                          value={engineModsOther}
-                          onChange={(e) => setEngineModsOther(e.target.value)}
-                          placeholder="Describe other engine modifications"
-                          required
-                        />
-                      </div>
-                    ) : null}
+                {shouldRequireTurboSpec ? (
+                  <div>
+                    <label className="label-rk">Turbo Spec</label>
+                    <input
+                      className="input-rk"
+                      value={turboSpec}
+                      onChange={(e) => setTurboSpec(e.target.value)}
+                      placeholder="e.g. G30-660 / GTX2867R / OEM hybrid"
+                      required
+                    />
                   </div>
                 ) : null}
-
-                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
-                  <div className="mb-5">
-                    <h3 className="text-lg font-semibold text-white">Additional Details</h3>
-                  </div>
-
-                  <textarea
-                    className="textarea-rk"
-                    value={additionalDetails}
-                    onChange={(e) => setAdditionalDetails(e.target.value)}
-                    placeholder="Describe your current setup (mods, turbo, fuel system, etc.)"
-                  />
-                </div>
               </div>
             ) : null}
 
@@ -2049,12 +1742,20 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
             {shouldShowEcuSection && shouldShowTcuSection ? "s" : ""}
           </h2>
           <p className="mt-3 text-white/65">
-            Upload your original file for tuning.
+            Please upload your original stock file for review.
           </p>
         </div>
 
         <div className="mt-6 text-sm text-white/60">
-          <p>Supported formats: .bin, .ori, .hex, .frf, .sgo (max 10MB)</p>
+          <p>Allowed formats: .bin, .ori, .hex, .frf, .sgo</p>
+          <p>Max recommended size: 10MB</p>
+          <p>
+            If you are unsure which file to upload, contact us before
+            submitting.
+          </p>
+          <p className="mt-1 text-white/50">
+            Your file will be handled securely and kept confidential.
+          </p>
         </div>
 
         <div className="mt-6 grid gap-6 md:grid-cols-2">
@@ -2212,7 +1913,10 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
                   </p>
                   <p>
                     <span className="text-white/45">Turbo Setup:</span>{" "}
-                    {finalTurboDisplay || "-"}
+                    {turboType === "other"
+                      ? turboOther || "-"
+                      : turboSetupOptions.find((item) => item.id === turboType)
+                          ?.name || "-"}
                   </p>
                 </>
               ) : null}
@@ -2226,37 +1930,10 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
                   {shouldShowTurboSetupInEcuSection ? (
                     <p>
                       <span className="text-white/45">Turbo Setup:</span>{" "}
-                      {finalTurboDisplay || "-"}
-                    </p>
-                  ) : null}
-                  <p>
-                    <span className="text-white/45">Hardware Mods:</span>{" "}
-                    {finalHardwareMods || "None"}
-                  </p>
-                  {shouldShowFullHardwareMods ? (
-                    <p>
-                      <span className="text-white/45">Fuel System:</span>{" "}
-                      {finalFuelSystemMods || "None"}
-                    </p>
-                  ) : null}
-                  {shouldShowEngineMods ? (
-                    <>
-                      <p>
-                        <span className="text-white/45">Engine Mods:</span>{" "}
-                        {finalEngineMods || "None"}
-                      </p>
-                      {engineMods.includes("Others") ? (
-                        <p>
-                          <span className="text-white/45">Other Engine Mods:</span>{" "}
-                          {engineModsOther || "-"}
-                        </p>
-                      ) : null}
-                    </>
-                  ) : null}
-                  {additionalDetails.trim() ? (
-                    <p>
-                      <span className="text-white/45">Additional Details:</span>{" "}
-                      {additionalDetails.trim()}
+                      {turboType === "other"
+                        ? turboOther || "-"
+                        : turboSetupOptions.find((item) => item.id === turboType)
+                            ?.name || "-"}
                     </p>
                   ) : null}
                   <p>
