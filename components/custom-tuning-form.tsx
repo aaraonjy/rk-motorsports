@@ -1500,6 +1500,39 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
                     })}
                   </div>
 
+                  {shouldShowFullHardwareMods ? (
+                    <div className="mt-8">
+                      <div className="mb-4">
+                        <h4 className="text-base font-semibold text-white">Fuel System</h4>
+                      </div>
+
+                      <div className="grid gap-3 md:grid-cols-3">
+                        {fuelSystemOptions.map((option) => {
+                          const checked = fuelSystemMods.includes(option);
+
+                          return (
+                            <label
+                              key={option}
+                              className={`flex items-center gap-3 rounded-2xl border px-4 py-3 transition ${
+                                checked
+                                  ? "border-amber-500/35 bg-amber-500/10"
+                                  : "border-white/10 bg-black/20 hover:border-white/20 hover:bg-white/[0.05]"
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() => toggleSelection(option, setFuelSystemMods)}
+                                className="h-4 w-4 accent-amber-500"
+                              />
+                              <span className="text-sm text-white">{option}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : null}									
+
                   {(shouldShowTurboSetupInEcuSection || shouldShowWmiInEcuSection) ? (
                     <div className="mt-6 grid gap-6 md:grid-cols-2">
                       {shouldShowTurboSetupInEcuSection ? (
@@ -1575,39 +1608,6 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
                     </div>
                   ) : null}
 
-
-                  {shouldShowFullHardwareMods ? (
-                    <div className="mt-8">
-                      <div className="mb-4">
-                        <h4 className="text-base font-semibold text-white">Fuel System</h4>
-                      </div>
-
-                      <div className="grid gap-3 md:grid-cols-3">
-                        {fuelSystemOptions.map((option) => {
-                          const checked = fuelSystemMods.includes(option);
-
-                          return (
-                            <label
-                              key={option}
-                              className={`flex items-center gap-3 rounded-2xl border px-4 py-3 transition ${
-                                checked
-                                  ? "border-amber-500/35 bg-amber-500/10"
-                                  : "border-white/10 bg-black/20 hover:border-white/20 hover:bg-white/[0.05]"
-                              }`}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={checked}
-                                onChange={() => toggleSelection(option, setFuelSystemMods)}
-                                className="h-4 w-4 accent-amber-500"
-                              />
-                              <span className="text-sm text-white">{option}</span>
-                            </label>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ) : null}
                 </div>
 
                 {shouldShowEngineMods ? (
