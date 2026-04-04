@@ -50,8 +50,7 @@ export function PaginationControls({
   basePath,
   params,
 }: PaginationControlsProps) {
-  if (totalPages <= 1) return null;
-
+  const showControls = totalPages > 1;
   const visiblePages = getVisiblePages(currentPage, totalPages);
 
   return (
@@ -61,52 +60,58 @@ export function PaginationControls({
         <span className="font-medium text-white">{totalPages}</span>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <Link
-          href={buildHref(basePath, Math.max(1, currentPage - 1), params)}
-          aria-disabled={currentPage === 1}
-          className={`rounded-xl border px-4 py-2 text-sm transition ${
-            currentPage === 1
-              ? "pointer-events-none border-white/10 text-white/25"
-              : "border-white/15 text-white/80 hover:bg-white/10"
-          }`}
-        >
-          Previous
-        </Link>
+      {showControls ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href={buildHref(basePath, Math.max(1, currentPage - 1), params)}
+            aria-disabled={currentPage === 1}
+            className={`rounded-xl border px-4 py-2 text-sm transition ${
+              currentPage === 1
+                ? "pointer-events-none border-white/10 text-white/25"
+                : "border-white/15 text-white/80 hover:bg-white/10"
+            }`}
+          >
+            Previous
+          </Link>
 
-        {visiblePages.map((page, index) => {
-          const prev = visiblePages[index - 1];
-          const showGap = prev && page - prev > 1;
+          {visiblePages.map((page, index) => {
+            const prev = visiblePages[index - 1];
+            const showGap = prev && page - prev > 1;
 
-          return (
-            <div key={page} className="flex items-center gap-2">
-              {showGap ? <span className="px-1 text-white/35">...</span> : null}
-              <Link
-                href={buildHref(basePath, page, params)}
-                className={`min-w-[42px] rounded-xl border px-3 py-2 text-center text-sm transition ${
-                  currentPage == page
-                    ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
-                    : "border-white/15 text-white/80 hover:bg-white/10"
-                }`}
-              >
-                {page}
-              </Link>
-            </div>
-          );
-        })}
+            return (
+              <div key={page} className="flex items-center gap-2">
+                {showGap ? <span className="px-1 text-white/35">...</span> : null}
+                <Link
+                  href={buildHref(basePath, page, params)}
+                  className={`min-w-[42px] rounded-xl border px-3 py-2 text-center text-sm transition ${
+                    currentPage === page
+                      ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
+                      : "border-white/15 text-white/80 hover:bg-white/10"
+                  }`}
+                >
+                  {page}
+                </Link>
+              </div>
+            );
+          })}
 
-        <Link
-          href={buildHref(basePath, Math.min(totalPages, currentPage + 1), params)}
-          aria-disabled={currentPage === totalPages}
-          className={`rounded-xl border px-4 py-2 text-sm transition ${
-            currentPage === totalPages
-              ? "pointer-events-none border-white/10 text-white/25"
-              : "border-white/15 text-white/80 hover:bg-white/10"
-          }`}
-        >
-          Next
-        </Link>
-      </div>
+          <Link
+            href={buildHref(
+              basePath,
+              Math.min(totalPages, currentPage + 1),
+              params
+            )}
+            aria-disabled={currentPage === totalPages}
+            className={`rounded-xl border px-4 py-2 text-sm transition ${
+              currentPage === totalPages
+                ? "pointer-events-none border-white/10 text-white/25"
+                : "border-white/15 text-white/80 hover:bg-white/10"
+            }`}
+          >
+            Next
+          </Link>
+        </div>
+      ) : null}
     </div>
   );
 }
