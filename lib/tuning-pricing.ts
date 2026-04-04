@@ -129,7 +129,7 @@ export const ecuTunes: TuneOption[] = [
       "Ideal for non-standard hardware combinations",
       "Recommended for advanced tuning goals",
     ],
-    suitableFor: ["Fully Built Setup", "Built engine", "Special requests"],
+    suitableFor: ["Fully Built", "Built engine", "Special requests"],
   },
 ];
 
@@ -154,7 +154,7 @@ export const tcuTunes: TuneOption[] = [
       "Raised clutch pressure and improved load handling",
       "Optimized shift points for stronger performance response",
     ],
-    suitableFor: ["Stage 2+ / High Torque", "Performance builds"],
+    suitableFor: ["Stage 2 / Stage 2+", "Performance builds"],
   },
   {
     id: "custom",
@@ -165,7 +165,7 @@ export const tcuTunes: TuneOption[] = [
       "Torque limit, clutch pressure, and shift behavior tailored to the build",
       "Suitable for special gearbox behavior, track, or drag applications",
     ],
-    suitableFor: ["Custom Transmission Setup", "Track / drag setups", "Special requests"],
+    suitableFor: ["Custom Transmission", "Track / drag setups", "Special requests"],
   },
 ];
 
