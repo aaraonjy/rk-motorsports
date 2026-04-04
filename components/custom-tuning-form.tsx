@@ -370,7 +370,7 @@ function getTurboDisplayLabel(
 ) {
   const baseLabel =
     turboType === "other"
-      ? turboOther.trim()
+      ? turboOther.trim() || turboSpec.trim()
       : turboSetupOptions.find((item) => item.id === turboType)?.name || "";
 
   if (!baseLabel) return "";
@@ -760,10 +760,10 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
 
   const finalTurboSetup = useMemo(() => {
     if (turboType === "other") {
-      return shouldShowTcuPreSetup ? turboOther.trim() : turboSpec.trim();
+      return turboSpec.trim();
     }
     return turboType;
-  }, [turboType, turboOther, turboSpec, shouldShowTcuPreSetup]);
+  }, [turboType, turboSpec]);
 
   const finalHardwareMods = useMemo(
     () => formatLabelList(hardwareMods),
@@ -1070,7 +1070,6 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
       (!currentEcuSetupStage ||
         (shouldShowTcuTurboSetup &&
           (!turboType ||
-            (turboType === "other" && !turboOther.trim()) ||
             (shouldRequireTurboSpec && !turboSpec.trim()))))) ||
     (shouldShowTcuSection &&
       (!tcuStage ||
@@ -1412,18 +1411,6 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
               </div>
             ) : null}
 
-            {shouldShowTcuTurboSetup && turboType === "other" ? (
-              <div className="mt-6">
-                <label className="label-rk">Other Turbo Setup</label>
-                <input
-                  className="input-rk"
-                  value={turboOther}
-                  onChange={(e) => setTurboOther(e.target.value)}
-                  placeholder="Specify turbo setup"
-                  required
-                />
-              </div>
-            ) : null}
           </>
         ) : null}
 
@@ -1488,7 +1475,8 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
                     })}
                   </div>
 
-                  <div className="mt-6 grid gap-6 md:grid-cols-2">
+                  {shouldShowTurboSetupInEcuSection ? (
+                    <div className="mt-6 grid gap-6 md:grid-cols-2">
                     <div>
                       <label className="label-rk">Turbo Setup</label>
                       <div className="relative mt-2">
@@ -1521,8 +1509,8 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
                         />
                       </div>
                     ) : null}
-                  </div>
-
+                    </div>
+                  ) : null}
 
                   {shouldShowFullHardwareMods ? (
                     <div className="mt-8">
