@@ -63,6 +63,16 @@ export async function POST(req: Request) {
     const tcuType = String(form.get("tcuType") || "").trim();
     const tcuReadTool = String(form.get("tcuReadTool") || "").trim();
     const tcuVersion = String(form.get("tcuVersion") || "").trim();
+    const currentEcuSetupStage = String(
+      form.get("currentEcuSetupStage") || ""
+    ).trim();
+    const turboType = String(form.get("turboType") || "").trim();
+    const turboSpec = String(form.get("turboSpec") || "").trim();
+    const hardwareMods = String(form.get("hardwareMods") || "").trim();
+    const fuelSystemMods = String(form.get("fuelSystemMods") || "").trim();
+    const engineMods = String(form.get("engineMods") || "").trim();
+    const engineModsOther = String(form.get("engineModsOther") || "").trim();
+    const additionalDetails = String(form.get("additionalDetails") || "").trim();
 
     const remarks = String(form.get("remarks") || "").trim();
     const estimatedTotalRaw = Number(form.get("estimatedTotal") || 0);
@@ -152,7 +162,15 @@ export async function POST(req: Request) {
       `Tuning Type: ${tuningType}`,
       `Selected Package: ${selectedTuneLabel || "Not specified"}`,
       `ECU Stage: ${ecuStage || "Not selected"}`,
+      `Current ECU Setup: ${currentEcuSetupStage || "Not selected"}`,
       `TCU Stage: ${tcuStage || "Not selected"}`,
+      `Turbo Setup: ${turboType || "Not selected"}`,
+      `Turbo Spec: ${turboSpec || "Not specified"}`,
+      `Hardware Mods: ${hardwareMods || "None"}`,
+      `Fuel System: ${fuelSystemMods || "None"}`,
+      `Engine Mods: ${engineMods || "None"}`,
+      `Other Engine Mods: ${engineModsOther || "None"}`,
+      `Additional Details: ${additionalDetails || "None"}`,
       `Add-ons: ${selectedAddOns.length > 0 ? selectedAddOns.join(", ") : "None"}`,
       `ECU Read Tool: ${ecuReadTool || "Not selected"}`,
       `TCU Read Tool: ${tcuReadTool || "Not selected"}`,
@@ -217,6 +235,14 @@ export async function POST(req: Request) {
         ecuReadTool: ecuReadTool || null,
         fuelGrade: fuelGrade || null,
         waterMethanolInjection: waterMethanolInjection || null,
+        currentEcuSetupStage: currentEcuSetupStage || null,
+        turboType: turboType || null,
+        turboSpec: turboSpec || null,
+        hardwareMods: hardwareMods || null,
+        fuelSystemMods: fuelSystemMods || null,
+        engineMods: engineMods || null,
+        engineModsOther: engineModsOther || null,
+        additionalDetails: additionalDetails || null,
         tcuType: tcuType || null,
         tcuReadTool: tcuReadTool || null,
         tcuVersion: tcuVersion || null,

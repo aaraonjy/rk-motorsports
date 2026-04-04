@@ -21,6 +21,14 @@ export type OrderWithRelations = Order & {
   items: (OrderItem & { product: Product })[];
   engineModel?: string | null;
   engineCapacity?: string | number | null;
+  currentEcuSetupStage?: string | null;
+  turboType?: string | null;
+  turboSpec?: string | null;
+  hardwareMods?: string | null;
+  fuelSystemMods?: string | null;
+  engineMods?: string | null;
+  engineModsOther?: string | null;
+  additionalDetails?: string | null;
   cancelledBy?: "CUSTOMER" | "ADMIN" | null;
   cancelReason?: string | null;
 };
@@ -90,6 +98,15 @@ function getRevisionTargetLabel(value?: string | null) {
   return (value || "ECU").toUpperCase() === "TCU" ? "TCU" : "ECU";
 }
 
+function formatStoredList(value?: string | null) {
+  if (!value) return "";
+  return value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .join(", ");
+}
+
 function VehicleDetails({ order }: { order: OrderWithRelations }) {
   return (
     <div className="space-y-1 text-sm leading-6">
@@ -131,6 +148,50 @@ function VehicleDetails({ order }: { order: OrderWithRelations }) {
             <span className="text-white/45">ECU Stage:</span>{" "}
             <span className="text-white/90">{order.ecuStage || "-"}</span>
           </div>
+          {order.currentEcuSetupStage ? (
+            <div>
+              <span className="text-white/45">Current ECU Setup:</span>{" "}
+              <span className="text-white/90">{order.currentEcuSetupStage}</span>
+            </div>
+          ) : null}
+          {order.turboType ? (
+            <div>
+              <span className="text-white/45">Turbo Setup:</span>{" "}
+              <span className="text-white/90">
+                {order.turboSpec ? `${order.turboType} (${order.turboSpec})` : order.turboType}
+              </span>
+            </div>
+          ) : null}
+          {order.hardwareMods ? (
+            <div>
+              <span className="text-white/45">Hardware Mods:</span>{" "}
+              <span className="text-white/90">{formatStoredList(order.hardwareMods)}</span>
+            </div>
+          ) : null}
+          {order.fuelSystemMods ? (
+            <div>
+              <span className="text-white/45">Fuel System:</span>{" "}
+              <span className="text-white/90">{formatStoredList(order.fuelSystemMods)}</span>
+            </div>
+          ) : null}
+          {order.engineMods ? (
+            <div>
+              <span className="text-white/45">Engine Mods:</span>{" "}
+              <span className="text-white/90">{formatStoredList(order.engineMods)}</span>
+            </div>
+          ) : null}
+          {order.engineModsOther ? (
+            <div>
+              <span className="text-white/45">Other Engine Mods:</span>{" "}
+              <span className="text-white/90">{order.engineModsOther}</span>
+            </div>
+          ) : null}
+          {order.additionalDetails ? (
+            <div>
+              <span className="text-white/45">Additional Details:</span>{" "}
+              <span className="text-white/90">{order.additionalDetails}</span>
+            </div>
+          ) : null}
           <div>
             <span className="text-white/45">ECU Type:</span>{" "}
             <span className="text-white/90">{order.ecuType || "-"}</span>

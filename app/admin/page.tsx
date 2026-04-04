@@ -1,315 +1,160 @@
-import { getSessionUser } from "@/lib/auth";
-import { getAllOrders } from "@/lib/queries";
-import { redirect } from "next/navigation";
-import { OrderTable, type OrderWithRelations } from "@/components/order-table";
-import { ClearSuccessParam } from "@/components/clear-success-param";
-import { PaginationControls } from "@/components/pagination-controls";
+"use client";
 
-type AdminPageProps = {
-  searchParams?: Promise<{
-    status?: string;
-    search?: string;
-    customerEmail?: string;
-    tuningType?: string;
-    dateFrom?: string;
-    dateTo?: string;
-    page?: string;
-    success?: string;
-  }>;
+import { useState } from "react";
+import { VehicleSelector } from "@/components/vehicle-selector";
+import carLibrary from "@/lib/car-library.json";
+
+type Engine = {
+  id: string;
+  name: string;
 };
 
-type BannerState =
-  | {
-      tone: "success" | "cancelled";
-      title: string;
-      message: string;
+type Model = {
+  id: string;
+  name: string;
+  engines: Engine[];
+};
+
+type Make = {
+  make: string;
+  models: Model[];
+};
+
+type VehicleSearchPayload = {
+  make: string;
+  model: string;
+  engine: string;
+};
+
+type ResultData = {
+  name: string;
+  stockHp: number;
+  stockTorque: number;
+  stage1Hp: number;
+  stage1Torque: number;
+  stage2Hp: number;
+  stage2Torque: number;
+};
+
+function parsePower(engineName: string) {
+  const hpMatch = engineName.match(/(\d+)\s*hp/i);
+  const torqueMatch = engineName.match(/(\d+)\s*Nm/i);
+
+  const hp = hpMatch ? Number(hpMatch[1]) : 0;
+  const torque = torqueMatch ? Number(torqueMatch[1]) : 0;
+
+  return { hp, torque };
+}
+
+export default function ShopPage() {
+  const [result, setResult] = useState<ResultData | null>(null);
+  const [hasSearched, setHasSearched] = useState(false);
+
+  const handleSearch = (data: VehicleSearchPayload) => {
+    setHasSearched(true);
+
+    const library = carLibrary as Make[];
+
+    const makeEntry = library.find((item) => item.make === data.make);
+    const modelEntry = makeEntry?.models.find((item) => item.name === data.model);
+    const engineEntry = modelEntry?.engines.find((item) => item.name === data.engine);
+
+    if (!makeEntry || !modelEntry || !engineEntry) {
+      setResult(null);
+      return;
     }
-  | null;
 
-function getAdminBanner(success?: string): BannerState {
-  switch (success) {
-    case "tuned_ecu_uploaded":
-      return {
-        tone: "success",
-        title: "Success",
-        message: "Tuned ECU file uploaded successfully.",
-      };
-    case "tuned_tcu_uploaded":
-      return {
-        tone: "success",
-        title: "Success",
-        message: "Tuned TCU file uploaded successfully.",
-      };
-    case "tuned_files_uploaded":
-      return {
-        tone: "success",
-        title: "Success",
-        message: "Tuned ECU and TCU files uploaded successfully.",
-      };
-    case "revision_ecu_uploaded":
-      return {
-        tone: "success",
-        title: "Success",
-        message: "ECU revision file uploaded successfully.",
-      };
-    case "revision_tcu_uploaded":
-      return {
-        tone: "success",
-        title: "Success",
-        message: "TCU revision file uploaded successfully.",
-      };
-    case "revision_files_uploaded":
-      return {
-        tone: "success",
-        title: "Success",
-        message: "ECU and TCU revision files uploaded successfully.",
-      };
-    case "order_released":
-      return {
-        tone: "success",
-        title: "Success",
-        message: "Download released successfully.",
-      };
-    case "admin_order_cancelled":
-      return {
-        tone: "cancelled",
-        title: "Cancelled",
-        message: "Order cancelled successfully.",
-      };
-    default:
-      return null;
-  }
-}
+    const { hp, torque } = parsePower(engineEntry.name);
 
-function Banner({ data }: { data: NonNullable<BannerState> }) {
-  const toneClass =
-    data.tone === "cancelled"
-      ? "border-red-500/30 bg-red-500/10 text-red-200"
-      : "border-emerald-500/30 bg-emerald-500/10 text-emerald-200";
-
-  const eyebrowClass =
-    data.tone === "cancelled"
-      ? "text-red-300/80"
-      : "text-emerald-300/80";
-
-  return (
-    <div className={`mt-6 rounded-2xl border p-4 ${toneClass}`}>
-      <div
-        className={`text-sm font-semibold uppercase tracking-[0.18em] ${eyebrowClass}`}
-      >
-        {data.title}
-      </div>
-      <p className="mt-2 text-sm leading-6">{data.message}</p>
-    </div>
-  );
-}
-
-export default async function AdminPage({ searchParams }: AdminPageProps) {
-  const user = await getSessionUser();
-  if (!user) redirect("/login");
-  if (user.role !== "ADMIN") redirect("/dashboard");
-
-  const params = (await searchParams) || {};
-  const status = params.status || "ALL";
-  const search = params.search || "";
-  const customerEmail = params.customerEmail || "";
-  const tuningType = params.tuningType || "ALL";
-  const dateFrom = params.dateFrom || "";
-  const dateTo = params.dateTo || "";
-  const page = Math.max(1, Number(params.page || "1") || 1);
-  const banner = getAdminBanner(params.success);
-
-  const result = (await getAllOrders({
-    status,
-    search,
-    customerEmail,
-    tuningType,
-    dateFrom,
-    dateTo,
-    page,
-    pageSize: 5,
-  })) as {
-    orders: OrderWithRelations[];
-    totalCount: number;
-    currentPage: number;
-    pageSize: number;
-    totalPages: number;
+    setResult({
+      name: `${makeEntry.make} ${modelEntry.name} ${engineEntry.name}`,
+      stockHp: hp,
+      stockTorque: torque,
+      stage1Hp: Math.round(hp * 1.1),
+      stage1Torque: Math.round(torque * 1.1),
+      stage2Hp: Math.round(hp * 1.3),
+      stage2Torque: Math.round(torque * 1.3),
+    });
   };
 
   return (
-    <section className="section-pad">
-      <ClearSuccessParam />
-      <div className="container-rk">
-        <h1 className="text-4xl font-bold">Admin Dashboard</h1>
-        <p className="mt-4 text-white/70">
-          Review ECU / TCU orders, uploaded files, and manage delivery workflow.
-        </p>
+    <section className="flex min-h-[calc(100vh-80px)] items-center pt-24">
+      <div className="container-rk flex w-full justify-center">
+        <div className="w-full max-w-6xl rounded-[2rem] border border-white/15 bg-black/55 p-8 shadow-[0_30px_120px_rgba(0,0,0,0.6)] backdrop-blur-md md:p-12">
+          <div className="mb-8">
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/45">
+              Compare tuning options
+            </p>
 
-        {banner ? <Banner data={banner} /> : null}
+            <h1 className="mt-3 text-3xl font-bold text-white md:text-5xl">
+              Compare file tuning options for your vehicle
+            </h1>
 
-        <div className="mt-8 space-y-4">
-          <div className="card-rk p-6 text-white/75">
-            <p>
-              Search by order number, customer email, status, tuning type, or date range to manage customer orders more efficiently.
+            <p className="mt-4 max-w-3xl text-base leading-7 text-white/70 md:text-lg">
+              Select your vehicle platform and ECU to browse available tuning
+              services, ready-made files, and custom file options.
             </p>
           </div>
 
-          <form method="get" className="card-rk grid gap-4 p-6 md:grid-cols-2 xl:grid-cols-3">
-            <div>
-              <label className="mb-2 block text-sm text-white/65">
-                Search Order Number
-              </label>
-              <input
-                type="text"
-                name="search"
-                defaultValue={search}
-                placeholder="e.g. RK-20260328-2017"
-                className="w-full rounded-xl border border-white/15 bg-black/50 px-4 py-3 text-white outline-none placeholder:text-white/35"
-              />
-            </div>
+          <VehicleSelector onSearch={handleSearch} />
 
-            <div>
-              <label className="mb-2 block text-sm text-white/65">
-                Customer Email
-              </label>
-              <input
-                type="text"
-                name="customerEmail"
-                defaultValue={customerEmail}
-                placeholder="e.g. customer@email.com"
-                className="w-full rounded-xl border border-white/15 bg-black/50 px-4 py-3 text-white outline-none placeholder:text-white/35"
-              />
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm text-white/65">
-                Filter Status
-              </label>
-              <div className="relative">
-                <select
-                  name="status"
-                  defaultValue={status}
-                  className="w-full appearance-none rounded-xl border border-white/15 bg-black/50 px-4 py-3 pr-12 text-white outline-none"
-                >
-                  <option value="ALL">All Statuses</option>
-                  <option value="FILE_RECEIVED">File Received</option>
-                  <option value="IN_PROGRESS">In Progress</option>
-                  <option value="AWAITING_PAYMENT">Awaiting Payment</option>
-                  <option value="PAID">Paid</option>
-                  <option value="READY_FOR_DOWNLOAD">Ready for Download</option>
-                  <option value="COMPLETED">Completed</option>
-                  <option value="CANCELLED">Cancelled</option>
-                </select>
-
-                <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/60">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                    className="h-5 w-5"
-                    aria-hidden="true"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.51a.75.75 0 0 1-1.08 0l-4.25-4.51a.75.75 0 0 1 .02-1.06Z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
+          <div id="find-a-file-result">
+            {result && (
+              <div className="mt-8 rounded-2xl border border-white/10 bg-[#151515] p-6 text-white md:p-8">
+                <div className="mb-6">
+                  <p className="text-xs font-semibold uppercase tracking-[0.28em] text-white/40">
+                    Performance Preview
+                  </p>
+                  <h3 className="mt-3 text-xl font-bold md:text-2xl">
+                    {result.name}
+                  </h3>
                 </div>
-              </div>
-            </div>
 
-            <div>
-              <label className="mb-2 block text-sm text-white/65">
-                Tuning Type
-              </label>
-              <div className="relative">
-                <select
-                  name="tuningType"
-                  defaultValue={tuningType}
-                  className="w-full appearance-none rounded-xl border border-white/15 bg-black/50 px-4 py-3 pr-12 text-white outline-none"
-                >
-                  <option value="ALL">All Tuning Types</option>
-                  <option value="ECU">ECU</option>
-                  <option value="TCU">TCU</option>
-                  <option value="ECU_TCU">ECU + TCU</option>
-                </select>
+                <div className="grid gap-4 text-center md:grid-cols-3">
+                  <div className="rounded-2xl border border-white/10 bg-black/35 p-5">
+                    <p className="text-sm text-white/55">Stock</p>
+                    <p className="mt-3 text-3xl font-semibold">
+                      {result.stockHp} HP
+                    </p>
+                    <p className="mt-2 text-base text-white/70">
+                      {result.stockTorque} Nm
+                    </p>
+                  </div>
 
-                <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/60">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                    className="h-5 w-5"
-                    aria-hidden="true"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.51a.75.75 0 0 1-1.08 0l-4.25-4.51a.75.75 0 0 1 .02-1.06Z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
+                  <div className="rounded-2xl border border-red-500/25 bg-red-500/10 p-5">
+                    <p className="text-sm text-red-200/80">Stage 1</p>
+                    <p className="mt-3 text-3xl font-semibold text-red-300">
+                      {result.stage1Hp} HP
+                    </p>
+                    <p className="mt-2 text-base text-red-200/85">
+                      {result.stage1Torque} Nm
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl border border-amber-500/25 bg-amber-500/10 p-5">
+                    <p className="text-sm text-amber-200/80">Stage 2</p>
+                    <p className="mt-3 text-3xl font-semibold text-amber-300">
+                      {result.stage2Hp} HP
+                    </p>
+                    <p className="mt-2 text-base text-amber-200/85">
+                      {result.stage2Torque} Nm
+                    </p>
+                  </div>
                 </div>
+
+                <p className="mt-6 text-sm leading-6 text-white/45">
+                  Estimated values only. Actual results depend on hardware,
+                  fuel quality, ECU type, and tuning conditions.
+                </p>
               </div>
-            </div>
+            )}
 
-            <div>
-              <label className="mb-2 block text-sm text-white/65">
-                Date From
-              </label>
-              <input
-                type="date"
-                name="dateFrom"
-                defaultValue={dateFrom}
-                className="w-full rounded-xl border border-white/15 bg-black/50 px-4 py-3 text-white outline-none"
-              />
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm text-white/65">
-                Date To
-              </label>
-              <input
-                type="date"
-                name="dateTo"
-                defaultValue={dateTo}
-                className="w-full rounded-xl border border-white/15 bg-black/50 px-4 py-3 text-white outline-none"
-              />
-            </div>
-
-            <div className="md:col-span-2 xl:col-span-3 flex flex-wrap items-end gap-3">
-              <input type="hidden" name="page" value="1" />
-              <button
-                type="submit"
-                className="rounded-xl border border-white/15 bg-black/30 px-4 py-3 hover:bg-white/10"
-              >
-                Apply
-              </button>
-              <a
-                href="/admin"
-                className="rounded-xl border border-white/15 bg-black/30 px-4 py-3 text-white/70 hover:bg-white/10"
-              >
-                Reset
-              </a>
-            </div>
-          </form>
-
-          <OrderTable orders={result.orders} admin />
-
-          <PaginationControls
-            currentPage={result.currentPage}
-            totalPages={result.totalPages}
-            basePath="/admin"
-            params={{
-              status: status !== "ALL" ? status : undefined,
-              search: search || undefined,
-              customerEmail: customerEmail || undefined,
-              tuningType: tuningType !== "ALL" ? tuningType : undefined,
-              dateFrom: dateFrom || undefined,
-              dateTo: dateTo || undefined,
-              success: params.success,
-            }}
-          />
+            {hasSearched && !result && (
+              <div className="mt-8 rounded-2xl border border-yellow-500/20 bg-yellow-500/10 p-6 text-sm text-yellow-100">
+                No matching file result found for the selected vehicle.
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </section>

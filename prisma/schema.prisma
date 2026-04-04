@@ -132,6 +132,14 @@ model Order {
   ecuReadTool            String?
   fuelGrade              String?
   waterMethanolInjection String?
+  currentEcuSetupStage   String?
+  turboType              String?
+  turboSpec              String?
+  hardwareMods           String?
+  fuelSystemMods         String?
+  engineMods             String?
+  engineModsOther        String?
+  additionalDetails      String?
   tcuType                String?
   tcuVersion             String?
   tcuReadTool            String?
