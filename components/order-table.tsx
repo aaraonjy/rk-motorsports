@@ -107,6 +107,14 @@ function formatStoredList(value?: string | null) {
     .join(", ");
 }
 
+function formatTurboLabel(value?: string | null) {
+  if (!value) return "";
+
+  return value
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
 function VehicleDetails({ order }: { order: OrderWithRelations }) {
   return (
     <div className="space-y-1 text-sm leading-6">
@@ -158,7 +166,9 @@ function VehicleDetails({ order }: { order: OrderWithRelations }) {
             <div>
               <span className="text-white/45">Turbo Setup:</span>{" "}
               <span className="text-white/90">
-                {order.turboSpec ? `${order.turboType} (${order.turboSpec})` : order.turboType}
+                {order.turboSpec
+									? `${formatTurboLabel(order.turboType)} (${order.turboSpec})`
+									: formatTurboLabel(order.turboType)}
               </span>
             </div>
           ) : null}
@@ -223,11 +233,13 @@ function VehicleDetails({ order }: { order: OrderWithRelations }) {
           </div>
         </>
       ) : null}
-
+		
+		{order.tuningType === "ECU" || order.tuningType === "ECU_TCU" || !order.tuningType ? (
       <div>
         <span className="text-white/45">Fuel Grade:</span>{" "}
         <span className="text-white/90">{order.fuelGrade || "-"}</span>
       </div>
+			) : null}
 
       {order.tuningType === "ECU" || order.tuningType === "ECU_TCU" || !order.tuningType ? (
         <div>
