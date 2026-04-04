@@ -706,7 +706,7 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
   const shouldShowTcuPreSetup = tuningType === "TCU";
   const shouldShowTurboSetupInEcuSection = shouldShowEcuSection;
   const selectedEcuSetupStage = (currentEcuSetupStage || ecuStage) as EcuSetupStage | "";
-  const shouldShowDynamicEcuMods = shouldShowEcuSection;
+  const shouldShowDynamicEcuMods = shouldShowEcuSection && !!selectedEcuSetupStage;
   const shouldShowFullHardwareMods =
     selectedEcuSetupStage === "stage2" ||
     selectedEcuSetupStage === "stage3" ||
@@ -1409,18 +1409,9 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
 
             {shouldShowDynamicEcuMods ? (
               <div className="mt-8 space-y-8">
-                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-                  <p className="text-sm text-white/55">
-                    Additional inputs will appear based on your selected stage.
-                  </p>
-                </div>
-
                 <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
                   <div className="mb-5">
                     <h3 className="text-lg font-semibold text-white">Hardware Mods</h3>
-                    <p className="mt-2 text-sm text-white/60">
-                      Basic hardware options always show. Fuel system options appear for Stage 2, Stage 3, and Custom.
-                    </p>
                   </div>
 
                   <div className="grid gap-3 md:grid-cols-2">
@@ -1502,9 +1493,6 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
                     <div className="mt-8">
                       <div className="mb-4">
                         <h4 className="text-base font-semibold text-white">Fuel System</h4>
-                        <p className="mt-2 text-sm text-white/60">
-                          Only shown for Stage 2, Stage 3, and Custom setups.
-                        </p>
                       </div>
 
                       <div className="grid gap-3 md:grid-cols-3">
@@ -1539,9 +1527,6 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
                   <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
                     <div className="mb-5">
                       <h3 className="text-lg font-semibold text-white">Engine Mods</h3>
-                      <p className="mt-2 text-sm text-white/60">
-                        Only shown for Stage 3 and Custom setups.
-                      </p>
                     </div>
 
                     <div className="grid gap-3 md:grid-cols-2">
@@ -1603,16 +1588,13 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
                 <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
                   <div className="mb-5">
                     <h3 className="text-lg font-semibold text-white">Additional Details</h3>
-                    <p className="mt-2 text-sm text-white/60">
-                      Example: FMIC + catless downpipe, 1000cc injectors, forged engine.
-                    </p>
                   </div>
 
                   <textarea
                     className="textarea-rk"
                     value={additionalDetails}
                     onChange={(e) => setAdditionalDetails(e.target.value)}
-                    placeholder="Add any extra hardware or setup notes here"
+                    placeholder="Describe your current setup (mods, turbo, fuel system, etc.)"
                   />
                 </div>
               </div>
