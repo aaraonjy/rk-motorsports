@@ -96,7 +96,7 @@ export const ecuTunes: TuneOption[] = [
       "Improved throttle response and drivability",
       "Safe daily-use calibration",
     ],
-    suitableFor: ["Stock turbo", "Basic bolt-ons"],
+    suitableFor: ["Stock Hardware", "Basic bolt-ons"],
   },
   {
     id: "stage2",
@@ -107,7 +107,7 @@ export const ecuTunes: TuneOption[] = [
       "Higher power and torque targets",
       "Sharper performance response",
     ],
-    suitableFor: ["Downpipe", "Intake", "Intercooler upgrades"],
+    suitableFor: ["Bolt-On Mods", "Intake", "Intercooler upgrades"],
   },
   {
     id: "stage3",
@@ -118,7 +118,7 @@ export const ecuTunes: TuneOption[] = [
       "Requires proper supporting mods",
       "Built for serious performance applications",
     ],
-    suitableFor: ["Big turbo", "High power builds"],
+    suitableFor: ["Upgraded Turbo", "High power builds"],
   },
   {
     id: "custom",
@@ -129,7 +129,7 @@ export const ecuTunes: TuneOption[] = [
       "Ideal for non-standard hardware combinations",
       "Recommended for advanced tuning goals",
     ],
-    suitableFor: ["Hybrid turbo", "Built engine", "Special requests"],
+    suitableFor: ["Fully Built Setup", "Built engine", "Special requests"],
   },
 ];
 
@@ -143,7 +143,7 @@ export const tcuTunes: TuneOption[] = [
       "Slight increase in torque limit for daily use",
       "Refined transmission behavior without over-aggression",
     ],
-    suitableFor: ["Stock turbo", "ECU Stage 1", "Daily driving"],
+    suitableFor: ["Stock / Stage 1 ECU", "Daily driving"],
   },
   {
     id: "stage2",
@@ -154,7 +154,7 @@ export const tcuTunes: TuneOption[] = [
       "Raised clutch pressure and improved load handling",
       "Optimized shift points for stronger performance response",
     ],
-    suitableFor: ["ECU Stage 2", "ECU Stage 3", "Performance builds"],
+    suitableFor: ["Stage 2+ / High Torque", "Performance builds"],
   },
   {
     id: "custom",
@@ -165,7 +165,7 @@ export const tcuTunes: TuneOption[] = [
       "Torque limit, clutch pressure, and shift behavior tailored to the build",
       "Suitable for special gearbox behavior, track, or drag applications",
     ],
-    suitableFor: ["Big turbo", "Track / drag setups", "Special requests"],
+    suitableFor: ["Custom Transmission Setup", "Track / drag setups", "Special requests"],
   },
 ];
 
