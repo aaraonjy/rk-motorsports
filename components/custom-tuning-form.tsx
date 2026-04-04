@@ -703,8 +703,11 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
     tuningType === "TCU" || tuningType === "ECU_TCU";
   const shouldShowFuelGrade = tuningType !== "TCU";
   const shouldShowTcuPreSetup = tuningType === "TCU";
-  const shouldShowTurboSetupInEcuSection = shouldShowEcuSection;
   const selectedEcuSetupStage = (currentEcuSetupStage || ecuStage) as EcuSetupStage | "";
+  const shouldShowTurboSetupInEcuSection =
+    shouldShowEcuSection &&
+    selectedEcuSetupStage !== "stage1" &&
+    selectedEcuSetupStage !== "stock";
   const shouldShowDynamicEcuMods = shouldShowEcuSection && !!selectedEcuSetupStage;
   const shouldShowFullHardwareMods =
     selectedEcuSetupStage === "stage2" ||
@@ -756,9 +759,11 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
   }, [shouldShowEcuSection, wmiOption, wmiOther]);
 
   const finalTurboSetup = useMemo(() => {
-    if (turboType === "other") return turboOther.trim();
+    if (turboType === "other") {
+      return shouldShowTcuPreSetup ? turboOther.trim() : turboSpec.trim();
+    }
     return turboType;
-  }, [turboType, turboOther]);
+  }, [turboType, turboOther, turboSpec, shouldShowTcuPreSetup]);
 
   const finalHardwareMods = useMemo(
     () => formatLabelList(hardwareMods),
@@ -945,6 +950,19 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
     }
   }, [ecuStage, turboType, tuningType]);
 
+  useEffect(() => {
+    if (
+      shouldShowEcuSection &&
+      (!selectedEcuSetupStage ||
+        selectedEcuSetupStage === "stock" ||
+        selectedEcuSetupStage === "stage1")
+    ) {
+      setTurboType("");
+      setTurboOther("");
+      setTurboSpec("");
+    }
+  }, [selectedEcuSetupStage, shouldShowEcuSection]);
+
   function toggleAddOn(option: string) {
     setSelectedAddOns((prev) =>
       prev.includes(option)
@@ -1041,7 +1059,7 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
         !finalEcuReadTool ||
         (shouldShowTurboSetupInEcuSection &&
           (!turboType ||
-            (turboType === "other" && !turboOther.trim()) ||
+            (turboType === "other" && !turboSpec.trim()) ||
             (shouldRequireTurboSpec && !turboSpec.trim()))) ||
         (ecuBrand === "Other" && !ecuOther.trim()) ||
         (ecuReadTool === "Other (Specify)" && !ecuReadToolOther.trim()) ||
@@ -1505,18 +1523,6 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
                     ) : null}
                   </div>
 
-                  {turboType === "other" ? (
-                    <div className="mt-6">
-                      <label className="label-rk">Other Turbo Setup</label>
-                      <input
-                        className="input-rk"
-                        value={turboOther}
-                        onChange={(e) => setTurboOther(e.target.value)}
-                        placeholder="Specify turbo setup"
-                        required
-                      />
-                    </div>
-                  ) : null}
 
                   {shouldShowFullHardwareMods ? (
                     <div className="mt-8">
