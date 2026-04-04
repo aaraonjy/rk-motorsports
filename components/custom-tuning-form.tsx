@@ -703,7 +703,7 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
     tuningType === "TCU" || tuningType === "ECU_TCU";
   const shouldShowFuelGrade = tuningType !== "TCU";
   const shouldShowTcuPreSetup = tuningType === "TCU";
-  const selectedEcuSetupStage = (currentEcuSetupStage || ecuStage) as EcuSetupStage | "";
+  const selectedEcuSetupStage = (shouldShowTcuPreSetup ? currentEcuSetupStage : ecuStage) as EcuSetupStage | "";
   const shouldShowTurboSetupInEcuSection =
     shouldShowEcuSection &&
     selectedEcuSetupStage !== "stage1" &&
@@ -1500,40 +1500,80 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
                     })}
                   </div>
 
-                  <div className="mt-6 grid gap-6 md:grid-cols-2">
-                    <div>
-                      <label className="label-rk">Turbo Setup</label>
-                      <div className="relative mt-2">
-                        <select
-                          className="input-rk appearance-none pr-12"
-                          value={turboType}
-                          onChange={(e) => setTurboType(e.target.value as TurboSetupOption)}
-                          required
-                        >
-                          <option value="">Select turbo setup</option>
-                          {turboSetupOptions.map((item) => (
-                            <option key={item.id} value={item.id}>
-                              {item.name}
-                            </option>
-                          ))}
-                        </select>
-                        <SelectArrow />
-                      </div>
-                    </div>
+                  {(shouldShowTurboSetupInEcuSection || shouldShowWmiInEcuSection) ? (
+                    <div className="mt-6 grid gap-6 md:grid-cols-2">
+                      {shouldShowTurboSetupInEcuSection ? (
+                        <div>
+                          <label className="label-rk">Turbo Setup</label>
+                          <div className="relative mt-2">
+                            <select
+                              className="input-rk appearance-none pr-12"
+                              value={turboType}
+                              onChange={(e) => setTurboType(e.target.value as TurboSetupOption)}
+                              required
+                            >
+                              <option value="">Select turbo setup</option>
+                              {turboSetupOptions.map((item) => (
+                                <option key={item.id} value={item.id}>
+                                  {item.name}
+                                </option>
+                              ))}
+                            </select>
+                            <SelectArrow />
+                          </div>
+                        </div>
+                      ) : <div />}
 
-                    {shouldRequireTurboSpec ? (
-                      <div>
-                        <label className="label-rk">Turbo Spec</label>
-                        <input
-                          className="input-rk"
-                          value={turboSpec}
-                          onChange={(e) => setTurboSpec(e.target.value)}
-                          placeholder="e.g. G30-660"
-                          required
-                        />
-                      </div>
-                    ) : null}
-                  </div>
+                      {shouldShowWmiInEcuSection ? (
+                        <div>
+                          <label className="label-rk">Water Methanol Injection (Optional)</label>
+                          <div className="relative mt-2">
+                            <select
+                              className={`input-rk appearance-none pr-12 ${
+                                !wmiOption ? "text-white/45" : "text-white"
+                              }`}
+                              value={wmiOption}
+                              onChange={(e) => setWmiOption(e.target.value)}
+                            >
+                              <option value="">Select WMI setup</option>
+                              {wmiOptions.map((option) => (
+                                <option key={option} value={option}>
+                                  {option}
+                                </option>
+                              ))}
+                            </select>
+                            <SelectArrow />
+                          </div>
+                        </div>
+                      ) : <div />}
+
+                      {shouldRequireTurboSpec ? (
+                        <div>
+                          <label className="label-rk">Turbo Spec</label>
+                          <input
+                            className="input-rk"
+                            value={turboSpec}
+                            onChange={(e) => setTurboSpec(e.target.value)}
+                            placeholder="e.g. G30-660"
+                            required
+                          />
+                        </div>
+                      ) : null}
+
+                      {shouldShowWmiInEcuSection && wmiOption === "Custom (Specify)" ? (
+                        <div>
+                          <label className="label-rk">Custom Water Methanol Injection</label>
+                          <input
+                            className="input-rk"
+                            value={wmiOther}
+                            onChange={(e) => setWmiOther(e.target.value)}
+                            placeholder="Specify WMI setup"
+                            required
+                          />
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
 
 
                   {shouldShowFullHardwareMods ? (
@@ -2193,89 +2233,12 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
                     {selectedEcuTune?.name || "-"}
                   </p>
                   {shouldShowTurboSetupInEcuSection ? (
-                    <div className="mt-6 space-y-6">
-                      <div className="grid gap-6 md:grid-cols-2">
-                        <div>
-                          <label className="label-rk">Turbo Setup</label>
-                          <div className="relative mt-2">
-                            <select
-                              className="input-rk appearance-none pr-12"
-                              value={turboType}
-                              onChange={(e) => setTurboType(e.target.value as TurboSetupOption)}
-                              required
-                            >
-                              <option value="">Select turbo setup</option>
-                              {turboSetupOptions.map((item) => (
-                                <option key={item.id} value={item.id}>
-                                  {item.name}
-                                </option>
-                              ))}
-                            </select>
-                            <SelectArrow />
-                          </div>
-                        </div>
-
-                        {shouldShowWmiInEcuSection ? (
-                          <div>
-                            <label className="label-rk">Water Methanol Injection (Optional)</label>
-                            <div className="relative mt-2">
-                              <select
-                                className={`input-rk appearance-none pr-12 ${
-                                  !wmiOption ? "text-white/45" : "text-white"
-                                }`}
-                                value={wmiOption}
-                                onChange={(e) => setWmiOption(e.target.value)}
-                              >
-                                <option value="">Select WMI setup</option>
-                                {wmiOptions.map((option) => (
-                                  <option key={option} value={option}>
-                                    {option}
-                                  </option>
-                                ))}
-                              </select>
-                              <SelectArrow />
-                            </div>
-                          </div>
-                        ) : (
-                          <div />
-                        )}
-                      </div>
-
-                      {shouldRequireTurboSpec || wmiOption === "Custom (Specify)" ? (
-                        <div className="grid gap-6 md:grid-cols-2">
-                          {shouldRequireTurboSpec ? (
-                            <div>
-                              <label className="label-rk">Turbo Spec</label>
-                              <input
-                                className="input-rk"
-                                value={turboSpec}
-                                onChange={(e) => setTurboSpec(e.target.value)}
-                                placeholder="e.g. G30-660"
-                                required
-                              />
-                            </div>
-                          ) : (
-                            <div />
-                          )}
-
-                          {wmiOption === "Custom (Specify)" ? (
-                            <div>
-                              <label className="label-rk">Custom Water Methanol Injection</label>
-                              <input
-                                className="input-rk"
-                                value={wmiOther}
-                                onChange={(e) => setWmiOther(e.target.value)}
-                                placeholder="Specify WMI setup"
-                                required
-                              />
-                            </div>
-                          ) : (
-                            <div />
-                          )}
-                        </div>
-                      ) : null}
-                    </div>
-                  ) : null}                  <p>
+                    <p>
+                      <span className="text-white/45">Turbo Setup:</span>{" "}
+                      {finalTurboDisplay || "-"}
+                    </p>
+                  ) : null}
+                  <p>
                     <span className="text-white/45">Hardware Mods:</span>{" "}
                     {finalHardwareMods || "None"}
                   </p>
