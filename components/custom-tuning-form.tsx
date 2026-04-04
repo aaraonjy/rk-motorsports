@@ -703,11 +703,8 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
     tuningType === "TCU" || tuningType === "ECU_TCU";
   const shouldShowFuelGrade = tuningType !== "TCU";
   const shouldShowTcuPreSetup = tuningType === "TCU";
+  const shouldShowTurboSetupInEcuSection = shouldShowEcuSection;
   const selectedEcuSetupStage = (currentEcuSetupStage || ecuStage) as EcuSetupStage | "";
-  const shouldShowTurboSetupInEcuSection =
-    shouldShowEcuSection &&
-    selectedEcuSetupStage !== "stage1" &&
-    selectedEcuSetupStage !== "stock";
   const shouldShowDynamicEcuMods = shouldShowEcuSection && !!selectedEcuSetupStage;
   const shouldShowFullHardwareMods =
     selectedEcuSetupStage === "stage2" ||
@@ -759,11 +756,9 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
   }, [shouldShowEcuSection, wmiOption, wmiOther]);
 
   const finalTurboSetup = useMemo(() => {
-    if (turboType === "other") {
-      return shouldShowTcuPreSetup ? turboOther.trim() : turboSpec.trim();
-    }
+    if (turboType === "other") return turboOther.trim();
     return turboType;
-  }, [turboType, turboOther, turboSpec, shouldShowTcuPreSetup]);
+  }, [turboType, turboOther]);
 
   const finalHardwareMods = useMemo(
     () => formatLabelList(hardwareMods),
@@ -950,19 +945,6 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
     }
   }, [ecuStage, turboType, tuningType]);
 
-  useEffect(() => {
-    if (
-      shouldShowEcuSection &&
-      (!selectedEcuSetupStage ||
-        selectedEcuSetupStage === "stock" ||
-        selectedEcuSetupStage === "stage1")
-    ) {
-      setTurboType("");
-      setTurboOther("");
-      setTurboSpec("");
-    }
-  }, [selectedEcuSetupStage, shouldShowEcuSection]);
-
   function toggleAddOn(option: string) {
     setSelectedAddOns((prev) =>
       prev.includes(option)
@@ -1059,7 +1041,7 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
         !finalEcuReadTool ||
         (shouldShowTurboSetupInEcuSection &&
           (!turboType ||
-            (turboType === "other" && !turboSpec.trim()) ||
+            (turboType === "other" && !turboOther.trim()) ||
             (shouldRequireTurboSpec && !turboSpec.trim()))) ||
         (ecuBrand === "Other" && !ecuOther.trim()) ||
         (ecuReadTool === "Other (Specify)" && !ecuReadToolOther.trim()) ||
@@ -1070,7 +1052,7 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
       (!currentEcuSetupStage ||
         (shouldShowTcuTurboSetup &&
           (!turboType ||
-            (turboType === "other" && !turboSpec.trim()) ||
+            (turboType === "other" && !turboOther.trim()) ||
             (shouldRequireTurboSpec && !turboSpec.trim()))))) ||
     (shouldShowTcuSection &&
       (!tcuStage ||
