@@ -722,7 +722,7 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
       selectedEcuSetupStage === "custom");
   const shouldRequireTurboSpec =
     turboType === "hybrid" || turboType === "big_turbo" || turboType === "other";
-  const shouldShowTcuTurboSetup =
+  const shouldShowTcuTurboSetup = false;
     currentEcuSetupStage === "stage2" ||
     currentEcuSetupStage === "stage3" ||
     currentEcuSetupStage === "custom";
