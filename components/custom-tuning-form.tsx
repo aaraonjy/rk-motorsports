@@ -471,6 +471,7 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
     useState<EcuSetupStage | "">("");
   const [turboType, setTurboType] = useState<TurboSetupOption | "">("");
   const [turboOther, setTurboOther] = useState("");
+  const [turboSpec, setTurboSpec] = useState("");
 
   const [ecuBrand, setEcuBrand] = useState("");
   const [ecuFamily, setEcuFamily] = useState("");
@@ -646,16 +647,24 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
     [selectedTcuFamilyData]
   );
 
-  const shouldShowEcuSection =
+	const shouldShowEcuSection =
     tuningType === "ECU" || tuningType === "ECU_TCU";
   const shouldShowTcuSection =
     tuningType === "TCU" || tuningType === "ECU_TCU";
   const shouldShowFuelGrade = tuningType !== "TCU";
   const shouldShowTcuPreSetup = tuningType === "TCU";
+  const selectedEcuSetupStage = (currentEcuSetupStage || ecuStage) as EcuSetupStage | "";
   const shouldShowTurboSetupInEcuSection =
     shouldShowEcuSection &&
     selectedEcuSetupStage !== "stage1" &&
     selectedEcuSetupStage !== "stock";
+
+  const shouldRequireTurboSpec =
+    turboType === "hybrid" || turboType === "big_turbo" || turboType === "other";
+  const shouldShowTcuTurboSetup =
+    currentEcuSetupStage === "stage2" ||
+    currentEcuSetupStage === "stage3" ||
+    currentEcuSetupStage === "custom";
 
   const finalEcuType = useMemo(() => {
     if (!shouldShowEcuSection) return "";
@@ -765,6 +774,9 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
 
   useEffect(() => {
     if (turboType !== "other") setTurboOther("");
+    if (turboType !== "hybrid" && turboType !== "big_turbo" && turboType !== "other") {
+      setTurboSpec("");
+    }
   }, [turboType]);
 
   useEffect(() => {
@@ -782,6 +794,7 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
       setCurrentEcuSetupStage("");
       setTurboType("");
       setTurboOther("");
+      setTurboSpec("");
     }
 
     if (tuningType === "TCU") {
@@ -823,6 +836,16 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
 
       if (recommended) {
         setTcuStage(recommended);
+      }
+
+      if (
+        currentEcuSetupStage === "stock" ||
+        currentEcuSetupStage === "stage1" ||
+        !currentEcuSetupStage
+      ) {
+        setTurboType("");
+        setTurboOther("");
+        setTurboSpec("");
       }
     }
   }, [currentEcuSetupStage, turboType, tuningType]);
@@ -933,13 +956,17 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
         !finalEcuType ||
         !finalEcuReadTool ||
         (shouldShowTurboSetupInEcuSection &&
-          (!turboType || (turboType === "other" && !turboOther.trim()))) ||
+          (!turboType ||
+            (turboType === "other" && !turboSpec.trim()) ||
+            (shouldRequireTurboSpec && !turboSpec.trim()))) ||
         (ecuBrand === "Other" && !ecuOther.trim()) ||
         (ecuReadTool === "Other (Specify)" && !ecuReadToolOther.trim()))) ||
     (shouldShowTcuPreSetup &&
       (!currentEcuSetupStage ||
-        !turboType ||
-        (turboType === "other" && !turboOther.trim()))) ||
+        (shouldShowTcuTurboSetup &&
+          (!turboType ||
+            (turboType === "other" && !turboOther.trim()) ||
+            (shouldRequireTurboSpec && !turboSpec.trim()))))) ||
     (shouldShowTcuSection &&
       (!tcuStage ||
         !finalTcuType ||
@@ -969,6 +996,7 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
         value={currentEcuSetupStage}
       />
       <input type="hidden" name="turboType" value={finalTurboSetup} />
+      <input type="hidden" name="turboSpec" value={turboSpec.trim()} />
       <input type="hidden" name="selectedTuneLabel" value={selectedTuneLabel} />
       <input type="hidden" name="estimatedTotal" value={estimatedTotal || ""} />
       <input type="hidden" name="vehicleBrand" value={selectedBrand} />
@@ -1221,8 +1249,7 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
                 ECU tuning setup
               </h2>
               <p className="mt-3 text-white/65">
-                Select your current ECU stage first. Then choose your turbo
-                setup so we can recommend the suitable TCU tune.
+                Select your current ECU stage so we can recommend the suitable TCU tune.
               </p>
             </div>
 
@@ -1239,25 +1266,42 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
               ))}
             </div>
 
-            <div className="mt-6 max-w-md">
-              <label className="label-rk">Turbo Setup</label>
-              <div className="relative mt-2">
-                <select
-                  className="input-rk appearance-none pr-12"
-                  value={turboType}
-                  onChange={(e) => setTurboType(e.target.value as TurboSetupOption)}
-                  required
-                >
-                  <option value="">Select turbo setup</option>
-                  {turboSetupOptions.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.name}
-                    </option>
-                  ))}
-                </select>
-                <SelectArrow />
+            {shouldShowTcuTurboSetup ? (
+              <div className="mt-6 grid gap-6 md:grid-cols-2">
+                <div>
+                  <label className="label-rk">Turbo Setup</label>
+                  <div className="relative mt-2">
+                    <select
+                      className="input-rk appearance-none pr-12"
+                      value={turboType}
+                      onChange={(e) => setTurboType(e.target.value as TurboSetupOption)}
+                      required
+                    >
+                      <option value="">Select turbo setup</option>
+                      {turboSetupOptions.map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.name}
+                        </option>
+                      ))}
+                    </select>
+                    <SelectArrow />
+                  </div>
+                </div>
+
+                {shouldRequireTurboSpec ? (
+                  <div>
+                    <label className="label-rk">Turbo Spec</label>
+                    <input
+                      className="input-rk"
+                      value={turboSpec}
+                      onChange={(e) => setTurboSpec(e.target.value)}
+                      placeholder="e.g. G30-660"
+                      required
+                    />
+                  </div>
+                ) : null}
               </div>
-            </div>
+            ) : null}
           </>
         ) : null}
 
