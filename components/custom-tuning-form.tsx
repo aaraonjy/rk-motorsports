@@ -1601,7 +1601,7 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
 
                       {hasWmi ? (
                         <div className="mt-6">
-                          <label className="label-rk">Water Methanol Injection Setup</label>
+                          <label className="label-rk">Water Methanol Injection</label>
                           <div className="relative mt-2">
                             <select
                               className={`input-rk appearance-none pr-12 ${
