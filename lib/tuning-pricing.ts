@@ -165,7 +165,7 @@ export const tcuTunes: TuneOption[] = [
       "Torque limit, clutch pressure, and shift behavior tailored to the build",
       "Suitable for special gearbox behavior, track, or drag applications",
     ],
-    suitableFor: ["Custom Transmission", "Track / drag setups", "Special requests"],
+    suitableFor: ["Custom Tune", "Track / drag setups", "Special requests"],
   },
 ];
 
