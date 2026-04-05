@@ -14,18 +14,29 @@ export const ALLOWED_UPLOAD_EXTENSIONS = [
   ".mod",
 ] as const;
 
+export const ALLOWED_PAYMENT_UPLOAD_EXTENSIONS = [
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".webp",
+  ".pdf",
+] as const;
+
 export function formatFileSizeLimitMessage(limitBytes: number) {
   const mb = Math.round(limitBytes / (1024 * 1024));
   return `File size limit exceeded. Maximum allowed size is ${mb}MB.`;
 }
 
-function hasAllowedFileExtension(fileName: string) {
+function hasAllowedFileExtension(
+  fileName: string,
+  allowedExtensions: readonly string[]
+) {
   const lowerName = fileName.toLowerCase().trim();
-  return ALLOWED_UPLOAD_EXTENSIONS.some((ext) => lowerName.endsWith(ext));
+  return allowedExtensions.some((ext) => lowerName.endsWith(ext));
 }
 
-function formatAllowedExtensionsMessage() {
-  return `Invalid file type. Only ${ALLOWED_UPLOAD_EXTENSIONS.join(", ")} files are allowed.`;
+function formatAllowedExtensionsMessage(allowedExtensions: readonly string[]) {
+  return `Invalid file type. Only ${allowedExtensions.join(", ")} files are allowed.`;
 }
 
 export function validateSingleUploadFile(file: File) {
@@ -37,8 +48,24 @@ export function validateSingleUploadFile(file: File) {
     return formatFileSizeLimitMessage(MAX_SINGLE_UPLOAD_BYTES);
   }
 
-  if (!hasAllowedFileExtension(file.name)) {
-    return formatAllowedExtensionsMessage();
+  if (!hasAllowedFileExtension(file.name, ALLOWED_UPLOAD_EXTENSIONS)) {
+    return formatAllowedExtensionsMessage(ALLOWED_UPLOAD_EXTENSIONS);
+  }
+
+  return null;
+}
+
+export function validateSinglePaymentUploadFile(file: File) {
+  if (!(file instanceof File) || file.size <= 0) {
+    return "No file uploaded.";
+  }
+
+  if (file.size > MAX_SINGLE_UPLOAD_BYTES) {
+    return formatFileSizeLimitMessage(MAX_SINGLE_UPLOAD_BYTES);
+  }
+
+  if (!hasAllowedFileExtension(file.name, ALLOWED_PAYMENT_UPLOAD_EXTENSIONS)) {
+    return formatAllowedExtensionsMessage(ALLOWED_PAYMENT_UPLOAD_EXTENSIONS);
   }
 
   return null;
@@ -58,7 +85,7 @@ export function validatePackageUploadFiles(files: File[]) {
       return formatFileSizeLimitMessage(MAX_SINGLE_UPLOAD_BYTES);
     }
 
-    if (!hasAllowedFileExtension(file.name)) {
+    if (!hasAllowedFileExtension(file.name, ALLOWED_UPLOAD_EXTENSIONS)) {
       return `Invalid file type for "${file.name}". Only ${ALLOWED_UPLOAD_EXTENSIONS.join(", ")} files are allowed.`;
     }
   }

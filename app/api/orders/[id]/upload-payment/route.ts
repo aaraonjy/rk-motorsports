@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { saveFile, validateSingleUploadFile } from "@/lib/storage";
+import { saveFile, validateSinglePaymentUploadFile } from "@/lib/storage";
 
 export async function POST(
   req: Request,
@@ -22,7 +22,7 @@ export async function POST(
       return NextResponse.redirect(new URL("/dashboard", req.url), 303);
     }
 
-    const validationMessage = validateSingleUploadFile(file);
+    const validationMessage = validateSinglePaymentUploadFile(file);
 
     if (validationMessage) {
       return NextResponse.json({ error: validationMessage }, { status: 400 });
