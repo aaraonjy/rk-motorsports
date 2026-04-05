@@ -790,11 +790,31 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
     [turboType, turboOther, turboSpec]
   );
 
+  const ALLOWED_EXTENSIONS = [
+    ".bin",
+    ".ori",
+    ".hex",
+    ".frf",
+    ".sgo",
+    ".read",
+    ".full",
+    ".mod",
+  ];
+
   function validateFile(file: File | null) {
     if (!file) return null;
 
     if (file.size > MAX_FILE_SIZE) {
       return "File size limit exceeded. Maximum allowed size is 10MB.";
+    }
+
+    const fileName = file.name.toLowerCase().trim();
+    const isValidExtension = ALLOWED_EXTENSIONS.some((ext) =>
+      fileName.endsWith(ext)
+    );
+
+    if (!isValidExtension) {
+      return `Invalid file type. Only ${ALLOWED_EXTENSIONS.join(", ")} files are allowed.`;
     }
 
     return null;
@@ -2063,7 +2083,7 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
         </div>
 
         <div className="mt-6 text-sm text-white/60">
-          <p>Supported formats: .bin, .ori, .hex, .frf, .sgo (max 10MB)</p>
+          <p>Supported formats: .bin, .ori, .hex, .frf, .sgo, .read, .full, .mod (max 10MB)</p>
         </div>
 
         <div className="mt-6 grid gap-6 md:grid-cols-2">
@@ -2074,6 +2094,7 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
                 className="input-rk cursor-pointer"
                 name="ecuFile"
                 type="file"
+                accept=".bin,.ori,.hex,.frf,.sgo,.read,.full,.mod"
                 required={shouldShowEcuSection}
                 onChange={(e) => {
                   const file = e.target.files?.[0] || null;
@@ -2098,6 +2119,7 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
                 className="input-rk cursor-pointer"
                 name="tcuFile"
                 type="file"
+                accept=".bin,.ori,.hex,.frf,.sgo,.read,.full,.mod"
                 required={shouldShowTcuSection}
                 onChange={(e) => {
                   const file = e.target.files?.[0] || null;
