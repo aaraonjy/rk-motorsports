@@ -2,20 +2,22 @@ import { NextResponse } from "next/server";
 import { createSession, hashPassword } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { validatePasswordComplexity } from "@/lib/password-validation";
+import { PHONE_COUNTRY_CODES } from "@/lib/phone-country-codes";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const PHONE_REGEX = /^\+?[0-9]{10,15}$/;
+const FINAL_PHONE_REGEX = /^\+[1-9]\d{7,14}$/;
 
 export async function POST(req: Request) {
   try {
     const form = await req.formData();
     const name = String(form.get("name") || "").trim();
     const email = String(form.get("email") || "").trim().toLowerCase();
+    const countryCode = String(form.get("countryCode") || "").trim();
     const phone = String(form.get("phone") || "").trim();
     const password = String(form.get("password") || "");
     const confirmPassword = String(form.get("confirmPassword") || "");
 
-    if (!name || !email || !phone || !password || !confirmPassword) {
+    if (!name || !email || !countryCode || !phone || !password || !confirmPassword) {
       return NextResponse.json(
         { ok: false, error: "All fields are required." },
         { status: 400 }
@@ -29,9 +31,41 @@ export async function POST(req: Request) {
       );
     }
 
-    if (!PHONE_REGEX.test(phone)) {
+    const selectedCountry = PHONE_COUNTRY_CODES.find(
+      (item) => item.code === countryCode
+    );
+
+    if (!selectedCountry) {
       return NextResponse.json(
-        { ok: false, error: "Please enter a valid phone number (10 to 15 digits, optional +)." },
+        { ok: false, error: "Please select a valid country code." },
+        { status: 400 }
+      );
+    }
+
+    const cleanedPhone = phone.replace(/[^\d]/g, "");
+    const normalizedLocalPhone = cleanedPhone.startsWith("0")
+      ? cleanedPhone.slice(1)
+      : cleanedPhone;
+
+    if (!normalizedLocalPhone) {
+      return NextResponse.json(
+        { ok: false, error: "Please enter a valid phone number." },
+        { status: 400 }
+      );
+    }
+
+    if (normalizedLocalPhone.length < 7 || normalizedLocalPhone.length > 12) {
+      return NextResponse.json(
+        { ok: false, error: "Please enter a valid phone number." },
+        { status: 400 }
+      );
+    }
+
+    const finalPhone = `${selectedCountry.dialCode}${normalizedLocalPhone}`;
+
+    if (!FINAL_PHONE_REGEX.test(finalPhone)) {
+      return NextResponse.json(
+        { ok: false, error: "Please enter a valid phone number." },
         { status: 400 }
       );
     }
@@ -64,7 +98,7 @@ export async function POST(req: Request) {
       data: {
         name,
         email,
-        phone,
+        phone: finalPhone,
         passwordHash: await hashPassword(password),
       },
     });

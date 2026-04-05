@@ -6,6 +6,7 @@ import {
   PASSWORD_REQUIREMENTS_TEXT,
   validatePasswordComplexity,
 } from "@/lib/password-validation";
+import { PHONE_COUNTRY_CODES } from "@/lib/phone-country-codes";
 
 type ApiResponse = {
   ok?: boolean;
@@ -14,11 +15,11 @@ type ApiResponse = {
 };
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const PHONE_REGEX = /^\+?[0-9]{10,15}$/;
 
 export default function RegisterPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [countryCode, setCountryCode] = useState("MY");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -34,15 +35,33 @@ export default function RegisterPage() {
     setSuccess("");
 
     const normalizedEmail = email.trim().toLowerCase();
-    const normalizedPhone = phone.trim();
 
     if (!EMAIL_REGEX.test(normalizedEmail)) {
       setError("Please enter a valid email address.");
       return;
     }
 
-    if (!PHONE_REGEX.test(normalizedPhone)) {
-      setError("Please enter a valid phone number (10 to 15 digits, optional +).");
+    const selectedCountry = PHONE_COUNTRY_CODES.find(
+      (item) => item.code === countryCode
+    );
+
+    if (!selectedCountry) {
+      setError("Please select a valid country code.");
+      return;
+    }
+
+    const cleanedPhone = phone.replace(/[^\d]/g, "");
+    const normalizedLocalPhone = cleanedPhone.startsWith("0")
+      ? cleanedPhone.slice(1)
+      : cleanedPhone;
+
+    if (!normalizedLocalPhone) {
+      setError("Please enter a valid phone number.");
+      return;
+    }
+
+    if (normalizedLocalPhone.length < 7 || normalizedLocalPhone.length > 12) {
+      setError("Please enter a valid phone number.");
       return;
     }
 
@@ -63,7 +82,8 @@ export default function RegisterPage() {
       const formData = new FormData();
       formData.append("name", name);
       formData.append("email", normalizedEmail);
-      formData.append("phone", normalizedPhone);
+      formData.append("countryCode", countryCode);
+      formData.append("phone", normalizedLocalPhone);
       formData.append("password", password);
       formData.append("confirmPassword", confirmPassword);
 
@@ -123,18 +143,33 @@ export default function RegisterPage() {
 
           <div>
             <label className="label-rk">Phone Number</label>
-            <input
-              className="input-rk"
-              name="phone"
-              type="tel"
-              autoComplete="tel"
-              required
-              inputMode="tel"
-              placeholder="e.g. +60123456789"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              disabled={isSubmitting}
-            />
+            <div className="flex gap-2">
+              <select
+                className="input-rk w-32"
+                value={countryCode}
+                onChange={(e) => setCountryCode(e.target.value)}
+                disabled={isSubmitting}
+              >
+                {PHONE_COUNTRY_CODES.map((item) => (
+                  <option key={item.code} value={item.code}>
+                    {item.dialCode}
+                  </option>
+                ))}
+              </select>
+
+              <input
+                className="input-rk flex-1"
+                name="phone"
+                type="tel"
+                autoComplete="tel"
+                required
+                inputMode="numeric"
+                placeholder="e.g. 123456789"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                disabled={isSubmitting}
+              />
+            </div>
           </div>
 
           <div>
