@@ -735,21 +735,10 @@ function FileSection({
 
 function CustomerDetails({ user }: { user?: User }) {
   return (
-    <div className="space-y-1 text-sm leading-6 break-words">
-      <div>
-        <span className="text-white/45">Name:</span>{" "}
-        <span className="text-white/90">{user?.name || "-"}</span>
-      </div>
-
-      <div>
-        <span className="text-white/45">Phone No:</span>{" "}
-        <span className="text-white/90">{user?.phone || "-"}</span>
-      </div>
-
-      <div>
-        <span className="text-white/45">Email:</span>{" "}
-        <span className="text-white/90">{user?.email || "-"}</span>
-      </div>
+    <div className="space-y-1 text-sm leading-6 break-words text-white/90">
+      <div>{user?.name || "-"}</div>
+      <div>{user?.phone || "-"}</div>
+      <div>{user?.email || "-"}</div>
     </div>
   );
 }
@@ -774,7 +763,7 @@ export function OrderTable({
           <thead className="bg-black/50 text-white/65">
             <tr>
               <th className="px-4 py-4 w-[140px]">Order</th>
-              {admin ? <th className="px-4 py-4 w-[220px]">Customer</th> : null}
+              {admin ? <th className="px-4 py-4 w-[130px]">Customer</th> : null}
               <th className="px-4 py-4">Vehicle</th>
               <th className="px-4 py-4 w-[180px]">Status</th>
               <th className="px-4 py-4 w-[110px]">Amount</th>
