@@ -172,7 +172,7 @@ export default function RegisterPage() {
                   className="input-rk flex h-full w-full items-center justify-between gap-3 px-4 text-left disabled:cursor-not-allowed"
                 >
                   <span className="truncate">
-                    {selectedCountry.label} {selectedCountry.dialCode}
+                    {selectedCountry.code} {selectedCountry.dialCode}
                   </span>
                   <span className="text-white/60">{isCountryOpen ? "▴" : "▾"}</span>
                 </button>
