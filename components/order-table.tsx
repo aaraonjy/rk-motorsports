@@ -11,6 +11,12 @@ import {
   User,
 } from "@prisma/client";
 import { formatCurrency } from "@/lib/utils";
+import {
+  formatCurrentEcuSetupLabel,
+  formatEcuStageLabel,
+  formatTcuStageLabel,
+  formatTurboSetupLabel,
+} from "@/lib/order-labels";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
@@ -107,13 +113,6 @@ function formatStoredList(value?: string | null) {
     .join(", ");
 }
 
-function formatTurboLabel(value?: string | null) {
-  if (!value) return "";
-
-  return value
-    .replaceAll("_", " ")
-    .replace(/\b\w/g, (char) => char.toUpperCase());
-}
 
 function VehicleDetails({ order }: { order: OrderWithRelations }) {
   return (
@@ -154,12 +153,12 @@ function VehicleDetails({ order }: { order: OrderWithRelations }) {
         <>
           <div>
             <span className="text-white/45">ECU Stage:</span>{" "}
-            <span className="text-white/90">{order.ecuStage || "-"}</span>
+            <span className="text-white/90">{formatEcuStageLabel(order.ecuStage) || "-"}</span>
           </div>
           {order.currentEcuSetupStage ? (
             <div>
               <span className="text-white/45">Current ECU Setup:</span>{" "}
-              <span className="text-white/90">{order.currentEcuSetupStage}</span>
+              <span className="text-white/90">{formatCurrentEcuSetupLabel(order.currentEcuSetupStage) || "-"}</span>
             </div>
           ) : null}
           {order.turboType ? (
@@ -167,8 +166,8 @@ function VehicleDetails({ order }: { order: OrderWithRelations }) {
               <span className="text-white/45">Turbo Setup:</span>{" "}
               <span className="text-white/90">
                 {order.turboSpec
-									? `${formatTurboLabel(order.turboType)} (${order.turboSpec})`
-									: formatTurboLabel(order.turboType)}
+									? `${formatTurboSetupLabel(order.turboType)} (${order.turboSpec})`
+									: formatTurboSetupLabel(order.turboType)}
               </span>
             </div>
           ) : null}
@@ -217,7 +216,7 @@ function VehicleDetails({ order }: { order: OrderWithRelations }) {
         <>
           <div>
             <span className="text-white/45">TCU Stage:</span>{" "}
-            <span className="text-white/90">{order.tcuStage || "-"}</span>
+            <span className="text-white/90">{formatTcuStageLabel(order.tcuStage) || "-"}</span>
           </div>
           <div>
             <span className="text-white/45">TCU Type:</span>{" "}
