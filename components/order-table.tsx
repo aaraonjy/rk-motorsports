@@ -560,6 +560,14 @@ function UploadConfirmModal({
                     ? "tcuFile"
                     : "file"
               }
+              accept={
+                isAdminUploadEcu ||
+                isAdminUploadTcu ||
+                isAdminRevisionEcu ||
+                isAdminRevisionTcu
+                  ? ".bin,.ori,.hex,.frf,.sgo,.read,.full,.mod"
+                  : ".jpg,.jpeg,.png,.webp,.pdf"
+              }
               required
               className="block w-full text-xs text-white/80 file:mr-3 file:rounded-lg file:border file:border-white/15 file:bg-black/40 file:px-3 file:py-2 file:text-white hover:file:bg-white/10"
               onChange={(e) => {
@@ -573,6 +581,28 @@ function UploadConfirmModal({
                 if (file.size > MAX_FILE_SIZE) {
                   setFileError(
                     "File size limit exceeded. Maximum allowed size is 10MB."
+                  );
+                  e.target.value = "";
+                  return;
+                }
+
+                const fileName = file.name.toLowerCase().trim();
+
+                const allowedExtensions =
+                  isAdminUploadEcu ||
+                  isAdminUploadTcu ||
+                  isAdminRevisionEcu ||
+                  isAdminRevisionTcu
+                    ? [".bin", ".ori", ".hex", ".frf", ".sgo", ".read", ".full", ".mod"]
+                    : [".jpg", ".jpeg", ".png", ".webp", ".pdf"];
+
+                const isValid = allowedExtensions.some((ext) =>
+                  fileName.endsWith(ext)
+                );
+
+                if (!isValid) {
+                  setFileError(
+                    `Invalid file type. Only ${allowedExtensions.join(", ")} files are allowed.`
                   );
                   e.target.value = "";
                   return;
