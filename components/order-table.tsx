@@ -113,7 +113,6 @@ function formatStoredList(value?: string | null) {
     .join(", ");
 }
 
-
 function VehicleDetails({ order }: { order: OrderWithRelations }) {
   return (
     <div className="space-y-1 text-sm leading-6">
@@ -166,8 +165,8 @@ function VehicleDetails({ order }: { order: OrderWithRelations }) {
               <span className="text-white/45">Turbo Setup:</span>{" "}
               <span className="text-white/90">
                 {order.turboSpec
-									? `${formatTurboSetupLabel(order.turboType)} (${order.turboSpec})`
-									: formatTurboSetupLabel(order.turboType)}
+                  ? `${formatTurboSetupLabel(order.turboType)} (${order.turboSpec})`
+                  : formatTurboSetupLabel(order.turboType)}
               </span>
             </div>
           ) : null}
@@ -232,13 +231,13 @@ function VehicleDetails({ order }: { order: OrderWithRelations }) {
           </div>
         </>
       ) : null}
-		
-		{order.tuningType === "ECU" || order.tuningType === "ECU_TCU" || !order.tuningType ? (
-      <div>
-        <span className="text-white/45">Fuel Grade:</span>{" "}
-        <span className="text-white/90">{order.fuelGrade || "-"}</span>
-      </div>
-			) : null}
+
+      {order.tuningType === "ECU" || order.tuningType === "ECU_TCU" || !order.tuningType ? (
+        <div>
+          <span className="text-white/45">Fuel Grade:</span>{" "}
+          <span className="text-white/90">{order.fuelGrade || "-"}</span>
+        </div>
+      ) : null}
 
       {order.tuningType === "ECU" || order.tuningType === "ECU_TCU" || !order.tuningType ? (
         <div>
@@ -734,6 +733,27 @@ function FileSection({
   );
 }
 
+function CustomerDetails({ user }: { user?: User }) {
+  return (
+    <div className="space-y-1 text-sm leading-6 break-words">
+      <div>
+        <span className="text-white/45">Name:</span>{" "}
+        <span className="text-white/90">{user?.name || "-"}</span>
+      </div>
+
+      <div>
+        <span className="text-white/45">Phone No:</span>{" "}
+        <span className="text-white/90">{user?.phone || "-"}</span>
+      </div>
+
+      <div>
+        <span className="text-white/45">Email:</span>{" "}
+        <span className="text-white/90">{user?.email || "-"}</span>
+      </div>
+    </div>
+  );
+}
+
 export function OrderTable({
   orders,
   admin = false,
@@ -754,7 +774,7 @@ export function OrderTable({
           <thead className="bg-black/50 text-white/65">
             <tr>
               <th className="px-4 py-4 w-[140px]">Order</th>
-              {admin ? <th className="px-4 py-4 w-[130px]">Customer</th> : null}
+              {admin ? <th className="px-4 py-4 w-[220px]">Customer</th> : null}
               <th className="px-4 py-4">Vehicle</th>
               <th className="px-4 py-4 w-[180px]">Status</th>
               <th className="px-4 py-4 w-[110px]">Amount</th>
@@ -849,7 +869,9 @@ export function OrderTable({
                   </td>
 
                   {admin ? (
-                    <td className="px-4 py-4 break-words">{order.user?.email}</td>
+                    <td className="px-4 py-4">
+                      <CustomerDetails user={order.user} />
+                    </td>
                   ) : null}
 
                   <td className="px-4 py-4">
