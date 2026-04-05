@@ -124,10 +124,6 @@ export default function LoginPage() {
               Register
             </Link>
           </p>
-
-          <p className="text-sm text-white/55">
-            Demo admin: admin@rkmotorsports.com / admin123
-          </p>
         </form>
       </div>
     </section>
