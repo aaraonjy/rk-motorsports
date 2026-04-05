@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   PASSWORD_REQUIREMENTS_TEXT,
   validatePasswordComplexity,
@@ -28,6 +28,29 @@ export default function RegisterPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [isCountryOpen, setIsCountryOpen] = useState(false);
+
+  const countryDropdownRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        countryDropdownRef.current &&
+        !countryDropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsCountryOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  const selectedCountry =
+    PHONE_COUNTRY_CODES.find((item) => item.code === countryCode) ||
+    PHONE_COUNTRY_CODES[0];
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -40,10 +63,6 @@ export default function RegisterPage() {
       setError("Please enter a valid email address.");
       return;
     }
-
-    const selectedCountry = PHONE_COUNTRY_CODES.find(
-      (item) => item.code === countryCode
-    );
 
     if (!selectedCountry) {
       setError("Please select a valid country code.");
@@ -143,32 +162,62 @@ export default function RegisterPage() {
 
           <div>
             <label className="label-rk">Phone Number</label>
-            <div className="flex gap-2">
-              <select
-                className="input-rk w-32"
-                value={countryCode}
-                onChange={(e) => setCountryCode(e.target.value)}
-                disabled={isSubmitting}
-              >
-                {PHONE_COUNTRY_CODES.map((item) => (
-                  <option key={item.code} value={item.code}>
-                    {item.dialCode}
-                  </option>
-                ))}
-              </select>
 
-              <input
-                className="input-rk flex-1"
-                name="phone"
-                type="tel"
-                autoComplete="tel"
-                required
-                inputMode="numeric"
-                placeholder="e.g. 123456789"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                disabled={isSubmitting}
-              />
+            <div className="flex items-stretch gap-2">
+              <div className="relative w-48" ref={countryDropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsCountryOpen((prev) => !prev)}
+                  disabled={isSubmitting}
+                  className="input-rk flex h-full w-full items-center justify-between gap-3 px-4 text-left disabled:cursor-not-allowed"
+                >
+                  <span className="truncate">
+                    {selectedCountry.label} {selectedCountry.dialCode}
+                  </span>
+                  <span className="text-white/60">{isCountryOpen ? "▴" : "▾"}</span>
+                </button>
+
+                {isCountryOpen ? (
+                  <div className="absolute left-0 top-[calc(100%+8px)] z-50 max-h-72 w-full overflow-y-auto rounded-2xl border border-white/10 bg-black/95 shadow-2xl backdrop-blur">
+                    {PHONE_COUNTRY_CODES.map((item) => (
+                      <button
+                        key={item.code}
+                        type="button"
+                        onClick={() => {
+                          setCountryCode(item.code);
+                          setIsCountryOpen(false);
+                        }}
+                        className={`flex w-full items-center justify-between px-4 py-3 text-left text-sm transition hover:bg-white/10 ${
+                          item.code === countryCode ? "bg-white/10" : ""
+                        }`}
+                      >
+                        <span className="truncate">{item.label}</span>
+                        <span className="ml-3 shrink-0 text-white/70">
+                          {item.dialCode}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="relative flex-1">
+                <div className="pointer-events-none absolute inset-y-0 left-4 flex items-center text-white/60">
+                  {selectedCountry.dialCode}
+                </div>
+                <input
+                  className="input-rk pl-16"
+                  name="phone"
+                  type="tel"
+                  autoComplete="tel"
+                  required
+                  inputMode="numeric"
+                  placeholder="123456789"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  disabled={isSubmitting}
+                />
+              </div>
             </div>
           </div>
 
