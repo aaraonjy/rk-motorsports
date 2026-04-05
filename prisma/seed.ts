@@ -11,11 +11,13 @@ async function main() {
     where: { email: "admin@rkmotorsports.com" },
     update: {
       name: "RK Admin",
+      phone: "+60123456789",
       role: Role.ADMIN,
     },
     create: {
       name: "RK Admin",
       email: "admin@rkmotorsports.com",
+      phone: "+60123456789",
       passwordHash: adminHash,
       role: Role.ADMIN,
     },
@@ -25,10 +27,12 @@ async function main() {
     where: { email: "customer@example.com" },
     update: {
       name: "Demo Customer",
+      phone: "+60111222333",
     },
     create: {
       name: "Demo Customer",
       email: "customer@example.com",
+      phone: "+60111222333",
       passwordHash: customerHash,
     },
   });
