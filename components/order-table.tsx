@@ -888,6 +888,13 @@ export function OrderTable({
                     <div className="text-white/45">
                       {new Date(order.createdAt).toLocaleDateString()}
                     </div>
+                    <div className="text-white/35 text-xs">
+                    {new Date(order.createdAt).toLocaleTimeString([], {
+                      hour: "numeric",
+                      minute: "2-digit",
+                      hour12: true,
+                    })}
+                  </div>
                   </td>
 
                   {admin ? (
