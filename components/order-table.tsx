@@ -239,13 +239,16 @@ function VehicleDetails({ order }: { order: OrderWithRelations }) {
         </div>
       ) : null}
 
-      {order.tuningType === "ECU" || order.tuningType === "ECU_TCU" || !order.tuningType ? (
-        <div>
-          <span className="text-white/45">Water Methanol Injection:</span>{" "}
-          <span className="text-white/90">
-            {order.waterMethanolInjection || "Not selected"}
-          </span>
-        </div>
+      {(order.tuningType === "ECU" || order.tuningType === "ECU_TCU" || !order.tuningType) &&
+        order.ecuStage !== "Stage 1" &&
+        order.waterMethanolInjection &&
+        order.waterMethanolInjection !== "Not selected" ? (
+          <div>
+            <span className="text-white/45">Water Methanol Injection:</span>{" "}
+            <span className="text-white/90">
+              {order.waterMethanolInjection}
+            </span>
+          </div>
       ) : null}
     </div>
   );
