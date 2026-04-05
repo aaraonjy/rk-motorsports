@@ -13,6 +13,7 @@ const nav = [
 
 export async function SiteHeader() {
   const user = await getSessionUser();
+  const dashboardHref = user?.role === "ADMIN" ? "/admin" : "/dashboard";
 
   return (
     <header className="absolute left-0 top-0 z-50 w-full bg-transparent">
@@ -48,12 +49,39 @@ export async function SiteHeader() {
               <>
                 <AdminNotificationBell />
 
-                <Link
-                  href={user.role === "ADMIN" ? "/admin" : "/dashboard"}
-                  className="text-white/75 transition hover:text-white"
-                >
-                  {user.role === "ADMIN" ? "Admin" : "Dashboard"}
-                </Link>
+                <details className="group relative">
+                  <summary className="flex cursor-pointer list-none items-center gap-2 rounded-full border border-white/15 px-4 py-2 text-white/85 transition hover:bg-white/10 hover:text-white">
+                    <span>Dashboard</span>
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                      className="h-4 w-4 transition group-open:rotate-180"
+                      aria-hidden="true"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  </summary>
+
+                  <div className="absolute right-0 top-[calc(100%+10px)] z-[70] min-w-[220px] overflow-hidden rounded-2xl border border-white/10 bg-[#0b0b0c]/95 shadow-2xl backdrop-blur-xl">
+                    <Link
+                      href={dashboardHref}
+                      className="block border-b border-white/10 px-4 py-3 text-white/80 transition hover:bg-white/5 hover:text-white"
+                    >
+                      My Dashboard
+                    </Link>
+                    <Link
+                      href="/change-password"
+                      className="block px-4 py-3 text-white/80 transition hover:bg-white/5 hover:text-white"
+                    >
+                      Change Password
+                    </Link>
+                  </div>
+                </details>
 
                 <form action="/api/auth/logout" method="post">
                   <button
