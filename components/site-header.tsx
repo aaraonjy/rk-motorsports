@@ -1,14 +1,8 @@
-"use client";
-
 import Link from "next/link";
 import Image from "next/image";
-import { useEffect, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
+import { getSessionUser } from "@/lib/auth";
 import { AdminNotificationBell } from "@/components/admin-notification-bell";
-
-type HeaderUser = {
-  role: "ADMIN" | "CUSTOMER";
-};
+import { SiteHeaderClient } from "@/components/site-header-client";
 
 const nav = [
   ["Services", "/#services"],
@@ -18,34 +12,8 @@ const nav = [
   ["Contact", "/contact"],
 ] as const;
 
-type SiteHeaderProps = {
-  user: HeaderUser | null;
-};
-
-export function SiteHeaderClient({ user }: SiteHeaderProps) {
-  const pathname = usePathname();
-  const [isDashboardOpen, setIsDashboardOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    setIsDashboardOpen(false);
-  }, [pathname]);
-
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(event.target as Node)
-      ) {
-        setIsDashboardOpen(false);
-      }
-    }
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, []);
+export async function SiteHeader() {
+  const user = await getSessionUser();
 
   return (
     <header className="absolute left-0 top-0 z-50 w-full bg-transparent">
@@ -81,50 +49,8 @@ export function SiteHeaderClient({ user }: SiteHeaderProps) {
               <>
                 <AdminNotificationBell />
 
-                <div ref={dropdownRef} className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setIsDashboardOpen((prev) => !prev)}
-                    className="inline-flex items-center gap-2 rounded-full border border-white/20 px-4 py-2 text-white/85 transition hover:bg-white/10"
-                  >
-                    <span>{user.role === "ADMIN" ? "Admin" : "Dashboard"}</span>
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 20 20"
-                      fill="currentColor"
-                      className={`h-4 w-4 transition ${isDashboardOpen ? "rotate-180" : ""}`}
-                      aria-hidden="true"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                  </button>
-
-                  {isDashboardOpen ? (
-                    <div className="absolute right-0 top-[calc(100%+10px)] z-[70] w-56 overflow-hidden rounded-2xl border border-white/10 bg-[#0b0b0c]/95 shadow-2xl backdrop-blur-xl">
-                      <Link
-                        href={user.role === "ADMIN" ? "/admin" : "/dashboard"}
-                        onClick={() => setIsDashboardOpen(false)}
-                        className="block px-4 py-4 text-white/85 transition hover:bg-white/10 hover:text-white"
-                      >
-                        My Dashboard
-                      </Link>
-
-                      <div className="h-px bg-white/10" />
-
-                      <Link
-                        href="/change-password"
-                        onClick={() => setIsDashboardOpen(false)}
-                        className="block px-4 py-4 text-white/85 transition hover:bg-white/10 hover:text-white"
-                      >
-                        Change Password
-                      </Link>
-                    </div>
-                  ) : null}
-                </div>
+                {/* 👇 Dashboard dropdown handled in client component */}
+                <SiteHeaderClient user={user} />
 
                 <form action="/api/auth/logout" method="post">
                   <button
