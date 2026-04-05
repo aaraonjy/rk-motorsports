@@ -201,18 +201,14 @@ export default function RegisterPage() {
                 ) : null}
               </div>
 
-              <div className="relative flex-1">
-                <div className="pointer-events-none absolute inset-y-0 left-4 flex items-center text-white/60">
-                  {selectedCountry.dialCode}
-                </div>
+              <div className="flex-1">
                 <input
-                  className="input-rk pl-16"
+                  className="input-rk"
                   name="phone"
                   type="tel"
                   autoComplete="tel"
                   required
                   inputMode="numeric"
-                  placeholder="123456789"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   disabled={isSubmitting}
