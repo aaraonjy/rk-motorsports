@@ -38,17 +38,6 @@ export default function ContactPage() {
                 <p className="mt-3 text-2xl font-semibold text-white">
                   012-310 6132
                 </p>
-
-                <div className="mt-5">
-                  <a
-                    href="https://wa.me/60123106132"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center justify-center rounded-full bg-red-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-red-500"
-                  >
-                    WhatsApp Us
-                  </a>
-                </div>
               </div>
 
               <div className="h-px bg-white/10" />
