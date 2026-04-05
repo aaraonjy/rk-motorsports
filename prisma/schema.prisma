@@ -53,7 +53,7 @@ model User {
   email            String         @unique
   passwordHash     String
   role             Role           @default(CUSTOMER)
-  phone            String
+  phone            String?
   resetToken       String?
   resetTokenExpiry DateTime?
   createdAt        DateTime       @default(now())
