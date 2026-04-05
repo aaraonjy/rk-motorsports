@@ -17,8 +17,8 @@ import {
   tcuTunes,
   type AddOn,
   type TuningTypeOption,
-  type TuneOption,
 } from "@/lib/tuning-pricing";
+import { SharedTuneCard } from "@/components/tune-option-card";
 
 type EngineOption = {
   id: string;
@@ -199,52 +199,6 @@ function getTuningTypeCardClass(
   return "border-white/10 bg-white/[0.03] hover:border-[#ff3b57]/40 hover:bg-[#ff3b57]/10";
 }
 
-function getTuneCardClass(kind: "ecu" | "tcu", itemId: string, active: boolean) {
-  if (kind === "ecu") {
-    if (active) {
-      if (itemId === "stage1") {
-        return "border-sky-500 bg-sky-500/15 shadow-[0_0_0_1px_rgba(14,165,233,0.35)]";
-      }
-      if (itemId === "stage2") {
-        return "border-amber-500 bg-amber-500/15 shadow-[0_0_0_1px_rgba(245,158,11,0.35)]";
-      }
-      if (itemId === "stage3") {
-        return "border-[#ff3b57] bg-[#ff3b57]/15 shadow-[0_0_0_1px_rgba(255,59,87,0.35)]";
-      }
-      return "border-fuchsia-500 bg-fuchsia-500/15 shadow-[0_0_0_1px_rgba(217,70,239,0.35)]";
-    }
-
-    if (itemId === "stage1") {
-      return "border-white/10 bg-white/[0.03] hover:border-sky-500/40 hover:bg-sky-500/10";
-    }
-    if (itemId === "stage2") {
-      return "border-white/10 bg-white/[0.03] hover:border-amber-500/40 hover:bg-amber-500/10";
-    }
-    if (itemId === "stage3") {
-      return "border-white/10 bg-white/[0.03] hover:border-[#ff3b57]/40 hover:bg-[#ff3b57]/10";
-    }
-    return "border-white/10 bg-white/[0.03] hover:border-fuchsia-500/40 hover:bg-fuchsia-500/10";
-  }
-
-  if (active) {
-    if (itemId === "stage1") {
-      return "border-violet-500 bg-violet-500/15 shadow-[0_0_0_1px_rgba(139,92,246,0.35)]";
-    }
-    if (itemId === "stage2") {
-      return "border-orange-500 bg-orange-500/15 shadow-[0_0_0_1px_rgba(249,115,22,0.35)]";
-    }
-    return "border-fuchsia-500 bg-fuchsia-500/15 shadow-[0_0_0_1px_rgba(217,70,239,0.35)]";
-  }
-
-  if (itemId === "stage1") {
-    return "border-white/10 bg-white/[0.03] hover:border-violet-500/40 hover:bg-violet-500/10";
-  }
-  if (itemId === "stage2") {
-    return "border-white/10 bg-white/[0.03] hover:border-orange-500/40 hover:bg-orange-500/10";
-  }
-  return "border-white/10 bg-white/[0.03] hover:border-fuchsia-500/40 hover:bg-fuchsia-500/10";
-}
-
 function getSetupCardClass(itemId: string, active: boolean) {
   if (active) {
     if (itemId === "stock") {
@@ -382,63 +336,6 @@ function getTurboDisplayLabel(
   }
 
   return baseLabel;
-}
-
-function TuneCard({
-  item,
-  active,
-  onSelect,
-  kind,
-  badge,
-}: {
-  item: TuneOption;
-  active: boolean;
-  onSelect: () => void;
-  kind: "ecu" | "tcu";
-  badge?: React.ReactNode;
-}) {
-  const primaryDescription = item.description?.[0] || "";
-  const suitableLabel =
-    item.suitableFor && item.suitableFor.length > 0
-      ? item.suitableFor[0]
-      : undefined;
-
-  return (
-    <label
-      className={`flex min-h-[240px] cursor-pointer flex-col rounded-2xl border p-5 transition duration-200 hover:scale-[1.01] ${getTuneCardClass(
-        kind,
-        item.id,
-        active
-      )}`}
-    >
-      <input
-        type="radio"
-        className="sr-only"
-        checked={active}
-        onChange={onSelect}
-      />
-
-      <div>
-        <p className="text-lg font-semibold text-white">{item.name}</p>
-
-        {badge ? <div className="mt-2">{badge}</div> : null}
-      </div>
-
-      <p className="mt-2 text-white/75">RM {item.price.toLocaleString()}</p>
-
-      <p className="mt-3 min-h-[72px] text-sm leading-6 text-white/60">
-        {primaryDescription}
-      </p>
-
-      <div className="mt-auto pt-4 flex justify-center">
-        {suitableLabel ? (
-          <span className="inline-flex min-w-[140px] justify-center rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/60 text-center">
-            {suitableLabel}
-          </span>
-        ) : null}
-      </div>
-    </label>
-  );
 }
 
 function CompactSetupCard({
@@ -790,31 +687,11 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
     [turboType, turboOther, turboSpec]
   );
 
-  const ALLOWED_EXTENSIONS = [
-    ".bin",
-    ".ori",
-    ".hex",
-    ".frf",
-    ".sgo",
-    ".read",
-    ".full",
-    ".mod",
-  ];
-
   function validateFile(file: File | null) {
     if (!file) return null;
 
     if (file.size > MAX_FILE_SIZE) {
       return "File size limit exceeded. Maximum allowed size is 10MB.";
-    }
-
-    const fileName = file.name.toLowerCase().trim();
-    const isValidExtension = ALLOWED_EXTENSIONS.some((ext) =>
-      fileName.endsWith(ext)
-    );
-
-    if (!isValidExtension) {
-      return `Invalid file type. Only ${ALLOWED_EXTENSIONS.join(", ")} files are allowed.`;
     }
 
     return null;
@@ -1475,7 +1352,7 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
                 const isActive = ecuStage === item.id;
 
                 return (
-                  <TuneCard
+                  <SharedTuneCard
                     key={item.id}
                     item={item}
                     active={isActive}
@@ -1835,7 +1712,7 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
                 const isRecommended = recommendedTcuStageForDisplay === item.id;
 
                 return (
-                  <TuneCard
+                  <SharedTuneCard
                     key={item.id}
                     item={item}
                     active={isActive}
@@ -2083,7 +1960,7 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
         </div>
 
         <div className="mt-6 text-sm text-white/60">
-          <p>Supported formats: .bin, .ori, .hex, .frf, .sgo, .read, .full, .mod (max 10MB)</p>
+          <p>Supported formats: .bin, .ori, .hex, .frf, .sgo (max 10MB)</p>
         </div>
 
         <div className="mt-6 grid gap-6 md:grid-cols-2">
@@ -2094,7 +1971,6 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
                 className="input-rk cursor-pointer"
                 name="ecuFile"
                 type="file"
-                accept=".bin,.ori,.hex,.frf,.sgo,.read,.full,.mod"
                 required={shouldShowEcuSection}
                 onChange={(e) => {
                   const file = e.target.files?.[0] || null;
@@ -2119,7 +1995,6 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
                 className="input-rk cursor-pointer"
                 name="tcuFile"
                 type="file"
-                accept=".bin,.ori,.hex,.frf,.sgo,.read,.full,.mod"
                 required={shouldShowTcuSection}
                 onChange={(e) => {
                   const file = e.target.files?.[0] || null;
