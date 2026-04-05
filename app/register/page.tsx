@@ -13,9 +13,13 @@ type ApiResponse = {
   redirectTo?: string;
 };
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_REGEX = /^\+?[0-9]{10,15}$/;
+
 export default function RegisterPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -28,6 +32,19 @@ export default function RegisterPage() {
     event.preventDefault();
     setError("");
     setSuccess("");
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedPhone = phone.trim();
+
+    if (!EMAIL_REGEX.test(normalizedEmail)) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+
+    if (!PHONE_REGEX.test(normalizedPhone)) {
+      setError("Please enter a valid phone number (10 to 15 digits, optional +).");
+      return;
+    }
 
     if (password !== confirmPassword) {
       setError("Password confirmation does not match.");
@@ -45,7 +62,8 @@ export default function RegisterPage() {
     try {
       const formData = new FormData();
       formData.append("name", name);
-      formData.append("email", email);
+      formData.append("email", normalizedEmail);
+      formData.append("phone", normalizedPhone);
       formData.append("password", password);
       formData.append("confirmPassword", confirmPassword);
 
@@ -99,6 +117,22 @@ export default function RegisterPage() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              disabled={isSubmitting}
+            />
+          </div>
+
+          <div>
+            <label className="label-rk">Phone Number</label>
+            <input
+              className="input-rk"
+              name="phone"
+              type="tel"
+              autoComplete="tel"
+              required
+              inputMode="tel"
+              placeholder="e.g. +60123456789"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
               disabled={isSubmitting}
             />
           </div>
