@@ -48,8 +48,6 @@ export async function SiteHeader() {
             {user ? (
               <>
                 <AdminNotificationBell />
-
-                {/* 👇 Dashboard dropdown handled in client component */}
                 <SiteHeaderClient user={user} />
 
                 <form action="/api/auth/logout" method="post">
