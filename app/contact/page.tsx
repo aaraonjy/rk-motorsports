@@ -44,7 +44,7 @@ export default function ContactPage() {
                     href="https://wa.me/60123106132"
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center justify-center rounded-full bg-[#ff3b57] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#ff526b]"
+                    className="inline-flex items-center justify-center rounded-full bg-red-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-red-500"
                   >
                     WhatsApp Us
                   </a>
