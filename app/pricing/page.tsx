@@ -15,8 +15,8 @@ import {
   tuningTypeOptions,
   type AddOn,
   type TuningTypeOption,
-  type TuneOption,
 } from "@/lib/tuning-pricing";
+import { SharedTuneCard } from "@/components/tune-option-card";
 
 function getTuningTypeCardClasses(
   optionId: TuningTypeOption,
@@ -46,64 +46,6 @@ function getTuningTypeCardClasses(
   return active ? styles[optionId].active : styles[optionId].idle;
 }
 
-function getEcuTuneCardClasses(stageId: string, active: boolean) {
-  const styles: Record<string, { active: string; idle: string }> = {
-    stage1: {
-      active:
-        "border-sky-400 bg-sky-500/15 shadow-[0_0_0_1px_rgba(56,189,248,0.35)]",
-      idle:
-        "border-white/10 bg-white/[0.03] hover:border-sky-400/40 hover:bg-sky-500/10",
-    },
-    stage2: {
-      active:
-        "border-amber-400 bg-amber-500/15 shadow-[0_0_0_1px_rgba(251,191,36,0.35)]",
-      idle:
-        "border-white/10 bg-white/[0.03] hover:border-amber-400/40 hover:bg-amber-500/10",
-    },
-    stage3: {
-      active:
-        "border-[#ff3b57] bg-[#ff3b57]/15 shadow-[0_0_0_1px_rgba(255,59,87,0.35)]",
-      idle:
-        "border-white/10 bg-white/[0.03] hover:border-[#ff3b57]/40 hover:bg-[#ff3b57]/10",
-    },
-    custom: {
-      active:
-        "border-violet-400 bg-violet-500/15 shadow-[0_0_0_1px_rgba(167,139,250,0.35)]",
-      idle:
-        "border-white/10 bg-white/[0.03] hover:border-violet-400/40 hover:bg-violet-500/10",
-    },
-  };
-
-  const style = styles[stageId] || styles.custom;
-  return active ? style.active : style.idle;
-}
-
-function getTcuTuneCardClasses(stageId: string, active: boolean) {
-  const styles: Record<string, { active: string; idle: string }> = {
-    stage1: {
-      active:
-        "border-sky-400 bg-sky-500/15 shadow-[0_0_0_1px_rgba(56,189,248,0.35)]",
-      idle:
-        "border-white/10 bg-white/[0.03] hover:border-sky-400/40 hover:bg-sky-500/10",
-    },
-    stage2: {
-      active:
-        "border-orange-400 bg-orange-500/15 shadow-[0_0_0_1px_rgba(251,146,60,0.35)]",
-      idle:
-        "border-white/10 bg-white/[0.03] hover:border-orange-400/40 hover:bg-orange-500/10",
-    },
-    custom: {
-      active:
-        "border-violet-400 bg-violet-500/15 shadow-[0_0_0_1px_rgba(167,139,250,0.35)]",
-      idle:
-        "border-white/10 bg-white/[0.03] hover:border-violet-400/40 hover:bg-violet-500/10",
-    },
-  };
-
-  const style = styles[stageId] || styles.custom;
-  return active ? style.active : style.idle;
-}
-
 function getTotalBoxClass(tuningType: TuningTypeOption, hasSelection: boolean) {
   if (!hasSelection) return "border-white/10 bg-white/[0.03]";
 
@@ -120,10 +62,6 @@ function getTotalLabelClass(
   if (tuningType === "ECU") return "text-sky-200/80";
   if (tuningType === "TCU") return "text-violet-200/80";
   return "text-red-200/80";
-}
-
-function getPrimaryTag(item: TuneOption) {
-  return item.suitableFor?.[0] || "";
 }
 
 function getAddOnGroups(options: AddOn[]) {
@@ -147,53 +85,6 @@ function getAddOnGroups(options: AddOn[]) {
     { title: "Utility", items: utility },
     { title: "Advanced / Special", items: advanced },
   ].filter((group) => group.items.length > 0);
-}
-
-function PricingTuneCard({
-  item,
-  active,
-  onClick,
-  className,
-  badge,
-}: {
-  item: TuneOption;
-  active: boolean;
-  onClick: () => void;
-  className: string;
-  badge?: React.ReactNode;
-}) {
-  const primaryDescription = item.description?.[0] || "";
-  const primaryTag = getPrimaryTag(item);
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`rounded-2xl border p-5 text-left transition ${className}`}
-    >
-      <div className="flex min-h-[240px] flex-col">
-        <div>
-          <p className="text-lg font-semibold text-white">{item.name}</p>
-
-          {badge ? <div className="mt-2">{badge}</div> : null}
-        </div>
-
-        <p className="mt-2 text-white/70">RM {item.price.toLocaleString()}</p>
-
-        <p className="mt-4 min-h-[72px] text-sm leading-6 text-white/65">
-          {primaryDescription}
-        </p>
-
-        <div className="mt-auto pt-4">
-          {primaryTag ? (
-            <span className="inline-flex rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/60">
-              {primaryTag}
-            </span>
-          ) : null}
-        </div>
-      </div>
-    </button>
-  );
 }
 
 export default function PricingPage() {
@@ -354,12 +245,13 @@ export default function PricingPage() {
                     const isActive = ecuStage === item.id;
 
                     return (
-                      <PricingTuneCard
+                      <SharedTuneCard
                         key={item.id}
                         item={item}
                         active={isActive}
-                        onClick={() => setEcuStage(item.id)}
-                        className={getEcuTuneCardClasses(item.id, isActive)}
+                        onSelect={() => setEcuStage(item.id)}
+                        kind="ecu"
+                        as="button"
                       />
                     );
                   })}
@@ -393,12 +285,13 @@ export default function PricingPage() {
                       getRecommendedTcuStage(ecuStage) === item.id;
 
                     return (
-                      <PricingTuneCard
+                      <SharedTuneCard
                         key={item.id}
                         item={item}
                         active={isActive}
-                        onClick={() => setTcuStage(item.id)}
-                        className={getTcuTuneCardClasses(item.id, isActive)}
+                        onSelect={() => setTcuStage(item.id)}
+                        kind="tcu"
+                        as="button"
                         badge={
                           isRecommended ? (
                             <span className="inline-flex w-fit rounded-full border border-amber-400/30 bg-amber-400/10 px-2 py-[2px] text-[9px] font-semibold uppercase tracking-[0.14em] text-amber-300">
