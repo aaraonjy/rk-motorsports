@@ -1184,10 +1184,10 @@ export function OrderTable({
                           {["READY_FOR_DOWNLOAD", "COMPLETED"].includes(order.status) ? (
                             <Link
                               href={`/api/admin/orders/${order.id}/invoice`}
-                              className="inline-flex w-full min-h-[44px] items-center justify-center rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center text-sm transition hover:bg-white/10"
+                              className="inline-flex w-full min-h-[44px] flex-col items-center justify-center rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center text-sm leading-5 transition hover:bg-white/10"
                             >
-                              Download
-                              Invoice
+                              <span>Download</span>
+                              <span>Invoice</span>
                             </Link>
                           ) : null}
                         </div>

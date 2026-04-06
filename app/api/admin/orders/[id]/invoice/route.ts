@@ -45,7 +45,7 @@ export async function GET(
 
     const { width, height } = page.getSize();
     const left = 50;
-    let y = height - 50;
+    let y = height - 56;
 
     const drawText = (
       text: string,
@@ -64,27 +64,34 @@ export async function GET(
       });
     };
 
-    // Logo
+    // Header row: logo left, invoice title aligned on same top line
+    let logoBottomY = height - 110;
     try {
-      const logoPath = path.join(process.cwd(), "public", "logo.png");
+      const logoPath = path.join(process.cwd(), "public", "Invoice Logo.png");
       const logoBytes = await fs.readFile(logoPath);
       const logoImage = await pdfDoc.embedPng(logoBytes);
-      const logoDims = logoImage.scale(0.32);
+
+      const targetWidth = 270;
+      const scale = targetWidth / logoImage.width;
+      const logoWidth = logoImage.width * scale;
+      const logoHeight = logoImage.height * scale;
+
+      logoBottomY = height - 56 - logoHeight + 8;
 
       page.drawImage(logoImage, {
         x: left,
-        y: height - 92,
-        width: logoDims.width,
-        height: logoDims.height,
+        y: logoBottomY,
+        width: logoWidth,
+        height: logoHeight,
       });
     } catch (logoError) {
       console.error("Invoice logo load failed:", logoError);
     }
 
-    drawText("INVOICE", width - 130, height - 50, 18, true);
+    drawText("INVOICE", width - 140, height - 56, 18, true);
 
-    // Company address block
-    y = height - 130;
+    // Company address block below header row
+    y = Math.min(logoBottomY - 18, height - 150);
     drawText("34, Jalan Tembaga SD 5/2b,", left, y);
     y -= 14;
     drawText("Bandar Sri Damansara,", left, y);
@@ -131,14 +138,14 @@ export async function GET(
     y -= 14;
     drawText(`TCU Stage: ${order.tcuStage || "-"}`, left, y);
 
-    // Items heading with proper spacing
-    y -= 32;
+    // Items heading with clear spacing above table
+    y -= 42;
     drawText("Items", left, y, 12, true);
 
-    y -= 26;
+    const headerY = y - 22;
     page.drawRectangle({
       x: left,
-      y,
+      y: headerY,
       width: width - 100,
       height: 26,
       color: rgb(0.95, 0.95, 0.95),
@@ -146,10 +153,10 @@ export async function GET(
       borderColor: rgb(0.8, 0.8, 0.8),
     });
 
-    drawText("Description", left + 8, y + 8, 10, true);
-    drawText("Amount", width - 125, y + 8, 10, true);
+    drawText("Description", left + 8, headerY + 8, 10, true);
+    drawText("Amount", width - 125, headerY + 8, 10, true);
 
-    y -= 30;
+    y = headerY - 28;
 
     if (order.items.length > 0) {
       for (const item of order.items) {
