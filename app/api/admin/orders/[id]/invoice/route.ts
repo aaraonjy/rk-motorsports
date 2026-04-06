@@ -13,6 +13,20 @@ function formatMoney(value: number | string) {
   return `RM ${Number(value || 0).toFixed(2)}`;
 }
 
+function formatStoredList(value?: string | null) {
+  if (!value) return "-";
+  return value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .join(", ");
+}
+
+function formatWaterMethanol(value?: string | null) {
+  if (!value || value === "Not selected") return "-";
+  return value;
+}
+
 export async function GET(
   req: Request,
   ctx: { params: Promise<{ id: string }> }
@@ -88,7 +102,8 @@ export async function GET(
       console.error("Invoice logo load failed:", logoError);
     }
 
-    drawText("INVOICE", width - 140, height - 56, 18, true);
+    // Move INVOICE title slightly down to align better with logo
+    drawText("INVOICE", width - 140, height - 66, 18, true);
 
     // Company address block below header row
     y = Math.min(logoBottomY - 22, height - 160);
@@ -124,25 +139,41 @@ export async function GET(
     y -= 28;
     drawText("Order Information", left, y, 12, true);
     y -= 18;
-    drawText(`Order Number: ${order.orderNumber}`, left, y);
-    y -= 14;
     drawText(`Tuning Type: ${order.tuningType || "ECU"}`, left, y);
     y -= 14;
-    drawText(
-      `Vehicle: ${order.vehicleBrand || "-"} ${order.vehicleModel || "-"}`,
-      left,
-      y
-    );
+    drawText(`Brand: ${order.vehicleBrand || "-"}`, left, y);
+    y -= 14;
+    drawText(`Model / Generation: ${order.vehicleModel || "-"}`, left, y);
+    y -= 14;
+    drawText(`Engine / Variant: ${order.engineModel || "-"}`, left, y);
+    y -= 14;
+    drawText(`Year / Range: ${order.vehicleYear || "-"}`, left, y);
+    y -= 14;
+    drawText(`Capacity: ${order.engineCapacity ? `${order.engineCapacity}cc` : "-"}`, left, y);
     y -= 14;
     drawText(`ECU Stage: ${order.ecuStage || "-"}`, left, y);
     y -= 14;
-    drawText(`TCU Stage: ${order.tcuStage || "-"}`, left, y);
+    drawText(`Turbo Setup: ${order.turboType || "-"}`, left, y);
+    y -= 14;
+    drawText(`Hardware Mods: ${formatStoredList(order.hardwareMods)}`, left, y);
+    y -= 14;
+    drawText(`ECU Type: ${order.ecuType || "-"}`, left, y);
+    y -= 14;
+    drawText(`ECU Read Tool: ${order.ecuReadTool || "-"}`, left, y);
+    y -= 14;
+    drawText(`Fuel Grade: ${order.fuelGrade || "-"}`, left, y);
+    y -= 14;
+    drawText(
+      `Water Methanol Injection: ${formatWaterMethanol(order.waterMethanolInjection)}`,
+      left,
+      y
+    );
 
-    // Items heading with more spacing above table
-    y -= 48;
+    // Items heading with a bit more clearance from the table
+    y -= 38;
     drawText("Items", left, y, 12, true);
 
-    const headerY = y - 26;
+    const headerY = y - 30;
     page.drawRectangle({
       x: left,
       y: headerY,
@@ -158,18 +189,12 @@ export async function GET(
 
     y = headerY - 28;
 
-    if (order.items.length > 0) {
-      for (const item of order.items) {
-        const title = item.product?.title || "Tuning Service";
-        drawText(title, left + 8, y, 10);
-        drawText(formatMoney(item.price), width - 125, y, 10);
-        y -= 18;
-      }
-    } else {
-      drawText("Tuning Service", left + 8, y, 10);
-      drawText(formatMoney(order.totalAmount), width - 125, y, 10);
-      y -= 18;
-    }
+    const stageLabel = order.ecuStage || order.tcuStage || "-";
+    const descriptionText = `${order.tuningType || "ECU"} Tuning - ${order.vehicleBrand || "-"} ${order.vehicleModel || "-"} - ${stageLabel}`;
+
+    drawText(descriptionText, left + 8, y, 10);
+    drawText(formatMoney(order.totalAmount), width - 125, y, 10);
+    y -= 18;
 
     y -= 10;
     page.drawLine({
@@ -187,11 +212,12 @@ export async function GET(
     drawText("Thank you for your business.", left, y, 10);
 
     const pdfBytes = await pdfDoc.save();
+    const fileSuffix = order.orderNumber.replace(/^RK-/, "");
 
     return new NextResponse(new Uint8Array(pdfBytes), {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="RK-Invoice-${order.orderNumber}.pdf"`,
+        "Content-Disposition": `attachment; filename="RK-INV-${fileSuffix}.pdf"`,
         "Cache-Control": "private, no-store",
       },
     });
