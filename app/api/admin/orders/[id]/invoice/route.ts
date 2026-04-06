@@ -58,7 +58,7 @@ export async function GET(
     const { width, height } = page.getSize();
     const left = 50;
     const right = width - 50;
-    const rightColumnX = right - 60;
+    const rightColumnX = right - 80;
 
     const draw = (
       text: string,
