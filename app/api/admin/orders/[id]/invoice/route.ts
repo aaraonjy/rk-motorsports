@@ -16,11 +16,7 @@ function formatMoney(value: number | string) {
 
 function formatStoredList(value?: string | null) {
   if (!value) return "-";
-  return value
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean)
-    .join(", ");
+  return value.split(",").map(v => v.trim()).join(", ");
 }
 
 export async function GET(
@@ -42,30 +38,33 @@ export async function GET(
 
     const pdfDoc = await PDFDocument.create();
     const page = pdfDoc.addPage([595.28, 841.89]);
+
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
     const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
     const { width, height } = page.getSize();
     const left = 50;
-    let y = height - 56;
+    const right = width - 50;
 
     const draw = (
       text: string,
       x: number,
-      yPos: number,
+      y: number,
       size = 10,
       isBold = false
     ) => {
       page.drawText(text, {
         x,
-        y: yPos,
+        y,
         size,
         font: isBold ? bold : font,
         color: rgb(0, 0, 0),
       });
     };
 
+    // ===== LOGO =====
     let logoBottomY = height - 100;
+
     try {
       const logoBytes = await fs.readFile(
         path.join(process.cwd(), "public", "Invoice Logo.png")
@@ -84,13 +83,15 @@ export async function GET(
         width: w,
         height: h,
       });
-    } catch {
-      // Keep PDF generation working even if logo file is missing
-    }
+    } catch {}
 
-    draw("INVOICE", width - 140, height - 90, 18, true);
+    // ===== TITLE =====
+    const titleY = height - 84;
+    draw("INVOICE", right - 95, titleY, 18, true);
 
-    y = logoBottomY - 10;
+    // ===== ADDRESS (slightly down) =====
+    let y = logoBottomY - 26;
+
     draw("34, Jalan Tembaga SD 5/2b,", left, y);
     y -= 14;
     draw("Bandar Sri Damansara,", left, y);
@@ -99,19 +100,23 @@ export async function GET(
     y -= 14;
     draw("012-310 6132", left, y);
 
-    y -= 25;
+    y -= 28;
+
     page.drawLine({
       start: { x: left, y },
-      end: { x: width - 50, y },
+      end: { x: right, y },
       thickness: 1,
       color: rgb(0.85, 0.85, 0.85),
     });
 
-    y -= 18;
-    draw(`Invoice No: ${order.orderNumber}`, left, y, 10, true);
-    draw(`Date: ${formatDate(order.createdAt)}`, width - 170, y, 10, true);
+    // ===== HEADER INFO =====
+    y -= 20;
 
-    y -= 26;
+    draw(`Invoice No: ${order.orderNumber}`, left, y, 10, true);
+    draw(`Date: ${formatDate(order.createdAt)}`, right - 140, y, 10, true);
+
+    // ===== BILL TO =====
+    y -= 28;
     draw("Bill To:", left, y, 12, true);
     y -= 16;
     draw(order.user?.name || "-", left, y);
@@ -120,24 +125,26 @@ export async function GET(
     y -= 14;
     draw(order.user?.email || "-", left, y);
 
-    y -= 40;
+    // ===== ITEMS =====
+    y -= 36;
     draw("Items", left, y, 12, true);
 
-    const headerY = y - 22;
+    const headerY = y - 34;
+
     page.drawRectangle({
       x: left,
       y: headerY,
       width: width - 100,
-      height: 26,
+      height: 28,
       color: rgb(0.95, 0.95, 0.95),
       borderWidth: 0.5,
       borderColor: rgb(0.8, 0.8, 0.8),
     });
 
-    draw("Description", left + 8, headerY + 8, 10, true);
-    draw("Amount", width - 125, headerY + 8, 10, true);
+    draw("Description", left + 10, headerY + 9, 10, true);
+    draw("Amount", right - 85, headerY + 9, 10, true);
 
-    y = headerY - 20;
+    y = headerY - 26;
 
     const lines = [
       `Tuning Type: ${order.tuningType || "-"}`,
@@ -145,7 +152,7 @@ export async function GET(
       `Model / Generation: ${order.vehicleModel || "-"}`,
       `Engine / Variant: ${order.engineModel || "-"}`,
       `Year / Range: ${order.vehicleYear || "-"}`,
-      `Capacity: ${order.engineCapacity ? `${order.engineCapacity}cc` : "-"}`,
+      `Capacity: ${order.engineCapacity ? order.engineCapacity + "cc" : "-"}`,
       `ECU Stage: ${formatEcuStageLabel(order.ecuStage) || "-"}`,
       `Turbo Setup: ${formatTurboSetupLabel(order.turboType) || "-"}`,
       `Hardware Mods: ${formatStoredList(order.hardwareMods)}`,
@@ -156,11 +163,31 @@ export async function GET(
     ];
 
     for (const line of lines) {
-      draw(line, left + 8, y, 9);
+      draw(line, left + 10, y, 9);
       y -= 12;
     }
 
-    draw(formatMoney(order.totalAmount), width - 125, headerY - 20, 10);
+    draw(formatMoney(order.totalAmount), right - 92, headerY - 18, 10);
+
+    // ===== TOTAL =====
+    y -= 14;
+
+    page.drawLine({
+      start: { x: left, y },
+      end: { x: right, y },
+      thickness: 1,
+      color: rgb(0.85, 0.85, 0.85),
+    });
+
+    y -= 28;
+    draw("Grand Total:", right - 165, y, 12, true);
+    draw(formatMoney(order.totalAmount), right - 92, y, 12, true);
+
+    // ===== FOOTER =====
+    y -= 54;
+    draw("Thank you for your business.", left, y, 10);
+    y -= 14;
+    draw("We appreciate your support and trust in RK Motorsports.", left, y, 10);
 
     const pdfBytes = await pdfDoc.save();
     const fileSuffix = order.orderNumber.replace(/^RK-/, "");
@@ -169,11 +196,10 @@ export async function GET(
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `attachment; filename="RK-INV-${fileSuffix}.pdf"`,
-        "Cache-Control": "private, no-store",
       },
     });
   } catch (error) {
-    console.error("Invoice generation failed:", error);
+    console.error(error);
     return NextResponse.json({ message: "Error" }, { status: 500 });
   }
 }
