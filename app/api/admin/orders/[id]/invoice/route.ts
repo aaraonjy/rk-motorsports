@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import fs from "node:fs/promises";
+import path from "node:path";
 
 function formatDate(value: Date) {
   return new Date(value).toLocaleDateString("en-MY");
@@ -62,9 +64,27 @@ export async function GET(
       });
     };
 
-    // Header
-    drawText("RK MOTORSPORTS", left, y, 20, true);
-    y -= 24;
+    // Logo
+    try {
+      const logoPath = path.join(process.cwd(), "public", "logo.png");
+      const logoBytes = await fs.readFile(logoPath);
+      const logoImage = await pdfDoc.embedPng(logoBytes);
+      const logoDims = logoImage.scale(0.32);
+
+      page.drawImage(logoImage, {
+        x: left,
+        y: height - 92,
+        width: logoDims.width,
+        height: logoDims.height,
+      });
+    } catch (logoError) {
+      console.error("Invoice logo load failed:", logoError);
+    }
+
+    drawText("INVOICE", width - 130, height - 50, 18, true);
+
+    // Company address block
+    y = height - 130;
     drawText("34, Jalan Tembaga SD 5/2b,", left, y);
     y -= 14;
     drawText("Bandar Sri Damansara,", left, y);
@@ -72,8 +92,6 @@ export async function GET(
     drawText("52200 Kuala Lumpur, Selangor", left, y);
     y -= 14;
     drawText("012-310 6132", left, y);
-
-    drawText("INVOICE", width - 130, height - 50, 18, true);
 
     y -= 34;
     page.drawLine({
@@ -113,35 +131,36 @@ export async function GET(
     y -= 14;
     drawText(`TCU Stage: ${order.tcuStage || "-"}`, left, y);
 
-    y -= 28;
+    // Items heading with proper spacing
+    y -= 32;
     drawText("Items", left, y, 12, true);
-    y -= 18;
 
+    y -= 26;
     page.drawRectangle({
       x: left,
-      y: y - 4,
+      y,
       width: width - 100,
-      height: 22,
+      height: 26,
       color: rgb(0.95, 0.95, 0.95),
       borderWidth: 0.5,
       borderColor: rgb(0.8, 0.8, 0.8),
     });
 
-    drawText("Description", left + 8, y + 3, 10, true);
-    drawText("Amount", width - 120, y + 3, 10, true);
+    drawText("Description", left + 8, y + 8, 10, true);
+    drawText("Amount", width - 125, y + 8, 10, true);
 
-    y -= 28;
+    y -= 30;
 
     if (order.items.length > 0) {
       for (const item of order.items) {
         const title = item.product?.title || "Tuning Service";
         drawText(title, left + 8, y, 10);
-        drawText(formatMoney(item.price), width - 120, y, 10);
+        drawText(formatMoney(item.price), width - 125, y, 10);
         y -= 18;
       }
     } else {
       drawText("Tuning Service", left + 8, y, 10);
-      drawText(formatMoney(order.totalAmount), width - 120, y, 10);
+      drawText(formatMoney(order.totalAmount), width - 125, y, 10);
       y -= 18;
     }
 
@@ -155,7 +174,7 @@ export async function GET(
 
     y -= 24;
     drawText("Total:", width - 180, y, 12, true);
-    drawText(formatMoney(order.totalAmount), width - 120, y, 12, true);
+    drawText(formatMoney(order.totalAmount), width - 125, y, 12, true);
 
     y -= 50;
     drawText("Thank you for your business.", left, y, 10);
