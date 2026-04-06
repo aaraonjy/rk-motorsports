@@ -164,7 +164,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 type="text"
                 name="search"
                 defaultValue={search}
-                placeholder="e.g. RK-20260328-2017"
+                placeholder="Search order number"
                 className="w-full rounded-xl border border-white/15 bg-black/50 px-4 py-3 text-white outline-none placeholder:text-white/35"
               />
             </div>
@@ -177,7 +177,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 type="text"
                 name="customerKeyword"
                 defaultValue={customerKeyword}
-                placeholder="e.g. James / +60123456789 / customer@email.com"
+                placeholder="Search name, phone, or email"
                 className="w-full rounded-xl border border-white/15 bg-black/50 px-4 py-3 text-white outline-none placeholder:text-white/35"
               />
             </div>
