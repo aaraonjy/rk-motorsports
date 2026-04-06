@@ -1,4 +1,4 @@
-import { Ratelimit } from "@upstash/ratelimit";
+import { Ratelimit, type Duration } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 
 type RateLimitCheckInput = {
@@ -67,9 +67,13 @@ export function normalizeEmail(value: string) {
   return value.trim().toLowerCase();
 }
 
-export function createRateLimitKey(...parts: Array<string | number | null | undefined>) {
+export function createRateLimitKey(
+  ...parts: Array<string | number | null | undefined>
+) {
   return parts
-    .filter((part) => part !== null && part !== undefined && String(part).trim() !== "")
+    .filter(
+      (part) => part !== null && part !== undefined && String(part).trim() !== ""
+    )
     .map((part) => encodeURIComponent(String(part).trim()))
     .join(":");
 }
@@ -78,22 +82,22 @@ function getWindowSeconds(windowMs: number) {
   return Math.max(1, Math.ceil(windowMs / 1000));
 }
 
-function getUpstashDuration(windowMs: number) {
+function getUpstashDuration(windowMs: number): Duration {
   const seconds = getWindowSeconds(windowMs);
 
   if (seconds % 86400 === 0) {
-    return `${seconds / 86400} d`;
+    return `${seconds / 86400} d` as Duration;
   }
 
   if (seconds % 3600 === 0) {
-    return `${seconds / 3600} h`;
+    return `${seconds / 3600} h` as Duration;
   }
 
   if (seconds % 60 === 0) {
-    return `${seconds / 60} m`;
+    return `${seconds / 60} m` as Duration;
   }
 
-  return `${seconds} s`;
+  return `${seconds} s` as Duration;
 }
 
 function getUpstashLimiter(limit: number, windowMs: number) {
