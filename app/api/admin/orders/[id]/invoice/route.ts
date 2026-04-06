@@ -180,8 +180,8 @@ export async function GET(
     });
 
     y -= 28;
-    draw("Grand Total:", right - 140, y, 12, true);
-    draw(formatMoney(order.totalAmount), right - 70, y, 12, true);
+    draw("Grand Total:", right - 165, y, 12, true);
+    draw(formatMoney(order.totalAmount), right - 92, y, 12, true);
 
     // ===== FOOTER =====
     y -= 54;
