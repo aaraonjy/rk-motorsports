@@ -1,4 +1,4 @@
-"use client";
+ "use client";
 
 import { useState } from "react";
 import Link from "next/link";
@@ -52,7 +52,6 @@ type UploadModalState =
       orderId: string;
     }
   | null;
-
 
 type ApiResponse = {
   ok?: boolean;
@@ -552,57 +551,56 @@ function UploadConfirmModal({
           </p>
         </div>
 
+        <form
+          action={action}
+          method="post"
+          encType="multipart/form-data"
+          className="mt-6 space-y-4"
+          onSubmit={async (e) => {
+            if (fileError) {
+              e.preventDefault();
+              return;
+            }
 
-<form
-  action={action}
-  method="post"
-  encType="multipart/form-data"
-  className="mt-6 space-y-4"
-  onSubmit={async (e) => {
-    if (fileError) {
-      e.preventDefault();
-      return;
-    }
+            if (!isCustomerPayment) {
+              setIsSubmitting(true);
+              return;
+            }
 
-    if (!isCustomerPayment) {
-      setIsSubmitting(true);
-      return;
-    }
+            e.preventDefault();
+            setSubmitError(null);
+            setIsSubmitting(true);
 
-    e.preventDefault();
-    setSubmitError(null);
-    setIsSubmitting(true);
+            try {
+              const formData = new FormData(e.currentTarget);
+              const response = await fetch(action, {
+                method: "POST",
+                body: formData,
+                headers: {
+                  "x-rk-client-submit": "1",
+                },
+              });
 
-    try {
-      const formData = new FormData(e.currentTarget);
-      const response = await fetch(action, {
-        method: "POST",
-        body: formData,
-        headers: {
-          "x-rk-client-submit": "1",
-        },
-      });
+              const data = (await response.json()) as ApiResponse;
 
-      const data = (await response.json()) as ApiResponse;
+              if (!response.ok || !data.ok) {
+                setSubmitError(data.error || "Unable to upload payment slip right now. Please try again.");
+                return;
+              }
 
-      if (!response.ok || !data.ok) {
-        setSubmitError(data.error || "Unable to upload payment slip right now. Please try again.");
-        return;
-      }
-
-      setRemark("");
-      setFileError(null);
-      setSubmitError(null);
-      onClose();
-      router.push(data.redirectTo || "/dashboard");
-      router.refresh();
-    } catch {
-      setSubmitError("Unable to upload payment slip right now. Please try again.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  }}
->
+              setRemark("");
+              setFileError(null);
+              setSubmitError(null);
+              onClose();
+              router.push(data.redirectTo || "/dashboard");
+              router.refresh();
+            } catch {
+              setSubmitError("Unable to upload payment slip right now. Please try again.");
+            } finally {
+              setIsSubmitting(false);
+            }
+          }}
+        >
           {target ? <input type="hidden" name="target" value={target} /> : null}
 
           <div>
@@ -956,12 +954,12 @@ export function OrderTable({
                       {new Date(order.createdAt).toLocaleDateString()}
                     </div>
                     <div className="text-white/35 text-xs">
-                    {new Date(order.createdAt).toLocaleTimeString([], {
-                      hour: "numeric",
-                      minute: "2-digit",
-                      hour12: true,
-                    })}
-                  </div>
+                      {new Date(order.createdAt).toLocaleTimeString([], {
+                        hour: "numeric",
+                        minute: "2-digit",
+                        hour12: true,
+                      })}
+                    </div>
                   </td>
 
                   {admin ? (
@@ -1177,21 +1175,20 @@ export function OrderTable({
                             </button>
                           ) : null}
 
-                          {order.status === "READY_FOR_DOWNLOAD" ? (
+                          {["READY_FOR_DOWNLOAD", "COMPLETED"].includes(order.status) ? (
                             <span className="inline-flex w-full items-center justify-center rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-center text-sm text-emerald-400">
                               Download Released
                             </span>
                           ) : null}
 
-                          {order.status === "COMPLETED" ? (
+                          {["READY_FOR_DOWNLOAD", "COMPLETED"].includes(order.status) ? (
                             <Link
                               href={`/api/admin/orders/${order.id}/invoice`}
-                              className="w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center text-sm transition hover:bg-white/10"
+                              className="inline-flex w-full items-center justify-center rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center text-sm transition hover:bg-white/10"
                             >
                               Download Invoice
                             </Link>
                           ) : null}
-
                         </div>
                       )
                     ) : order.status === "CANCELLED" ? (
