@@ -9,7 +9,7 @@ type AdminPageProps = {
   searchParams?: Promise<{
     status?: string;
     search?: string;
-    customerEmail?: string;
+    customerKeyword?: string;
     tuningType?: string;
     dateFrom?: string;
     dateTo?: string;
@@ -112,7 +112,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const params = (await searchParams) || {};
   const status = params.status || "ALL";
   const search = params.search || "";
-  const customerEmail = params.customerEmail || "";
+  const customerKeyword = params.customerKeyword || "";
   const tuningType = params.tuningType || "ALL";
   const dateFrom = params.dateFrom || "";
   const dateTo = params.dateTo || "";
@@ -122,7 +122,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const result = (await getAllOrders({
     status,
     search,
-    customerEmail,
+    customerKeyword,
     tuningType,
     dateFrom,
     dateTo,
@@ -150,7 +150,8 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         <div className="mt-8 space-y-4">
           <div className="card-rk p-6 text-white/75">
             <p>
-              Search by order number, customer email, status, tuning type, or date range to manage customer orders more efficiently.
+              Search by order number, customer name, phone number, email, status,
+              tuning type, or date range to manage customer orders more efficiently.
             </p>
           </div>
 
@@ -170,13 +171,13 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
 
             <div>
               <label className="mb-2 block text-sm text-white/65">
-                Customer Email
+                Customer Name / Phone Number / Email
               </label>
               <input
                 type="text"
-                name="customerEmail"
-                defaultValue={customerEmail}
-                placeholder="e.g. customer@email.com"
+                name="customerKeyword"
+                defaultValue={customerKeyword}
+                placeholder="e.g. James / +60123456789 / customer@email.com"
                 className="w-full rounded-xl border border-white/15 bg-black/50 px-4 py-3 text-white outline-none placeholder:text-white/35"
               />
             </div>
@@ -303,7 +304,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             params={{
               status: status !== "ALL" ? status : undefined,
               search: search || undefined,
-              customerEmail: customerEmail || undefined,
+              customerKeyword: customerKeyword || undefined,
               tuningType: tuningType !== "ALL" ? tuningType : undefined,
               dateFrom: dateFrom || undefined,
               dateTo: dateTo || undefined,

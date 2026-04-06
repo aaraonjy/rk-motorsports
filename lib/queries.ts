@@ -55,7 +55,7 @@ export async function getRecentOrdersForUser(
 type AllOrdersOptions = {
   status?: string;
   search?: string;
-  customerEmail?: string;
+  customerKeyword?: string;
   tuningType?: string;
   dateFrom?: string;
   dateTo?: string;
@@ -97,13 +97,29 @@ export async function getAllOrders(filters?: AllOrdersOptions) {
           },
         }
       : {}),
-    ...(filters?.customerEmail
+    ...(filters?.customerKeyword
       ? {
           user: {
-            email: {
-              contains: filters.customerEmail,
-              mode: "insensitive",
-            },
+            OR: [
+              {
+                name: {
+                  contains: filters.customerKeyword,
+                  mode: "insensitive",
+                },
+              },
+              {
+                phone: {
+                  contains: filters.customerKeyword,
+                  mode: "insensitive",
+                },
+              },
+              {
+                email: {
+                  contains: filters.customerKeyword,
+                  mode: "insensitive",
+                },
+              },
+            ],
           },
         }
       : {}),
