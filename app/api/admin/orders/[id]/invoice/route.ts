@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/auth";
+import { getSessionUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import fs from "node:fs/promises";
@@ -37,7 +37,12 @@ export async function GET(
   ctx: { params: Promise<{ id: string }> }
 ) {
   try {
-    await requireAdmin();
+    const user = await getSessionUser();
+
+    if (!user) {
+      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    }
+
     const { id } = await ctx.params;
 
     const order = await db.order.findUnique({
@@ -47,6 +52,13 @@ export async function GET(
 
     if (!order) {
       return NextResponse.json({ message: "Not found" }, { status: 404 });
+    }
+
+    const isAdmin = user.role === "ADMIN";
+    const isOwner = order.userId === user.id;
+
+    if (!isAdmin && !isOwner) {
+      return NextResponse.json({ message: "Forbidden" }, { status: 403 });
     }
 
     const pdfDoc = await PDFDocument.create();

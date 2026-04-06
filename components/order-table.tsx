@@ -1223,6 +1223,24 @@ export function OrderTable({
                             Upload Payment Slip
                           </button>
                         )}
+
+                        <Link
+                          href={`/api/admin/orders/${order.id}/invoice`}
+                          className="inline-flex w-full min-h-[44px] flex-col items-center justify-center rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center text-sm leading-5 transition hover:bg-white/10"
+                        >
+                          <span>Download</span>
+                          <span>Invoice</span>
+                        </Link>
+                      </div>
+                    ) : ["READY_FOR_DOWNLOAD", "COMPLETED"].includes(order.status) ? (
+                      <div className="flex w-full max-w-[170px] flex-col gap-2">
+                        <Link
+                          href={`/api/admin/orders/${order.id}/invoice`}
+                          className="inline-flex w-full min-h-[44px] flex-col items-center justify-center rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center text-sm leading-5 transition hover:bg-white/10"
+                        >
+                          <span>Download</span>
+                          <span>Invoice</span>
+                        </Link>
                       </div>
                     ) : ["FILE_RECEIVED", "IN_PROGRESS"].includes(order.status) ? (
                       <button
