@@ -1182,6 +1182,16 @@ export function OrderTable({
                               Download Released
                             </span>
                           ) : null}
+
+                          {order.status === "COMPLETED" ? (
+                            <Link
+                              href={`/api/admin/orders/${order.id}/invoice`}
+                              className="w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center text-sm transition hover:bg-white/10"
+                            >
+                              Download Invoice
+                            </Link>
+                          ) : null}
+
                         </div>
                       )
                     ) : order.status === "CANCELLED" ? (
