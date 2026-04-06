@@ -134,9 +134,6 @@ export async function GET(
     y -= 14;
     draw(order.user?.email || "-", left, y);
 
-    y -= 36;
-    draw("Items", left, y, 12, true);
-
     const headerY = y - 34;
 
     page.drawRectangle({
