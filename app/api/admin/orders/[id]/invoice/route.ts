@@ -64,19 +64,19 @@ export async function GET(
       });
     };
 
-    // Header row: logo left, invoice title aligned on same top line
-    let logoBottomY = height - 110;
+    // Header row: smaller logo left, invoice title right
+    let logoBottomY = height - 108;
     try {
       const logoPath = path.join(process.cwd(), "public", "Invoice Logo.png");
       const logoBytes = await fs.readFile(logoPath);
       const logoImage = await pdfDoc.embedPng(logoBytes);
 
-      const targetWidth = 270;
+      const targetWidth = 180;
       const scale = targetWidth / logoImage.width;
       const logoWidth = logoImage.width * scale;
       const logoHeight = logoImage.height * scale;
 
-      logoBottomY = height - 56 - logoHeight + 8;
+      logoBottomY = height - 56 - logoHeight + 6;
 
       page.drawImage(logoImage, {
         x: left,
@@ -91,7 +91,7 @@ export async function GET(
     drawText("INVOICE", width - 140, height - 56, 18, true);
 
     // Company address block below header row
-    y = Math.min(logoBottomY - 18, height - 150);
+    y = Math.min(logoBottomY - 22, height - 160);
     drawText("34, Jalan Tembaga SD 5/2b,", left, y);
     y -= 14;
     drawText("Bandar Sri Damansara,", left, y);
@@ -109,7 +109,7 @@ export async function GET(
     });
 
     y -= 24;
-    drawText(`Invoice No: RK-${order.orderNumber}`, left, y, 10, true);
+    drawText(`Invoice No: ${order.orderNumber}`, left, y, 10, true);
     drawText(`Date: ${formatDate(order.createdAt)}`, width - 170, y, 10, true);
 
     y -= 28;
@@ -138,11 +138,11 @@ export async function GET(
     y -= 14;
     drawText(`TCU Stage: ${order.tcuStage || "-"}`, left, y);
 
-    // Items heading with clear spacing above table
-    y -= 42;
+    // Items heading with more spacing above table
+    y -= 48;
     drawText("Items", left, y, 12, true);
 
-    const headerY = y - 22;
+    const headerY = y - 26;
     page.drawRectangle({
       x: left,
       y: headerY,
