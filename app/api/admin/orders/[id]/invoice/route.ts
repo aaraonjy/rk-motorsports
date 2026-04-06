@@ -22,11 +22,6 @@ function formatStoredList(value?: string | null) {
     .join(", ");
 }
 
-function formatWaterMethanol(value?: string | null) {
-  if (!value || value === "Not selected") return "-";
-  return value;
-}
-
 export async function GET(
   req: Request,
   ctx: { params: Promise<{ id: string }> }
@@ -40,11 +35,6 @@ export async function GET(
       where: { id },
       include: {
         user: true,
-        items: {
-          include: {
-            product: true,
-          },
-        },
       },
     });
 
@@ -53,7 +43,7 @@ export async function GET(
     }
 
     const pdfDoc = await PDFDocument.create();
-    const page = pdfDoc.addPage([595.28, 841.89]); // A4
+    const page = pdfDoc.addPage([595.28, 841.89]);
     const fontRegular = await pdfDoc.embedFont(StandardFonts.Helvetica);
     const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
@@ -66,27 +56,25 @@ export async function GET(
       x: number,
       yPos: number,
       size = 10,
-      bold = false,
-      color = rgb(0, 0, 0)
+      bold = false
     ) => {
       page.drawText(text, {
         x,
         y: yPos,
         size,
         font: bold ? fontBold : fontRegular,
-        color,
+        color: rgb(0, 0, 0),
       });
     };
 
-    // Header row: smaller logo left, invoice title right
+    // Logo
     let logoBottomY = height - 108;
     try {
       const logoPath = path.join(process.cwd(), "public", "Invoice Logo.png");
       const logoBytes = await fs.readFile(logoPath);
       const logoImage = await pdfDoc.embedPng(logoBytes);
 
-      const targetWidth = 180;
-      const scale = targetWidth / logoImage.width;
+      const scale = 180 / logoImage.width;
       const logoWidth = logoImage.width * scale;
       const logoHeight = logoImage.height * scale;
 
@@ -98,15 +86,13 @@ export async function GET(
         width: logoWidth,
         height: logoHeight,
       });
-    } catch (logoError) {
-      console.error("Invoice logo load failed:", logoError);
-    }
+    } catch {}
 
-    // Move INVOICE title slightly down to align better with logo
-    drawText("INVOICE", width - 140, height - 66, 18, true);
+    // Move INVOICE lower again
+    drawText("INVOICE", width - 140, height - 80, 18, true);
 
-    // Company address block below header row
     y = Math.min(logoBottomY - 22, height - 160);
+
     drawText("34, Jalan Tembaga SD 5/2b,", left, y);
     y -= 14;
     drawText("Bandar Sri Damansara,", left, y);
@@ -115,7 +101,7 @@ export async function GET(
     y -= 14;
     drawText("012-310 6132", left, y);
 
-    y -= 34;
+    y -= 30;
     page.drawLine({
       start: { x: left, y },
       end: { x: width - 50, y },
@@ -123,11 +109,11 @@ export async function GET(
       color: rgb(0.85, 0.85, 0.85),
     });
 
-    y -= 24;
+    y -= 20;
     drawText(`Invoice No: ${order.orderNumber}`, left, y, 10, true);
     drawText(`Date: ${formatDate(order.createdAt)}`, width - 170, y, 10, true);
 
-    y -= 28;
+    y -= 26;
     drawText("Bill To:", left, y, 12, true);
     y -= 16;
     drawText(order.user?.name || "-", left, y);
@@ -136,44 +122,12 @@ export async function GET(
     y -= 14;
     drawText(order.user?.email || "-", left, y);
 
-    y -= 28;
-    drawText("Order Information", left, y, 12, true);
-    y -= 18;
-    drawText(`Tuning Type: ${order.tuningType || "ECU"}`, left, y);
-    y -= 14;
-    drawText(`Brand: ${order.vehicleBrand || "-"}`, left, y);
-    y -= 14;
-    drawText(`Model / Generation: ${order.vehicleModel || "-"}`, left, y);
-    y -= 14;
-    drawText(`Engine / Variant: ${order.engineModel || "-"}`, left, y);
-    y -= 14;
-    drawText(`Year / Range: ${order.vehicleYear || "-"}`, left, y);
-    y -= 14;
-    drawText(`Capacity: ${order.engineCapacity ? `${order.engineCapacity}cc` : "-"}`, left, y);
-    y -= 14;
-    drawText(`ECU Stage: ${order.ecuStage || "-"}`, left, y);
-    y -= 14;
-    drawText(`Turbo Setup: ${order.turboType || "-"}`, left, y);
-    y -= 14;
-    drawText(`Hardware Mods: ${formatStoredList(order.hardwareMods)}`, left, y);
-    y -= 14;
-    drawText(`ECU Type: ${order.ecuType || "-"}`, left, y);
-    y -= 14;
-    drawText(`ECU Read Tool: ${order.ecuReadTool || "-"}`, left, y);
-    y -= 14;
-    drawText(`Fuel Grade: ${order.fuelGrade || "-"}`, left, y);
-    y -= 14;
-    drawText(
-      `Water Methanol Injection: ${formatWaterMethanol(order.waterMethanolInjection)}`,
-      left,
-      y
-    );
-
-    // Items heading with a bit more clearance from the table
-    y -= 38;
+    // Items section
+    y -= 40;
     drawText("Items", left, y, 12, true);
 
-    const headerY = y - 30;
+    const headerY = y - 28;
+
     page.drawRectangle({
       x: left,
       y: headerY,
@@ -187,16 +141,34 @@ export async function GET(
     drawText("Description", left + 8, headerY + 8, 10, true);
     drawText("Amount", width - 125, headerY + 8, 10, true);
 
-    y = headerY - 28;
+    y = headerY - 20;
 
-    const stageLabel = order.ecuStage || order.tcuStage || "-";
-    const descriptionText = `${order.tuningType || "ECU"} Tuning - ${order.vehicleBrand || "-"} ${order.vehicleModel || "-"} - ${stageLabel}`;
+    // FULL DETAILS inside description
+    const lines = [
+      `Tuning Type: ${order.tuningType || "-"}`,
+      `Brand: ${order.vehicleBrand || "-"}`,
+      `Model / Generation: ${order.vehicleModel || "-"}`,
+      `Engine / Variant: ${order.engineModel || "-"}`,
+      `Year / Range: ${order.vehicleYear || "-"}`,
+      `Capacity: ${order.engineCapacity ? order.engineCapacity + "cc" : "-"}`,
+      `ECU Stage: ${order.ecuStage || "-"}`,
+      `Turbo Setup: ${order.turboType || "-"}`,
+      `Hardware Mods: ${formatStoredList(order.hardwareMods)}`,
+      `ECU Type: ${order.ecuType || "-"}`,
+      `ECU Read Tool: ${order.ecuReadTool || "-"}`,
+      `Fuel Grade: ${order.fuelGrade || "-"}`,
+      `Water Methanol Injection: ${order.waterMethanolInjection || "-"}`,
+    ];
 
-    drawText(descriptionText, left + 8, y, 10);
-    drawText(formatMoney(order.totalAmount), width - 125, y, 10);
-    y -= 18;
+    for (const line of lines) {
+      drawText(line, left + 8, y, 9);
+      y -= 12;
+    }
+
+    drawText(formatMoney(order.totalAmount), width - 125, headerY - 20, 10);
 
     y -= 10;
+
     page.drawLine({
       start: { x: left, y },
       end: { x: width - 50, y },
@@ -218,11 +190,9 @@ export async function GET(
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `attachment; filename="RK-INV-${fileSuffix}.pdf"`,
-        "Cache-Control": "private, no-store",
       },
     });
   } catch (error) {
-    console.error("Invoice generation failed:", error);
     return NextResponse.json({ message: "Error" }, { status: 500 });
   }
 }
