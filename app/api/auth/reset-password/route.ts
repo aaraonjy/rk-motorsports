@@ -1,9 +1,18 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { hashPassword } from "@/lib/auth";
 import { validatePasswordComplexity } from "@/lib/password-validation";
+import {
+  buildRateLimitHeaders,
+  checkRateLimit,
+  createRateLimitKey,
+  getClientIp,
+} from "@/lib/rate-limit";
 
-export async function POST(req: Request) {
+const RESET_PASSWORD_LIMIT = 5;
+const RESET_PASSWORD_WINDOW_MS = 30 * 60 * 1000;
+
+export async function POST(req: NextRequest) {
   try {
     const form = await req.formData();
 
@@ -11,17 +20,42 @@ export async function POST(req: Request) {
     const password = String(form.get("password") || "");
     const confirmPassword = String(form.get("confirmPassword") || "");
 
+    const rateLimitResult = await checkRateLimit({
+      key: createRateLimitKey("reset-password", "ip", getClientIp(req)),
+      limit: RESET_PASSWORD_LIMIT,
+      windowMs: RESET_PASSWORD_WINDOW_MS,
+    });
+
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Too many reset password attempts. Please try again later.",
+        },
+        {
+          status: 429,
+          headers: buildRateLimitHeaders(rateLimitResult),
+        }
+      );
+    }
+
     if (!token || !password || !confirmPassword) {
       return NextResponse.json(
         { ok: false, error: "All fields are required." },
-        { status: 400 }
+        {
+          status: 400,
+          headers: buildRateLimitHeaders(rateLimitResult),
+        }
       );
     }
 
     if (password !== confirmPassword) {
       return NextResponse.json(
         { ok: false, error: "Password confirmation does not match." },
-        { status: 400 }
+        {
+          status: 400,
+          headers: buildRateLimitHeaders(rateLimitResult),
+        }
       );
     }
 
@@ -29,7 +63,10 @@ export async function POST(req: Request) {
     if (passwordError) {
       return NextResponse.json(
         { ok: false, error: passwordError },
-        { status: 400 }
+        {
+          status: 400,
+          headers: buildRateLimitHeaders(rateLimitResult),
+        }
       );
     }
 
@@ -45,7 +82,10 @@ export async function POST(req: Request) {
     if (!user) {
       return NextResponse.json(
         { ok: false, error: "Reset token is invalid or has expired." },
-        { status: 400 }
+        {
+          status: 400,
+          headers: buildRateLimitHeaders(rateLimitResult),
+        }
       );
     }
 
@@ -60,10 +100,15 @@ export async function POST(req: Request) {
       },
     });
 
-    return NextResponse.json({
-      ok: true,
-      redirectTo: "/login",
-    });
+    return NextResponse.json(
+      {
+        ok: true,
+        redirectTo: "/login",
+      },
+      {
+        headers: buildRateLimitHeaders(rateLimitResult),
+      }
+    );
   } catch {
     return NextResponse.json(
       { ok: false, error: "Unable to reset password right now. Please try again." },

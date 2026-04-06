@@ -1,0 +1,123 @@
+import { NextRequest, NextResponse } from "next/server";
+import { getSessionUser } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { saveFile, validateSinglePaymentUploadFile } from "@/lib/storage";
+import {
+  checkRateLimit,
+  createRateLimitKey,
+} from "@/lib/rate-limit";
+
+const PAYMENT_UPLOAD_LIMIT = 5;
+const PAYMENT_UPLOAD_WINDOW_MS = 15 * 60 * 1000;
+
+export async function POST(
+  req: NextRequest,
+  ctx: { params: Promise<{ id: string }> }
+) {
+  try {
+    const user = await getSessionUser();
+    const { id } = await ctx.params;
+
+    if (!user) {
+      return NextResponse.redirect(new URL("/login", req.url), 303);
+    }
+
+    const rateLimitResult = await checkRateLimit({
+      key: createRateLimitKey("payment-upload", "user", user.id),
+      limit: PAYMENT_UPLOAD_LIMIT,
+      windowMs: PAYMENT_UPLOAD_WINDOW_MS,
+      bypass: user.role === "ADMIN",
+    });
+
+    if (!rateLimitResult.success) {
+      return NextResponse.redirect(
+        new URL("/dashboard?error=too_many_requests", req.url),
+        303
+      );
+    }
+
+    const formData = await req.formData();
+    const file = formData.get("file");
+
+    if (!(file instanceof File) || file.size === 0) {
+      return NextResponse.redirect(new URL("/dashboard", req.url), 303);
+    }
+
+    const validationMessage = validateSinglePaymentUploadFile(file);
+
+    if (validationMessage) {
+      return NextResponse.json({ error: validationMessage }, { status: 400 });
+    }
+
+    const order = await db.order.findUnique({
+      where: { id },
+      include: { files: true },
+    });
+
+    if (!order || order.userId !== user.id) {
+      return NextResponse.redirect(new URL("/dashboard", req.url), 303);
+    }
+
+    const existingPayment = order.files.find(
+      (f) => f.kind === "CUSTOMER_PAYMENT_PROOF"
+    );
+
+    const saved = await saveFile(file, "customer-payment-proof");
+
+    if (existingPayment) {
+      await db.orderFile.update({
+        where: { id: existingPayment.id },
+        data: {
+          fileName: saved.fileName,
+          storagePath: saved.storagePath,
+          mimeType: saved.mimeType,
+        },
+      });
+    } else {
+      await db.orderFile.create({
+        data: {
+          orderId: order.id,
+          kind: "CUSTOMER_PAYMENT_PROOF",
+          fileName: saved.fileName,
+          storagePath: saved.storagePath,
+          mimeType: saved.mimeType,
+        },
+      });
+    }
+
+    await db.order.update({
+      where: { id: order.id },
+      data: {
+        status: "AWAITING_PAYMENT",
+      },
+    });
+
+    try {
+      const admins = await db.user.findMany({
+        where: { role: "ADMIN" },
+      });
+
+      await db.notification.createMany({
+        data: admins.map((admin) => ({
+          userId: admin.id,
+          type: "PAYMENT_UPLOADED",
+          title: "Payment slip uploaded",
+          message: `${user.name} uploaded payment proof.`,
+          orderId: order.id,
+        })),
+      });
+    } catch (err) {
+      console.error("Admin notification failed:", err);
+    }
+
+    const success = existingPayment ? "payment_replaced" : "payment_uploaded";
+
+    return NextResponse.redirect(
+      new URL(`/dashboard?success=${success}`, req.url),
+      303
+    );
+  } catch (error) {
+    console.error("Upload payment failed:", error);
+    return NextResponse.redirect(new URL("/dashboard", req.url), 303);
+  }
+}

@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
 import { generateOrderNumber } from "@/lib/utils";
@@ -12,6 +12,13 @@ import {
   calculateAddOnTotal,
   calculateBaseTuneTotal,
 } from "@/lib/tuning-pricing";
+import {
+  checkRateLimit,
+  createRateLimitKey,
+} from "@/lib/rate-limit";
+
+const SUBMIT_ORDER_LIMIT = 5;
+const SUBMIT_ORDER_WINDOW_MS = 15 * 60 * 1000;
 
 function normalizeTuningType(value: string) {
   if (value === "TCU") return "TCU";
@@ -31,13 +38,27 @@ function getOrderSubmittedRedirectPath(tuningType: string) {
   return "/dashboard?success=order_submitted_ecu";
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
     const form = await req.formData();
     const user = await getSessionUser();
 
     if (!user) {
       return NextResponse.redirect(new URL("/login", req.url), 303);
+    }
+
+    const rateLimitResult = await checkRateLimit({
+      key: createRateLimitKey("submit-order", "user", user.id),
+      limit: SUBMIT_ORDER_LIMIT,
+      windowMs: SUBMIT_ORDER_WINDOW_MS,
+      bypass: user.role === "ADMIN",
+    });
+
+    if (!rateLimitResult.success) {
+      return NextResponse.redirect(
+        new URL("/custom-tuning?error=too_many_requests", req.url),
+        303
+      );
     }
 
     const productId = String(form.get("productId") || "");

@@ -1,8 +1,18 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createSession, verifyPassword } from "@/lib/auth";
 import { db } from "@/lib/db";
+import {
+  buildRateLimitHeaders,
+  checkRateLimits,
+  createRateLimitKey,
+  getClientIp,
+  normalizeEmail,
+} from "@/lib/rate-limit";
 
-export async function POST(req: Request) {
+const LOGIN_LIMIT = 5;
+const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+
+export async function POST(req: NextRequest) {
   try {
     const form = await req.formData();
     const email = String(form.get("email") || "").trim().toLowerCase();
@@ -15,12 +25,42 @@ export async function POST(req: Request) {
       );
     }
 
+    const ip = getClientIp(req);
+    const rateLimitResult = await checkRateLimits([
+      {
+        key: createRateLimitKey("login", "ip", ip),
+        limit: LOGIN_LIMIT,
+        windowMs: LOGIN_WINDOW_MS,
+      },
+      {
+        key: createRateLimitKey("login", "email", normalizeEmail(email)),
+        limit: LOGIN_LIMIT,
+        windowMs: LOGIN_WINDOW_MS,
+      },
+    ]);
+
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Too many login attempts. Please try again later.",
+        },
+        {
+          status: 429,
+          headers: buildRateLimitHeaders(rateLimitResult),
+        }
+      );
+    }
+
     const user = await db.user.findUnique({ where: { email } });
 
     if (!user) {
       return NextResponse.json(
         { ok: false, error: "Invalid email or password." },
-        { status: 401 }
+        {
+          status: 401,
+          headers: buildRateLimitHeaders(rateLimitResult),
+        }
       );
     }
 
@@ -29,16 +69,24 @@ export async function POST(req: Request) {
     if (!ok) {
       return NextResponse.json(
         { ok: false, error: "Invalid email or password." },
-        { status: 401 }
+        {
+          status: 401,
+          headers: buildRateLimitHeaders(rateLimitResult),
+        }
       );
     }
 
     await createSession(user.id);
 
-    return NextResponse.json({
-      ok: true,
-      redirectTo: user.role === "ADMIN" ? "/admin" : "/dashboard",
-    });
+    return NextResponse.json(
+      {
+        ok: true,
+        redirectTo: user.role === "ADMIN" ? "/admin" : "/dashboard",
+      },
+      {
+        headers: buildRateLimitHeaders(rateLimitResult),
+      }
+    );
   } catch {
     return NextResponse.json(
       { ok: false, error: "Unable to login right now. Please try again." },
