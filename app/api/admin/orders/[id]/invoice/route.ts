@@ -89,7 +89,7 @@ export async function GET(
     const titleY = height - 84;
     draw("INVOICE", right - 95, titleY, 18, true);
 
-    // ===== ADDRESS (slightly down) =====
+    // ===== ADDRESS =====
     let y = logoBottomY - 26;
 
     draw("34, Jalan Tembaga SD 5/2b,", left, y);
@@ -112,8 +112,10 @@ export async function GET(
     // ===== HEADER INFO =====
     y -= 20;
 
+    const rightAlignX = right - 94; // ✅ unified alignment
+
     draw(`Invoice No: ${order.orderNumber}`, left, y, 10, true);
-    draw(`Date: ${formatDate(order.createdAt)}`, right - 94, y, 10, true);
+    draw(`Date: ${formatDate(order.createdAt)}`, rightAlignX, y, 10, true);
 
     // ===== BILL TO =====
     y -= 28;
@@ -142,7 +144,7 @@ export async function GET(
     });
 
     draw("Description", left + 10, headerY + 9, 10, true);
-    draw("Amount", right - 85, headerY + 9, 10, true);
+    draw("Amount", rightAlignX, headerY + 9, 10, true); // ✅ aligned
 
     y = headerY - 26;
 
@@ -167,7 +169,7 @@ export async function GET(
       y -= 12;
     }
 
-    draw(formatMoney(order.totalAmount), right - 92, headerY - 18, 10);
+    draw(formatMoney(order.totalAmount), rightAlignX, headerY - 18, 10); // ✅ aligned
 
     // ===== TOTAL =====
     y -= 14;
@@ -180,8 +182,8 @@ export async function GET(
     });
 
     y -= 28;
-    draw("Grand Total:", right - 165, y, 12, true);
-    draw(formatMoney(order.totalAmount), right - 92, y, 12, true);
+    draw("Grand Total:", rightAlignX - 100, y, 12, true); // keep relative spacing
+    draw(formatMoney(order.totalAmount), rightAlignX, y, 12, true); // ✅ aligned
 
     // ===== FOOTER =====
     y -= 54;
