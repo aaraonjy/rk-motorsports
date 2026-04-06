@@ -4,7 +4,12 @@ import { db } from "@/lib/db";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { formatEcuStageLabel, formatTurboSetupLabel } from "@/lib/order-labels";
+import {
+  formatCurrentEcuSetupLabel,
+  formatEcuStageLabel,
+  formatTcuStageLabel,
+  formatTurboSetupLabel,
+} from "@/lib/order-labels";
 
 function formatDate(value: Date) {
   return new Date(value).toLocaleDateString("en-MY");
@@ -15,8 +20,16 @@ function formatMoney(value: number | string) {
 }
 
 function formatStoredList(value?: string | null) {
-  if (!value) return "-";
-  return value.split(",").map(v => v.trim()).join(", ");
+  if (!value) return "";
+  return value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .join(", ");
+}
+
+function isPresent(value?: string | null | number) {
+  return !!String(value ?? "").trim();
 }
 
 export async function GET(
@@ -45,6 +58,7 @@ export async function GET(
     const { width, height } = page.getSize();
     const left = 50;
     const right = width - 50;
+    const rightColumnX = right - 140;
 
     const draw = (
       text: string,
@@ -62,7 +76,6 @@ export async function GET(
       });
     };
 
-    // ===== LOGO =====
     let logoBottomY = height - 100;
 
     try {
@@ -83,15 +96,14 @@ export async function GET(
         width: w,
         height: h,
       });
-    } catch {}
+    } catch {
+      // keep invoice generation working even if logo is missing
+    }
 
-    // ===== TITLE =====
     const titleY = height - 84;
-    draw("INVOICE", right - 95, titleY, 18, true);
+    draw("INVOICE", rightColumnX, titleY, 18, true);
 
-    // ===== ADDRESS =====
     let y = logoBottomY - 26;
-
     draw("34, Jalan Tembaga SD 5/2b,", left, y);
     y -= 14;
     draw("Bandar Sri Damansara,", left, y);
@@ -109,15 +121,10 @@ export async function GET(
       color: rgb(0.85, 0.85, 0.85),
     });
 
-    // ===== HEADER INFO =====
     y -= 20;
-
-    const rightAlignX = right - 94; // ✅ unified alignment
-
     draw(`Invoice No: ${order.orderNumber}`, left, y, 10, true);
-    draw(`Date: ${formatDate(order.createdAt)}`, rightAlignX, y, 10, true);
+    draw(`Date: ${formatDate(order.createdAt)}`, rightColumnX, y, 10, true);
 
-    // ===== BILL TO =====
     y -= 28;
     draw("Bill To:", left, y, 12, true);
     y -= 16;
@@ -127,7 +134,6 @@ export async function GET(
     y -= 14;
     draw(order.user?.email || "-", left, y);
 
-    // ===== ITEMS =====
     y -= 36;
     draw("Items", left, y, 12, true);
 
@@ -144,36 +150,106 @@ export async function GET(
     });
 
     draw("Description", left + 10, headerY + 9, 10, true);
-    draw("Amount", rightAlignX, headerY + 9, 10, true); // ✅ aligned
+    draw("Amount", rightColumnX, headerY + 9, 10, true);
 
     y = headerY - 26;
 
-    const lines = [
-      `Tuning Type: ${order.tuningType || "-"}`,
-      `Brand: ${order.vehicleBrand || "-"}`,
-      `Model / Generation: ${order.vehicleModel || "-"}`,
-      `Engine / Variant: ${order.engineModel || "-"}`,
-      `Year / Range: ${order.vehicleYear || "-"}`,
-      `Capacity: ${order.engineCapacity ? order.engineCapacity + "cc" : "-"}`,
-      `ECU Stage: ${formatEcuStageLabel(order.ecuStage) || "-"}`,
-      `Turbo Setup: ${formatTurboSetupLabel(order.turboType) || "-"}`,
-      `Hardware Mods: ${formatStoredList(order.hardwareMods)}`,
-      `ECU Type: ${order.ecuType || "-"}`,
-      `ECU Read Tool: ${order.ecuReadTool || "-"}`,
-      `Fuel Grade: ${order.fuelGrade || "-"}`,
-      `Water Methanol Injection: ${order.waterMethanolInjection || "-"}`,
-    ];
+    const lines: string[] = [];
+
+    if (isPresent(order.tuningType)) {
+      lines.push(
+        `Tuning Type: ${order.tuningType === "ECU_TCU" ? "ECU + TCU" : order.tuningType}`
+      );
+    }
+    if (isPresent(order.vehicleBrand)) {
+      lines.push(`Brand: ${order.vehicleBrand}`);
+    }
+    if (isPresent(order.vehicleModel)) {
+      lines.push(`Model / Generation: ${order.vehicleModel}`);
+    }
+    if (isPresent(order.engineModel)) {
+      lines.push(`Engine / Variant: ${order.engineModel}`);
+    }
+    if (isPresent(order.vehicleYear)) {
+      lines.push(`Year / Range: ${order.vehicleYear}`);
+    }
+    if (isPresent(order.engineCapacity)) {
+      lines.push(`Capacity: ${order.engineCapacity}cc`);
+    }
+
+    if (order.tuningType === "ECU" || order.tuningType === "ECU_TCU" || !order.tuningType) {
+      if (isPresent(order.ecuStage)) {
+        lines.push(`ECU Stage: ${formatEcuStageLabel(order.ecuStage) || order.ecuStage}`);
+      }
+      if (isPresent(order.currentEcuSetupStage)) {
+        lines.push(
+          `Current ECU Setup: ${
+            formatCurrentEcuSetupLabel(order.currentEcuSetupStage) || order.currentEcuSetupStage
+          }`
+        );
+      }
+      if (isPresent(order.turboType)) {
+        const turboLabel = formatTurboSetupLabel(order.turboType) || order.turboType;
+        const turboValue = isPresent(order.turboSpec)
+          ? `${turboLabel} (${order.turboSpec})`
+          : turboLabel;
+        lines.push(`Turbo Setup: ${turboValue}`);
+      }
+      if (isPresent(order.hardwareMods)) {
+        lines.push(`Hardware Mods: ${formatStoredList(order.hardwareMods)}`);
+      }
+      if (isPresent(order.fuelSystemMods)) {
+        lines.push(`Fuel System: ${formatStoredList(order.fuelSystemMods)}`);
+      }
+      if (isPresent(order.engineMods)) {
+        lines.push(`Engine Mods: ${formatStoredList(order.engineMods)}`);
+      }
+      if (isPresent(order.engineModsOther)) {
+        lines.push(`Other Engine Mods: ${order.engineModsOther}`);
+      }
+      if (isPresent(order.additionalDetails)) {
+        lines.push(`Additional Details: ${order.additionalDetails}`);
+      }
+      if (isPresent(order.ecuType)) {
+        lines.push(`ECU Type: ${order.ecuType}`);
+      }
+      if (isPresent(order.ecuReadTool)) {
+        lines.push(`ECU Read Tool: ${order.ecuReadTool}`);
+      }
+      if (isPresent(order.fuelGrade)) {
+        lines.push(`Fuel Grade: ${order.fuelGrade}`);
+      }
+      if (
+        isPresent(order.waterMethanolInjection) &&
+        order.waterMethanolInjection !== "Not selected"
+      ) {
+        lines.push(`Water Methanol Injection: ${order.waterMethanolInjection}`);
+      }
+    }
+
+    if (order.tuningType === "TCU" || order.tuningType === "ECU_TCU") {
+      if (isPresent(order.tcuStage)) {
+        lines.push(`TCU Stage: ${formatTcuStageLabel(order.tcuStage) || order.tcuStage}`);
+      }
+      if (isPresent(order.tcuType)) {
+        lines.push(`TCU Type: ${order.tcuType}`);
+      }
+      if (isPresent(order.tcuReadTool)) {
+        lines.push(`TCU Read Tool: ${order.tcuReadTool}`);
+      }
+      if (isPresent(order.tcuVersion)) {
+        lines.push(`TCU Version: ${order.tcuVersion}`);
+      }
+    }
 
     for (const line of lines) {
       draw(line, left + 10, y, 9);
       y -= 12;
     }
 
-    draw(formatMoney(order.totalAmount), rightAlignX, headerY - 18, 10); // ✅ aligned
+    draw(formatMoney(order.totalAmount), rightColumnX, headerY - 18, 10);
 
-    // ===== TOTAL =====
     y -= 14;
-
     page.drawLine({
       start: { x: left, y },
       end: { x: right, y },
@@ -182,10 +258,9 @@ export async function GET(
     });
 
     y -= 28;
-    draw("Grand Total:", rightAlignX - 100, y, 12, true); // keep relative spacing
-    draw(formatMoney(order.totalAmount), rightAlignX, y, 12, true); // ✅ aligned
+    draw("Grand Total:", rightColumnX - 110, y, 12, true);
+    draw(formatMoney(order.totalAmount), rightColumnX, y, 12, true);
 
-    // ===== FOOTER =====
     y -= 54;
     draw("Thank you for your business.", left, y, 10);
     y -= 14;
@@ -198,10 +273,11 @@ export async function GET(
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `attachment; filename="RK-INV-${fileSuffix}.pdf"`,
+        "Cache-Control": "private, no-store",
       },
     });
   } catch (error) {
-    console.error(error);
+    console.error("Invoice generation failed:", error);
     return NextResponse.json({ message: "Error" }, { status: 500 });
   }
 }
