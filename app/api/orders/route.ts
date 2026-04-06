@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
 import { generateOrderNumber } from "@/lib/utils";
@@ -13,12 +13,11 @@ import {
   calculateBaseTuneTotal,
 } from "@/lib/tuning-pricing";
 import {
+  RATE_LIMIT_RULES,
+  buildRateLimitHeaders,
   checkRateLimit,
   createRateLimitKey,
 } from "@/lib/rate-limit";
-
-const SUBMIT_ORDER_LIMIT = 5;
-const SUBMIT_ORDER_WINDOW_MS = 15 * 60 * 1000;
 
 function normalizeTuningType(value: string) {
   if (value === "TCU") return "TCU";
@@ -38,7 +37,16 @@ function getOrderSubmittedRedirectPath(tuningType: string) {
   return "/dashboard?success=order_submitted_ecu";
 }
 
-export async function POST(req: NextRequest) {
+function formatRetryAfterText(seconds: number) {
+  if (seconds <= 59) {
+    return `${seconds} second${seconds === 1 ? "" : "s"}`;
+  }
+
+  const minutes = Math.ceil(seconds / 60);
+  return `${minutes} minute${minutes === 1 ? "" : "s"}`;
+}
+
+export async function POST(req: Request) {
   try {
     const form = await req.formData();
     const user = await getSessionUser();
@@ -47,22 +55,36 @@ export async function POST(req: NextRequest) {
       return NextResponse.redirect(new URL("/login", req.url), 303);
     }
 
-    const rateLimitResult = await checkRateLimit({
-      key: createRateLimitKey("submit-order", "user", user.id),
-      limit: SUBMIT_ORDER_LIMIT,
-      windowMs: SUBMIT_ORDER_WINDOW_MS,
-      bypass: user.role === "ADMIN",
-    });
+    if (user.role !== "ADMIN") {
+      const rateLimitResult = await checkRateLimit({
+        key: createRateLimitKey("order-submit", "user", user.id),
+        limit: RATE_LIMIT_RULES.orderSubmit.limit,
+        windowMs: RATE_LIMIT_RULES.orderSubmit.windowMs,
+      });
 
-    if (!rateLimitResult.success) {
-      return NextResponse.redirect(
-        new URL("/custom-tuning?error=too_many_requests", req.url),
-        303
-      );
+      if (!rateLimitResult.success) {
+        const retryAfterSeconds = rateLimitResult.retryAfter;
+        const retryAfterText = formatRetryAfterText(retryAfterSeconds);
+
+        return NextResponse.json(
+          {
+            ok: false,
+            error: `You have submitted too many orders in a short period. Please try again in ${retryAfterText}.`,
+            retryAfterSeconds,
+            retryAfterText,
+          },
+          {
+            status: 429,
+            headers: buildRateLimitHeaders(rateLimitResult),
+          }
+        );
+      }
     }
 
     const productId = String(form.get("productId") || "");
-    const tuningType = normalizeTuningType(String(form.get("tuningType") || "ECU"));
+    const tuningType = normalizeTuningType(
+      String(form.get("tuningType") || "ECU")
+    );
 
     const ecuStage = String(form.get("ecuStage") || "").trim();
     const tcuStage = String(form.get("tcuStage") || "").trim();
@@ -192,12 +214,16 @@ export async function POST(req: NextRequest) {
       `Engine Mods: ${engineMods || "None"}`,
       `Other Engine Mods: ${engineModsOther || "None"}`,
       `Additional Details: ${additionalDetails || "None"}`,
-      `Add-ons: ${selectedAddOns.length > 0 ? selectedAddOns.join(", ") : "None"}`,
+      `Add-ons: ${
+        selectedAddOns.length > 0 ? selectedAddOns.join(", ") : "None"
+      }`,
       `ECU Read Tool: ${ecuReadTool || "Not selected"}`,
       `TCU Read Tool: ${tcuReadTool || "Not selected"}`,
       `TCU Version: ${tcuVersion || "Not selected"}`,
       `Fuel Grade: ${fuelGrade || "Not selected"}`,
-      `Water Methanol Injection: ${waterMethanolInjection || "Not selected"}`,
+      `Water Methanol Injection: ${
+        waterMethanolInjection || "Not selected"
+      }`,
       `Remarks: ${remarks || "None"}`,
     ];
 
@@ -285,21 +311,24 @@ export async function POST(req: NextRequest) {
       await createAdminNotification({
         type: "ORDER_SUBMITTED",
         title: "New Order received",
-        message: `${user.name} submitted a new ${tuningType.replaceAll("_", " + ")} order.`,
+        message: `${user.name} submitted a new ${tuningType.replaceAll(
+          "_",
+          " + "
+        )} order.`,
         orderId: order.id,
       });
     } catch (error) {
       console.error("Notification creation failed:", error);
     }
 
-    return NextResponse.redirect(
-      new URL(getOrderSubmittedRedirectPath(tuningType), req.url),
-      303
-    );
+    return NextResponse.json({
+      ok: true,
+      redirectTo: getOrderSubmittedRedirectPath(tuningType),
+    });
   } catch (error) {
     console.error("POST /api/orders failed:", error);
     return NextResponse.json(
-      { message: "Order submission failed. Check server logs." },
+      { ok: false, error: "Order submission failed. Please try again." },
       { status: 500 }
     );
   }

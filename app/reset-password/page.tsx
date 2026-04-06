@@ -11,6 +11,8 @@ type ApiResponse = {
   ok?: boolean;
   error?: string;
   redirectTo?: string;
+  retryAfterSeconds?: number;
+  retryAfterText?: string;
 };
 
 function ResetPasswordForm() {
@@ -86,45 +88,19 @@ function ResetPasswordForm() {
           <div>
             <label className="label-rk">New Password</label>
             <div className="relative">
-              <input
-                className="input-rk pr-20"
-                name="password"
-                type={showPassword ? "text" : "password"}
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                disabled={isSubmitting}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword((prev) => !prev)}
-                className="absolute inset-y-0 right-3 my-auto h-fit rounded-lg px-2 py-1 text-xs text-white/60 transition hover:bg-white/10 hover:text-white"
-              >
+              <input className="input-rk pr-20" name="password" type={showPassword ? "text" : "password"} required value={password} onChange={(e) => setPassword(e.target.value)} disabled={isSubmitting} />
+              <button type="button" onClick={() => setShowPassword((prev) => !prev)} className="absolute inset-y-0 right-3 my-auto h-fit rounded-lg px-2 py-1 text-xs text-white/60 transition hover:bg-white/10 hover:text-white">
                 {showPassword ? "Hide" : "Show"}
               </button>
             </div>
-            <p className="mt-2 text-xs text-white/50">
-              {PASSWORD_REQUIREMENTS_TEXT}
-            </p>
+            <p className="mt-2 text-xs text-white/50">{PASSWORD_REQUIREMENTS_TEXT}</p>
           </div>
 
           <div>
             <label className="label-rk">Confirm New Password</label>
             <div className="relative">
-              <input
-                className="input-rk pr-20"
-                name="confirmPassword"
-                type={showConfirmPassword ? "text" : "password"}
-                required
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                disabled={isSubmitting}
-              />
-              <button
-                type="button"
-                onClick={() => setShowConfirmPassword((prev) => !prev)}
-                className="absolute inset-y-0 right-3 my-auto h-fit rounded-lg px-2 py-1 text-xs text-white/60 transition hover:bg-white/10 hover:text-white"
-              >
+              <input className="input-rk pr-20" name="confirmPassword" type={showConfirmPassword ? "text" : "password"} required value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} disabled={isSubmitting} />
+              <button type="button" onClick={() => setShowConfirmPassword((prev) => !prev)} className="absolute inset-y-0 right-3 my-auto h-fit rounded-lg px-2 py-1 text-xs text-white/60 transition hover:bg-white/10 hover:text-white">
                 {showConfirmPassword ? "Hide" : "Show"}
               </button>
             </div>
@@ -132,26 +108,19 @@ function ResetPasswordForm() {
 
           {error ? (
             <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
-              <div className="font-semibold uppercase tracking-[0.18em] text-red-300/80">
-                Reset Failed
-              </div>
+              <div className="font-semibold uppercase tracking-[0.18em] text-red-300/80">Reset Failed</div>
               <p className="mt-2 leading-6">{error}</p>
             </div>
           ) : null}
 
           {success ? (
             <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm text-emerald-200">
-              <div className="font-semibold uppercase tracking-[0.18em] text-emerald-300/80">
-                Success
-              </div>
+              <div className="font-semibold uppercase tracking-[0.18em] text-emerald-300/80">Success</div>
               <p className="mt-2 leading-6">{success}</p>
             </div>
           ) : null}
 
-          <button
-            className="btn-primary w-full disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={isSubmitting}
-          >
+          <button className="btn-primary w-full disabled:cursor-not-allowed disabled:opacity-60" disabled={isSubmitting}>
             {isSubmitting ? "Resetting Password..." : "Reset Password"}
           </button>
         </form>

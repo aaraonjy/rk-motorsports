@@ -7,6 +7,8 @@ type ApiResponse = {
   ok?: boolean;
   error?: string;
   redirectTo?: string;
+  retryAfterSeconds?: number;
+  retryAfterText?: string;
 };
 
 export default function LoginPage() {
@@ -116,7 +118,7 @@ export default function LoginPage() {
           </button>
 
           <p className="text-center text-sm text-white/70">
-            Don&apos;t have an account?{" "}
+            Don&apos;t have an account?{' '}
             <Link
               href="/register"
               className="font-medium text-white transition hover:text-white/80"

@@ -12,6 +12,8 @@ type ApiResponse = {
   ok?: boolean;
   error?: string;
   redirectTo?: string;
+  retryAfterSeconds?: number;
+  retryAfterText?: string;
 };
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -135,34 +137,16 @@ export default function RegisterPage() {
         <form onSubmit={handleSubmit} className="card-rk mt-8 space-y-4 p-6">
           <div>
             <label className="label-rk">Name</label>
-            <input
-              className="input-rk"
-              name="name"
-              autoComplete="name"
-              required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              disabled={isSubmitting}
-            />
+            <input className="input-rk" name="name" autoComplete="name" required value={name} onChange={(e) => setName(e.target.value)} disabled={isSubmitting} />
           </div>
 
           <div>
             <label className="label-rk">Email</label>
-            <input
-              className="input-rk"
-              name="email"
-              type="email"
-              autoComplete="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              disabled={isSubmitting}
-            />
+            <input className="input-rk" name="email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} disabled={isSubmitting} />
           </div>
 
           <div>
             <label className="label-rk">Phone Number</label>
-
             <div className="flex items-stretch gap-2">
               <div className="relative w-48" ref={countryDropdownRef}>
                 <button
@@ -171,9 +155,7 @@ export default function RegisterPage() {
                   disabled={isSubmitting}
                   className="input-rk flex h-full w-full items-center justify-between gap-3 px-4 text-left disabled:cursor-not-allowed"
                 >
-                  <span className="truncate">
-                    {selectedCountry.code} {selectedCountry.dialCode}
-                  </span>
+                  <span className="truncate">{selectedCountry.code} {selectedCountry.dialCode}</span>
                   <span className="text-white/60">{isCountryOpen ? "▴" : "▾"}</span>
                 </button>
 
@@ -187,14 +169,10 @@ export default function RegisterPage() {
                           setCountryCode(item.code);
                           setIsCountryOpen(false);
                         }}
-                        className={`flex w-full items-center justify-between px-4 py-3 text-left text-sm transition hover:bg-white/10 ${
-                          item.code === countryCode ? "bg-white/10" : ""
-                        }`}
+                        className={`flex w-full items-center justify-between px-4 py-3 text-left text-sm transition hover:bg-white/10 ${item.code === countryCode ? "bg-white/10" : ""}`}
                       >
                         <span className="truncate">{item.label}</span>
-                        <span className="ml-3 shrink-0 text-white/70">
-                          {item.dialCode}
-                        </span>
+                        <span className="ml-3 shrink-0 text-white/70">{item.dialCode}</span>
                       </button>
                     ))}
                   </div>
@@ -202,17 +180,7 @@ export default function RegisterPage() {
               </div>
 
               <div className="flex-1">
-                <input
-                  className="input-rk"
-                  name="phone"
-                  type="tel"
-                  autoComplete="tel"
-                  required
-                  inputMode="numeric"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  disabled={isSubmitting}
-                />
+                <input className="input-rk" name="phone" type="tel" autoComplete="tel" required inputMode="numeric" value={phone} onChange={(e) => setPhone(e.target.value)} disabled={isSubmitting} />
               </div>
             </div>
           </div>
@@ -220,47 +188,19 @@ export default function RegisterPage() {
           <div>
             <label className="label-rk">Password</label>
             <div className="relative">
-              <input
-                className="input-rk pr-20"
-                name="password"
-                type={showPassword ? "text" : "password"}
-                autoComplete="new-password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                disabled={isSubmitting}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword((prev) => !prev)}
-                className="absolute inset-y-0 right-3 my-auto h-fit rounded-lg px-2 py-1 text-xs text-white/60 transition hover:bg-white/10 hover:text-white"
-              >
+              <input className="input-rk pr-20" name="password" type={showPassword ? "text" : "password"} autoComplete="new-password" required value={password} onChange={(e) => setPassword(e.target.value)} disabled={isSubmitting} />
+              <button type="button" onClick={() => setShowPassword((prev) => !prev)} className="absolute inset-y-0 right-3 my-auto h-fit rounded-lg px-2 py-1 text-xs text-white/60 transition hover:bg-white/10 hover:text-white">
                 {showPassword ? "Hide" : "Show"}
               </button>
             </div>
-            <p className="mt-2 text-xs text-white/50">
-              {PASSWORD_REQUIREMENTS_TEXT}
-            </p>
+            <p className="mt-2 text-xs text-white/50">{PASSWORD_REQUIREMENTS_TEXT}</p>
           </div>
 
           <div>
             <label className="label-rk">Confirm Password</label>
             <div className="relative">
-              <input
-                className="input-rk pr-20"
-                name="confirmPassword"
-                type={showConfirmPassword ? "text" : "password"}
-                autoComplete="new-password"
-                required
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                disabled={isSubmitting}
-              />
-              <button
-                type="button"
-                onClick={() => setShowConfirmPassword((prev) => !prev)}
-                className="absolute inset-y-0 right-3 my-auto h-fit rounded-lg px-2 py-1 text-xs text-white/60 transition hover:bg-white/10 hover:text-white"
-              >
+              <input className="input-rk pr-20" name="confirmPassword" type={showConfirmPassword ? "text" : "password"} autoComplete="new-password" required value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} disabled={isSubmitting} />
+              <button type="button" onClick={() => setShowConfirmPassword((prev) => !prev)} className="absolute inset-y-0 right-3 my-auto h-fit rounded-lg px-2 py-1 text-xs text-white/60 transition hover:bg-white/10 hover:text-white">
                 {showConfirmPassword ? "Hide" : "Show"}
               </button>
             </div>
@@ -268,38 +208,25 @@ export default function RegisterPage() {
 
           {error ? (
             <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
-              <div className="font-semibold uppercase tracking-[0.18em] text-red-300/80">
-                Registration Failed
-              </div>
+              <div className="font-semibold uppercase tracking-[0.18em] text-red-300/80">Registration Failed</div>
               <p className="mt-2 leading-6">{error}</p>
             </div>
           ) : null}
 
           {success ? (
             <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm text-emerald-200">
-              <div className="font-semibold uppercase tracking-[0.18em] text-emerald-300/80">
-                Success
-              </div>
+              <div className="font-semibold uppercase tracking-[0.18em] text-emerald-300/80">Success</div>
               <p className="mt-2 leading-6">{success}</p>
             </div>
           ) : null}
 
-          <button
-            type="submit"
-            className="btn-primary w-full disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? "Creating Account..." : "Create account"}
+          <button type="submit" className="btn-primary w-full disabled:cursor-not-allowed disabled:opacity-60" disabled={isSubmitting}>
+            {isSubmitting ? "Creating Account..." : "Create Account"}
           </button>
 
           <p className="text-center text-sm text-white/70">
-            Already have an account?{" "}
-            <Link
-              href="/login"
-              className="font-medium text-white transition hover:text-white/80"
-            >
-              Login
-            </Link>
+            Already have an account?{' '}
+            <Link href="/login" className="font-medium text-white transition hover:text-white/80">Login</Link>
           </p>
         </form>
       </div>

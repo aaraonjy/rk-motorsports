@@ -27,8 +27,7 @@ declare global {
 }
 
 const memoryStore =
-  globalThis.__rkRateLimitMemoryStore ||
-  new Map<string, MemoryEntry>();
+  globalThis.__rkRateLimitMemoryStore || new Map<string, MemoryEntry>();
 
 if (!globalThis.__rkRateLimitMemoryStore) {
   globalThis.__rkRateLimitMemoryStore = memoryStore;
@@ -40,6 +39,33 @@ const redis =
     : null;
 
 const upstashLimiterCache = new Map<string, Ratelimit>();
+
+export const RATE_LIMIT_RULES = {
+  login: {
+    limit: 5,
+    windowMs: 15 * 60 * 1000,
+  },
+  register: {
+    limit: 3,
+    windowMs: 30 * 60 * 1000,
+  },
+  forgotPassword: {
+    limit: 3,
+    windowMs: 30 * 60 * 1000,
+  },
+  resetPassword: {
+    limit: 5,
+    windowMs: 30 * 60 * 1000,
+  },
+  orderSubmit: {
+    limit: 5,
+    windowMs: 15 * 60 * 1000,
+  },
+  paymentUpload: {
+    limit: 5,
+    windowMs: 15 * 60 * 1000,
+  },
+} as const;
 
 function getClientIpFromForwarded(forwarded: string | null) {
   if (!forwarded) return null;
@@ -217,6 +243,27 @@ export async function checkRateLimits(
   }
 
   return lastResult;
+}
+
+export function createRateLimitErrorPayload(
+  message: string,
+  result: RateLimitCheckResult
+) {
+  const retryAfterSeconds = result.retryAfter;
+
+  const retryAfterText =
+    retryAfterSeconds <= 59
+      ? `${retryAfterSeconds} second${retryAfterSeconds === 1 ? "" : "s"}`
+      : `${Math.ceil(retryAfterSeconds / 60)} minute${
+          Math.ceil(retryAfterSeconds / 60) === 1 ? "" : "s"
+        }`;
+
+  return {
+    ok: false,
+    error: message.replace("{timeLeft}", retryAfterText),
+    retryAfterSeconds,
+    retryAfterText,
+  };
 }
 
 export function buildRateLimitHeaders(result: RateLimitCheckResult) {

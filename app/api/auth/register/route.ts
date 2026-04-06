@@ -6,6 +6,7 @@ import { PHONE_COUNTRY_CODES } from "@/lib/phone-country-codes";
 import {
   buildRateLimitHeaders,
   checkRateLimit,
+  createRateLimitErrorPayload,
   createRateLimitKey,
   getClientIp,
 } from "@/lib/rate-limit";
@@ -33,11 +34,12 @@ export async function POST(req: NextRequest) {
     });
 
     if (!rateLimitResult.success) {
+      const retryAfterText = createRateLimitErrorPayload("", rateLimitResult).retryAfterText;
       return NextResponse.json(
-        {
-          ok: false,
-          error: "Too many registration attempts. Please try again later.",
-        },
+        createRateLimitErrorPayload(
+          `Too many registration attempts. Please try again in ${retryAfterText}.`,
+          rateLimitResult
+        ),
         {
           status: 429,
           headers: buildRateLimitHeaders(rateLimitResult),
@@ -48,34 +50,23 @@ export async function POST(req: NextRequest) {
     if (!name || !email || !countryCode || !phone || !password || !confirmPassword) {
       return NextResponse.json(
         { ok: false, error: "All fields are required." },
-        {
-          status: 400,
-          headers: buildRateLimitHeaders(rateLimitResult),
-        }
+        { status: 400, headers: buildRateLimitHeaders(rateLimitResult) }
       );
     }
 
     if (!EMAIL_REGEX.test(email)) {
       return NextResponse.json(
         { ok: false, error: "Please enter a valid email address." },
-        {
-          status: 400,
-          headers: buildRateLimitHeaders(rateLimitResult),
-        }
+        { status: 400, headers: buildRateLimitHeaders(rateLimitResult) }
       );
     }
 
-    const selectedCountry = PHONE_COUNTRY_CODES.find(
-      (item) => item.code === countryCode
-    );
+    const selectedCountry = PHONE_COUNTRY_CODES.find((item) => item.code === countryCode);
 
     if (!selectedCountry) {
       return NextResponse.json(
         { ok: false, error: "Please select a valid country code." },
-        {
-          status: 400,
-          headers: buildRateLimitHeaders(rateLimitResult),
-        }
+        { status: 400, headers: buildRateLimitHeaders(rateLimitResult) }
       );
     }
 
@@ -87,20 +78,14 @@ export async function POST(req: NextRequest) {
     if (!normalizedLocalPhone) {
       return NextResponse.json(
         { ok: false, error: "Please enter a valid phone number." },
-        {
-          status: 400,
-          headers: buildRateLimitHeaders(rateLimitResult),
-        }
+        { status: 400, headers: buildRateLimitHeaders(rateLimitResult) }
       );
     }
 
     if (normalizedLocalPhone.length < 7 || normalizedLocalPhone.length > 12) {
       return NextResponse.json(
         { ok: false, error: "Please enter a valid phone number." },
-        {
-          status: 400,
-          headers: buildRateLimitHeaders(rateLimitResult),
-        }
+        { status: 400, headers: buildRateLimitHeaders(rateLimitResult) }
       );
     }
 
@@ -109,20 +94,14 @@ export async function POST(req: NextRequest) {
     if (!FINAL_PHONE_REGEX.test(finalPhone)) {
       return NextResponse.json(
         { ok: false, error: "Please enter a valid phone number." },
-        {
-          status: 400,
-          headers: buildRateLimitHeaders(rateLimitResult),
-        }
+        { status: 400, headers: buildRateLimitHeaders(rateLimitResult) }
       );
     }
 
     if (password !== confirmPassword) {
       return NextResponse.json(
         { ok: false, error: "Password confirmation does not match." },
-        {
-          status: 400,
-          headers: buildRateLimitHeaders(rateLimitResult),
-        }
+        { status: 400, headers: buildRateLimitHeaders(rateLimitResult) }
       );
     }
 
@@ -130,10 +109,7 @@ export async function POST(req: NextRequest) {
     if (passwordError) {
       return NextResponse.json(
         { ok: false, error: passwordError },
-        {
-          status: 400,
-          headers: buildRateLimitHeaders(rateLimitResult),
-        }
+        { status: 400, headers: buildRateLimitHeaders(rateLimitResult) }
       );
     }
 
@@ -142,10 +118,7 @@ export async function POST(req: NextRequest) {
     if (exists) {
       return NextResponse.json(
         { ok: false, error: "An account with this email already exists." },
-        {
-          status: 409,
-          headers: buildRateLimitHeaders(rateLimitResult),
-        }
+        { status: 409, headers: buildRateLimitHeaders(rateLimitResult) }
       );
     }
 
@@ -161,13 +134,8 @@ export async function POST(req: NextRequest) {
     await createSession(user.id);
 
     return NextResponse.json(
-      {
-        ok: true,
-        redirectTo: "/dashboard",
-      },
-      {
-        headers: buildRateLimitHeaders(rateLimitResult),
-      }
+      { ok: true, redirectTo: "/dashboard" },
+      { headers: buildRateLimitHeaders(rateLimitResult) }
     );
   } catch {
     return NextResponse.json(

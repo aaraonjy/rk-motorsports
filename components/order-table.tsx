@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Order,
   OrderFile,
@@ -51,6 +52,15 @@ type UploadModalState =
       orderId: string;
     }
   | null;
+
+
+type ApiResponse = {
+  ok?: boolean;
+  error?: string;
+  redirectTo?: string;
+  retryAfterSeconds?: number;
+  retryAfterText?: string;
+};
 
 function getStatusBadge(status: string) {
   switch (status) {
@@ -483,8 +493,11 @@ function UploadConfirmModal({
   orderId: string | null;
   onClose: () => void;
 }) {
+  const router = useRouter();
   const [remark, setRemark] = useState("");
   const [fileError, setFileError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!isOpen || !mode || !orderId) return null;
 
@@ -493,13 +506,15 @@ function UploadConfirmModal({
   const isAdminRevisionEcu = mode === "admin-upload-revision-ecu";
   const isAdminRevisionTcu = mode === "admin-upload-revision-tcu";
   const isReplace = mode === "customer-replace-payment";
+  const isCustomerPayment =
+    mode === "customer-upload-payment" || mode === "customer-replace-payment";
 
   const action =
     isAdminUploadEcu || isAdminUploadTcu
       ? `/api/admin/orders/${orderId}/upload`
       : isAdminRevisionEcu || isAdminRevisionTcu
         ? `/api/admin/orders/${orderId}/upload-revision`
-        : `/api/orders/${orderId}/upload-payment`;
+        : `/api/orders/${orderId}/payment`;
 
   const title = isAdminUploadEcu
     ? "Upload Tuned ECU File"
@@ -537,17 +552,57 @@ function UploadConfirmModal({
           </p>
         </div>
 
-        <form
-          action={action}
-          method="post"
-          encType="multipart/form-data"
-          className="mt-6 space-y-4"
-          onSubmit={(e) => {
-            if (fileError) {
-              e.preventDefault();
-            }
-          }}
-        >
+
+<form
+  action={action}
+  method="post"
+  encType="multipart/form-data"
+  className="mt-6 space-y-4"
+  onSubmit={async (e) => {
+    if (fileError) {
+      e.preventDefault();
+      return;
+    }
+
+    if (!isCustomerPayment) {
+      setIsSubmitting(true);
+      return;
+    }
+
+    e.preventDefault();
+    setSubmitError(null);
+    setIsSubmitting(true);
+
+    try {
+      const formData = new FormData(e.currentTarget);
+      const response = await fetch(action, {
+        method: "POST",
+        body: formData,
+        headers: {
+          "x-rk-client-submit": "1",
+        },
+      });
+
+      const data = (await response.json()) as ApiResponse;
+
+      if (!response.ok || !data.ok) {
+        setSubmitError(data.error || "Unable to upload payment slip right now. Please try again.");
+        return;
+      }
+
+      setRemark("");
+      setFileError(null);
+      setSubmitError(null);
+      onClose();
+      router.push(data.redirectTo || "/dashboard");
+      router.refresh();
+    } catch {
+      setSubmitError("Unable to upload payment slip right now. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }}
+>
           {target ? <input type="hidden" name="target" value={target} /> : null}
 
           <div>
@@ -571,6 +626,7 @@ function UploadConfirmModal({
               required
               className="block w-full text-xs text-white/80 file:mr-3 file:rounded-lg file:border file:border-white/15 file:bg-black/40 file:px-3 file:py-2 file:text-white hover:file:bg-white/10"
               onChange={(e) => {
+                setSubmitError(null);
                 const file = e.target.files?.[0] || null;
 
                 if (!file) {
@@ -634,25 +690,36 @@ function UploadConfirmModal({
             </div>
           ) : null}
 
+          {submitError ? (
+            <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
+              <div className="font-semibold uppercase tracking-[0.18em] text-red-300/80">
+                Upload Failed
+              </div>
+              <p className="mt-2 leading-6">{submitError}</p>
+            </div>
+          ) : null}
+
           <div className="flex items-center justify-end gap-3">
             <button
               type="button"
               onClick={() => {
                 setRemark("");
                 setFileError(null);
+                setSubmitError(null);
                 onClose();
               }}
-              className="rounded-xl border border-white/15 px-4 py-2.5 text-sm text-white/75 transition hover:bg-white/10 hover:text-white"
+              disabled={isSubmitting}
+              className="rounded-xl border border-white/15 px-4 py-2.5 text-sm text-white/75 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
             >
               Cancel
             </button>
 
             <button
               type="submit"
-              disabled={!!fileError}
+              disabled={!!fileError || isSubmitting}
               className="rounded-xl border border-white/15 px-4 py-2.5 text-sm text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {buttonLabel}
+              {isSubmitting ? "Uploading..." : buttonLabel}
             </button>
           </div>
         </form>

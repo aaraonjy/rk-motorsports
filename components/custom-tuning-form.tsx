@@ -65,6 +65,15 @@ type CustomTuningFormProps = {
   productId: string;
 };
 
+
+type ApiResponse = {
+  ok?: boolean;
+  error?: string;
+  redirectTo?: string;
+  retryAfterSeconds?: number;
+  retryAfterText?: string;
+};
+
 type EcuSetupStage = "stock" | "stage1" | "stage2" | "stage3" | "custom";
 type TurboSetupOption =
   | "stock"
@@ -399,6 +408,8 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
   const [selectedAddOns, setSelectedAddOns] = useState<string[]>([]);
   const [isAddOnsOpen, setIsAddOnsOpen] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string>("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [selectedBrand, setSelectedBrand] = useState("");
   const [selectedModelId, setSelectedModelId] = useState("");
@@ -954,6 +965,39 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
     return getBundleLabel(ecuStage, tcuStage);
   }, [tuningType, selectedEcuTune, selectedTcuTune, ecuStage, tcuStage]);
 
+
+
+async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  event.preventDefault();
+  setSubmitError("");
+
+  if (disableSubmit) {
+    return;
+  }
+
+  setIsSubmitting(true);
+
+  try {
+    const formData = new FormData(event.currentTarget);
+    const response = await fetch("/api/orders", {
+      method: "POST",
+      body: formData,
+    });
+
+    const data = (await response.json()) as ApiResponse;
+
+    if (!response.ok || !data.ok) {
+      setSubmitError(data.error || "Order submission failed. Please try again.");
+      return;
+    }
+
+    window.location.href = data.redirectTo || "/dashboard";
+  } catch {
+    setSubmitError("Order submission failed. Please try again.");
+  } finally {
+    setIsSubmitting(false);
+  }
+}
   const disableSubmit =
     !!fileError ||
     !selectedBrand ||
@@ -998,6 +1042,7 @@ export function CustomTuningForm({ productId }: CustomTuningFormProps) {
       action="/api/orders"
       method="post"
       encType="multipart/form-data"
+      onSubmit={handleSubmit}
       className="grid gap-8 lg:grid-cols-[1.5fr_0.9fr]"
     >
       <input type="hidden" name="productId" value={productId} />

@@ -3,7 +3,9 @@ import { getSessionUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { saveFile, validateSinglePaymentUploadFile } from "@/lib/storage";
 import {
+  buildRateLimitHeaders,
   checkRateLimit,
+  createRateLimitErrorPayload,
   createRateLimitKey,
 } from "@/lib/rate-limit";
 
@@ -19,7 +21,10 @@ export async function POST(
     const { id } = await ctx.params;
 
     if (!user) {
-      return NextResponse.redirect(new URL("/login", req.url), 303);
+      return NextResponse.json(
+        { ok: false, error: "Please login before uploading your payment slip." },
+        { status: 401 }
+      );
     }
 
     const rateLimitResult = await checkRateLimit({
@@ -30,9 +35,16 @@ export async function POST(
     });
 
     if (!rateLimitResult.success) {
-      return NextResponse.redirect(
-        new URL("/dashboard?error=too_many_requests", req.url),
-        303
+      const retryAfterText = createRateLimitErrorPayload("", rateLimitResult).retryAfterText;
+      return NextResponse.json(
+        createRateLimitErrorPayload(
+          `You have uploaded payment proof too many times. Please try again in ${retryAfterText}.`,
+          rateLimitResult
+        ),
+        {
+          status: 429,
+          headers: buildRateLimitHeaders(rateLimitResult),
+        }
       );
     }
 
@@ -40,13 +52,18 @@ export async function POST(
     const file = formData.get("file");
 
     if (!(file instanceof File) || file.size === 0) {
-      return NextResponse.redirect(new URL("/dashboard", req.url), 303);
+      return NextResponse.json(
+        { ok: false, error: "Please select a valid payment slip file." },
+        { status: 400, headers: buildRateLimitHeaders(rateLimitResult) }
+      );
     }
 
     const validationMessage = validateSinglePaymentUploadFile(file);
-
     if (validationMessage) {
-      return NextResponse.json({ error: validationMessage }, { status: 400 });
+      return NextResponse.json(
+        { ok: false, error: validationMessage },
+        { status: 400, headers: buildRateLimitHeaders(rateLimitResult) }
+      );
     }
 
     const order = await db.order.findUnique({
@@ -55,13 +72,13 @@ export async function POST(
     });
 
     if (!order || order.userId !== user.id) {
-      return NextResponse.redirect(new URL("/dashboard", req.url), 303);
+      return NextResponse.json(
+        { ok: false, error: "Order not found or access denied." },
+        { status: 404, headers: buildRateLimitHeaders(rateLimitResult) }
+      );
     }
 
-    const existingPayment = order.files.find(
-      (f) => f.kind === "CUSTOMER_PAYMENT_PROOF"
-    );
-
+    const existingPayment = order.files.find((f) => f.kind === "CUSTOMER_PAYMENT_PROOF");
     const saved = await saveFile(file, "customer-payment-proof");
 
     if (existingPayment) {
@@ -87,16 +104,11 @@ export async function POST(
 
     await db.order.update({
       where: { id: order.id },
-      data: {
-        status: "AWAITING_PAYMENT",
-      },
+      data: { status: "AWAITING_PAYMENT" },
     });
 
     try {
-      const admins = await db.user.findMany({
-        where: { role: "ADMIN" },
-      });
-
+      const admins = await db.user.findMany({ where: { role: "ADMIN" } });
       await db.notification.createMany({
         data: admins.map((admin) => ({
           userId: admin.id,
@@ -112,12 +124,18 @@ export async function POST(
 
     const success = existingPayment ? "payment_replaced" : "payment_uploaded";
 
-    return NextResponse.redirect(
-      new URL(`/dashboard?success=${success}`, req.url),
-      303
+    return NextResponse.json(
+      {
+        ok: true,
+        redirectTo: `/dashboard?success=${success}`,
+      },
+      { headers: buildRateLimitHeaders(rateLimitResult) }
     );
   } catch (error) {
     console.error("Upload payment failed:", error);
-    return NextResponse.redirect(new URL("/dashboard", req.url), 303);
+    return NextResponse.json(
+      { ok: false, error: "Unable to upload payment slip right now. Please try again." },
+      { status: 500 }
+    );
   }
 }

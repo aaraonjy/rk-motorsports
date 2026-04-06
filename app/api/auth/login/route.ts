@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import {
   buildRateLimitHeaders,
   checkRateLimits,
+  createRateLimitErrorPayload,
   createRateLimitKey,
   getClientIp,
   normalizeEmail,
@@ -40,11 +41,12 @@ export async function POST(req: NextRequest) {
     ]);
 
     if (!rateLimitResult.success) {
+      const retryAfterText = createRateLimitErrorPayload("", rateLimitResult).retryAfterText;
       return NextResponse.json(
-        {
-          ok: false,
-          error: "Too many login attempts. Please try again later.",
-        },
+        createRateLimitErrorPayload(
+          `Too many failed login attempts. Please try again in ${retryAfterText}.`,
+          rateLimitResult
+        ),
         {
           status: 429,
           headers: buildRateLimitHeaders(rateLimitResult),
