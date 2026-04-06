@@ -113,7 +113,7 @@ export async function GET(
     y -= 20;
 
     draw(`Invoice No: ${order.orderNumber}`, left, y, 10, true);
-    draw(`Date: ${formatDate(order.createdAt)}`, right - 140, y, 10, true);
+    draw(`Date: ${formatDate(order.createdAt)}`, right - 95, y, 10, true);
 
     // ===== BILL TO =====
     y -= 28;
