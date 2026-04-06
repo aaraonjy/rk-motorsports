@@ -1,7 +1,15 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
-import PDFDocument from "pdfkit";
+import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+
+function formatDate(value: Date) {
+  return new Date(value).toLocaleDateString("en-MY");
+}
+
+function formatMoney(value: number | string) {
+  return `RM ${Number(value || 0).toFixed(2)}`;
+}
 
 export async function GET(
   req: Request,
@@ -28,82 +36,133 @@ export async function GET(
       return NextResponse.json({ message: "Not found" }, { status: 404 });
     }
 
-    const doc = new PDFDocument({
-      size: "A4",
-      margin: 50,
+    const pdfDoc = await PDFDocument.create();
+    const page = pdfDoc.addPage([595.28, 841.89]); // A4
+    const fontRegular = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+
+    const { width, height } = page.getSize();
+    const left = 50;
+    let y = height - 50;
+
+    const drawText = (
+      text: string,
+      x: number,
+      yPos: number,
+      size = 10,
+      bold = false,
+      color = rgb(0, 0, 0)
+    ) => {
+      page.drawText(text, {
+        x,
+        y: yPos,
+        size,
+        font: bold ? fontBold : fontRegular,
+        color,
+      });
+    };
+
+    // Header
+    drawText("RK MOTORSPORTS", left, y, 20, true);
+    y -= 24;
+    drawText("34, Jalan Tembaga SD 5/2b,", left, y);
+    y -= 14;
+    drawText("Bandar Sri Damansara,", left, y);
+    y -= 14;
+    drawText("52200 Kuala Lumpur, Selangor", left, y);
+    y -= 14;
+    drawText("012-310 6132", left, y);
+
+    drawText("INVOICE", width - 130, height - 50, 18, true);
+
+    y -= 34;
+    page.drawLine({
+      start: { x: left, y },
+      end: { x: width - 50, y },
+      thickness: 1,
+      color: rgb(0.85, 0.85, 0.85),
     });
 
-    const buffers: Buffer[] = [];
+    y -= 24;
+    drawText(`Invoice No: RK-${order.orderNumber}`, left, y, 10, true);
+    drawText(`Date: ${formatDate(order.createdAt)}`, width - 170, y, 10, true);
 
-    doc.on("data", (chunk: Buffer) => {
-      buffers.push(chunk);
+    y -= 28;
+    drawText("Bill To:", left, y, 12, true);
+    y -= 16;
+    drawText(order.user?.name || "-", left, y);
+    y -= 14;
+    drawText(order.user?.phone || "-", left, y);
+    y -= 14;
+    drawText(order.user?.email || "-", left, y);
+
+    y -= 28;
+    drawText("Order Information", left, y, 12, true);
+    y -= 18;
+    drawText(`Order Number: ${order.orderNumber}`, left, y);
+    y -= 14;
+    drawText(`Tuning Type: ${order.tuningType || "ECU"}`, left, y);
+    y -= 14;
+    drawText(
+      `Vehicle: ${order.vehicleBrand || "-"} ${order.vehicleModel || "-"}`,
+      left,
+      y
+    );
+    y -= 14;
+    drawText(`ECU Stage: ${order.ecuStage || "-"}`, left, y);
+    y -= 14;
+    drawText(`TCU Stage: ${order.tcuStage || "-"}`, left, y);
+
+    y -= 28;
+    drawText("Items", left, y, 12, true);
+    y -= 18;
+
+    page.drawRectangle({
+      x: left,
+      y: y - 4,
+      width: width - 100,
+      height: 22,
+      color: rgb(0.95, 0.95, 0.95),
+      borderWidth: 0.5,
+      borderColor: rgb(0.8, 0.8, 0.8),
     });
 
-    const pdfBufferPromise = new Promise<Buffer>((resolve, reject) => {
-      doc.on("end", () => resolve(Buffer.concat(buffers)));
-      doc.on("error", reject);
-    });
+    drawText("Description", left + 8, y + 3, 10, true);
+    drawText("Amount", width - 120, y + 3, 10, true);
 
-    doc.fontSize(20).text("RK MOTORSPORTS", { align: "left" });
-    doc
-      .fontSize(10)
-      .text("34, Jalan Tembaga SD 5/2b,")
-      .text("Bandar Sri Damansara,")
-      .text("52200 Kuala Lumpur, Selangor")
-      .text("012-310 6132");
-
-    doc.moveDown();
-    doc.fontSize(16).text("INVOICE", { align: "right" });
-    doc.moveDown();
-
-    doc.fontSize(10);
-    doc.text(`Invoice No: RK-${order.orderNumber}`);
-    doc.text(`Date: ${new Date(order.createdAt).toLocaleDateString()}`);
-
-    doc.moveDown();
-
-    doc.fontSize(12).text("Bill To:");
-    doc.fontSize(10);
-    doc.text(order.user?.name || "-");
-    doc.text(order.user?.phone || "-");
-    doc.text(order.user?.email || "-");
-
-    doc.moveDown();
-
-    doc.fontSize(12).text("Order Details:");
-    doc.moveDown(0.5);
-
-    doc.fontSize(10);
-    doc.text(`Vehicle: ${order.vehicleBrand || "-"} ${order.vehicleModel || "-"}`);
-    doc.text(`Stage: ${order.ecuStage || order.tcuStage || "-"}`);
-    doc.text(`Tuning Type: ${order.tuningType || "ECU"}`);
-
-    doc.moveDown();
-
-    doc.fontSize(12).text("Items:");
-    doc.moveDown(0.5);
+    y -= 28;
 
     if (order.items.length > 0) {
-      order.items.forEach((item, index) => {
-        doc
-          .fontSize(10)
-          .text(`${index + 1}. ${item.product.title} - RM ${Number(item.price).toFixed(2)}`);
-      });
+      for (const item of order.items) {
+        const title = item.product?.title || "Tuning Service";
+        drawText(title, left + 8, y, 10);
+        drawText(formatMoney(item.price), width - 120, y, 10);
+        y -= 18;
+      }
     } else {
-      doc.fontSize(10).text("1. Tuning Service");
+      drawText("Tuning Service", left + 8, y, 10);
+      drawText(formatMoney(order.totalAmount), width - 120, y, 10);
+      y -= 18;
     }
 
-    doc.moveDown();
-
-    doc.fontSize(14).text(`Total: RM ${Number(order.totalAmount).toFixed(2)}`, {
-      align: "right",
+    y -= 10;
+    page.drawLine({
+      start: { x: left, y },
+      end: { x: width - 50, y },
+      thickness: 1,
+      color: rgb(0.85, 0.85, 0.85),
     });
 
-    doc.end();
+    y -= 24;
+    drawText("Total:", width - 180, y, 12, true);
+    drawText(formatMoney(order.totalAmount), width - 120, y, 12, true);
 
-    const pdfBuffer = await pdfBufferPromise;
+    y -= 50;
+    drawText("Thank you for your business.", left, y, 10);
 
-    return new NextResponse(new Uint8Array(pdfBuffer), {
+    const pdfBytes = await pdfDoc.save();
+
+    return new NextResponse(new Uint8Array(pdfBytes), {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `attachment; filename="RK-Invoice-${order.orderNumber}.pdf"`,
