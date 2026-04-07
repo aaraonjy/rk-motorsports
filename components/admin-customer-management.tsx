@@ -303,12 +303,70 @@ function TempPasswordModal({
   );
 }
 
+function PortalAccessConfirmModal({
+  customer,
+  isSubmitting,
+  onClose,
+  onConfirm,
+}: {
+  customer: CustomerRecord | null;
+  isSubmitting: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  if (!customer) return null;
+
+  const isEnabling = !customer.portalAccess;
+
+  return (
+    <div className="fixed inset-0 z-[115] flex items-center justify-center bg-black/70 px-4">
+      <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-zinc-950 p-6 shadow-2xl">
+        <div>
+          <h3 className="text-lg font-semibold text-white">
+            {isEnabling ? "Enable Portal Access" : "Disable Portal Access"}
+          </h3>
+          <p className="mt-2 text-sm leading-6 text-white/60">
+            {isEnabling
+              ? `Are you sure you want to enable portal access for ${customer.name}? A new temporary password will be generated immediately.`
+              : `Are you sure you want to disable portal access for ${customer.name}? They will no longer be able to log in to the portal.`}
+          </p>
+        </div>
+
+        <div className="mt-6 flex items-center justify-end gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isSubmitting}
+            className="rounded-xl border border-white/15 px-4 py-2.5 text-sm text-white/75 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            No
+          </button>
+
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={isSubmitting}
+            className={`rounded-xl border px-4 py-2.5 text-sm transition disabled:cursor-not-allowed disabled:opacity-50 ${
+              isEnabling
+                ? "border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10"
+                : "border-red-500/40 text-red-300 hover:bg-red-500/10"
+            }`}
+          >
+            {isSubmitting ? "Updating..." : "Yes"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function AdminCustomerManagement({ customers, currentPage, pageSize }: Props) {
   const router = useRouter();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<CustomerRecord | null>(null);
   const [isTogglingId, setIsTogglingId] = useState<string | null>(null);
   const [tempPassword, setTempPassword] = useState<string | null>(null);
+  const [portalAccessTarget, setPortalAccessTarget] = useState<CustomerRecord | null>(null);
 
   async function togglePortalAccess(userId: string) {
     try {
@@ -334,6 +392,14 @@ export function AdminCustomerManagement({ customers, currentPage, pageSize }: Pr
     } finally {
       setIsTogglingId(null);
     }
+  }
+
+  async function handleConfirmPortalAccess() {
+    if (!portalAccessTarget) return;
+
+    const userId = portalAccessTarget.id;
+    setPortalAccessTarget(null);
+    await togglePortalAccess(userId);
   }
 
   function handleSaved() {
@@ -396,7 +462,7 @@ export function AdminCustomerManagement({ customers, currentPage, pageSize }: Pr
                   <td className="px-4 py-4">
                     <button
                       type="button"
-                      onClick={() => togglePortalAccess(customer.id)}
+                      onClick={() => setPortalAccessTarget(customer)}
                       disabled={isTogglingId === customer.id}
                       className={getPortalAccessBadge(customer.portalAccess)}
                     >
@@ -457,6 +523,13 @@ export function AdminCustomerManagement({ customers, currentPage, pageSize }: Pr
         customer={editingCustomer}
         onClose={() => setEditingCustomer(null)}
         onSaved={handleSaved}
+      />
+
+      <PortalAccessConfirmModal
+        customer={portalAccessTarget}
+        isSubmitting={!!(portalAccessTarget && isTogglingId === portalAccessTarget.id)}
+        onClose={() => setPortalAccessTarget(null)}
+        onConfirm={handleConfirmPortalAccess}
       />
 
       <TempPasswordModal password={tempPassword} onClose={() => setTempPassword(null)} />
