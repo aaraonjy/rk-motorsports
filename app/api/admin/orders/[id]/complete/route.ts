@@ -16,18 +16,29 @@ export async function POST(
 ) {
   try {
     await requireAdmin();
-
     const { id } = await ctx.params;
 
     const order = await db.order.findUnique({
       where: { id },
-      include: {
-        files: true,
-      },
+      include: { files: true },
     });
 
     if (!order) {
       return NextResponse.redirect(new URL("/admin", req.url), 303);
+    }
+
+    const isCustomOrder = order.orderType === "CUSTOM_ORDER";
+
+    if (isCustomOrder) {
+      await db.order.update({
+        where: { id },
+        data: { status: "COMPLETED" },
+      });
+
+      return NextResponse.redirect(
+        new URL("/admin?success=order_completed", req.url),
+        303
+      );
     }
 
     const hasEcuReady =
@@ -46,9 +57,7 @@ export async function POST(
     if (order.createdByAdminId) {
       await db.order.update({
         where: { id },
-        data: {
-          status: "COMPLETED",
-        },
+        data: { status: "COMPLETED" },
       });
 
       return NextResponse.redirect(
@@ -59,9 +68,7 @@ export async function POST(
 
     await db.order.update({
       where: { id },
-      data: {
-        status: "READY_FOR_DOWNLOAD",
-      },
+      data: { status: "READY_FOR_DOWNLOAD" },
     });
 
     try {
@@ -74,8 +81,8 @@ export async function POST(
             order.tuningType === "ECU_TCU"
               ? "Payment received, your tuned ECU and TCU files are ready to download."
               : order.tuningType === "TCU"
-                ? "Payment received, your tuned TCU file is ready to download."
-                : "Payment received, your tuned ECU file is ready to download.",
+              ? "Payment received, your tuned TCU file is ready to download."
+              : "Payment received, your tuned ECU file is ready to download.",
           orderId: id,
         },
       });
