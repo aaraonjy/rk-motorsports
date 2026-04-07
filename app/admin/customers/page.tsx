@@ -64,7 +64,8 @@ export default async function AdminCustomersPage({
         <div className="mt-8 space-y-4">
           <div className="card-rk p-6 text-white/75">
             <p>
-              Search by customer name, phone number, or email, then filter by account source and portal access status.
+              Search by customer name, phone number, or email, then filter by account
+              source and portal access status.
             </p>
           </div>
 
@@ -165,7 +166,14 @@ export default async function AdminCustomersPage({
             </div>
           </form>
 
-          <AdminCustomerManagement customers={result.customers.map((customer) => ({ ...customer, createdAt: customer.createdAt.toISOString() as never })) as never} />
+          <AdminCustomerManagement
+            customers={result.customers.map((customer) => ({
+              ...customer,
+              createdAt: customer.createdAt.toISOString(),
+            }))}
+            currentPage={result.currentPage}
+            pageSize={result.pageSize}
+          />
 
           <PaginationControls
             currentPage={result.currentPage}

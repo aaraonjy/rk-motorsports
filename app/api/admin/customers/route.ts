@@ -1,64 +1,47 @@
-import { NextResponse } from "next/server";
-import crypto from "node:crypto";
+import { requireAdmin, hashPassword } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { hashPassword, requireAdmin } from "@/lib/auth";
 
-function randomTempPassword() {
-  return `rk-${crypto.randomBytes(8).toString("hex")}`;
+function generateTempPassword() {
+  return Math.random().toString(36).slice(-10);
 }
 
-function normalizePhone(phone?: string | null) {
-  const value = phone?.trim();
-  return value ? value : null;
-}
+export async function POST(req: Request) {
+  await requireAdmin();
 
-export async function POST(request: Request) {
-  try {
-    await requireAdmin();
+  const body = await req.json();
+  const name = String(body?.name || "").trim();
+  const email = String(body?.email || "").trim().toLowerCase();
+  const phone = String(body?.phone || "").trim();
 
-    const body = (await request.json()) as {
-      name?: string;
-      email?: string;
-      phone?: string | null;
-    };
-
-    const name = body.name?.trim() || "";
-    const email = body.email?.trim().toLowerCase() || "";
-    const phone = normalizePhone(body.phone);
-
-    if (!name) {
-      return NextResponse.json({ ok: false, error: "Customer name is required." }, { status: 400 });
-    }
-
-    if (!email) {
-      return NextResponse.json({ ok: false, error: "Email is required in the current system setup." }, { status: 400 });
-    }
-
-    const existingEmail = await db.user.findUnique({ where: { email } });
-    if (existingEmail) {
-      return NextResponse.json({ ok: false, error: "This email is already in use." }, { status: 409 });
-    }
-
-    const passwordHash = await hashPassword(randomTempPassword());
-
-    await db.user.create({
-      data: {
-        name,
-        email,
-        phone,
-        passwordHash,
-        role: "CUSTOMER",
-        accountSource: "ADMIN",
-        portalAccess: false,
-      },
-    });
-
-    return NextResponse.json({ ok: true });
-  } catch (error) {
-    if (error instanceof Error && error.message === "FORBIDDEN") {
-      return NextResponse.json({ ok: false, error: "Forbidden." }, { status: 403 });
-    }
-
-    return NextResponse.json({ ok: false, error: "Unable to create customer right now." }, { status: 500 });
+  if (!name) {
+    return Response.json({ ok: false, error: "Customer name is required." }, { status: 400 });
   }
+
+  if (!email) {
+    return Response.json({ ok: false, error: "Email is required." }, { status: 400 });
+  }
+
+  const existingEmail = await db.user.findUnique({ where: { email } });
+  if (existingEmail) {
+    return Response.json(
+      { ok: false, error: "This email is already used by another customer." },
+      { status: 409 }
+    );
+  }
+
+  const passwordHash = await hashPassword(generateTempPassword());
+
+  await db.user.create({
+    data: {
+      name,
+      email,
+      phone: phone || null,
+      passwordHash,
+      role: "CUSTOMER",
+      accountSource: "ADMIN",
+      portalAccess: false,
+    },
+  });
+
+  return Response.json({ ok: true });
 }
