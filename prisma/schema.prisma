@@ -52,22 +52,27 @@ enum TuningType {
   ECU_TCU
 }
 
+enum OrderType {
+  STANDARD_TUNING
+  CUSTOM_ORDER
+}
+
 model User {
-  id               String         @id @default(cuid())
-  name             String
-  email            String         @unique
-  passwordHash     String
-  role             Role           @default(CUSTOMER)
-  phone            String?        @unique
-  accountSource    AccountSource  @default(PORTAL)
-  portalAccess     Boolean        @default(true)
-  resetToken       String?
-  resetTokenExpiry DateTime?
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
-  orders           Order[]        @relation("CustomerOrders")
-  adminCreatedOrders Order[]      @relation("AdminCreatedOrders")
-  notifications    Notification[]
+  id                 String         @id @default(cuid())
+  name               String
+  email              String         @unique
+  passwordHash       String
+  role               Role           @default(CUSTOMER)
+  phone              String?        @unique
+  accountSource      AccountSource  @default(PORTAL)
+  portalAccess       Boolean        @default(true)
+  resetToken         String?
+  resetTokenExpiry   DateTime?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+  orders             Order[]        @relation("CustomerOrders")
+  adminCreatedOrders Order[]        @relation("AdminCreatedOrders")
+  notifications      Notification[]
 }
 
 model VehicleBrand {
@@ -121,12 +126,13 @@ model Product {
 }
 
 model Order {
-  id                     String          @id @default(cuid())
-  orderNumber            String          @unique
-  status                 OrderStatus     @default(AWAITING_PAYMENT)
+  id                     String            @id @default(cuid())
+  orderNumber            String            @unique
+  status                 OrderStatus       @default(AWAITING_PAYMENT)
+  orderType              OrderType         @default(STANDARD_TUNING)
   notes                  String?
   requestDetails         String?
-  tuningType             TuningType      @default(ECU)
+  tuningType             TuningType        @default(ECU)
   selectedTuneId         String?
   selectedTuneLabel      String?
   ecuStage               String?
@@ -151,22 +157,29 @@ model Order {
   tcuType                String?
   tcuVersion             String?
   tcuReadTool            String?
+  customTitle            String?
+  internalRemarks        String?
+  customSubtotal         Int               @default(0)
+  customDiscount         Int               @default(0)
+  customGrandTotal       Int               @default(0)
   cancelledBy            CancelledBy?
   cancelReason           String?
   cancelledAt            DateTime?
-  totalAmount            Int             @default(0)
-  createdAt              DateTime        @default(now())
-  updatedAt              DateTime        @updatedAt
+  totalAmount            Int               @default(0)
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
   userId                 String
   createdByAdminId       String?
-  user                   User            @relation("CustomerOrders", fields: [userId], references: [id], onDelete: Cascade)
-  createdByAdmin         User?           @relation("AdminCreatedOrders", fields: [createdByAdminId], references: [id], onDelete: SetNull)
+  user                   User              @relation("CustomerOrders", fields: [userId], references: [id], onDelete: Cascade)
+  createdByAdmin         User?             @relation("AdminCreatedOrders", fields: [createdByAdminId], references: [id], onDelete: SetNull)
   items                  OrderItem[]
+  customItems            CustomOrderItem[]
   files                  OrderFile[]
   revisions              OrderRevision[]
   notifications          Notification[]
 
   @@index([createdByAdminId])
+  @@index([orderType])
 }
 
 model OrderItem {
@@ -177,6 +190,20 @@ model OrderItem {
   productId String
   order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+}
+
+model CustomOrderItem {
+  id          String   @id @default(cuid())
+  orderId      String
+  description  String
+  qty          Int      @default(1)
+  unitPrice    Int
+  lineTotal    Int
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  order        Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
 }
 
 model OrderFile {

@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
-import { getCustomerById, getProducts } from "@/lib/queries";
-import { CustomTuningForm } from "@/components/custom-tuning-form";
+import { getCustomerById } from "@/lib/queries";
 
 type CreateOrderPageProps = {
   params: Promise<{
@@ -26,7 +25,9 @@ function getPortalAccessBadge(enabled: boolean) {
     : "inline-flex min-w-[88px] items-center justify-center rounded-full border border-white/15 bg-white/10 px-3 py-1 text-center text-xs font-semibold text-white/75";
 }
 
-export default async function AdminCustomerCreateOrderPage({ params }: CreateOrderPageProps) {
+export default async function AdminCustomerCreateOrderPage({
+  params,
+}: CreateOrderPageProps) {
   const user = await getSessionUser();
   if (!user) redirect("/login");
   if (user.role !== "ADMIN") redirect("/dashboard");
@@ -35,20 +36,17 @@ export default async function AdminCustomerCreateOrderPage({ params }: CreateOrd
   const customer = await getCustomerById(id);
   if (!customer) redirect("/admin/customers");
 
-  const products = await getProducts();
-  const customProduct = products.find((p) => p.slug === "custom-file-service");
-
   return (
     <section className="section-pad">
       <div className="container-rk max-w-6xl">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/45">
-              Phase 3A-3
+              Phase 3B-1
             </p>
-            <h1 className="mt-3 text-4xl font-bold">Create Order</h1>
+            <h1 className="mt-3 text-4xl font-bold">Select Order Type</h1>
             <p className="mt-4 text-white/70">
-              Create a tuning order for the selected customer using the shared form in admin mode.
+              Choose the order flow you want to create for this customer.
             </p>
           </div>
 
@@ -68,28 +66,38 @@ export default async function AdminCustomerCreateOrderPage({ params }: CreateOrd
           <div className="mt-5 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
             <div>
               <div className="text-sm text-white/45">Customer Name</div>
-              <div className="mt-2 text-lg font-semibold text-white">{customer.name}</div>
+              <div className="mt-2 text-lg font-semibold text-white">
+                {customer.name}
+              </div>
             </div>
 
             <div>
               <div className="text-sm text-white/45">Phone</div>
-              <div className="mt-2 text-lg font-semibold text-white">{customer.phone || "-"}</div>
+              <div className="mt-2 text-lg font-semibold text-white">
+                {customer.phone || "-"}
+              </div>
             </div>
 
             <div>
               <div className="text-sm text-white/45">Email</div>
-              <div className="mt-2 text-lg font-semibold text-white break-words">{customer.email}</div>
+              <div className="mt-2 break-words text-lg font-semibold text-white">
+                {customer.email}
+              </div>
             </div>
 
             <div>
               <div className="text-sm text-white/45">Orders</div>
-              <div className="mt-2 text-lg font-semibold text-white">{customer._count.orders}</div>
+              <div className="mt-2 text-lg font-semibold text-white">
+                {customer._count.orders}
+              </div>
             </div>
 
             <div>
               <div className="text-sm text-white/45">Account Source</div>
               <div className="mt-3">
-                <span className={getSourceBadge(customer.accountSource)}>{getSourceLabel(customer.accountSource)}</span>
+                <span className={getSourceBadge(customer.accountSource)}>
+                  {getSourceLabel(customer.accountSource)}
+                </span>
               </div>
             </div>
 
@@ -104,25 +112,65 @@ export default async function AdminCustomerCreateOrderPage({ params }: CreateOrd
           </div>
         </div>
 
-        {!customProduct ? (
-          <div className="card-rk mt-10 p-6 text-white/70">
-            <p className="font-medium text-white">
-              Custom File Service product is not configured yet.
+        <div className="mt-10 grid gap-6 lg:grid-cols-2">
+          <div className="card-rk flex h-full flex-col p-6">
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-sky-300/70">
+              Option 1
             </p>
-            <p className="mt-3 text-white/65">
-              Please run the database seed or create the product record with slug {" "}
-              <code className="rounded bg-black/40 px-2 py-1">custom-file-service</code>.
+            <h2 className="mt-3 text-2xl font-semibold text-white">
+              Standard Tuning Order
+            </h2>
+            <p className="mt-4 text-white/70">
+              Use the existing structured tuning workflow for ECU, TCU, or ECU +
+              TCU jobs. This keeps the current tuning logic unchanged.
             </p>
+
+            <div className="mt-6 space-y-2 text-sm leading-6 text-white/65">
+              <p>• Shared tuning form</p>
+              <p>• ECU / TCU file workflow</p>
+              <p>• Existing validation and pricing logic</p>
+              <p>• Current admin flow preserved</p>
+            </div>
+
+            <div className="mt-8">
+              <Link
+                href={`/admin/customers/${customer.id}/create-order/standard`}
+                className="inline-flex items-center justify-center rounded-xl border border-sky-500/30 bg-sky-500/10 px-5 py-3 font-medium text-sky-200 transition hover:bg-sky-500/15"
+              >
+                Continue with Standard Tuning
+              </Link>
+            </div>
           </div>
-        ) : (
-          <div className="mt-10">
-            <CustomTuningForm
-              productId={customProduct.id}
-              adminMode
-              customerId={customer.id}
-            />
+
+          <div className="card-rk flex h-full flex-col p-6">
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-amber-300/70">
+              Option 2
+            </p>
+            <h2 className="mt-3 text-2xl font-semibold text-white">
+              Custom Order
+            </h2>
+            <p className="mt-4 text-white/70">
+              Use a flexible manual order flow for non-standard jobs, service
+              work, or miscellaneous billing items.
+            </p>
+
+            <div className="mt-6 space-y-2 text-sm leading-6 text-white/65">
+              <p>• Manual title / summary</p>
+              <p>• Multiple custom line items</p>
+              <p>• Subtotal, discount, and grand total</p>
+              <p>• Separate workflow from tuning orders</p>
+            </div>
+
+            <div className="mt-8">
+              <Link
+                href={`/admin/customers/${customer.id}/create-order/custom`}
+                className="inline-flex items-center justify-center rounded-xl border border-amber-500/30 bg-amber-500/10 px-5 py-3 font-medium text-amber-200 transition hover:bg-amber-500/15"
+              >
+                Continue with Custom Order
+              </Link>
+            </div>
           </div>
-        )}
+        </div>
       </div>
     </section>
   );
