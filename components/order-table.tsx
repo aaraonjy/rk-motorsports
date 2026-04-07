@@ -36,6 +36,7 @@ export type OrderWithRelations = Order & {
   engineMods?: string | null;
   engineModsOther?: string | null;
   additionalDetails?: string | null;
+  createdByAdminId?: string | null;
   cancelledBy?: "CUSTOMER" | "ADMIN" | null;
   cancelReason?: string | null;
 };
@@ -47,6 +48,8 @@ type UploadModalState =
         | "admin-upload-tcu"
         | "admin-upload-revision-ecu"
         | "admin-upload-revision-tcu"
+        | "admin-upload-payment"
+        | "admin-replace-payment"
         | "customer-upload-payment"
         | "customer-replace-payment";
       orderId: string;
@@ -504,16 +507,20 @@ function UploadConfirmModal({
   const isAdminUploadTcu = mode === "admin-upload-tcu";
   const isAdminRevisionEcu = mode === "admin-upload-revision-ecu";
   const isAdminRevisionTcu = mode === "admin-upload-revision-tcu";
-  const isReplace = mode === "customer-replace-payment";
-  const isCustomerPayment =
-    mode === "customer-upload-payment" || mode === "customer-replace-payment";
+  const isReplace =
+    mode === "customer-replace-payment" || mode === "admin-replace-payment";
+  const isPaymentUpload =
+    mode === "customer-upload-payment" ||
+    mode === "customer-replace-payment" ||
+    mode === "admin-upload-payment" ||
+    mode === "admin-replace-payment";
 
   const action =
     isAdminUploadEcu || isAdminUploadTcu
       ? `/api/admin/orders/${orderId}/upload`
       : isAdminRevisionEcu || isAdminRevisionTcu
         ? `/api/admin/orders/${orderId}/upload-revision`
-        : `/api/orders/${orderId}/payment`;
+        : `/api/orders/${orderId}/upload-payment`;
 
   const title = isAdminUploadEcu
     ? "Upload Tuned ECU File"
@@ -562,7 +569,7 @@ function UploadConfirmModal({
               return;
             }
 
-            if (!isCustomerPayment) {
+            if (!isPaymentUpload) {
               setIsSubmitting(true);
               return;
             }
@@ -898,6 +905,7 @@ export function OrderTable({
               const paymentProof = order.files.find(
                 (f) => f.kind === "CUSTOMER_PAYMENT_PROOF"
               );
+              const isAdminCreatedOrder = !!order.createdByAdminId;
 
               const ecuRevisions = order.revisions
                 .filter(
@@ -1126,6 +1134,26 @@ export function OrderTable({
                               className="w-full rounded-xl border border-red-500/40 px-3 py-2 text-center text-sm text-red-400 transition hover:bg-red-500/10"
                             >
                               Admin Cancel Order
+                            </button>
+                          ) : null}
+
+                          {isAdminCreatedOrder &&
+                          ["FILE_RECEIVED", "IN_PROGRESS", "AWAITING_PAYMENT", "PAID"].includes(
+                            order.status
+                          ) ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setUploadModal({
+                                  action: paymentProof
+                                    ? "admin-replace-payment"
+                                    : "admin-upload-payment",
+                                  orderId: order.id,
+                                })
+                              }
+                              className="w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center text-sm transition hover:bg-white/10"
+                            >
+                              {paymentProof ? "Replace Payment Slip" : "Upload Payment Slip"}
                             </button>
                           ) : null}
 

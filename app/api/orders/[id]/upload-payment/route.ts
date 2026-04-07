@@ -71,7 +71,13 @@ export async function POST(
       include: { files: true },
     });
 
-    if (!order || order.userId !== user.id) {
+    const isAdminUploadingForAdminCreatedOrder =
+      user.role === "ADMIN" && !!order?.createdByAdminId;
+
+    if (
+      !order ||
+      (!isAdminUploadingForAdminCreatedOrder && order.userId !== user.id)
+    ) {
       return NextResponse.json(
         { ok: false, error: "Order not found or access denied." },
         { status: 404, headers: buildRateLimitHeaders(rateLimitResult) }
@@ -107,19 +113,21 @@ export async function POST(
       data: { status: "AWAITING_PAYMENT" },
     });
 
-    try {
-      const admins = await db.user.findMany({ where: { role: "ADMIN" } });
-      await db.notification.createMany({
-        data: admins.map((admin) => ({
-          userId: admin.id,
-          type: "PAYMENT_UPLOADED",
-          title: "Payment slip uploaded",
-          message: `${user.name} uploaded payment proof.`,
-          orderId: order.id,
-        })),
-      });
-    } catch (err) {
-      console.error("Admin notification failed:", err);
+    if (user.role !== "ADMIN") {
+      try {
+        const admins = await db.user.findMany({ where: { role: "ADMIN" } });
+        await db.notification.createMany({
+          data: admins.map((admin) => ({
+            userId: admin.id,
+            type: "PAYMENT_UPLOADED",
+            title: "Payment slip uploaded",
+            message: `${user.name} uploaded payment proof.`,
+            orderId: order.id,
+          })),
+        });
+      } catch (err) {
+        console.error("Admin notification failed:", err);
+      }
     }
 
     const success = existingPayment ? "payment_replaced" : "payment_uploaded";
@@ -127,7 +135,8 @@ export async function POST(
     return NextResponse.json(
       {
         ok: true,
-        redirectTo: `/dashboard?success=${success}`,
+        redirectTo:
+          user.role === "ADMIN" ? "/admin" : `/dashboard?success=${success}`,
       },
       { headers: buildRateLimitHeaders(rateLimitResult) }
     );
