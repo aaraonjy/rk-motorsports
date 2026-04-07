@@ -299,18 +299,16 @@ function CustomOrderDetails({ order }: { order: OrderWithRelations }) {
 
       {items.length > 0 ? (
         <div className="rounded-xl border border-white/10 bg-black/20 p-3">
-          <div className="flex items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={() => setIsItemsOpen((prev) => !prev)}
+            className="flex w-full items-center justify-between gap-3 text-left transition hover:text-white"
+          >
             <div className="text-xs font-semibold uppercase tracking-[0.18em] text-white/45">
               Line Items
             </div>
-            <button
-              type="button"
-              onClick={() => setIsItemsOpen((prev) => !prev)}
-              className="rounded-lg border border-white/15 bg-black/30 px-3 py-1.5 text-xs text-white/75 transition hover:bg-white/10 hover:text-white"
-            >
-              {isItemsOpen ? "Collapse" : "Expand"}
-            </button>
-          </div>
+            <span className="text-sm text-white/60">{isItemsOpen ? "▴" : "▾"}</span>
+          </button>
 
           {isItemsOpen ? (
             <div className="mt-3 space-y-2">
