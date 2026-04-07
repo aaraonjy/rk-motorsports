@@ -239,12 +239,14 @@ function TempPasswordModal({
   if (!password) return null;
 
   async function handleCopy() {
-    try {
-      await navigator.clipboard.writeText(password);
-    } catch {
-      // ignore clipboard failures silently
-    }
+  if (!password) return;
+
+  try {
+    await navigator.clipboard.writeText(password);
+  } catch {
+    // ignore clipboard failures silently
   }
+}
 
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/70 px-4">
@@ -266,6 +268,7 @@ function TempPasswordModal({
           <button
             type="button"
             onClick={handleCopy}
+            disabled={!password}
             className="rounded-xl border border-white/15 px-4 py-2.5 text-sm text-white/80 transition hover:bg-white/10"
           >
             Copy Password
