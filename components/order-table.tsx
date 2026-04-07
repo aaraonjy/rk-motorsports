@@ -278,6 +278,7 @@ function VehicleDetails({ order }: { order: OrderWithRelations }) {
 
 function CustomOrderDetails({ order }: { order: OrderWithRelations }) {
   const items = order.customItems || [];
+  const [isItemsOpen, setIsItemsOpen] = useState(false);
 
   return (
     <div className="space-y-3 text-sm leading-6">
@@ -287,7 +288,7 @@ function CustomOrderDetails({ order }: { order: OrderWithRelations }) {
       </div>
 
       <div>
-        <span className="text-white/45">Title / Summary:</span>{" "}
+        <span className="text-white/45">Description:</span>{" "}
         <span className="text-white/90">{order.customTitle || "-"}</span>
       </div>
 
@@ -298,19 +299,31 @@ function CustomOrderDetails({ order }: { order: OrderWithRelations }) {
 
       {items.length > 0 ? (
         <div className="rounded-xl border border-white/10 bg-black/20 p-3">
-          <div className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-white/45">
-            Line Items
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-white/45">
+              Line Items
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsItemsOpen((prev) => !prev)}
+              className="rounded-lg border border-white/15 bg-black/30 px-3 py-1.5 text-xs text-white/75 transition hover:bg-white/10 hover:text-white"
+            >
+              {isItemsOpen ? "Collapse" : "Expand"}
+            </button>
           </div>
-          <div className="space-y-2">
-            {items.map((item) => (
-              <div key={item.id} className="rounded-lg border border-white/8 bg-black/20 p-2.5">
-                <div className="font-medium text-white/90">{item.description}</div>
-                <div className="text-xs text-white/55">
-                  Qty {item.qty} × {formatCurrency(item.unitPrice)} = {formatCurrency(item.lineTotal)}
+
+          {isItemsOpen ? (
+            <div className="mt-3 space-y-2">
+              {items.map((item) => (
+                <div key={item.id} className="rounded-lg border border-white/8 bg-black/20 p-2.5">
+                  <div className="font-medium text-white/90">{item.description}</div>
+                  <div className="text-xs text-white/55">
+                    Qty {item.qty} × {formatCurrency(item.unitPrice)} = {formatCurrency(item.lineTotal)}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : null}
         </div>
       ) : null}
 
