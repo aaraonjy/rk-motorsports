@@ -158,3 +158,78 @@ export async function getAllOrders(filters?: AllOrdersOptions) {
     totalPages: Math.max(1, Math.ceil(totalCount / pageSize)),
   };
 }
+
+type CustomersOptions = {
+  search?: string;
+  source?: string;
+  portalAccess?: string;
+  page?: number;
+  pageSize?: number;
+};
+
+export async function getCustomers(filters?: CustomersOptions) {
+  const page = Math.max(1, filters?.page ?? 1);
+  const pageSize = Math.max(1, filters?.pageSize ?? 10);
+  const skip = (page - 1) * pageSize;
+
+  const where: Prisma.UserWhereInput = {
+    role: "CUSTOMER",
+    ...(filters?.search
+      ? {
+          OR: [
+            {
+              name: {
+                contains: filters.search,
+                mode: "insensitive",
+              },
+            },
+            {
+              phone: {
+                contains: filters.search,
+                mode: "insensitive",
+              },
+            },
+            {
+              email: {
+                contains: filters.search,
+                mode: "insensitive",
+              },
+            },
+          ],
+        }
+      : {}),
+    ...(filters?.source && filters.source !== "ALL"
+      ? { accountSource: filters.source as any }
+      : {}),
+    ...(filters?.portalAccess === "ENABLED"
+      ? { portalAccess: true }
+      : filters?.portalAccess === "DISABLED"
+        ? { portalAccess: false }
+        : {}),
+  };
+
+  const [customers, totalCount] = await Promise.all([
+    db.user.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip,
+      take: pageSize,
+      include: {
+        _count: {
+          select: {
+            orders: true,
+          },
+        },
+      },
+    }),
+    db.user.count({ where }),
+  ]);
+
+  return {
+    customers,
+    totalCount,
+    currentPage: page,
+    pageSize,
+    totalPages: Math.max(1, Math.ceil(totalCount / pageSize)),
+  };
+}

@@ -66,6 +66,20 @@ export function SiteHeaderClient({ user }: { user: HeaderUser }) {
             My Dashboard
           </Link>
 
+          {user.role === "ADMIN" ? (
+            <>
+              <div className="h-px bg-white/10" />
+
+              <Link
+                href="/admin/customers"
+                onClick={() => setIsDashboardOpen(false)}
+                className="block px-4 py-4 text-white/85 transition hover:bg-white/10 hover:text-white"
+              >
+                Customers
+              </Link>
+            </>
+          ) : null}
+
           <div className="h-px bg-white/10" />
 
           <Link
