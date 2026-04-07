@@ -1,4 +1,4 @@
-import { PrismaClient, Role } from "@prisma/client";
+import { PrismaClient, Role, AccountSource } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
@@ -12,6 +12,8 @@ async function main() {
       name: "RK Admin",
       phone: "+60123456789",
       role: Role.ADMIN,
+      accountSource: AccountSource.ADMIN,
+      portalAccess: true,
     },
     create: {
       name: "RK Admin",
@@ -19,6 +21,8 @@ async function main() {
       phone: "+60123456789",
       passwordHash: adminHash,
       role: Role.ADMIN,
+      accountSource: AccountSource.ADMIN,
+      portalAccess: true,
     },
   });
 

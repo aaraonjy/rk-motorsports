@@ -12,6 +12,11 @@ enum Role {
   ADMIN
 }
 
+enum AccountSource {
+  PORTAL
+  ADMIN
+}
+
 enum ProductType {
   READY_MAP
   CUSTOM_TUNE
@@ -53,12 +58,15 @@ model User {
   email            String         @unique
   passwordHash     String
   role             Role           @default(CUSTOMER)
-  phone            String
+  phone            String?        @unique
+  accountSource    AccountSource  @default(PORTAL)
+  portalAccess     Boolean        @default(true)
   resetToken       String?
   resetTokenExpiry DateTime?
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
-  orders           Order[]
+  orders           Order[]        @relation("CustomerOrders")
+  adminCreatedOrders Order[]      @relation("AdminCreatedOrders")
   notifications    Notification[]
 }
 
@@ -150,11 +158,15 @@ model Order {
   createdAt              DateTime        @default(now())
   updatedAt              DateTime        @updatedAt
   userId                 String
-  user                   User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdByAdminId       String?
+  user                   User            @relation("CustomerOrders", fields: [userId], references: [id], onDelete: Cascade)
+  createdByAdmin         User?           @relation("AdminCreatedOrders", fields: [createdByAdminId], references: [id], onDelete: SetNull)
   items                  OrderItem[]
   files                  OrderFile[]
   revisions              OrderRevision[]
   notifications          Notification[]
+
+  @@index([createdByAdminId])
 }
 
 model OrderItem {
