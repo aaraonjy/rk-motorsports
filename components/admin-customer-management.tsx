@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 type CustomerRecord = {
   id: string;
@@ -430,7 +431,7 @@ export function AdminCustomerManagement({ customers, currentPage, pageSize }: Pr
               <th className="px-4 py-4 w-[140px]">Portal Access</th>
               <th className="px-4 py-4 w-[110px]">Orders</th>
               <th className="px-4 py-4 w-[160px]">Created Date</th>
-              <th className="px-4 py-4 w-[110px]">Action</th>
+              <th className="px-4 py-4 w-[200px]">Action</th>
             </tr>
           </thead>
 
@@ -488,13 +489,22 @@ export function AdminCustomerManagement({ customers, currentPage, pageSize }: Pr
                   </td>
 
                   <td className="px-4 py-4">
-                    <button
-                      type="button"
-                      onClick={() => setEditingCustomer(customer)}
-                      className="rounded-xl border border-white/15 bg-black/30 px-4 py-2 text-white transition hover:bg-white/10"
-                    >
-                      Edit
-                    </button>
+                    <div className="flex flex-col gap-2">
+                      <Link
+                        href={`/admin/customers/${customer.id}/create-order`}
+                        className="inline-flex items-center justify-center rounded-xl border border-white/15 bg-black/30 px-4 py-2 text-white transition hover:bg-white/10"
+                      >
+                        Create Order
+                      </Link>
+
+                      <button
+                        type="button"
+                        onClick={() => setEditingCustomer(customer)}
+                        className="rounded-xl border border-white/15 bg-black/30 px-4 py-2 text-white transition hover:bg-white/10"
+                      >
+                        Edit
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))
