@@ -921,15 +921,23 @@ export function OrderTable({
                 )
                 .sort((a, b) => b.revisionNo - a.revisionNo);
 
-              const statusLabel = getStatusLabel(order.status);
-              const statusBadgeClass = getStatusBadge(order.status);
+              const displayStatus =
+                isAdminCreatedOrder &&
+                order.status !== "COMPLETED" &&
+                order.status !== "CANCELLED"
+                  ? "FILE_RECEIVED"
+                  : order.status;
+
+              const statusLabel = getStatusLabel(displayStatus);
+              const statusBadgeClass = getStatusBadge(displayStatus);
 
               const hasAllAdminFiles =
                 (!needsEcu || !!adminEcu) && (!needsTcu || !!adminTcu);
 
-              const customerCanDownload =
-                order.status === "READY_FOR_DOWNLOAD" ||
-                order.status === "COMPLETED";
+              const customerCanDownload = isAdminCreatedOrder
+                ? order.status === "COMPLETED"
+                : order.status === "READY_FOR_DOWNLOAD" ||
+                  order.status === "COMPLETED";
 
               const customerPaymentStatusLabel =
                 order.status === "AWAITING_PAYMENT" && paymentProof
@@ -942,12 +950,12 @@ export function OrderTable({
                   : statusBadgeClass;
 
               const adminPaymentStatusLabel =
-                order.status === "AWAITING_PAYMENT" && paymentProof
+                !isAdminCreatedOrder && order.status === "AWAITING_PAYMENT" && paymentProof
                   ? "Payment Received"
                   : statusLabel;
 
               const adminPaymentStatusClass =
-                order.status === "AWAITING_PAYMENT" && paymentProof
+                !isAdminCreatedOrder && order.status === "AWAITING_PAYMENT" && paymentProof
                   ? "inline-flex min-w-[122px] items-center justify-center rounded-full border border-cyan-500/30 bg-cyan-500/15 px-3 py-1 text-center text-xs font-semibold text-cyan-300"
                   : statusBadgeClass;
 
@@ -987,6 +995,7 @@ export function OrderTable({
                       </span>
 
                       {admin &&
+                      !isAdminCreatedOrder &&
                       order.status === "AWAITING_PAYMENT" &&
                       !paymentProof ? (
                         <div className="text-sm text-amber-300/90">
@@ -995,6 +1004,7 @@ export function OrderTable({
                       ) : null}
 
                       {admin &&
+                      !isAdminCreatedOrder &&
                       order.status === "AWAITING_PAYMENT" &&
                       paymentProof &&
                       hasAllAdminFiles ? (
@@ -1125,7 +1135,7 @@ export function OrderTable({
                             </button>
                           ) : null}
 
-                          {["FILE_RECEIVED", "IN_PROGRESS", "AWAITING_PAYMENT"].includes(
+                          {["FILE_RECEIVED", "IN_PROGRESS", "AWAITING_PAYMENT", "PAID"].includes(
                             order.status
                           ) ? (
                             <button
@@ -1157,7 +1167,8 @@ export function OrderTable({
                             </button>
                           ) : null}
 
-                          {order.status === "AWAITING_PAYMENT" &&
+                          {!isAdminCreatedOrder &&
+                          order.status === "AWAITING_PAYMENT" &&
                           paymentProof &&
                           hasAllAdminFiles ? (
                             <button
@@ -1169,9 +1180,26 @@ export function OrderTable({
                             </button>
                           ) : null}
 
-                          {["READY_FOR_DOWNLOAD", "COMPLETED"].includes(order.status) &&
-                          needsEcu &&
-                          adminEcu ? (
+                          {isAdminCreatedOrder &&
+                          hasAllAdminFiles &&
+                          order.status !== "COMPLETED" ? (
+                            <form
+                              action={`/api/admin/orders/${order.id}/complete`}
+                              method="post"
+                            >
+                              <button
+                                type="submit"
+                                className="w-full rounded-xl border border-emerald-500/40 px-3 py-2 text-center text-sm text-emerald-400 transition hover:bg-emerald-500/10"
+                              >
+                                Mark Completed
+                              </button>
+                            </form>
+                          ) : null}
+
+                          {((isAdminCreatedOrder && !!adminEcu) ||
+                            (["READY_FOR_DOWNLOAD", "COMPLETED"].includes(order.status) &&
+                              needsEcu &&
+                              adminEcu)) ? (
                             <button
                               type="button"
                               onClick={() =>
@@ -1186,9 +1214,10 @@ export function OrderTable({
                             </button>
                           ) : null}
 
-                          {["READY_FOR_DOWNLOAD", "COMPLETED"].includes(order.status) &&
-                          needsTcu &&
-                          adminTcu ? (
+                          {((isAdminCreatedOrder && !!adminTcu) ||
+                            (["READY_FOR_DOWNLOAD", "COMPLETED"].includes(order.status) &&
+                              needsTcu &&
+                              adminTcu)) ? (
                             <button
                               type="button"
                               onClick={() =>
@@ -1203,13 +1232,16 @@ export function OrderTable({
                             </button>
                           ) : null}
 
-                          {["READY_FOR_DOWNLOAD", "COMPLETED"].includes(order.status) ? (
+                          {!isAdminCreatedOrder &&
+                          ["READY_FOR_DOWNLOAD", "COMPLETED"].includes(order.status) ? (
                             <span className="inline-flex w-full min-h-[44px] items-center justify-center rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-center text-sm text-emerald-400">
                               Download Released
                             </span>
                           ) : null}
 
-                          {["READY_FOR_DOWNLOAD", "COMPLETED"].includes(order.status) ? (
+                          {(isAdminCreatedOrder ||
+                            (!isAdminCreatedOrder &&
+                              ["READY_FOR_DOWNLOAD", "COMPLETED"].includes(order.status))) ? (
                             <Link
                               href={`/api/admin/orders/${order.id}/invoice`}
                               className="inline-flex w-full min-h-[44px] flex-col items-center justify-center rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center text-sm leading-5 transition hover:bg-white/10"
@@ -1219,8 +1251,7 @@ export function OrderTable({
                             </Link>
                           ) : null}
                         </div>
-                      )
-                    ) : order.status === "CANCELLED" ? (
+                      )                    ) : order.status === "CANCELLED" ? (
                       <span className="text-red-400">Cancelled</span>
                     ) : order.status === "AWAITING_PAYMENT" && hasAllAdminFiles ? (
                       <div className="flex w-full max-w-[170px] flex-col gap-2">

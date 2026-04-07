@@ -43,6 +43,20 @@ export async function POST(
       return NextResponse.redirect(new URL("/admin", req.url), 303);
     }
 
+    if (order.createdByAdminId) {
+      await db.order.update({
+        where: { id },
+        data: {
+          status: "COMPLETED",
+        },
+      });
+
+      return NextResponse.redirect(
+        new URL("/admin?success=order_completed", req.url),
+        303
+      );
+    }
+
     await db.order.update({
       where: { id },
       data: {

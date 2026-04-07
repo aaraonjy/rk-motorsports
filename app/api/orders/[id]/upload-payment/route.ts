@@ -108,10 +108,12 @@ export async function POST(
       });
     }
 
-    await db.order.update({
-      where: { id: order.id },
-      data: { status: "AWAITING_PAYMENT" },
-    });
+    if (!isAdminUploadingForAdminCreatedOrder) {
+      await db.order.update({
+        where: { id: order.id },
+        data: { status: "AWAITING_PAYMENT" },
+      });
+    }
 
     if (user.role !== "ADMIN") {
       try {

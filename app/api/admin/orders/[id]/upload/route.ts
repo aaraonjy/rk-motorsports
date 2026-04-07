@@ -136,34 +136,36 @@ export async function POST(
       !needsTcu(order.tuningType) ||
       refreshedFiles.some((f) => f.kind === "ADMIN_TCU");
 
-    const nextStatus =
-      hasRequiredEcu && hasRequiredTcu ? "AWAITING_PAYMENT" : "IN_PROGRESS";
+    if (!order.createdByAdminId) {
+      const nextStatus =
+        hasRequiredEcu && hasRequiredTcu ? "AWAITING_PAYMENT" : "IN_PROGRESS";
 
-    await db.order.update({
-      where: { id },
-      data: {
-        status: nextStatus,
-      },
-    });
+      await db.order.update({
+        where: { id },
+        data: {
+          status: nextStatus,
+        },
+      });
 
-    if (nextStatus === "AWAITING_PAYMENT") {
-      try {
-        await db.notification.create({
-          data: {
-            userId: order.userId,
-            type: "TUNED_FILE_READY",
-            title: "Tuned file ready",
-            message:
-              order.tuningType === "ECU_TCU"
-                ? "Your tuned ECU and TCU files are ready, pending payment."
-                : order.tuningType === "TCU"
-                  ? "Your tuned TCU file is ready, pending payment."
-                  : "Your tuned ECU file is ready, pending payment.",
-            orderId: id,
-          },
-        });
-      } catch (err) {
-        console.error("Customer notification failed:", err);
+      if (nextStatus === "AWAITING_PAYMENT") {
+        try {
+          await db.notification.create({
+            data: {
+              userId: order.userId,
+              type: "TUNED_FILE_READY",
+              title: "Tuned file ready",
+              message:
+                order.tuningType === "ECU_TCU"
+                  ? "Your tuned ECU and TCU files are ready, pending payment."
+                  : order.tuningType === "TCU"
+                    ? "Your tuned TCU file is ready, pending payment."
+                    : "Your tuned ECU file is ready, pending payment.",
+              orderId: id,
+            },
+          });
+        } catch (err) {
+          console.error("Customer notification failed:", err);
+        }
       }
     }
 
