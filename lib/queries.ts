@@ -211,16 +211,23 @@ export async function getCustomers(filters?: CustomersOptions) {
   const [customers, totalCount] = await Promise.all([
     db.user.findMany({
       where,
-      orderBy: { createdAt: "desc" },
-      skip,
-      take: pageSize,
-      include: {
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        accountSource: true,
+        portalAccess: true,
+        createdAt: true,
         _count: {
           select: {
             orders: true,
           },
         },
       },
+      orderBy: { createdAt: "desc" },
+      skip,
+      take: pageSize,
     }),
     db.user.count({ where }),
   ]);

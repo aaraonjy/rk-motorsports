@@ -2,6 +2,7 @@ import { getSessionUser } from "@/lib/auth";
 import { getCustomers } from "@/lib/queries";
 import { redirect } from "next/navigation";
 import { PaginationControls } from "@/components/pagination-controls";
+import { AdminCustomerManagement } from "@/components/admin-customer-management";
 
 type CustomersPageProps = {
   searchParams?: Promise<{
@@ -24,22 +25,6 @@ type CustomerRecord = {
     orders: number;
   };
 };
-
-function getSourceBadge(source: "PORTAL" | "ADMIN") {
-  return source === "ADMIN"
-    ? "inline-flex min-w-[110px] items-center justify-center rounded-full border border-amber-500/30 bg-amber-500/15 px-3 py-1 text-center text-xs font-semibold text-amber-300"
-    : "inline-flex min-w-[110px] items-center justify-center rounded-full border border-sky-500/30 bg-sky-500/15 px-3 py-1 text-center text-xs font-semibold text-sky-300";
-}
-
-function getSourceLabel(source: "PORTAL" | "ADMIN") {
-  return source === "ADMIN" ? "Admin Created" : "Self Registered";
-}
-
-function getPortalAccessBadge(enabled: boolean) {
-  return enabled
-    ? "inline-flex min-w-[88px] items-center justify-center rounded-full border border-emerald-500/30 bg-emerald-500/15 px-3 py-1 text-center text-xs font-semibold text-emerald-300"
-    : "inline-flex min-w-[88px] items-center justify-center rounded-full border border-white/15 bg-white/10 px-3 py-1 text-center text-xs font-semibold text-white/75";
-}
 
 export default async function AdminCustomersPage({
   searchParams,
@@ -180,79 +165,7 @@ export default async function AdminCustomersPage({
             </div>
           </form>
 
-          <div className="overflow-x-auto rounded-3xl border border-white/20 bg-black/60 shadow-xl shadow-black/40 backdrop-blur-md">
-            <table className="min-w-full table-fixed text-left text-sm">
-              <thead className="bg-black/50 text-white/65">
-                <tr>
-                  <th className="px-4 py-4 w-[220px]">Customer</th>
-                  <th className="px-4 py-4 w-[180px]">Phone</th>
-                  <th className="px-4 py-4 w-[260px]">Email</th>
-                  <th className="px-4 py-4 w-[150px]">Source</th>
-                  <th className="px-4 py-4 w-[140px]">Portal Access</th>
-                  <th className="px-4 py-4 w-[110px]">Orders</th>
-                  <th className="px-4 py-4 w-[160px]">Created Date</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {result.customers.length > 0 ? (
-                  result.customers.map((customer) => (
-                    <tr
-                      key={customer.id}
-                      className="border-t border-white/10 align-top transition-colors hover:bg-white/[0.03]"
-                    >
-                      <td className="px-4 py-4">
-                        <div className="font-semibold break-words text-white/90">
-                          {customer.name}
-                        </div>
-                      </td>
-
-                      <td className="px-4 py-4 text-white/85 break-words">
-                        {customer.phone || "-"}
-                      </td>
-
-                      <td className="px-4 py-4 text-white/85 break-words">
-                        {customer.email}
-                      </td>
-
-                      <td className="px-4 py-4">
-                        <span className={getSourceBadge(customer.accountSource)}>
-                          {getSourceLabel(customer.accountSource)}
-                        </span>
-                      </td>
-
-                      <td className="px-4 py-4">
-                        <span className={getPortalAccessBadge(customer.portalAccess)}>
-                          {customer.portalAccess ? "Enabled" : "Disabled"}
-                        </span>
-                      </td>
-
-                      <td className="px-4 py-4 text-white/85">
-                        {customer._count.orders}
-                      </td>
-
-                      <td className="px-4 py-4 text-white/65">
-                        <div>{new Date(customer.createdAt).toLocaleDateString()}</div>
-                        <div className="text-xs text-white/35">
-                          {new Date(customer.createdAt).toLocaleTimeString([], {
-                            hour: "numeric",
-                            minute: "2-digit",
-                            hour12: true,
-                          })}
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={7} className="px-4 py-10 text-center text-white/45">
-                      No customers found for the selected filters.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+          <AdminCustomerManagement customers={result.customers.map((customer) => ({ ...customer, createdAt: customer.createdAt.toISOString() as never })) as never} />
 
           <PaginationControls
             currentPage={result.currentPage}
