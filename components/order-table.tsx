@@ -1,9 +1,10 @@
- "use client";
+"use client";
 
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  CustomOrderItem,
   Order,
   OrderFile,
   OrderItem,
@@ -26,6 +27,7 @@ export type OrderWithRelations = Order & {
   files: OrderFile[];
   revisions: (OrderRevision & { orderFile: OrderFile })[];
   items: (OrderItem & { product: Product })[];
+  customOrderItems?: CustomOrderItem[];
   engineModel?: string | null;
   engineCapacity?: string | number | null;
   currentEcuSetupStage?: string | null;
@@ -39,6 +41,12 @@ export type OrderWithRelations = Order & {
   createdByAdminId?: string | null;
   cancelledBy?: "CUSTOMER" | "ADMIN" | null;
   cancelReason?: string | null;
+  orderType?: "STANDARD_TUNING" | "CUSTOM_ORDER" | null;
+  customTitle?: string | null;
+  internalRemarks?: string | null;
+  customSubtotal?: number | null;
+  customDiscount?: number | null;
+  customGrandTotal?: number | null;
 };
 
 type UploadModalState =
@@ -123,6 +131,10 @@ function formatStoredList(value?: string | null) {
     .map((item) => item.trim())
     .filter(Boolean)
     .join(", ");
+}
+
+function isCustomOrder(order: OrderWithRelations) {
+  return order.orderType === "CUSTOM_ORDER";
 }
 
 function VehicleDetails({ order }: { order: OrderWithRelations }) {
@@ -252,15 +264,76 @@ function VehicleDetails({ order }: { order: OrderWithRelations }) {
       ) : null}
 
       {(order.tuningType === "ECU" || order.tuningType === "ECU_TCU" || !order.tuningType) &&
-        order.ecuStage !== "Stage 1" &&
-        order.waterMethanolInjection &&
-        order.waterMethanolInjection !== "Not selected" ? (
-          <div>
-            <span className="text-white/45">Water Methanol Injection:</span>{" "}
-            <span className="text-white/90">
-              {order.waterMethanolInjection}
-            </span>
+      order.ecuStage !== "Stage 1" &&
+      order.waterMethanolInjection &&
+      order.waterMethanolInjection !== "Not selected" ? (
+        <div>
+          <span className="text-white/45">Water Methanol Injection:</span>{" "}
+          <span className="text-white/90">{order.waterMethanolInjection}</span>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function CustomOrderDetails({ order }: { order: OrderWithRelations }) {
+  const items = order.customOrderItems || [];
+
+  return (
+    <div className="space-y-3 text-sm leading-6">
+      <div>
+        <span className="text-white/45">Order Type:</span>{" "}
+        <span className="text-white/90">Custom Order</span>
+      </div>
+
+      <div>
+        <span className="text-white/45">Title / Summary:</span>{" "}
+        <span className="text-white/90">{order.customTitle || "-"}</span>
+      </div>
+
+      <div>
+        <span className="text-white/45">Item Count:</span>{" "}
+        <span className="text-white/90">{items.length}</span>
+      </div>
+
+      {items.length > 0 ? (
+        <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+          <div className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-white/45">
+            Line Items
           </div>
+          <div className="space-y-2">
+            {items.map((item) => (
+              <div key={item.id} className="rounded-lg border border-white/8 bg-black/20 p-2.5">
+                <div className="font-medium text-white/90">{item.description}</div>
+                <div className="text-xs text-white/55">
+                  Qty {item.qty} × {formatCurrency(item.unitPrice)} = {formatCurrency(item.lineTotal)}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      <div>
+        <span className="text-white/45">Subtotal:</span>{" "}
+        <span className="text-white/90">{formatCurrency(order.customSubtotal ?? order.totalAmount ?? 0)}</span>
+      </div>
+
+      <div>
+        <span className="text-white/45">Discount:</span>{" "}
+        <span className="text-white/90">{formatCurrency(order.customDiscount ?? 0)}</span>
+      </div>
+
+      <div>
+        <span className="text-white/45">Grand Total:</span>{" "}
+        <span className="text-white/90">{formatCurrency(order.customGrandTotal ?? order.totalAmount ?? 0)}</span>
+      </div>
+
+      {order.internalRemarks ? (
+        <div>
+          <span className="text-white/45">Internal Remarks:</span>{" "}
+          <span className="text-white/90">{order.internalRemarks}</span>
+        </div>
       ) : null}
     </div>
   );
@@ -270,10 +343,14 @@ function RequestDetailsModal({
   isOpen,
   onClose,
   details,
+  title = "Request Details",
+  subtitle = "Submitted tuning requirements",
 }: {
   isOpen: boolean;
   onClose: () => void;
   details: string;
+  title?: string;
+  subtitle?: string;
 }) {
   if (!isOpen) return null;
 
@@ -282,10 +359,8 @@ function RequestDetailsModal({
       <div className="w-full max-w-2xl rounded-2xl border border-white/10 bg-zinc-950 p-6 shadow-2xl">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h3 className="text-lg font-semibold text-white">Request Details</h3>
-            <p className="mt-1 text-sm text-white/50">
-              Submitted tuning requirements
-            </p>
+            <h3 className="text-lg font-semibold text-white">{title}</h3>
+            <p className="mt-1 text-sm text-white/50">{subtitle}</p>
           </div>
 
           <button
@@ -298,9 +373,7 @@ function RequestDetailsModal({
         </div>
 
         <div className="mt-5 rounded-xl border border-white/10 bg-black/40 p-4">
-          <pre className="whitespace-pre-wrap text-sm leading-7 text-white/85">
-            {details}
-          </pre>
+          <pre className="whitespace-pre-wrap text-sm leading-7 text-white/85">{details}</pre>
         </div>
       </div>
     </div>
@@ -393,9 +466,7 @@ function CustomerCancelModal({
       <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-zinc-950 p-6 shadow-2xl">
         <div>
           <h3 className="text-lg font-semibold text-white">Cancel Order</h3>
-          <p className="mt-1 text-sm text-white/50">
-            Are you sure you want to cancel this order?
-          </p>
+          <p className="mt-1 text-sm text-white/50">Are you sure you want to cancel this order?</p>
         </div>
 
         <form
@@ -445,12 +516,10 @@ function ReleaseOrderModal({
     <div className="fixed inset-0 z-[115] flex items-center justify-center bg-black/70 px-4">
       <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-zinc-950 p-6 shadow-2xl">
         <div>
-          <h3 className="text-lg font-semibold text-white">
-            Release Download
-          </h3>
+          <h3 className="text-lg font-semibold text-white">Release Download</h3>
           <p className="mt-1 text-sm text-white/50">
-            Proceed only after you have manually verified the payment. This will
-            release the tuned file(s) for customer download.
+            Proceed only after you have manually verified the payment. This will release the tuned file(s)
+            for customer download.
           </p>
         </div>
 
@@ -507,8 +576,7 @@ function UploadConfirmModal({
   const isAdminUploadTcu = mode === "admin-upload-tcu";
   const isAdminRevisionEcu = mode === "admin-upload-revision-ecu";
   const isAdminRevisionTcu = mode === "admin-upload-revision-tcu";
-  const isReplace =
-    mode === "customer-replace-payment" || mode === "admin-replace-payment";
+  const isReplace = mode === "customer-replace-payment" || mode === "admin-replace-payment";
   const isPaymentUpload =
     mode === "customer-upload-payment" ||
     mode === "customer-replace-payment" ||
@@ -534,28 +602,17 @@ function UploadConfirmModal({
             ? "Replace Payment Slip"
             : "Upload Payment Slip";
 
-  const buttonLabel =
-    isAdminRevisionEcu || isAdminRevisionTcu
-      ? "Upload Revision"
-      : isReplace
-        ? "Confirm Replace"
-        : "Confirm Upload";
+  const buttonLabel = isAdminRevisionEcu || isAdminRevisionTcu ? "Upload Revision" : isReplace ? "Confirm Replace" : "Confirm Upload";
 
   const target =
-    isAdminUploadTcu || isAdminRevisionTcu
-      ? "TCU"
-      : isAdminUploadEcu || isAdminRevisionEcu
-        ? "ECU"
-        : "";
+    isAdminUploadTcu || isAdminRevisionTcu ? "TCU" : isAdminUploadEcu || isAdminRevisionEcu ? "ECU" : "";
 
   return (
     <div className="fixed inset-0 z-[112] flex items-center justify-center bg-black/70 px-4">
       <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-zinc-950 p-6 shadow-2xl">
         <div>
           <h3 className="text-lg font-semibold text-white">{title}</h3>
-          <p className="mt-1 text-sm text-white/50">
-            Please confirm the upload for this order.
-          </p>
+          <p className="mt-1 text-sm text-white/50">Please confirm the upload for this order.</p>
         </div>
 
         <form
@@ -621,10 +678,7 @@ function UploadConfirmModal({
                     : "file"
               }
               accept={
-                isAdminUploadEcu ||
-                isAdminUploadTcu ||
-                isAdminRevisionEcu ||
-                isAdminRevisionTcu
+                isAdminUploadEcu || isAdminUploadTcu || isAdminRevisionEcu || isAdminRevisionTcu
                   ? ".bin,.ori,.hex,.frf,.sgo,.read,.full,.mod"
                   : ".jpg,.jpeg,.png,.webp,.pdf"
               }
@@ -640,9 +694,7 @@ function UploadConfirmModal({
                 }
 
                 if (file.size > MAX_FILE_SIZE) {
-                  setFileError(
-                    "File size limit exceeded. Maximum allowed size is 10MB."
-                  );
+                  setFileError("File size limit exceeded. Maximum allowed size is 10MB.");
                   e.target.value = "";
                   return;
                 }
@@ -650,21 +702,14 @@ function UploadConfirmModal({
                 const fileName = file.name.toLowerCase().trim();
 
                 const allowedExtensions =
-                  isAdminUploadEcu ||
-                  isAdminUploadTcu ||
-                  isAdminRevisionEcu ||
-                  isAdminRevisionTcu
+                  isAdminUploadEcu || isAdminUploadTcu || isAdminRevisionEcu || isAdminRevisionTcu
                     ? [".bin", ".ori", ".hex", ".frf", ".sgo", ".read", ".full", ".mod"]
                     : [".jpg", ".jpeg", ".png", ".webp", ".pdf"];
 
-                const isValid = allowedExtensions.some((ext) =>
-                  fileName.endsWith(ext)
-                );
+                const isValid = allowedExtensions.some((ext) => fileName.endsWith(ext));
 
                 if (!isValid) {
-                  setFileError(
-                    `Invalid file type. Only ${allowedExtensions.join(", ")} files are allowed.`
-                  );
+                  setFileError(`Invalid file type. Only ${allowedExtensions.join(", ")} files are allowed.`);
                   e.target.value = "";
                   return;
                 }
@@ -672,11 +717,7 @@ function UploadConfirmModal({
                 setFileError(null);
               }}
             />
-            {fileError ? (
-              <p className="mt-2 text-sm font-medium text-red-400">
-                {fileError}
-              </p>
-            ) : null}
+            {fileError ? <p className="mt-2 text-sm font-medium text-red-400">{fileError}</p> : null}
           </div>
 
           {isAdminRevisionEcu || isAdminRevisionTcu ? (
@@ -697,9 +738,7 @@ function UploadConfirmModal({
 
           {submitError ? (
             <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
-              <div className="font-semibold uppercase tracking-[0.18em] text-red-300/80">
-                Upload Failed
-              </div>
+              <div className="font-semibold uppercase tracking-[0.18em] text-red-300/80">Upload Failed</div>
               <p className="mt-2 leading-6">{submitError}</p>
             </div>
           ) : null}
@@ -762,10 +801,7 @@ function RevisionFiles({
       {isOpen ? (
         <div className="mt-2 space-y-2">
           {orderedRevisions.map((revision) => (
-            <div
-              key={revision.id}
-              className="rounded-xl border border-white/10 bg-black/20 p-3"
-            >
+            <div key={revision.id} className="rounded-xl border border-white/10 bg-black/20 p-3">
               <Link
                 href={`/api/files/${revision.orderFile.id}/download`}
                 className="inline-block w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-left text-sm hover:bg-white/10"
@@ -773,11 +809,7 @@ function RevisionFiles({
                 {admin ? `Download Rev ${revision.revisionNo}` : `Rev ${revision.revisionNo}`}
               </Link>
 
-              {admin ? (
-                <div className="mt-2 text-xs text-white/45">
-                  Remark: {revision.remark}
-                </div>
-              ) : null}
+              {admin ? <div className="mt-2 text-xs text-white/45">Remark: {revision.remark}</div> : null}
             </div>
           ))}
         </div>
@@ -803,9 +835,7 @@ function FileSection({
 }) {
   return (
     <div className="w-full max-w-[190px] rounded-xl border border-white/10 bg-black/25 p-3">
-      <div className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-white/45">
-        {title}
-      </div>
+      <div className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-white/45">{title}</div>
 
       <div className="flex flex-col gap-2">
         {originalFile ? (
@@ -828,12 +858,28 @@ function FileSection({
           </Link>
         ) : null}
 
-        <RevisionFiles
-          revisions={revisions}
-          admin={admin}
-          canDownload={canDownloadTuned}
-        />
+        <RevisionFiles revisions={revisions} admin={admin} canDownload={canDownloadTuned} />
       </div>
+    </div>
+  );
+}
+
+function CustomOrderFileSection({ paymentProof }: { paymentProof: OrderFile | undefined }) {
+  return (
+    <div className="flex w-full max-w-[190px] flex-col gap-3">
+      <div className="w-full max-w-[190px] rounded-xl border border-white/10 bg-black/25 p-3">
+        <div className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-white/45">Custom Order</div>
+        <div className="text-xs text-white/45">No ECU / TCU file workflow</div>
+      </div>
+
+      {paymentProof ? (
+        <Link
+          href={`/api/files/${paymentProof.id}/download`}
+          className="inline-block rounded-xl border border-white/15 bg-black/30 px-3 py-2 hover:bg-white/10"
+        >
+          Payment Slip
+        </Link>
+      ) : null}
     </div>
   );
 }
@@ -855,7 +901,7 @@ export function OrderTable({
   orders: OrderWithRelations[];
   admin?: boolean;
 }) {
-  const [activeRequest, setActiveRequest] = useState<string | null>(null);
+  const [activeRequest, setActiveRequest] = useState<{ details: string; title: string; subtitle: string } | null>(null);
   const [cancelOrderId, setCancelOrderId] = useState<string | null>(null);
   const [customerCancelOrderId, setCustomerCancelOrderId] = useState<string | null>(null);
   const [releaseOrderId, setReleaseOrderId] = useState<string | null>(null);
@@ -879,70 +925,46 @@ export function OrderTable({
 
           <tbody>
             {orders.map((order) => {
+              const customOrder = isCustomOrder(order);
               const tuningType = order.tuningType || "ECU";
-              const needsEcu = tuningType === "ECU" || tuningType === "ECU_TCU";
-              const needsTcu = tuningType === "TCU" || tuningType === "ECU_TCU";
+              const needsEcu = !customOrder && (tuningType === "ECU" || tuningType === "ECU_TCU");
+              const needsTcu = !customOrder && (tuningType === "TCU" || tuningType === "ECU_TCU");
 
-              const customerOriginalLegacy = order.files.find(
-                (f) => f.kind === "CUSTOMER_ORIGINAL"
-              );
-
-              const customerEcu =
-                order.files.find((f) => f.kind === "CUSTOMER_ECU") ||
-                (needsEcu ? customerOriginalLegacy || null : null);
-
-              const customerTcu =
-                order.files.find((f) => f.kind === "CUSTOMER_TCU") || null;
-
+              const customerOriginalLegacy = order.files.find((f) => f.kind === "CUSTOMER_ORIGINAL");
+              const customerEcu = order.files.find((f) => f.kind === "CUSTOMER_ECU") || (needsEcu ? customerOriginalLegacy || null : null);
+              const customerTcu = order.files.find((f) => f.kind === "CUSTOMER_TCU") || null;
               const adminEcu =
                 order.files.find((f) => f.kind === "ADMIN_ECU") ||
                 order.files.find((f) => f.kind === "ADMIN_COMPLETED") ||
                 null;
-
-              const adminTcu =
-                order.files.find((f) => f.kind === "ADMIN_TCU") || null;
-
-              const paymentProof = order.files.find(
-                (f) => f.kind === "CUSTOMER_PAYMENT_PROOF"
-              );
+              const adminTcu = order.files.find((f) => f.kind === "ADMIN_TCU") || null;
+              const paymentProof = order.files.find((f) => f.kind === "CUSTOMER_PAYMENT_PROOF");
               const isAdminCreatedOrder = !!order.createdByAdminId;
 
               const ecuRevisions = order.revisions
-                .filter(
-                  (revision) =>
-                    getRevisionTargetLabel(revision.revisionTarget) === "ECU"
-                )
+                .filter((revision) => getRevisionTargetLabel(revision.revisionTarget) === "ECU")
                 .sort((a, b) => b.revisionNo - a.revisionNo);
 
               const tcuRevisions = order.revisions
-                .filter(
-                  (revision) =>
-                    getRevisionTargetLabel(revision.revisionTarget) === "TCU"
-                )
+                .filter((revision) => getRevisionTargetLabel(revision.revisionTarget) === "TCU")
                 .sort((a, b) => b.revisionNo - a.revisionNo);
 
               const displayStatus =
-                isAdminCreatedOrder &&
-                order.status !== "COMPLETED" &&
-                order.status !== "CANCELLED"
+                isAdminCreatedOrder && order.status !== "COMPLETED" && order.status !== "CANCELLED"
                   ? "FILE_RECEIVED"
                   : order.status;
 
               const statusLabel = getStatusLabel(displayStatus);
               const statusBadgeClass = getStatusBadge(displayStatus);
 
-              const hasAllAdminFiles =
-                (!needsEcu || !!adminEcu) && (!needsTcu || !!adminTcu);
+              const hasAllAdminFiles = customOrder ? true : (!needsEcu || !!adminEcu) && (!needsTcu || !!adminTcu);
 
               const customerCanDownload = isAdminCreatedOrder
                 ? order.status === "COMPLETED"
-                : order.status === "READY_FOR_DOWNLOAD" ||
-                  order.status === "COMPLETED";
+                : order.status === "READY_FOR_DOWNLOAD" || order.status === "COMPLETED";
 
               const customerPaymentStatusLabel =
-                order.status === "AWAITING_PAYMENT" && paymentProof
-                  ? "Payment Uploaded"
-                  : statusLabel;
+                order.status === "AWAITING_PAYMENT" && paymentProof ? "Payment Uploaded" : statusLabel;
 
               const customerPaymentStatusClass =
                 order.status === "AWAITING_PAYMENT" && paymentProof
@@ -959,6 +981,27 @@ export function OrderTable({
                   ? "inline-flex min-w-[122px] items-center justify-center rounded-full border border-cyan-500/30 bg-cyan-500/15 px-3 py-1 text-center text-xs font-semibold text-cyan-300"
                   : statusBadgeClass;
 
+              const requestTitle = customOrder ? "Custom Order Details" : "Request Details";
+              const requestSubtitle = customOrder ? "Submitted custom order summary" : "Submitted tuning requirements";
+              const requestDetailsText = customOrder
+                ? [
+                    `Order Type: Custom Order`,
+                    `Title / Summary: ${order.customTitle || "-"}`,
+                    `Subtotal: ${formatCurrency(order.customSubtotal ?? order.totalAmount ?? 0)}`,
+                    `Discount: ${formatCurrency(order.customDiscount ?? 0)}`,
+                    `Grand Total: ${formatCurrency(order.customGrandTotal ?? order.totalAmount ?? 0)}`,
+                    "",
+                    "Line Items:",
+                    ...(order.customOrderItems && order.customOrderItems.length > 0
+                      ? order.customOrderItems.map(
+                          (item, index) =>
+                            `${index + 1}. ${item.description} | Qty: ${item.qty} | Unit Price: ${formatCurrency(item.unitPrice)} | Total: ${formatCurrency(item.lineTotal)}`
+                        )
+                      : ["No line items"]),
+                    ...(order.internalRemarks ? ["", `Internal Remarks: ${order.internalRemarks}`] : []),
+                  ].join("\n")
+                : order.requestDetails || "";
+
               return (
                 <tr
                   key={order.id}
@@ -966,9 +1009,7 @@ export function OrderTable({
                 >
                   <td className="px-4 py-4">
                     <div className="font-semibold break-words">{order.orderNumber}</div>
-                    <div className="text-white/45">
-                      {new Date(order.createdAt).toLocaleDateString()}
-                    </div>
+                    <div className="text-white/45">{new Date(order.createdAt).toLocaleDateString()}</div>
                     <div className="text-white/35 text-xs">
                       {new Date(order.createdAt).toLocaleTimeString([], {
                         hour: "numeric",
@@ -984,9 +1025,7 @@ export function OrderTable({
                     </td>
                   ) : null}
 
-                  <td className="px-4 py-4">
-                    <VehicleDetails order={order} />
-                  </td>
+                  <td className="px-4 py-4">{customOrder ? <CustomOrderDetails order={order} /> : <VehicleDetails order={order} />}</td>
 
                   <td className="px-4 py-4 align-top">
                     <div className="flex flex-col items-start gap-3">
@@ -994,63 +1033,43 @@ export function OrderTable({
                         {admin ? adminPaymentStatusLabel : customerPaymentStatusLabel}
                       </span>
 
-                      {admin &&
-                      !isAdminCreatedOrder &&
-                      order.status === "AWAITING_PAYMENT" &&
-                      !paymentProof ? (
-                        <div className="text-sm text-amber-300/90">
-                          Waiting for payment proof
-                        </div>
+                      {admin && !isAdminCreatedOrder && order.status === "AWAITING_PAYMENT" && !paymentProof ? (
+                        <div className="text-sm text-amber-300/90">Waiting for payment proof</div>
                       ) : null}
 
-                      {admin &&
-                      !isAdminCreatedOrder &&
-                      order.status === "AWAITING_PAYMENT" &&
-                      paymentProof &&
-                      hasAllAdminFiles ? (
-                        <div className="text-sm text-emerald-300/90">
-                          Ready to Release
-                        </div>
+                      {admin && !isAdminCreatedOrder && order.status === "AWAITING_PAYMENT" && paymentProof && hasAllAdminFiles ? (
+                        <div className="text-sm text-emerald-300/90">Ready to Release</div>
                       ) : null}
 
-                      {!admin &&
-                      order.status === "AWAITING_PAYMENT" &&
-                      paymentProof &&
-                      hasAllAdminFiles ? (
-                        <div className="text-sm text-cyan-300/90">
-                          Awaiting Admin Release
-                        </div>
+                      {!admin && order.status === "AWAITING_PAYMENT" && paymentProof && hasAllAdminFiles ? (
+                        <div className="text-sm text-cyan-300/90">Awaiting Admin Release</div>
                       ) : null}
 
                       {admin && order.status === "CANCELLED" && order.cancelledBy ? (
                         <div className="text-xs text-white/45">
-                          Cancelled by{" "}
-                          {order.cancelledBy === "ADMIN" ? "admin" : "customer"}
+                          Cancelled by {order.cancelledBy === "ADMIN" ? "admin" : "customer"}
                           {order.cancelReason ? ` • ${order.cancelReason}` : ""}
                         </div>
-                      ) : !admin &&
-                        order.status === "CANCELLED" &&
-                        order.cancelledBy === "CUSTOMER" ? (
-                        <div className="text-xs text-white/45">
-                          Cancelled by you
-                        </div>
-                      ) : !admin &&
-                        order.status === "CANCELLED" &&
-                        order.cancelledBy === "ADMIN" ? (
+                      ) : !admin && order.status === "CANCELLED" && order.cancelledBy === "CUSTOMER" ? (
+                        <div className="text-xs text-white/45">Cancelled by you</div>
+                      ) : !admin && order.status === "CANCELLED" && order.cancelledBy === "ADMIN" ? (
                         <div className="text-xs text-white/45">
                           Cancelled by RK Motorsports
                           <div className="mt-1 text-white/40">
-                            This request could not be processed after review.
-                            Please contact us for clarification.
+                            This request could not be processed after review. Please contact us for clarification.
                           </div>
                         </div>
                       ) : null}
 
-                      {order.requestDetails ? (
+                      {requestDetailsText ? (
                         <button
                           type="button"
                           onClick={() =>
-                            setActiveRequest(order.requestDetails || "")
+                            setActiveRequest({
+                              details: requestDetailsText,
+                              title: requestTitle,
+                              subtitle: requestSubtitle,
+                            })
                           }
                           className="inline-flex min-w-[122px] items-center justify-center rounded-full border border-white/12 bg-white/[0.03] px-3 py-1.5 text-xs font-medium text-white/72 transition hover:border-white/20 hover:bg-white/[0.07] hover:text-white"
                         >
@@ -1060,43 +1079,45 @@ export function OrderTable({
                     </div>
                   </td>
 
-                  <td className="px-4 py-4 whitespace-nowrap align-top">
-                    {formatCurrency(order.totalAmount)}
-                  </td>
+                  <td className="px-4 py-4 whitespace-nowrap align-top">{formatCurrency(order.totalAmount)}</td>
 
                   <td className="px-4 py-4 align-top">
-                    <div className="flex w-full max-w-[190px] flex-col gap-3">
-                      {needsEcu ? (
-                        <FileSection
-                          title="ECU"
-                          originalFile={customerEcu}
-                          tunedFile={adminEcu}
-                          revisions={ecuRevisions}
-                          admin={admin}
-                          canDownloadTuned={customerCanDownload}
-                        />
-                      ) : null}
+                    {customOrder ? (
+                      <CustomOrderFileSection paymentProof={paymentProof} />
+                    ) : (
+                      <div className="flex w-full max-w-[190px] flex-col gap-3">
+                        {needsEcu ? (
+                          <FileSection
+                            title="ECU"
+                            originalFile={customerEcu}
+                            tunedFile={adminEcu}
+                            revisions={ecuRevisions}
+                            admin={admin}
+                            canDownloadTuned={customerCanDownload}
+                          />
+                        ) : null}
 
-                      {needsTcu ? (
-                        <FileSection
-                          title="TCU"
-                          originalFile={customerTcu}
-                          tunedFile={adminTcu}
-                          revisions={tcuRevisions}
-                          admin={admin}
-                          canDownloadTuned={customerCanDownload}
-                        />
-                      ) : null}
+                        {needsTcu ? (
+                          <FileSection
+                            title="TCU"
+                            originalFile={customerTcu}
+                            tunedFile={adminTcu}
+                            revisions={tcuRevisions}
+                            admin={admin}
+                            canDownloadTuned={customerCanDownload}
+                          />
+                        ) : null}
 
-                      {paymentProof ? (
-                        <Link
-                          href={`/api/files/${paymentProof.id}/download`}
-                          className="inline-block rounded-xl border border-white/15 bg-black/30 px-3 py-2 hover:bg-white/10"
-                        >
-                          Payment Slip
-                        </Link>
-                      ) : null}
-                    </div>
+                        {paymentProof ? (
+                          <Link
+                            href={`/api/files/${paymentProof.id}/download`}
+                            className="inline-block rounded-xl border border-white/15 bg-black/30 px-3 py-2 hover:bg-white/10"
+                          >
+                            Payment Slip
+                          </Link>
+                        ) : null}
+                      </div>
+                    )}
                   </td>
 
                   <td className="px-4 py-4 align-top">
@@ -1105,39 +1126,27 @@ export function OrderTable({
                         <span className="text-red-400">Order Cancelled</span>
                       ) : (
                         <div className="flex w-full max-w-[170px] flex-col gap-2">
-                          {needsEcu && !adminEcu ? (
+                          {!customOrder && needsEcu && !adminEcu ? (
                             <button
                               type="button"
-                              onClick={() =>
-                                setUploadModal({
-                                  action: "admin-upload-ecu",
-                                  orderId: order.id,
-                                })
-                              }
+                              onClick={() => setUploadModal({ action: "admin-upload-ecu", orderId: order.id })}
                               className="w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center text-sm whitespace-normal transition hover:bg-white/10"
                             >
                               Upload Tuned ECU
                             </button>
                           ) : null}
 
-                          {needsTcu && !adminTcu ? (
+                          {!customOrder && needsTcu && !adminTcu ? (
                             <button
                               type="button"
-                              onClick={() =>
-                                setUploadModal({
-                                  action: "admin-upload-tcu",
-                                  orderId: order.id,
-                                })
-                              }
+                              onClick={() => setUploadModal({ action: "admin-upload-tcu", orderId: order.id })}
                               className="w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center text-sm whitespace-normal transition hover:bg-white/10"
                             >
                               Upload Tuned TCU
                             </button>
                           ) : null}
 
-                          {["FILE_RECEIVED", "IN_PROGRESS", "AWAITING_PAYMENT", "PAID"].includes(
-                            order.status
-                          ) ? (
+                          {["FILE_RECEIVED", "IN_PROGRESS", "AWAITING_PAYMENT", "PAID"].includes(order.status) ? (
                             <button
                               type="button"
                               onClick={() => setCancelOrderId(order.id)}
@@ -1147,17 +1156,12 @@ export function OrderTable({
                             </button>
                           ) : null}
 
-                          {isAdminCreatedOrder &&
-                          ["FILE_RECEIVED", "IN_PROGRESS", "AWAITING_PAYMENT", "PAID"].includes(
-                            order.status
-                          ) ? (
+                          {isAdminCreatedOrder && ["FILE_RECEIVED", "IN_PROGRESS", "AWAITING_PAYMENT", "PAID"].includes(order.status) ? (
                             <button
                               type="button"
                               onClick={() =>
                                 setUploadModal({
-                                  action: paymentProof
-                                    ? "admin-replace-payment"
-                                    : "admin-upload-payment",
+                                  action: paymentProof ? "admin-replace-payment" : "admin-upload-payment",
                                   orderId: order.id,
                                 })
                               }
@@ -1167,10 +1171,7 @@ export function OrderTable({
                             </button>
                           ) : null}
 
-                          {!isAdminCreatedOrder &&
-                          order.status === "AWAITING_PAYMENT" &&
-                          paymentProof &&
-                          hasAllAdminFiles ? (
+                          {!isAdminCreatedOrder && order.status === "AWAITING_PAYMENT" && paymentProof && hasAllAdminFiles ? (
                             <button
                               type="button"
                               onClick={() => setReleaseOrderId(order.id)}
@@ -1180,70 +1181,50 @@ export function OrderTable({
                             </button>
                           ) : null}
 
-                          {isAdminCreatedOrder &&
-                          hasAllAdminFiles &&
-                          order.status !== "COMPLETED" ? (
-                            <form
-                              action={`/api/admin/orders/${order.id}/complete`}
-                              method="post"
-                            >
+                          {isAdminCreatedOrder && hasAllAdminFiles && order.status !== "COMPLETED" ? (
+                            <form action={`/api/admin/orders/${order.id}/complete`} method="post">
                               <button
                                 type="submit"
                                 className="w-full rounded-xl border border-emerald-500/40 px-3 py-2 text-center text-sm text-emerald-400 transition hover:bg-emerald-500/10 whitespace-normal leading-tight"
                               >
                                 <>
-                                 Complete <br /> Order
+                                  Complete <br /> Order
                                 </>
                               </button>
                             </form>
                           ) : null}
 
-                          {((isAdminCreatedOrder && !!adminEcu) ||
-                            (["READY_FOR_DOWNLOAD", "COMPLETED"].includes(order.status) &&
-                              needsEcu &&
-                              adminEcu)) ? (
+                          {!customOrder &&
+                          ((isAdminCreatedOrder && !!adminEcu) ||
+                            (["READY_FOR_DOWNLOAD", "COMPLETED"].includes(order.status) && needsEcu && adminEcu)) ? (
                             <button
                               type="button"
-                              onClick={() =>
-                                setUploadModal({
-                                  action: "admin-upload-revision-ecu",
-                                  orderId: order.id,
-                                })
-                              }
+                              onClick={() => setUploadModal({ action: "admin-upload-revision-ecu", orderId: order.id })}
                               className="w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center text-sm whitespace-normal transition hover:bg-white/10"
                             >
                               Upload ECU Revision
                             </button>
                           ) : null}
 
-                          {((isAdminCreatedOrder && !!adminTcu) ||
-                            (["READY_FOR_DOWNLOAD", "COMPLETED"].includes(order.status) &&
-                              needsTcu &&
-                              adminTcu)) ? (
+                          {!customOrder &&
+                          ((isAdminCreatedOrder && !!adminTcu) ||
+                            (["READY_FOR_DOWNLOAD", "COMPLETED"].includes(order.status) && needsTcu && adminTcu)) ? (
                             <button
                               type="button"
-                              onClick={() =>
-                                setUploadModal({
-                                  action: "admin-upload-revision-tcu",
-                                  orderId: order.id,
-                                })
-                              }
+                              onClick={() => setUploadModal({ action: "admin-upload-revision-tcu", orderId: order.id })}
                               className="w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center text-sm whitespace-normal transition hover:bg-white/10"
                             >
                               Upload TCU Revision
                             </button>
                           ) : null}
 
-                          {!isAdminCreatedOrder &&
-                          ["READY_FOR_DOWNLOAD", "COMPLETED"].includes(order.status) ? (
+                          {!isAdminCreatedOrder && ["READY_FOR_DOWNLOAD", "COMPLETED"].includes(order.status) ? (
                             <span className="inline-flex w-full min-h-[44px] items-center justify-center rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-center text-sm whitespace-normal text-emerald-400">
                               Download Released
                             </span>
                           ) : null}
 
-                          {(isAdminCreatedOrder ||
-                            (!isAdminCreatedOrder &&
-                              ["READY_FOR_DOWNLOAD", "COMPLETED"].includes(order.status))) ? (
+                          {(isAdminCreatedOrder || (!isAdminCreatedOrder && ["READY_FOR_DOWNLOAD", "COMPLETED"].includes(order.status))) ? (
                             <Link
                               href={`/api/admin/orders/${order.id}/invoice`}
                               className="inline-flex w-full min-h-[44px] flex-col items-center justify-center rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center text-sm whitespace-normal leading-5 transition hover:bg-white/10"
@@ -1253,19 +1234,15 @@ export function OrderTable({
                             </Link>
                           ) : null}
                         </div>
-                      )                    ) : order.status === "CANCELLED" ? (
+                      )
+                    ) : order.status === "CANCELLED" ? (
                       <span className="text-red-400">Cancelled</span>
                     ) : order.status === "AWAITING_PAYMENT" && hasAllAdminFiles ? (
                       <div className="flex w-full max-w-[170px] flex-col gap-2">
                         {paymentProof ? (
                           <button
                             type="button"
-                            onClick={() =>
-                              setUploadModal({
-                                action: "customer-replace-payment",
-                                orderId: order.id,
-                              })
-                            }
+                            onClick={() => setUploadModal({ action: "customer-replace-payment", orderId: order.id })}
                             className="rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-white/80 hover:bg-white/10"
                           >
                             Replace Payment Slip
@@ -1273,12 +1250,7 @@ export function OrderTable({
                         ) : (
                           <button
                             type="button"
-                            onClick={() =>
-                              setUploadModal({
-                                action: "customer-upload-payment",
-                                orderId: order.id,
-                              })
-                            }
+                            onClick={() => setUploadModal({ action: "customer-upload-payment", orderId: order.id })}
                             className="rounded-xl border border-amber-500/40 px-3 py-2 text-amber-300 hover:bg-amber-500/10"
                           >
                             Upload Payment Slip
@@ -1325,7 +1297,9 @@ export function OrderTable({
       <RequestDetailsModal
         isOpen={activeRequest !== null}
         onClose={() => setActiveRequest(null)}
-        details={activeRequest || ""}
+        details={activeRequest?.details || ""}
+        title={activeRequest?.title || "Request Details"}
+        subtitle={activeRequest?.subtitle || "Submitted tuning requirements"}
       />
 
       <AdminCancelModal
