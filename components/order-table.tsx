@@ -1114,7 +1114,7 @@ export function OrderTable({
                                   orderId: order.id,
                                 })
                               }
-                              className="w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center text-sm transition hover:bg-white/10"
+                              className="w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center text-sm whitespace-normal transition hover:bg-white/10"
                             >
                               Upload Tuned ECU
                             </button>
@@ -1129,7 +1129,7 @@ export function OrderTable({
                                   orderId: order.id,
                                 })
                               }
-                              className="w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center text-sm transition hover:bg-white/10"
+                              className="w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center text-sm whitespace-normal transition hover:bg-white/10"
                             >
                               Upload Tuned TCU
                             </button>
@@ -1141,7 +1141,7 @@ export function OrderTable({
                             <button
                               type="button"
                               onClick={() => setCancelOrderId(order.id)}
-                              className="w-full rounded-xl border border-red-500/40 px-3 py-2 text-center text-sm text-red-400 transition hover:bg-red-500/10"
+                              className="w-full rounded-xl border border-red-500/40 px-3 py-2 text-center text-sm whitespace-normal text-red-400 transition hover:bg-red-500/10"
                             >
                               Admin Cancel Order
                             </button>
@@ -1161,7 +1161,7 @@ export function OrderTable({
                                   orderId: order.id,
                                 })
                               }
-                              className="w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center text-sm transition hover:bg-white/10"
+                              className="w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center text-sm whitespace-normal transition hover:bg-white/10"
                             >
                               {paymentProof ? "Replace Payment Slip" : "Upload Payment Slip"}
                             </button>
@@ -1174,7 +1174,7 @@ export function OrderTable({
                             <button
                               type="button"
                               onClick={() => setReleaseOrderId(order.id)}
-                              className="w-full rounded-xl border border-emerald-500/40 px-3 py-2 text-center text-sm text-emerald-400 transition hover:bg-emerald-500/10"
+                              className="w-full rounded-xl border border-emerald-500/40 px-3 py-2 text-center text-sm whitespace-normal text-emerald-400 transition hover:bg-emerald-500/10"
                             >
                               Release Download
                             </button>
@@ -1189,10 +1189,9 @@ export function OrderTable({
                             >
                               <button
                                 type="submit"
-                                className="w-full rounded-xl border border-emerald-500/40 px-3 py-2 text-center text-sm text-emerald-400 transition hover:bg-emerald-500/10"
+                                className="w-full rounded-xl border border-emerald-500/40 px-3 py-2 text-center text-sm whitespace-normal text-emerald-400 transition hover:bg-emerald-500/10"
                               >
-                                Complete
-Order
+                                Mark Completed
                               </button>
                             </form>
                           ) : null}
@@ -1209,7 +1208,7 @@ Order
                                   orderId: order.id,
                                 })
                               }
-                              className="w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center text-sm transition hover:bg-white/10"
+                              className="w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center text-sm whitespace-normal transition hover:bg-white/10"
                             >
                               Upload ECU Revision
                             </button>
@@ -1227,7 +1226,7 @@ Order
                                   orderId: order.id,
                                 })
                               }
-                              className="w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center text-sm transition hover:bg-white/10"
+                              className="w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center text-sm whitespace-normal transition hover:bg-white/10"
                             >
                               Upload TCU Revision
                             </button>
@@ -1235,7 +1234,7 @@ Order
 
                           {!isAdminCreatedOrder &&
                           ["READY_FOR_DOWNLOAD", "COMPLETED"].includes(order.status) ? (
-                            <span className="inline-flex w-full min-h-[44px] items-center justify-center rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-center text-sm text-emerald-400">
+                            <span className="inline-flex w-full min-h-[44px] items-center justify-center rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-center text-sm whitespace-normal text-emerald-400">
                               Download Released
                             </span>
                           ) : null}
@@ -1245,7 +1244,7 @@ Order
                               ["READY_FOR_DOWNLOAD", "COMPLETED"].includes(order.status))) ? (
                             <Link
                               href={`/api/admin/orders/${order.id}/invoice`}
-                              className="inline-flex w-full min-h-[44px] flex-col items-center justify-center rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center text-sm leading-5 transition hover:bg-white/10"
+                              className="inline-flex w-full min-h-[44px] flex-col items-center justify-center rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center text-sm whitespace-normal leading-5 transition hover:bg-white/10"
                             >
                               <span>Download</span>
                               <span>Invoice</span>
@@ -1286,7 +1285,7 @@ Order
 
                         <Link
                           href={`/api/admin/orders/${order.id}/invoice`}
-                          className="inline-flex w-full min-h-[44px] flex-col items-center justify-center rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center text-sm leading-5 transition hover:bg-white/10"
+                          className="inline-flex w-full min-h-[44px] flex-col items-center justify-center rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center text-sm whitespace-normal leading-5 transition hover:bg-white/10"
                         >
                           <span>Download</span>
                           <span>Invoice</span>
@@ -1296,7 +1295,7 @@ Order
                       <div className="flex w-full max-w-[170px] flex-col gap-2">
                         <Link
                           href={`/api/admin/orders/${order.id}/invoice`}
-                          className="inline-flex w-full min-h-[44px] flex-col items-center justify-center rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center text-sm leading-5 transition hover:bg-white/10"
+                          className="inline-flex w-full min-h-[44px] flex-col items-center justify-center rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center text-sm whitespace-normal leading-5 transition hover:bg-white/10"
                         >
                           <span>Download</span>
                           <span>Invoice</span>
