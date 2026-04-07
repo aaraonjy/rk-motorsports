@@ -27,7 +27,7 @@ export type OrderWithRelations = Order & {
   files: OrderFile[];
   revisions: (OrderRevision & { orderFile: OrderFile })[];
   items: (OrderItem & { product: Product })[];
-  customOrderItems?: CustomOrderItem[];
+  customItems?: CustomOrderItem[];
   engineModel?: string | null;
   engineCapacity?: string | number | null;
   currentEcuSetupStage?: string | null;
@@ -277,7 +277,7 @@ function VehicleDetails({ order }: { order: OrderWithRelations }) {
 }
 
 function CustomOrderDetails({ order }: { order: OrderWithRelations }) {
-  const items = order.customOrderItems || [];
+  const items = order.customItems || [];
 
   return (
     <div className="space-y-3 text-sm leading-6">
@@ -992,8 +992,8 @@ export function OrderTable({
                     `Grand Total: ${formatCurrency(order.customGrandTotal ?? order.totalAmount ?? 0)}`,
                     "",
                     "Line Items:",
-                    ...(order.customOrderItems && order.customOrderItems.length > 0
-                      ? order.customOrderItems.map(
+                    ...(order.customItems && order.customItems.length > 0
+                      ? order.customItems.map(
                           (item, index) =>
                             `${index + 1}. ${item.description} | Qty: ${item.qty} | Unit Price: ${formatCurrency(item.unitPrice)} | Total: ${formatCurrency(item.lineTotal)}`
                         )

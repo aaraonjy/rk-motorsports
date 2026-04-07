@@ -1,7 +1,7 @@
 import { getSessionUser } from "@/lib/auth";
 import { getRecentOrdersForUser } from "@/lib/queries";
 import { redirect } from "next/navigation";
-import { OrderTable } from "@/components/order-table";
+import { OrderTable, type OrderWithRelations } from "@/components/order-table";
 import { paymentConfig } from "@/lib/payment-config";
 import { ClearSuccessParam } from "@/components/clear-success-param";
 import { PaginationControls } from "@/components/pagination-controls";
@@ -103,10 +103,16 @@ export default async function DashboardPage({
   const banner = getCustomerBanner(params.success);
   const page = Math.max(1, Number(params.page || "1") || 1);
 
-  const result = await getRecentOrdersForUser(user.id, {
+  const result = (await getRecentOrdersForUser(user.id, {
     page,
     pageSize: 5,
-  });
+  })) as {
+    orders: OrderWithRelations[];
+    totalCount: number;
+    currentPage: number;
+    pageSize: number;
+    totalPages: number;
+  };
 
   return (
     <section className="section-pad">

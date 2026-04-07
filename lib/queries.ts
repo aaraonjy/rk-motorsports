@@ -35,7 +35,7 @@ export async function getRecentOrdersForUser(
           orderBy: { revisionNo: "desc" },
         },
         items: { include: { product: true } },
-        customOrderItems: {
+        customItems: {
           orderBy: { createdAt: "asc" },
         },
       },
@@ -145,7 +145,7 @@ export async function getAllOrders(filters?: AllOrdersOptions) {
           orderBy: { revisionNo: "desc" },
         },
         items: { include: { product: true } },
-        customOrderItems: {
+        customItems: {
           orderBy: { createdAt: "asc" },
         },
       },
