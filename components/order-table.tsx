@@ -1191,7 +1191,7 @@ export function OrderTable({
                                 type="submit"
                                 className="w-full rounded-xl border border-emerald-500/40 px-3 py-2 text-center text-sm text-emerald-400 transition hover:bg-emerald-500/10"
                               >
-                                Mark Completed
+                                Complete Order
                               </button>
                             </form>
                           ) : null}
