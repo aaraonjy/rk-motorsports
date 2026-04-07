@@ -240,3 +240,26 @@ export async function getCustomers(filters?: CustomersOptions) {
     totalPages: Math.max(1, Math.ceil(totalCount / pageSize)),
   };
 }
+
+export async function getCustomerById(customerId: string) {
+  return db.user.findFirst({
+    where: {
+      id: customerId,
+      role: "CUSTOMER",
+    },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      phone: true,
+      accountSource: true,
+      portalAccess: true,
+      createdAt: true,
+      _count: {
+        select: {
+          orders: true,
+        },
+      },
+    },
+  });
+}
