@@ -1248,7 +1248,7 @@ export function OrderTable({
                       )
                     ) : order.status === "CANCELLED" ? (
                       <span className="text-red-400">Cancelled</span>
-                    ) : order.status === "AWAITING_PAYMENT" && hasAllAdminFiles ? (
+                    ) : !isAdminCreatedOrder && order.status === "AWAITING_PAYMENT" && hasAllAdminFiles ? (
                       <div className="flex w-full max-w-[170px] flex-col gap-2">
                         {paymentProof ? (
                           <button
