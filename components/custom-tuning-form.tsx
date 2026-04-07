@@ -63,6 +63,8 @@ type TcuTypesFile = Record<string, TcuTypeEntry[]>;
 
 type CustomTuningFormProps = {
   productId: string;
+  adminMode?: boolean;
+  customerId?: string;
 };
 
 
@@ -403,7 +405,11 @@ function getAddOnGroups(options: AddOn[]) {
   ].filter((group) => group.items.length > 0);
 }
 
-export function CustomTuningForm({ productId }: CustomTuningFormProps) {
+export function CustomTuningForm({
+  productId,
+  adminMode = false,
+  customerId,
+}: CustomTuningFormProps) {
   const [tuningType, setTuningType] = useState<TuningTypeOption>("ECU");
   const [selectedAddOns, setSelectedAddOns] = useState<string[]>([]);
   const [isAddOnsOpen, setIsAddOnsOpen] = useState(false);
@@ -979,6 +985,12 @@ async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
 
   try {
     const formData = new FormData(event.currentTarget);
+
+    if (adminMode && customerId) {
+      formData.set("adminMode", "true");
+      formData.set("customerId", customerId);
+    }
+
     const response = await fetch("/api/orders", {
       method: "POST",
       body: formData,
@@ -991,7 +1003,7 @@ async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
       return;
     }
 
-    window.location.href = data.redirectTo || "/dashboard";
+    window.location.href = data.redirectTo || (adminMode ? "/admin" : "/dashboard");
   } catch {
     setSubmitError("Order submission failed. Please try again.");
   } finally {
@@ -1046,6 +1058,10 @@ async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
       className="grid gap-8 lg:grid-cols-[1.5fr_0.9fr]"
     >
       <input type="hidden" name="productId" value={productId} />
+      {adminMode ? <input type="hidden" name="adminMode" value="true" /> : null}
+      {adminMode && customerId ? (
+        <input type="hidden" name="customerId" value={customerId} />
+      ) : null}
       <input type="hidden" name="tuningType" value={tuningType} />
       <input type="hidden" name="ecuStage" value={ecuStage} />
       <input type="hidden" name="tcuStage" value={tcuStage} />

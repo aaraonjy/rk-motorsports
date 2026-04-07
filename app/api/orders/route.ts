@@ -82,6 +82,8 @@ export async function POST(req: Request) {
     }
 
     const productId = String(form.get("productId") || "");
+    const adminMode = String(form.get("adminMode") || "") === "true";
+    const targetCustomerId = String(form.get("customerId") || "").trim();
     const tuningType = normalizeTuningType(
       String(form.get("tuningType") || "ECU")
     );
@@ -127,6 +129,43 @@ export async function POST(req: Request) {
 
     const ecuFile = form.get("ecuFile");
     const tcuFile = form.get("tcuFile");
+
+    let orderUserId = user.id;
+    let createdByAdminId: string | null = null;
+
+    if (adminMode) {
+      if (user.role !== "ADMIN") {
+        return NextResponse.json(
+          { ok: false, error: "Only admin can create orders in admin mode." },
+          { status: 403 }
+        );
+      }
+
+      if (!targetCustomerId) {
+        return NextResponse.json(
+          { ok: false, error: "Customer is required for admin order creation." },
+          { status: 400 }
+        );
+      }
+
+      const targetCustomer = await db.user.findFirst({
+        where: {
+          id: targetCustomerId,
+          role: "CUSTOMER",
+        },
+        select: { id: true, name: true },
+      });
+
+      if (!targetCustomer) {
+        return NextResponse.json(
+          { ok: false, error: "Selected customer not found." },
+          { status: 404 }
+        );
+      }
+
+      orderUserId = targetCustomer.id;
+      createdByAdminId = user.id;
+    }
 
     const product = await db.product.findUnique({
       where: { id: productId },
@@ -260,7 +299,8 @@ export async function POST(req: Request) {
     const order = await db.order.create({
       data: {
         orderNumber,
-        userId: user.id,
+        userId: orderUserId,
+        createdByAdminId,
         totalAmount: finalTotal,
         requestDetails,
         tuningType,
@@ -311,7 +351,7 @@ export async function POST(req: Request) {
       await createAdminNotification({
         type: "ORDER_SUBMITTED",
         title: "New Order received",
-        message: `${user.name} submitted a new ${tuningType.replaceAll(
+        message: `${user.name} ${adminMode ? "created" : "submitted"} a new ${tuningType.replaceAll(
           "_",
           " + "
         )} order.`,
@@ -323,7 +363,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       ok: true,
-      redirectTo: getOrderSubmittedRedirectPath(tuningType),
+      redirectTo: adminMode ? "/admin" : getOrderSubmittedRedirectPath(tuningType),
     });
   } catch (error) {
     console.error("POST /api/orders failed:", error);
