@@ -59,30 +59,6 @@ export function SiteHeaderClient({ user }: { user: HeaderUser }) {
       {isDashboardOpen ? (
         <div className="absolute right-0 top-[calc(100%+10px)] z-[70] w-56 overflow-hidden rounded-2xl border border-white/10 bg-[#0b0b0c]/95 shadow-2xl backdrop-blur-xl">
           <Link
-            href={user.role === "ADMIN" ? "/admin" : "/dashboard"}
-            onClick={() => setIsDashboardOpen(false)}
-            className="block px-4 py-4 text-white/85 transition hover:bg-white/10 hover:text-white"
-          >
-            My Dashboard
-          </Link>
-
-          {user.role === "ADMIN" ? (
-            <>
-              <div className="h-px bg-white/10" />
-
-              <Link
-                href="/admin/customers"
-                onClick={() => setIsDashboardOpen(false)}
-                className="block px-4 py-4 text-white/85 transition hover:bg-white/10 hover:text-white"
-              >
-                Customers
-              </Link>
-            </>
-          ) : null}
-
-          <div className="h-px bg-white/10" />
-
-          <Link
             href="/change-password"
             onClick={() => setIsDashboardOpen(false)}
             className="block px-4 py-4 text-white/85 transition hover:bg-white/10 hover:text-white"
