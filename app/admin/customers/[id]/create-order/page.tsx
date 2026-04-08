@@ -118,18 +118,18 @@ export default async function AdminCustomerCreateOrderPage({
               Option 1
             </p>
             <h2 className="mt-3 text-2xl font-semibold text-white">
-              Standard Tuning Order
+              Standard ECU / TCU Tuning
             </h2>
             <p className="mt-4 text-white/70">
-              Use the existing structured tuning workflow for ECU, TCU, or ECU +
-              TCU jobs. This keeps the current tuning logic unchanged.
+              Use our structured tuning workflow for ECU, TCU, or combined tuning jobs.
+              Ideal for file-based remapping with full validation and automation.
             </p>
 
             <div className="mt-6 space-y-2 text-sm leading-6 text-white/65">
-              <p>• Shared tuning form</p>
-              <p>• ECU / TCU file workflow</p>
-              <p>• Existing validation and pricing logic</p>
-              <p>• Current admin flow preserved</p>
+              <p>• Guided tuning workflow</p>
+              <p>• ECU / TCU file upload & delivery</p>
+              <p>• Built-in pricing and validation</p>
+              <p>• Best for regular tuning jobs</p>
             </div>
 
             <div className="mt-8">
@@ -137,7 +137,7 @@ export default async function AdminCustomerCreateOrderPage({
                 href={`/admin/customers/${customer.id}/create-order/standard`}
                 className="inline-flex items-center justify-center rounded-xl border border-sky-500/30 bg-sky-500/10 px-5 py-3 font-medium text-sky-200 transition hover:bg-sky-500/15"
               >
-                Continue with Standard Tuning
+                Start Standard Tuning
               </Link>
             </div>
           </div>
@@ -147,18 +147,18 @@ export default async function AdminCustomerCreateOrderPage({
               Option 2
             </p>
             <h2 className="mt-3 text-2xl font-semibold text-white">
-              Custom Order
+              Custom Service Order
             </h2>
             <p className="mt-4 text-white/70">
-              Use a flexible manual order flow for non-standard jobs, service
-              work, or miscellaneous billing items.
+              Create flexible orders for services, diagnostics, or non-standard work.
+              Perfect for manual jobs, workshop services, or special requests.
             </p>
 
             <div className="mt-6 space-y-2 text-sm leading-6 text-white/65">
-              <p>• Manual title / summary</p>
-              <p>• Multiple custom line items</p>
-              <p>• Subtotal, discount, and grand total</p>
-              <p>• Separate workflow from tuning orders</p>
+              <p>• Manual description & pricing</p>
+              <p>• Multiple line items</p>
+              <p>• Discount and total calculation</p>
+              <p>• Suitable for services & miscellaneous jobs</p>
             </div>
 
             <div className="mt-8">
@@ -166,7 +166,7 @@ export default async function AdminCustomerCreateOrderPage({
                 href={`/admin/customers/${customer.id}/create-order/custom`}
                 className="inline-flex items-center justify-center rounded-xl border border-amber-500/30 bg-amber-500/10 px-5 py-3 font-medium text-amber-200 transition hover:bg-amber-500/15"
               >
-                Continue with Custom Order
+                Create Custom Order
               </Link>
             </div>
           </div>
