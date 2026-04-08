@@ -4,7 +4,7 @@ import { getSessionUser } from "@/lib/auth";
 import { AdminNotificationBell } from "@/components/admin-notification-bell";
 import { SiteHeaderClient } from "@/components/site-header-client";
 
-const nav = [
+const publicNav = [
   ["Services", "/#services"],
   ["Find a File", "/shop"],
   ["Custom Tuning", "/custom-tuning"],
@@ -12,8 +12,15 @@ const nav = [
   ["Contact", "/contact"],
 ] as const;
 
+const adminNav = [
+  ["Dashboard", "/admin"],
+  ["Orders", "/admin"],
+  ["Customers", "/admin/customers"],
+] as const;
+
 export async function SiteHeader() {
   const user = await getSessionUser();
+  const nav = user?.role === "ADMIN" ? adminNav : publicNav;
 
   return (
     <header className="absolute left-0 top-0 z-50 w-full bg-transparent">
