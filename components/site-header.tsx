@@ -14,7 +14,6 @@ const publicNav = [
 
 const adminNav = [
   ["Dashboard", "/admin"],
-  ["Orders", "/admin"],
   ["Customers", "/admin/customers"],
 ] as const;
 
