@@ -2,8 +2,26 @@
 
 import { useMemo, useState } from "react";
 
+type CustomOrderInitialData = {
+  orderId: string;
+  customTitle: string | null;
+  internalRemarks: string | null;
+  customDiscount: number | null;
+  items: Array<{
+    id: string;
+    description: string;
+    qty: number;
+    unitPrice: number;
+  }>;
+};
+
 type CustomOrderFormProps = {
   customerId: string;
+  orderId?: string;
+  initialData?: CustomOrderInitialData;
+  submitLabel?: string;
+  submittingLabel?: string;
+  errorTitle?: string;
 };
 
 type CustomLineItem = {
@@ -42,11 +60,28 @@ function formatCurrency(value: number) {
   }).format(value);
 }
 
-export function CustomOrderForm({ customerId }: CustomOrderFormProps) {
-  const [title, setTitle] = useState("");
-  const [internalRemarks, setInternalRemarks] = useState("");
-  const [discount, setDiscount] = useState("0");
-  const [rows, setRows] = useState<CustomLineItem[]>([createEmptyRow()]);
+export function CustomOrderForm({
+  customerId,
+  orderId,
+  initialData,
+  submitLabel = "Create Custom Order",
+  submittingLabel,
+  errorTitle = "Create Order Failed",
+}: CustomOrderFormProps) {
+  const isEditMode = !!orderId;
+  const [title, setTitle] = useState(initialData?.customTitle || "");
+  const [internalRemarks, setInternalRemarks] = useState(initialData?.internalRemarks || "");
+  const [discount, setDiscount] = useState(String(initialData?.customDiscount ?? 0));
+  const [rows, setRows] = useState<CustomLineItem[]>(
+    initialData?.items?.length
+      ? initialData.items.map((item) => ({
+          id: item.id || crypto.randomUUID(),
+          description: item.description,
+          qty: String(item.qty),
+          unitPrice: String(item.unitPrice),
+        }))
+      : [createEmptyRow()]
+  );
   const [submitError, setSubmitError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -132,33 +167,45 @@ export function CustomOrderForm({ customerId }: CustomOrderFormProps) {
     setIsSubmitting(true);
 
     try {
-      const response = await fetch("/api/admin/orders", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          orderType: "CUSTOM_ORDER",
-          customerId,
-          customTitle: title.trim(),
-          internalRemarks: internalRemarks.trim(),
-          customSubtotal: subtotal,
-          customDiscount: discountAmount,
-          customGrandTotal: grandTotal,
-          items,
-        }),
-      });
+      const response = await fetch(
+        isEditMode ? `/api/admin/orders/${orderId}` : "/api/admin/orders",
+        {
+          method: isEditMode ? "PUT" : "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            orderType: "CUSTOM_ORDER",
+            customerId,
+            customTitle: title.trim(),
+            internalRemarks: internalRemarks.trim(),
+            customSubtotal: subtotal,
+            customDiscount: discountAmount,
+            customGrandTotal: grandTotal,
+            items,
+          }),
+        }
+      );
 
       const data = (await response.json()) as ApiResponse;
 
       if (!response.ok || !data.ok) {
-        setSubmitError(data.error || "Unable to create custom order right now.");
+        setSubmitError(
+          data.error ||
+            (isEditMode
+              ? "Unable to update custom order right now."
+              : "Unable to create custom order right now.")
+        );
         return;
       }
 
       window.location.href = data.redirectTo || "/admin";
     } catch {
-      setSubmitError("Unable to create custom order right now.");
+      setSubmitError(
+        isEditMode
+          ? "Unable to update custom order right now."
+          : "Unable to create custom order right now."
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -173,13 +220,13 @@ export function CustomOrderForm({ customerId }: CustomOrderFormProps) {
           </p>
           <h2 className="mt-3 text-2xl font-semibold text-white">Order details</h2>
           <p className="mt-3 text-white/65">
-            Enter a clear title / summary so the admin dashboard and invoice can display this order properly.
+            Enter a clear description so the admin dashboard and invoice can display this order properly.
           </p>
         </div>
 
         <div className="mt-8 space-y-6">
           <div>
-            <label className="label-rk">Order Title / Summary</label>
+            <label className="label-rk">Description</label>
             <input
               className="input-rk"
               value={title}
@@ -325,7 +372,7 @@ export function CustomOrderForm({ customerId }: CustomOrderFormProps) {
           {submitError ? (
             <div className="mt-6 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
               <div className="font-semibold uppercase tracking-[0.18em] text-red-300/80">
-                Create Order Failed
+                {errorTitle}
               </div>
               <p className="mt-2 leading-6">{submitError}</p>
             </div>
@@ -336,7 +383,9 @@ export function CustomOrderForm({ customerId }: CustomOrderFormProps) {
             disabled={disableSubmit}
             className="mt-6 w-full rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 font-medium text-amber-200 transition hover:bg-amber-500/15 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {isSubmitting ? "Creating Custom Order..." : "Create Custom Order"}
+            {isSubmitting
+              ? submittingLabel || (isEditMode ? "Updating Custom Order..." : "Creating Custom Order...")
+              : submitLabel}
           </button>
 
           <p className="mt-4 text-xs leading-6 text-white/45">

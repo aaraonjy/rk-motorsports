@@ -1167,6 +1167,17 @@ export function OrderTable({
                             </button>
                           ) : null}
 
+                          {customOrder &&
+                          !["COMPLETED", "CANCELLED"].includes(order.status) ? (
+                            <Link
+                              href={`/admin/orders/${order.id}/edit`}
+                              className="inline-flex w-full min-h-[44px] flex-col items-center justify-center rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center text-sm whitespace-normal leading-5 transition hover:bg-white/10"
+                            >
+                              <span>Edit</span>
+                              <span>Order</span>
+                            </Link>
+                          ) : null}
+
                           {isAdminCreatedOrder && ["FILE_RECEIVED", "IN_PROGRESS", "AWAITING_PAYMENT", "PAID"].includes(order.status) ? (
                             <button
                               type="button"
