@@ -34,15 +34,21 @@ export default async function AdminReportsPage() {
             </div>
           </Link>
 
-          <div className="card-rk rounded-3xl border border-white/10 p-6 opacity-60">
+          <Link
+            href="/admin/reports/customers"
+            className="card-rk block rounded-3xl border border-white/10 p-6 transition hover:border-white/20 hover:bg-white/[0.03]"
+          >
             <div className="text-xs font-semibold uppercase tracking-[0.22em] text-white/45">
-              Next Phase
+              Available
             </div>
             <h2 className="mt-3 text-2xl font-semibold text-white">Customer Report</h2>
             <p className="mt-3 text-sm leading-6 text-white/60">
-              Reserved for future customer-focused reporting.
+              Review customer records with filters, preview key customer metrics, and export as CSV.
             </p>
-          </div>
+            <div className="mt-6 inline-flex rounded-full border border-white/15 px-4 py-2 text-sm text-white/80">
+              View Report
+            </div>
+          </Link>
 
           <div className="card-rk rounded-3xl border border-white/10 p-6 opacity-60">
             <div className="text-xs font-semibold uppercase tracking-[0.22em] text-white/45">
