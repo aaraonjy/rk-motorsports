@@ -64,22 +64,42 @@ function getOrderDisplayAmount(order: {
     : order.totalAmount || 0;
 }
 
-function getCustomerProfileDisplayStatus(
-  order: {
-    orderType: "STANDARD_TUNING" | "CUSTOM_ORDER";
-    status: string;
-  },
-  customerAccountSource: "PORTAL" | "ADMIN"
-) {
-  if (customerAccountSource === "ADMIN") {
-    if (order.status === "COMPLETED" || order.status === "CANCELLED") {
-      return order.status;
-    }
+function getCustomerProfileDisplayStatus(order: {
+  createdByAdminId: string | null;
+  status: string;
+}) {
+  const isAdminCreatedOrder = !!order.createdByAdminId;
 
-    return "RECEIVED";
+  if (
+    isAdminCreatedOrder &&
+    order.status !== "COMPLETED" &&
+    order.status !== "CANCELLED"
+  ) {
+    return "FILE_RECEIVED";
   }
 
   return order.status;
+}
+
+function getCustomerProfileDisplayStatusLabel(status: string) {
+  switch (status) {
+    case "FILE_RECEIVED":
+      return "Received";
+    case "IN_PROGRESS":
+      return "In Progress";
+    case "AWAITING_PAYMENT":
+      return "Pending Payment";
+    case "READY_FOR_DOWNLOAD":
+      return "Completed";
+    case "COMPLETED":
+      return "Completed";
+    case "CANCELLED":
+      return "Cancelled";
+    case "PAID":
+      return "Paid";
+    default:
+      return status.replaceAll("_", " ");
+  }
 }
 
 function getStatusClasses(status: string) {
@@ -89,7 +109,7 @@ function getStatusClasses(status: string) {
     case "CANCELLED":
       return "border-red-500/30 bg-red-500/10 text-red-300";
     case "READY_FOR_DOWNLOAD":
-      return "border-sky-500/30 bg-sky-500/10 text-sky-300";
+      return "border-emerald-500/30 bg-emerald-500/10 text-emerald-300";
     case "IN_PROGRESS":
     case "FILE_RECEIVED":
     case "RECEIVED":
@@ -222,10 +242,7 @@ export default async function AdminCustomerDetailPage({
                 </thead>
                 <tbody>
                   {customer.orders.map((order) => {
-                    const displayStatus = getCustomerProfileDisplayStatus(
-                      order,
-                      customer.accountSource
-                    );
+                    const displayStatus = getCustomerProfileDisplayStatus(order);
 
                     return (
                       <tr key={order.id} className="border-t border-white/10 align-top">
@@ -244,7 +261,7 @@ export default async function AdminCustomerDetailPage({
                               displayStatus
                             )}`}
                           >
-                            {displayStatus.replaceAll("_", " ")}
+                            {getCustomerProfileDisplayStatusLabel(displayStatus)}
                           </span>
                         </td>
                         <td className="px-6 py-5 font-medium text-white">

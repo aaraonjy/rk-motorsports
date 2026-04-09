@@ -66,30 +66,47 @@ function getReportDisplayStatus(order: OrderWithRelations) {
     order.status !== "COMPLETED" &&
     order.status !== "CANCELLED"
   ) {
-    return "RECEIVED";
+    return "FILE_RECEIVED";
   }
 
   return order.status;
 }
 
 function getReportDisplayStatusLabel(order: OrderWithRelations) {
-  return getReportDisplayStatus(order).replaceAll("_", " ");
+  switch (getReportDisplayStatus(order)) {
+    case "FILE_RECEIVED":
+      return "Received";
+    case "IN_PROGRESS":
+      return "In Progress";
+    case "AWAITING_PAYMENT":
+      return "Pending Payment";
+    case "READY_FOR_DOWNLOAD":
+      return "Completed";
+    case "COMPLETED":
+      return "Completed";
+    case "CANCELLED":
+      return "Cancelled";
+    case "PAID":
+      return "Paid";
+    default:
+      return getReportDisplayStatus(order).replaceAll("_", " ");
+  }
 }
 
 function getReportStatusBadgeClass(order: OrderWithRelations) {
   switch (getReportDisplayStatus(order)) {
-    case "RECEIVED":
-    case "FILE_RECEIVED":
-      return "inline-flex min-w-[112px] items-center justify-center rounded-full border border-sky-500/30 bg-sky-500/15 px-3 py-1 text-center text-xs font-semibold text-sky-300";
-    case "COMPLETED":
+    case "AWAITING_PAYMENT":
+      return "inline-flex min-w-[112px] items-center justify-center rounded-full border border-amber-500/30 bg-amber-500/15 px-3 py-1 text-center text-xs font-semibold text-amber-300";
     case "READY_FOR_DOWNLOAD":
       return "inline-flex min-w-[112px] items-center justify-center rounded-full border border-emerald-500/30 bg-emerald-500/15 px-3 py-1 text-center text-xs font-semibold text-emerald-300";
     case "CANCELLED":
       return "inline-flex min-w-[112px] items-center justify-center rounded-full border border-red-500/30 bg-red-500/15 px-3 py-1 text-center text-xs font-semibold text-red-300";
+    case "FILE_RECEIVED":
+      return "inline-flex min-w-[112px] items-center justify-center rounded-full border border-sky-500/30 bg-sky-500/15 px-3 py-1 text-center text-xs font-semibold text-sky-300";
     case "IN_PROGRESS":
       return "inline-flex min-w-[112px] items-center justify-center rounded-full border border-violet-500/30 bg-violet-500/15 px-3 py-1 text-center text-xs font-semibold text-violet-300";
-    case "AWAITING_PAYMENT":
-      return "inline-flex min-w-[112px] items-center justify-center rounded-full border border-amber-500/30 bg-amber-500/15 px-3 py-1 text-center text-xs font-semibold text-amber-300";
+    case "COMPLETED":
+      return "inline-flex min-w-[112px] items-center justify-center rounded-full border border-green-500/30 bg-green-500/15 px-3 py-1 text-center text-xs font-semibold text-green-300";
     case "PAID":
       return "inline-flex min-w-[112px] items-center justify-center rounded-full border border-cyan-500/30 bg-cyan-500/15 px-3 py-1 text-center text-xs font-semibold text-cyan-300";
     default:
