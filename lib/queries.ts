@@ -291,6 +291,9 @@ export async function getCustomersReport(filters?: CustomersReportOptions) {
 
   const where: Prisma.UserWhereInput = {
     role: "CUSTOMER",
+    orders: {
+      some: orderWhere,
+    },
     ...(filters?.search
       ? {
           OR: [
@@ -347,7 +350,7 @@ export async function getCustomersReport(filters?: CustomersReportOptions) {
         },
       },
     },
-    orderBy: { createdAt: "desc" },
+    orderBy: { name: "asc" },
   });
 
   return customers.map((customer) => {
