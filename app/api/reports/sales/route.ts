@@ -108,7 +108,7 @@ export async function GET(req: Request) {
       "Total",
     ],
     ...result.orders.map((order) => [
-      new Date(order.createdAt).toISOString(),
+      new Intl.DateTimeFormat("en-GB").format(new Date(order.createdAt)),
       order.orderNumber,
       order.user?.name || "",
       order.user?.email || "",
