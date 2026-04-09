@@ -68,29 +68,44 @@ function getCustomerProfileDisplayStatus(order: {
   createdByAdminId: string | null;
   status: string;
 }) {
-  const isAdminCreatedOrder = !!order.createdByAdminId;
-
-  if (
-    isAdminCreatedOrder &&
-    order.status !== "COMPLETED" &&
-    order.status !== "CANCELLED"
-  ) {
+  if (order.createdByAdminId && order.status !== "COMPLETED" && order.status !== "CANCELLED") {
     return "FILE_RECEIVED";
   }
 
   return order.status;
 }
 
-function getCustomerProfileDisplayStatusLabel(status: string) {
+function getStatusClasses(status: string) {
+  switch (status) {
+    case "READY_FOR_DOWNLOAD":
+    case "COMPLETED":
+      return "border-emerald-500/30 bg-emerald-500/10 text-emerald-300";
+    case "CANCELLED":
+      return "border-red-500/30 bg-red-500/10 text-red-300";
+    case "IN_PROGRESS":
+      return "border-violet-500/30 bg-violet-500/10 text-violet-300";
+    case "FILE_RECEIVED":
+    case "RECEIVED":
+      return "border-sky-500/30 bg-sky-500/10 text-sky-300";
+    case "AWAITING_PAYMENT":
+      return "border-amber-500/30 bg-amber-500/10 text-amber-300";
+    case "PAID":
+      return "border-cyan-500/30 bg-cyan-500/15 text-cyan-300";
+    default:
+      return "border-white/15 bg-white/5 text-white/75";
+  }
+}
+
+function getStatusLabel(status: string) {
   switch (status) {
     case "FILE_RECEIVED":
+    case "RECEIVED":
       return "Received";
     case "IN_PROGRESS":
       return "In Progress";
     case "AWAITING_PAYMENT":
       return "Pending Payment";
     case "READY_FOR_DOWNLOAD":
-      return "Completed";
     case "COMPLETED":
       return "Completed";
     case "CANCELLED":
@@ -99,23 +114,6 @@ function getCustomerProfileDisplayStatusLabel(status: string) {
       return "Paid";
     default:
       return status.replaceAll("_", " ");
-  }
-}
-
-function getStatusClasses(status: string) {
-  switch (status) {
-    case "COMPLETED":
-      return "border-emerald-500/30 bg-emerald-500/10 text-emerald-300";
-    case "CANCELLED":
-      return "border-red-500/30 bg-red-500/10 text-red-300";
-    case "READY_FOR_DOWNLOAD":
-      return "border-emerald-500/30 bg-emerald-500/10 text-emerald-300";
-    case "IN_PROGRESS":
-    case "FILE_RECEIVED":
-    case "RECEIVED":
-      return "border-sky-500/30 bg-sky-500/10 text-sky-300";
-    default:
-      return "border-white/15 bg-white/5 text-white/75";
   }
 }
 
@@ -261,7 +259,7 @@ export default async function AdminCustomerDetailPage({
                               displayStatus
                             )}`}
                           >
-                            {getCustomerProfileDisplayStatusLabel(displayStatus)}
+                            {getStatusLabel(displayStatus)}
                           </span>
                         </td>
                         <td className="px-6 py-5 font-medium text-white">
