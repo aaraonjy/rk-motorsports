@@ -261,6 +261,112 @@ export async function getCustomers(filters?: CustomersOptions) {
   };
 }
 
+type CustomersReportOptions = {
+  search?: string;
+  source?: string;
+  portalAccess?: string;
+  dateFrom?: string;
+  dateTo?: string;
+};
+
+export async function getCustomersReport(filters?: CustomersReportOptions) {
+  const createdAt: Prisma.DateTimeFilter = {};
+
+  if (filters?.dateFrom) {
+    const start = new Date(filters.dateFrom);
+    if (!Number.isNaN(start.getTime())) {
+      createdAt.gte = start;
+    }
+  }
+
+  if (filters?.dateTo) {
+    const end = new Date(filters.dateTo);
+    if (!Number.isNaN(end.getTime())) {
+      end.setHours(23, 59, 59, 999);
+      createdAt.lte = end;
+    }
+  }
+
+  const orderWhere: Prisma.OrderWhereInput = Object.keys(createdAt).length > 0 ? { createdAt } : {};
+
+  const where: Prisma.UserWhereInput = {
+    role: "CUSTOMER",
+    ...(filters?.search
+      ? {
+          OR: [
+            {
+              name: {
+                contains: filters.search,
+                mode: "insensitive",
+              },
+            },
+            {
+              phone: {
+                contains: filters.search,
+                mode: "insensitive",
+              },
+            },
+            {
+              email: {
+                contains: filters.search,
+                mode: "insensitive",
+              },
+            },
+          ],
+        }
+      : {}),
+    ...(filters?.source && filters.source !== "ALL"
+      ? { accountSource: filters.source as any }
+      : {}),
+    ...(filters?.portalAccess === "ENABLED"
+      ? { portalAccess: true }
+      : filters?.portalAccess === "DISABLED"
+        ? { portalAccess: false }
+        : {}),
+  };
+
+  const customers = await db.user.findMany({
+    where,
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      phone: true,
+      accountSource: true,
+      portalAccess: true,
+      createdAt: true,
+      orders: {
+        where: orderWhere,
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          createdAt: true,
+          orderType: true,
+          totalAmount: true,
+          customGrandTotal: true,
+        },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  return customers.map((customer) => {
+    const totalOrders = customer.orders.length;
+    const totalSpent = customer.orders.reduce((sum, order) => {
+      return sum + (order.orderType === "CUSTOM_ORDER" ? order.customGrandTotal || 0 : order.totalAmount || 0);
+    }, 0);
+
+    const lastOrderDate = totalOrders > 0 ? customer.orders[0].createdAt : null;
+
+    return {
+      ...customer,
+      totalOrders,
+      totalSpent,
+      lastOrderDate,
+    };
+  });
+}
+
 export async function getCustomerById(customerId: string) {
   return db.user.findFirst({
     where: {
