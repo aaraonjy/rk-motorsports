@@ -71,8 +71,9 @@ export async function GET(req: Request) {
     ]),
   ];
 
-  const csv = rows.map((row) => row.map((cell) => escapeCsvValue(cell)).join(",")).join("
-");
+  const csv = rows
+    .map((row) => row.map((cell) => escapeCsvValue(cell)).join(","))
+    .join("\n");
 
   return new NextResponse(csv, {
     status: 200,
