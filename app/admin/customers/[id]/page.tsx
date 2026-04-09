@@ -93,7 +93,7 @@ function getStatusClasses(status: string) {
     case "IN_PROGRESS":
     case "FILE_RECEIVED":
     case "RECEIVED":
-      return "border-amber-500/30 bg-amber-500/10 text-amber-200";
+      return "border-sky-500/30 bg-sky-500/10 text-sky-300";
     default:
       return "border-white/15 bg-white/5 text-white/75";
   }
