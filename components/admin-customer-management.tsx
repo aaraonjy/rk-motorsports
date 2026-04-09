@@ -399,6 +399,10 @@ export function AdminCustomerManagement({ customers, currentPage, pageSize }: Pr
     router.refresh();
   }
 
+  function handleRowClick(customerId: string) {
+    router.push(`/admin/customers/${customerId}`);
+  }
+
   return (
     <>
       <div className="flex justify-end">
@@ -432,21 +436,17 @@ export function AdminCustomerManagement({ customers, currentPage, pageSize }: Pr
               customers.map((customer, index) => (
                 <tr
                   key={customer.id}
-                  className="border-t border-white/10 align-top transition-colors hover:bg-white/[0.03]"
+                  onClick={() => handleRowClick(customer.id)}
+                  className="cursor-pointer border-t border-white/10 align-top transition-colors hover:bg-white/[0.03]"
                 >
                   <td className="px-4 py-4 text-white/55">
                     {(currentPage - 1) * pageSize + index + 1}
                   </td>
 
                   <td className="px-4 py-4">
-                    <Link
-                      href={`/admin/customers/${customer.id}`}
-                      className="block -mx-2 -my-2 cursor-pointer rounded-xl px-2 py-2 transition hover:bg-white/5"
-                    >
-                      <div className="font-semibold break-words text-white/90">
-                        {customer.name}
-                      </div>
-                    </Link>
+                    <div className="font-semibold break-words text-white/90">
+                      {customer.name}
+                    </div>
                   </td>
 
                   <td className="px-4 py-4 text-white/85 break-words">{customer.phone || "-"}</td>
@@ -462,7 +462,10 @@ export function AdminCustomerManagement({ customers, currentPage, pageSize }: Pr
                   <td className="px-4 py-4">
                     <button
                       type="button"
-                      onClick={() => setPortalAccessTarget(customer)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPortalAccessTarget(customer);
+                      }}
                       disabled={isTogglingId === customer.id}
                       className={getPortalAccessBadge(customer.portalAccess)}
                     >
@@ -491,6 +494,7 @@ export function AdminCustomerManagement({ customers, currentPage, pageSize }: Pr
                     <div className="flex flex-col gap-2">
                       <Link
                         href={`/admin/customers/${customer.id}/create-order`}
+                        onClick={(e) => e.stopPropagation()}
                         className="inline-flex items-center justify-center rounded-xl border border-white/15 bg-black/30 px-4 py-2 text-white transition hover:bg-white/10"
                       >
                         Create Order
@@ -498,7 +502,10 @@ export function AdminCustomerManagement({ customers, currentPage, pageSize }: Pr
 
                       <button
                         type="button"
-                        onClick={() => setEditingCustomer(customer)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingCustomer(customer);
+                        }}
                         className="rounded-xl border border-white/15 bg-black/30 px-4 py-2 text-white transition hover:bg-white/10"
                       >
                         Edit
