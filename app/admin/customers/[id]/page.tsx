@@ -130,7 +130,7 @@ export default async function AdminCustomerDetailPage({
             </Link>
             <h1 className="mt-3 text-4xl font-bold">{customer.name}</h1>
             <p className="mt-3 text-white/70">
-              Customer intelligence overview and order history in one place.
+              Manage customer details, orders, and tuning records in one place.
             </p>
           </div>
         </div>
