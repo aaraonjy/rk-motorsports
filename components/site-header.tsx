@@ -15,6 +15,7 @@ const publicNav = [
 const adminNav = [
   ["Dashboard", "/admin"],
   ["Customers", "/admin/customers"],
+  ["Report", "/admin/reports"],
 ] as const;
 
 export async function SiteHeader() {

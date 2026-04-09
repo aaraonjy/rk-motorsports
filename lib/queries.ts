@@ -60,6 +60,7 @@ type AllOrdersOptions = {
   search?: string;
   customerKeyword?: string;
   tuningType?: string;
+  orderType?: string;
   dateFrom?: string;
   dateTo?: string;
   page?: number;
@@ -138,6 +139,9 @@ export async function getAllOrders(filters?: AllOrdersOptions) {
       : {}),
     ...(filters?.tuningType && filters.tuningType !== "ALL"
       ? { tuningType: filters.tuningType as any }
+      : {}),
+    ...(filters?.orderType && filters.orderType !== "ALL"
+      ? { orderType: filters.orderType as any }
       : {}),
     ...(Object.keys(createdAt).length > 0 ? { createdAt } : {}),
   };
