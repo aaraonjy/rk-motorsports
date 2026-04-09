@@ -11,6 +11,7 @@ type AdminPageProps = {
     search?: string;
     customerKeyword?: string;
     tuningType?: string;
+    orderType?: string;
     dateFrom?: string;
     dateTo?: string;
     page?: string;
@@ -114,6 +115,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const search = params.search || "";
   const customerKeyword = params.customerKeyword || "";
   const tuningType = params.tuningType || "ALL";
+  const orderType = params.orderType || "ALL";
   const dateFrom = params.dateFrom || "";
   const dateTo = params.dateTo || "";
   const page = Math.max(1, Number(params.page || "1") || 1);
@@ -124,6 +126,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     search,
     customerKeyword,
     tuningType,
+    orderType,
     dateFrom,
     dateTo,
     page,
@@ -151,11 +154,11 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           <div className="card-rk p-6 text-white/75">
             <p>
               Search by order number, customer name, phone number, email, vehicle no, status,
-              tuning type, or date range to manage customer orders more efficiently.
+              tuning type, order type, or date range to manage customer orders more efficiently.
             </p>
           </div>
 
-          <form method="get" className="card-rk grid gap-4 p-6 md:grid-cols-2 xl:grid-cols-3">
+          <form method="get" className="card-rk grid gap-4 p-6 md:grid-cols-2 xl:grid-cols-4">
             <div>
               <label className="mb-2 block text-sm text-white/65">
                 Search Order Number
@@ -256,6 +259,39 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
 
             <div>
               <label className="mb-2 block text-sm text-white/65">
+                Order Type
+              </label>
+              <div className="relative">
+                <select
+                  name="orderType"
+                  defaultValue={orderType}
+                  className="w-full appearance-none rounded-xl border border-white/15 bg-black/50 px-4 py-3 pr-12 text-white outline-none"
+                >
+                  <option value="ALL">All Order Types</option>
+                  <option value="STANDARD_TUNING">Standard Tuning</option>
+                  <option value="CUSTOM_ORDER">Custom Order</option>
+                </select>
+
+                <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/60">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    className="h-5 w-5"
+                    aria-hidden="true"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.51a.75.75 0 0 1-1.08 0l-4.25-4.51a.75.75 0 0 1 .02-1.06Z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm text-white/65">
                 Date From
               </label>
               <input
@@ -278,7 +314,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               />
             </div>
 
-            <div className="md:col-span-2 xl:col-span-3 flex flex-wrap items-end gap-3">
+            <div className="md:col-span-2 xl:col-span-4 flex flex-wrap items-end gap-3">
               <input type="hidden" name="page" value="1" />
               <button
                 type="submit"
@@ -306,6 +342,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               search: search || undefined,
               customerKeyword: customerKeyword || undefined,
               tuningType: tuningType !== "ALL" ? tuningType : undefined,
+              orderType: orderType !== "ALL" ? orderType : undefined,
               dateFrom: dateFrom || undefined,
               dateTo: dateTo || undefined,
               success: params.success,
