@@ -58,7 +58,6 @@ function getOrderAmount(order: OrderWithRelations) {
   return order.totalAmount ?? 0;
 }
 
-
 function getReportDisplayStatus(order: OrderWithRelations) {
   const isAdminCreatedOrder = !!order.createdByAdminId;
 
@@ -75,6 +74,27 @@ function getReportDisplayStatus(order: OrderWithRelations) {
 
 function getReportDisplayStatusLabel(order: OrderWithRelations) {
   return getReportDisplayStatus(order).replaceAll("_", " ");
+}
+
+function getReportStatusBadgeClass(order: OrderWithRelations) {
+  switch (getReportDisplayStatus(order)) {
+    case "RECEIVED":
+    case "FILE_RECEIVED":
+      return "inline-flex min-w-[112px] items-center justify-center rounded-full border border-sky-500/30 bg-sky-500/15 px-3 py-1 text-center text-xs font-semibold text-sky-300";
+    case "COMPLETED":
+    case "READY_FOR_DOWNLOAD":
+      return "inline-flex min-w-[112px] items-center justify-center rounded-full border border-emerald-500/30 bg-emerald-500/15 px-3 py-1 text-center text-xs font-semibold text-emerald-300";
+    case "CANCELLED":
+      return "inline-flex min-w-[112px] items-center justify-center rounded-full border border-red-500/30 bg-red-500/15 px-3 py-1 text-center text-xs font-semibold text-red-300";
+    case "IN_PROGRESS":
+      return "inline-flex min-w-[112px] items-center justify-center rounded-full border border-violet-500/30 bg-violet-500/15 px-3 py-1 text-center text-xs font-semibold text-violet-300";
+    case "AWAITING_PAYMENT":
+      return "inline-flex min-w-[112px] items-center justify-center rounded-full border border-amber-500/30 bg-amber-500/15 px-3 py-1 text-center text-xs font-semibold text-amber-300";
+    case "PAID":
+      return "inline-flex min-w-[112px] items-center justify-center rounded-full border border-cyan-500/30 bg-cyan-500/15 px-3 py-1 text-center text-xs font-semibold text-cyan-300";
+    default:
+      return "inline-flex min-w-[112px] items-center justify-center rounded-full border border-white/15 bg-white/10 px-3 py-1 text-center text-xs font-semibold text-white/80";
+  }
 }
 
 function buildQueryString(params: Record<string, string | undefined>) {
@@ -389,7 +409,9 @@ export default async function SalesReportPage({
                           {order.vehicleNo || "-"}
                         </td>
                         <td className="px-6 py-5 text-white/65">
-                          {getReportDisplayStatusLabel(order)}
+                          <span className={getReportStatusBadgeClass(order)}>
+                            {getReportDisplayStatusLabel(order)}
+                          </span>
                         </td>
                         <td className="px-6 py-5 text-right font-medium text-white">
                           {formatCurrency(getOrderAmount(order))}
