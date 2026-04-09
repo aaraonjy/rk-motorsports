@@ -72,6 +72,10 @@ function getCustomerProfileDisplayStatus(
   customerAccountSource: "PORTAL" | "ADMIN"
 ) {
   if (customerAccountSource === "ADMIN" && order.orderType === "CUSTOM_ORDER") {
+    if (order.status === "COMPLETED" || order.status === "CANCELLED") {
+      return order.status;
+    }
+
     return "RECEIVED";
   }
 
