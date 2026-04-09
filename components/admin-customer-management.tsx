@@ -135,14 +135,6 @@ function CustomerModal({
                 : "Update the customer details below."}
             </p>
           </div>
-
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg border border-white/15 px-3 py-1.5 text-sm text-white/70 transition hover:bg-white/10 hover:text-white"
-          >
-            Close
-          </button>
         </div>
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">
@@ -447,12 +439,7 @@ export function AdminCustomerManagement({ customers, currentPage, pageSize }: Pr
                   </td>
 
                   <td className="px-4 py-4">
-                    <Link
-                        href={`/admin/customers/${customer.id}`}
-                        className="font-semibold break-words text-white/90 transition hover:text-amber-200"
-                      >
-                        {customer.name}
-                      </Link>
+                    <div className="font-semibold break-words text-white/90">{customer.name}</div>
                   </td>
 
                   <td className="px-4 py-4 text-white/85 break-words">{customer.phone || "-"}</td>

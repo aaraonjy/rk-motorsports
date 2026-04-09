@@ -114,21 +114,6 @@ export default async function AdminCustomerDetailPage({
               Customer intelligence overview and order history in one place.
             </p>
           </div>
-
-          <div className="flex flex-wrap gap-3">
-            <Link
-              href={`/admin/customers/${customer.id}/create-order`}
-              className="rounded-xl border border-white/15 bg-black/30 px-4 py-3 text-white transition hover:bg-white/10"
-            >
-              Create Order
-            </Link>
-            <Link
-              href={`/admin/customers?edit=${customer.id}`}
-              className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-amber-200 transition hover:bg-amber-500/15"
-            >
-              Edit Customer
-            </Link>
-          </div>
         </div>
 
         <div className="card-rk p-6 md:p-8">
