@@ -117,7 +117,7 @@ export default async function AdminCustomerDetailPage({
 
           <div className="flex flex-wrap gap-3">
             <Link
-              href={`/admin/orders/new?customerId=${customer.id}`}
+              href={`/admin/customers/${customer.id}/create-order`}
               className="rounded-xl border border-white/15 bg-black/30 px-4 py-3 text-white transition hover:bg-white/10"
             >
               Create Order

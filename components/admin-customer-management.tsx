@@ -447,7 +447,12 @@ export function AdminCustomerManagement({ customers, currentPage, pageSize }: Pr
                   </td>
 
                   <td className="px-4 py-4">
-                    <div className="font-semibold break-words text-white/90">{customer.name}</div>
+                    <Link
+                        href={`/admin/customers/${customer.id}`}
+                        className="font-semibold break-words text-white/90 transition hover:text-amber-200"
+                      >
+                        {customer.name}
+                      </Link>
                   </td>
 
                   <td className="px-4 py-4 text-white/85 break-words">{customer.phone || "-"}</td>
