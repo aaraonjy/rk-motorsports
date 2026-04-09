@@ -270,16 +270,6 @@ export async function getCustomerById(customerId: string) {
   });
 }
 
-function getOrderDisplayAmount(order: {
-  orderType: "STANDARD_TUNING" | "CUSTOM_ORDER";
-  totalAmount: number;
-  customGrandTotal: number;
-}) {
-  return order.orderType === "CUSTOM_ORDER"
-    ? order.customGrandTotal || 0
-    : order.totalAmount || 0;
-}
-
 export async function getCustomerByIdWithIntelligence(customerId: string) {
   const customer = await db.user.findFirst({
     where: {
@@ -294,39 +284,33 @@ export async function getCustomerByIdWithIntelligence(customerId: string) {
       accountSource: true,
       portalAccess: true,
       createdAt: true,
-      _count: {
-        select: {
-          orders: true,
-        },
-      },
       orders: {
+        orderBy: { createdAt: "desc" },
         select: {
           id: true,
           orderNumber: true,
-          status: true,
           orderType: true,
           customTitle: true,
           selectedTuneLabel: true,
           tuningType: true,
           totalAmount: true,
           customGrandTotal: true,
+          status: true,
           createdAt: true,
         },
-        orderBy: { createdAt: "desc" },
       },
     },
   });
 
   if (!customer) return null;
 
-  const totalSpent = customer.orders.reduce(
-    (sum, order) => sum + getOrderDisplayAmount(order),
-    0
-  );
+  const totalOrders = customer.orders.length;
+  const totalSpent = customer.orders.reduce((sum, order) => {
+    return sum + (order.orderType === "CUSTOM_ORDER" ? order.customGrandTotal || 0 : order.totalAmount || 0);
+  }, 0);
 
-  const totalOrders = customer._count.orders;
   const averageOrderValue = totalOrders > 0 ? Math.round(totalSpent / totalOrders) : 0;
-  const lastOrderDate = customer.orders[0]?.createdAt ?? null;
+  const lastOrderDate = totalOrders > 0 ? customer.orders[0].createdAt : null;
 
   return {
     ...customer,

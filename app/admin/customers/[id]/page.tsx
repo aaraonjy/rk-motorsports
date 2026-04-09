@@ -101,7 +101,7 @@ export default async function AdminCustomerDetailPage({
   return (
     <section className="section-pad">
       <div className="container-rk space-y-8">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-col gap-4">
           <div>
             <Link
               href="/admin/customers"
