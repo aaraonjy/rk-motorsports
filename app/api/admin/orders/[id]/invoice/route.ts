@@ -320,6 +320,11 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
 
       y -= 8;
 
+      if (isPresent(order.vehicleNo)) {
+        drawText(page, font, bold, `Vehicle No: ${order.vehicleNo}`, descX, y, 9, false);
+        y -= 16;
+      }
+
       if (order.customItems.length > 0) {
         y -= 10;
         drawText(page, font, bold, "Item Breakdown", descX, y, 10, true);

@@ -142,6 +142,7 @@ model Order {
   engineModel            String?
   engineCapacity         String?
   vehicleYear            String?
+  vehicleNo              String?
   ecuType                String?
   ecuReadTool            String?
   fuelGrade              String?

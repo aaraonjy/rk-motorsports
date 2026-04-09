@@ -150,7 +150,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         <div className="mt-8 space-y-4">
           <div className="card-rk p-6 text-white/75">
             <p>
-              Search by order number, customer name, phone number, email, status,
+              Search by order number, customer name, phone number, email, vehicle no, status,
               tuning type, or date range to manage customer orders more efficiently.
             </p>
           </div>
@@ -171,13 +171,13 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
 
             <div>
               <label className="mb-2 block text-sm text-white/65">
-                Customer Name / Phone Number / Email
+                Customer / Phone / Email / Vehicle No.
               </label>
               <input
                 type="text"
                 name="customerKeyword"
                 defaultValue={customerKeyword}
-                placeholder="Search name, phone, or email"
+                placeholder="Search name, phone, email, or vehicle no"
                 className="w-full rounded-xl border border-white/15 bg-black/50 px-4 py-3 text-white outline-none placeholder:text-white/35"
               />
             </div>

@@ -13,6 +13,7 @@ type UpdateCustomOrderPayload = {
   orderType?: string;
   customerId?: string;
   customTitle?: string;
+  vehicleNo?: string;
   internalRemarks?: string;
   customSubtotal?: number;
   customDiscount?: number;
@@ -73,6 +74,8 @@ export async function PUT(
 
     const customerId = String(body.customerId || "").trim();
     const customTitle = String(body.customTitle || "").trim();
+    const submittedVehicleNo = String(body.vehicleNo || "").trim().toUpperCase();
+    const vehicleNo = submittedVehicleNo || order.vehicleNo || "";
     const internalRemarks = String(body.internalRemarks || "").trim();
     const items = Array.isArray(body.items) ? body.items : [];
 
@@ -133,6 +136,7 @@ export async function PUT(
     const requestDetailsLines = [
       `Order Type: Custom Order`,
       `Title / Summary: ${customTitle}`,
+      `Vehicle No: ${vehicleNo || "None"}`,
       `Internal Remarks: ${internalRemarks || "None"}`,
       `Subtotal: RM${calculatedSubtotal}`,
       `Discount: RM${customDiscount}`,
@@ -149,6 +153,7 @@ export async function PUT(
         where: { id: order.id },
         data: {
           customTitle,
+          vehicleNo: vehicleNo || null,
           internalRemarks: internalRemarks || null,
           customSubtotal: calculatedSubtotal,
           customDiscount,

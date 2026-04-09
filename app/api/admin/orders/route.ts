@@ -15,6 +15,7 @@ type CreateCustomOrderPayload = {
   orderType?: string;
   customerId?: string;
   customTitle?: string;
+  vehicleNo?: string;
   internalRemarks?: string;
   customSubtotal?: number;
   customDiscount?: number;
@@ -57,6 +58,7 @@ export async function POST(req: Request) {
 
     const customerId = String(body.customerId || "").trim();
     const customTitle = String(body.customTitle || "").trim();
+    const vehicleNo = String(body.vehicleNo || "").trim().toUpperCase();
     const internalRemarks = String(body.internalRemarks || "").trim();
     const items = Array.isArray(body.items) ? body.items : [];
 
@@ -135,6 +137,7 @@ export async function POST(req: Request) {
     const requestDetailsLines = [
       `Order Type: Custom Order`,
       `Title / Summary: ${customTitle}`,
+      `Vehicle No: ${vehicleNo || "None"}`,
       `Internal Remarks: ${internalRemarks || "None"}`,
       `Subtotal: RM${calculatedSubtotal}`,
       `Discount: RM${customDiscount}`,
@@ -150,6 +153,7 @@ export async function POST(req: Request) {
         status: "AWAITING_PAYMENT",
         orderType: "CUSTOM_ORDER",
         customTitle,
+        vehicleNo: vehicleNo || null,
         internalRemarks: internalRemarks || null,
         customSubtotal: calculatedSubtotal,
         customDiscount,

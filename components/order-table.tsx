@@ -47,6 +47,7 @@ export type OrderWithRelations = Order & {
   customSubtotal?: number | null;
   customDiscount?: number | null;
   customGrandTotal?: number | null;
+  vehicleNo?: string | null;
 };
 
 type UploadModalState =
@@ -291,6 +292,13 @@ function CustomOrderDetails({ order }: { order: OrderWithRelations }) {
         <span className="text-white/45">Description:</span>{" "}
         <span className="text-white/90">{order.customTitle || "-"}</span>
       </div>
+
+      {order.vehicleNo ? (
+        <div>
+          <span className="text-white/45">Vehicle No:</span>{" "}
+          <span className="text-white/90">{order.vehicleNo}</span>
+        </div>
+      ) : null}
 
       <div>
         <span className="text-white/45">Item Count:</span>{" "}

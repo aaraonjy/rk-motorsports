@@ -102,28 +102,38 @@ export async function getAllOrders(filters?: AllOrdersOptions) {
       : {}),
     ...(filters?.customerKeyword
       ? {
-          user: {
-            OR: [
-              {
-                name: {
-                  contains: filters.customerKeyword,
-                  mode: "insensitive",
-                },
+          OR: [
+            {
+              user: {
+                OR: [
+                  {
+                    name: {
+                      contains: filters.customerKeyword,
+                      mode: "insensitive",
+                    },
+                  },
+                  {
+                    phone: {
+                      contains: filters.customerKeyword,
+                      mode: "insensitive",
+                    },
+                  },
+                  {
+                    email: {
+                      contains: filters.customerKeyword,
+                      mode: "insensitive",
+                    },
+                  },
+                ],
               },
-              {
-                phone: {
-                  contains: filters.customerKeyword,
-                  mode: "insensitive",
-                },
+            },
+            {
+              vehicleNo: {
+                contains: filters.customerKeyword,
+                mode: "insensitive",
               },
-              {
-                email: {
-                  contains: filters.customerKeyword,
-                  mode: "insensitive",
-                },
-              },
-            ],
-          },
+            },
+          ],
         }
       : {}),
     ...(filters?.tuningType && filters.tuningType !== "ALL"
@@ -295,6 +305,7 @@ export async function getCustomerByIdWithIntelligence(customerId: string) {
           tuningType: true,
           totalAmount: true,
           customGrandTotal: true,
+          vehicleNo: true,
           status: true,
           createdAt: true,
         },

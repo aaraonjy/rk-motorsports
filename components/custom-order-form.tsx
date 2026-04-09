@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 type CustomOrderInitialData = {
   orderId: string;
   customTitle: string | null;
+  vehicleNo?: string | null;
   internalRemarks: string | null;
   customDiscount: number | null;
   items: Array<{
@@ -70,6 +71,7 @@ export function CustomOrderForm({
 }: CustomOrderFormProps) {
   const isEditMode = !!orderId;
   const [title, setTitle] = useState(initialData?.customTitle || "");
+  const [vehicleNo, setVehicleNo] = useState(initialData?.vehicleNo || "");
   const [internalRemarks, setInternalRemarks] = useState(initialData?.internalRemarks || "");
   const [discount, setDiscount] = useState(String(initialData?.customDiscount ?? 0));
   const [rows, setRows] = useState<CustomLineItem[]>(
@@ -178,6 +180,7 @@ export function CustomOrderForm({
             orderType: "CUSTOM_ORDER",
             customerId,
             customTitle: title.trim(),
+            vehicleNo: vehicleNo.trim(),
             internalRemarks: internalRemarks.trim(),
             customSubtotal: subtotal,
             customDiscount: discountAmount,
@@ -234,6 +237,19 @@ export function CustomOrderForm({
               placeholder="e.g. Workshop labour + diagnostics + dyno session"
               required
             />
+          </div>
+
+          <div>
+            <label className="label-rk">Vehicle No. (optional)</label>
+            <input
+              className="input-rk"
+              value={vehicleNo}
+              onChange={(e) => setVehicleNo(e.target.value)}
+              placeholder="e.g. VXX1234"
+            />
+            <p className="mt-2 text-xs text-white/45">
+              Used for workshop reference, invoice display, and admin search.
+            </p>
           </div>
 
           <div>
