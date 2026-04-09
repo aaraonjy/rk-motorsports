@@ -64,6 +64,20 @@ function getOrderDisplayAmount(order: {
     : order.totalAmount || 0;
 }
 
+function getCustomerProfileDisplayStatus(
+  order: {
+    orderType: "STANDARD_TUNING" | "CUSTOM_ORDER";
+    status: string;
+  },
+  customerAccountSource: "PORTAL" | "ADMIN"
+) {
+  if (customerAccountSource === "ADMIN" && order.orderType === "CUSTOM_ORDER") {
+    return "RECEIVED";
+  }
+
+  return order.status;
+}
+
 function getStatusClasses(status: string) {
   switch (status) {
     case "COMPLETED":
@@ -74,6 +88,7 @@ function getStatusClasses(status: string) {
       return "border-sky-500/30 bg-sky-500/10 text-sky-300";
     case "IN_PROGRESS":
     case "FILE_RECEIVED":
+    case "RECEIVED":
       return "border-amber-500/30 bg-amber-500/10 text-amber-200";
     default:
       return "border-white/15 bg-white/5 text-white/75";
@@ -202,34 +217,41 @@ export default async function AdminCustomerDetailPage({
                   </tr>
                 </thead>
                 <tbody>
-                  {customer.orders.map((order) => (
-                    <tr key={order.id} className="border-t border-white/10 align-top">
-                      <td className="px-6 py-5 md:px-8">
-                        <div className="font-medium text-white">{order.orderNumber}</div>
-                      </td>
-                      <td className="px-6 py-5">
-                        <div className="font-medium text-white">{getOrderTitle(order)}</div>
-                      </td>
-                      <td className="px-6 py-5 text-white/65">
-                        {order.orderType === "CUSTOM_ORDER" ? "Custom Order" : "Standard Tuning"}
-                      </td>
-                      <td className="px-6 py-5">
-                        <span
-                          className={`inline-flex rounded-full border px-3 py-1 text-xs font-medium ${getStatusClasses(
-                            order.status
-                          )}`}
-                        >
-                          {order.status.replaceAll("_", " ")}
-                        </span>
-                      </td>
-                      <td className="px-6 py-5 font-medium text-white">
-                        {formatCurrency(getOrderDisplayAmount(order))}
-                      </td>
-                      <td className="px-6 py-5 text-white/65">
-                        {formatDateTime(order.createdAt)}
-                      </td>
-                    </tr>
-                  ))}
+                  {customer.orders.map((order) => {
+                    const displayStatus = getCustomerProfileDisplayStatus(
+                      order,
+                      customer.accountSource
+                    );
+
+                    return (
+                      <tr key={order.id} className="border-t border-white/10 align-top">
+                        <td className="px-6 py-5 md:px-8">
+                          <div className="font-medium text-white">{order.orderNumber}</div>
+                        </td>
+                        <td className="px-6 py-5">
+                          <div className="font-medium text-white">{getOrderTitle(order)}</div>
+                        </td>
+                        <td className="px-6 py-5 text-white/65">
+                          {order.orderType === "CUSTOM_ORDER" ? "Custom Order" : "Standard Tuning"}
+                        </td>
+                        <td className="px-6 py-5">
+                          <span
+                            className={`inline-flex rounded-full border px-3 py-1 text-xs font-medium ${getStatusClasses(
+                              displayStatus
+                            )}`}
+                          >
+                            {displayStatus.replaceAll("_", " ")}
+                          </span>
+                        </td>
+                        <td className="px-6 py-5 font-medium text-white">
+                          {formatCurrency(getOrderDisplayAmount(order))}
+                        </td>
+                        <td className="px-6 py-5 text-white/65">
+                          {formatDateTime(order.createdAt)}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
