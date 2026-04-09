@@ -29,6 +29,25 @@ function getOrderAmount(order: OrderWithRelations) {
   return order.totalAmount ?? 0;
 }
 
+
+function getReportDisplayStatus(order: OrderWithRelations) {
+  const isAdminCreatedOrder = !!order.createdByAdminId;
+
+  if (
+    isAdminCreatedOrder &&
+    order.status !== "COMPLETED" &&
+    order.status !== "CANCELLED"
+  ) {
+    return "RECEIVED";
+  }
+
+  return order.status;
+}
+
+function getReportDisplayStatusLabel(order: OrderWithRelations) {
+  return getReportDisplayStatus(order).replaceAll("_", " ");
+}
+
 function escapeCsvValue(value: string | number | null | undefined) {
   const normalized = String(value ?? "");
   const escaped = normalized.replace(/"/g, '""');
@@ -98,7 +117,7 @@ export async function GET(req: Request) {
       getOrderTitle(order),
       getTuningTypeLabel(order.tuningType),
       order.vehicleNo || "",
-      order.status.replaceAll("_", " "),
+      getReportDisplayStatusLabel(order),
       getOrderAmount(order),
     ]),
   ];

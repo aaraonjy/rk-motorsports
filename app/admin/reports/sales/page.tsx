@@ -58,6 +58,25 @@ function getOrderAmount(order: OrderWithRelations) {
   return order.totalAmount ?? 0;
 }
 
+
+function getReportDisplayStatus(order: OrderWithRelations) {
+  const isAdminCreatedOrder = !!order.createdByAdminId;
+
+  if (
+    isAdminCreatedOrder &&
+    order.status !== "COMPLETED" &&
+    order.status !== "CANCELLED"
+  ) {
+    return "RECEIVED";
+  }
+
+  return order.status;
+}
+
+function getReportDisplayStatusLabel(order: OrderWithRelations) {
+  return getReportDisplayStatus(order).replaceAll("_", " ");
+}
+
 function buildQueryString(params: Record<string, string | undefined>) {
   const searchParams = new URLSearchParams();
 
@@ -370,7 +389,7 @@ export default async function SalesReportPage({
                           {order.vehicleNo || "-"}
                         </td>
                         <td className="px-6 py-5 text-white/65">
-                          {order.status.replaceAll("_", " ")}
+                          {getReportDisplayStatusLabel(order)}
                         </td>
                         <td className="px-6 py-5 text-right font-medium text-white">
                           {formatCurrency(getOrderAmount(order))}
