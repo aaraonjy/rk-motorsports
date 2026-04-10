@@ -13,6 +13,7 @@ type CustomOrderInitialData = {
     description: string;
     qty: number;
     unitPrice: number;
+    uom?: string | null;
   }>;
 };
 
@@ -29,6 +30,7 @@ type CustomLineItem = {
   id: string;
   description: string;
   qty: string;
+  uom: string;
   unitPrice: string;
 };
 
@@ -43,6 +45,7 @@ function createEmptyRow(): CustomLineItem {
     id: crypto.randomUUID(),
     description: "",
     qty: "1",
+    uom: "",
     unitPrice: "0",
   };
 }
@@ -80,6 +83,7 @@ export function CustomOrderForm({
           id: item.id || crypto.randomUUID(),
           description: item.description,
           qty: String(item.qty),
+          uom: item.uom || "",
           unitPrice: String(item.unitPrice),
         }))
       : [createEmptyRow()]
@@ -125,7 +129,7 @@ export function CustomOrderForm({
 
   function updateRow(
     rowId: string,
-    field: keyof Pick<CustomLineItem, "description" | "qty" | "unitPrice">,
+    field: keyof Pick<CustomLineItem, "description" | "qty" | "uom" | "unitPrice">,
     value: string
   ) {
     setRows((prev) =>
@@ -157,6 +161,7 @@ export function CustomOrderForm({
       .map((row) => ({
         description: row.description.trim(),
         qty: row.qty,
+        uom: row.uom.trim() || null,
         unitPrice: row.unitPrice,
         lineTotal: row.lineTotal,
       }));
@@ -296,7 +301,7 @@ export function CustomOrderForm({
                   </button>
                 </div>
 
-                <div className="mt-4 grid gap-4 md:grid-cols-[1.7fr_0.6fr_0.8fr_0.9fr]">
+                <div className="mt-4 grid gap-4 md:grid-cols-[1.7fr_0.55fr_0.7fr_0.8fr_0.9fr]">
                   <div>
                     <label className="label-rk">Description</label>
                     <input
@@ -316,6 +321,16 @@ export function CustomOrderForm({
                       className="input-rk"
                       value={row.qty}
                       onChange={(e) => updateRow(row.id, "qty", e.target.value)}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="label-rk">UOM (optional)</label>
+                    <input
+                      className="input-rk"
+                      value={row.uom}
+                      onChange={(e) => updateRow(row.id, "uom", e.target.value)}
+                      placeholder="e.g. pcs"
                     />
                   </div>
 

@@ -5,6 +5,7 @@ import { getSessionUser } from "@/lib/auth";
 type CustomOrderItemPayload = {
   description: string;
   qty: number;
+  uom?: string | null;
   unitPrice: number;
   lineTotal: number;
 };
@@ -97,12 +98,14 @@ export async function PUT(
       .map((item) => {
         const description = String(item.description || "").trim();
         const qty = Math.max(1, sanitizeWholeNumber(item.qty));
+        const uom = String(item.uom || "").trim();
         const unitPrice = Math.max(0, sanitizeWholeNumber(item.unitPrice));
         const lineTotal = qty * unitPrice;
 
         return {
           description,
           qty,
+          uom: uom || null,
           unitPrice,
           lineTotal,
         };
@@ -159,6 +162,10 @@ export async function PUT(
           customDiscount,
           customGrandTotal: calculatedGrandTotal,
           totalAmount: calculatedGrandTotal,
+          outstandingBalance: Math.max(
+            calculatedGrandTotal - (order.totalPaid || 0),
+            0
+          ),
           requestDetails: requestDetailsLines.join("\n"),
           customItems: {
             create: normalizedItems,
