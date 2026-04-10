@@ -287,10 +287,12 @@ function drawPaymentSummary(params: {
   });
 
   y -= 22;
-  drawText(page, font, bold, "Payment Summary", labelX, y, 10, true);
+  const paymentSummaryText = "Payment Summary";
+  drawText(page, font, bold, paymentSummaryText, labelX, y, 10, true);
+  const paymentSummaryTextWidth = bold.widthOfTextAtSize(paymentSummaryText, 10);
   page.drawLine({
     start: { x: labelX, y: y - 3 },
-    end: { x: labelX + 95, y: y - 3 },
+    end: { x: labelX + paymentSummaryTextWidth, y: y - 3 },
     thickness: 0.8,
     color: rgb(0, 0, 0),
   });
