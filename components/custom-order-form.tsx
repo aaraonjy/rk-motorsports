@@ -421,7 +421,7 @@ export function CustomOrderForm({
                         <div className="mt-1 text-xs text-white/45">Already uploaded</div>
                       </div>
                       <a
-                        href={file.storagePath}
+                        href={`/api/admin/orders/${orderId}/files/${file.id}`}
                         target="_blank"
                         rel="noreferrer"
                         className="rounded-xl border border-white/15 px-3 py-2 text-sm text-white/70 transition hover:bg-white/10 hover:text-white"
