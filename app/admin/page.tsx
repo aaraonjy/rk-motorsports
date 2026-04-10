@@ -71,6 +71,12 @@ function getAdminBanner(success?: string): BannerState {
         title: "Success",
         message: "Download released successfully.",
       };
+    case "order_completed":
+      return {
+        tone: "success",
+        title: "Success",
+        message: "Order completed successfully.",
+      };
     case "admin_order_cancelled":
       return {
         tone: "cancelled",
