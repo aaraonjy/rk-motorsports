@@ -12,6 +12,8 @@ type AdminPageProps = {
     customerKeyword?: string;
     tuningType?: string;
     orderType?: string;
+    paymentStatus?: string;
+    outstandingOnly?: string;
     dateFrom?: string;
     dateTo?: string;
     page?: string;
@@ -128,6 +130,8 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const customerKeyword = params.customerKeyword || "";
   const tuningType = params.tuningType || "ALL";
   const orderType = params.orderType || "ALL";
+  const paymentStatus = params.paymentStatus || "ALL";
+  const outstandingOnly = params.outstandingOnly === "1";
   const dateFrom = params.dateFrom || "";
   const dateTo = params.dateTo || "";
   const page = Math.max(1, Number(params.page || "1") || 1);
@@ -139,6 +143,8 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     customerKeyword,
     tuningType,
     orderType,
+    paymentStatus,
+    outstandingOnly,
     dateFrom,
     dateTo,
     page,
@@ -304,6 +310,53 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
 
             <div>
               <label className="mb-2 block text-sm text-white/65">
+                Payment Status
+              </label>
+              <div className="relative">
+                <select
+                  name="paymentStatus"
+                  defaultValue={paymentStatus}
+                  className="w-full appearance-none rounded-xl border border-white/15 bg-black/50 px-4 py-3 pr-12 text-white outline-none"
+                >
+                  <option value="ALL">All Payment Statuses</option>
+                  <option value="UNPAID">Unpaid</option>
+                  <option value="PARTIALLY_PAID">Partially Paid</option>
+                  <option value="PAID">Paid</option>
+                </select>
+
+                <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/60">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    className="h-5 w-5"
+                    aria-hidden="true"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.51a.75.75 0 0 1-1.08 0l-4.25-4.51a.75.75 0 0 1 .02-1.06Z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-end">
+              <label className="inline-flex items-center gap-3 rounded-xl border border-white/15 bg-black/50 px-4 py-3 text-sm text-white/80">
+                <input
+                  type="checkbox"
+                  name="outstandingOnly"
+                  value="1"
+                  defaultChecked={outstandingOnly}
+                  className="h-4 w-4 rounded border-white/20 bg-black/40"
+                />
+                Outstanding Only
+              </label>
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm text-white/65">
                 Date From
               </label>
               <input
@@ -355,6 +408,8 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               customerKeyword: customerKeyword || undefined,
               tuningType: tuningType !== "ALL" ? tuningType : undefined,
               orderType: orderType !== "ALL" ? orderType : undefined,
+              paymentStatus: paymentStatus !== "ALL" ? paymentStatus : undefined,
+              outstandingOnly: outstandingOnly ? "1" : undefined,
               dateFrom: dateFrom || undefined,
               dateTo: dateTo || undefined,
               success: params.success,

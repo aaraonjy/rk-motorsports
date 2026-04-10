@@ -64,6 +64,8 @@ type AllOrdersOptions = {
   customerKeyword?: string;
   tuningType?: string;
   orderType?: string;
+  paymentStatus?: string;
+  outstandingOnly?: boolean;
   dateFrom?: string;
   dateTo?: string;
   page?: number;
@@ -91,6 +93,33 @@ export async function getAllOrders(filters?: AllOrdersOptions) {
       createdAt.lte = end;
     }
   }
+
+  const paymentWhere: Prisma.OrderWhereInput =
+    filters?.paymentStatus === "UNPAID"
+      ? {
+          orderType: "CUSTOM_ORDER",
+          totalPaid: 0,
+          outstandingBalance: { gt: 0 },
+        }
+      : filters?.paymentStatus === "PARTIALLY_PAID"
+        ? {
+            orderType: "CUSTOM_ORDER",
+            totalPaid: { gt: 0 },
+            outstandingBalance: { gt: 0 },
+          }
+        : filters?.paymentStatus === "PAID"
+          ? {
+              orderType: "CUSTOM_ORDER",
+              outstandingBalance: 0,
+            }
+          : {};
+
+  const outstandingWhere: Prisma.OrderWhereInput = filters?.outstandingOnly
+    ? {
+        orderType: "CUSTOM_ORDER",
+        outstandingBalance: { gt: 0 },
+      }
+    : {};
 
   const where: Prisma.OrderWhereInput = {
     ...(filters?.status && filters.status !== "ALL"
@@ -146,6 +175,8 @@ export async function getAllOrders(filters?: AllOrdersOptions) {
     ...(filters?.orderType && filters.orderType !== "ALL"
       ? { orderType: filters.orderType as any }
       : {}),
+    ...paymentWhere,
+    ...outstandingWhere,
     ...(Object.keys(createdAt).length > 0 ? { createdAt } : {}),
   };
 
