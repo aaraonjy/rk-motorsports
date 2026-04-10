@@ -105,9 +105,12 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
           lineTotal: amount,
         }];
 
+    const cnDate = new Date();
+
     await db.creditNote.create({
       data: {
-        cnNo: generateCreditNoteNumber(),
+        cnNo: generateCreditNoteNumber(cnDate),
+        cnDate,
         orderId: order.id,
         customerId: order.userId,
         referenceOrderNumber: order.orderNumber,

@@ -5,8 +5,15 @@ import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf
 import fs from "node:fs/promises";
 import path from "node:path";
 
+const MALAYSIA_TIME_ZONE = "Asia/Kuala_Lumpur";
+
 function formatDate(value: Date) {
-  return new Date(value).toLocaleDateString("en-MY");
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: MALAYSIA_TIME_ZONE,
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(new Date(value));
 }
 
 function formatMoney(value: number | string | null | undefined) {
@@ -163,7 +170,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     const left = 50;
     const right = width - 50;
 
-    const { y: headerStartY, rightColumnX } = await drawHeader({
+    const { y: headerStartY } = await drawHeader({
       pdfDoc,
       page,
       font,
