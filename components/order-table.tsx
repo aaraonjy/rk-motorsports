@@ -1418,7 +1418,7 @@ export function OrderTable({
 
                       {admin && order.creditNote ? (
                         <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-200">
-                          <div className="font-semibold">Credited by: {order.creditNote.cnNo}</div>
+                          <div className="font-semibold">CN No: {order.creditNote.cnNo}</div>
                           <div className="mt-1 text-red-200/80">Reason: {getCreditNoteReasonLabel(order.creditNote.reasonType)}</div>
                         </div>
                       ) : null}
