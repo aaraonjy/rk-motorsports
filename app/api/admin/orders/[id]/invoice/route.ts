@@ -520,17 +520,6 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
       drawText(page, font, bold, formatMoney(order.totalAmount), rightColumnX, y, 12, true);
 
       y -= 28;
-      y = drawPaymentSummary({
-        page,
-        font,
-        bold,
-        left,
-        right,
-        startY: y,
-        totalPaid: order.totalPaid ?? 0,
-        outstandingBalance: order.outstandingBalance ?? 0,
-        payments: order.payments,
-      });
 
       y -= 28;
       drawText(page, font, bold, "Thank you for your business.", left, y, 10);
