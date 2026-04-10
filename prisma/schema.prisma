@@ -167,6 +167,8 @@ model Order {
   cancelReason           String?
   cancelledAt            DateTime?
   totalAmount            Int               @default(0)
+  totalPaid              Int               @default(0)
+  outstandingBalance     Int               @default(0)
   createdAt              DateTime          @default(now())
   updatedAt              DateTime          @updatedAt
   userId                 String
@@ -178,6 +180,7 @@ model Order {
   files                  OrderFile[]
   revisions              OrderRevision[]
   notifications          Notification[]
+  payments               Payment[]
 
   @@index([createdByAdminId])
   @@index([orderType])
@@ -198,6 +201,7 @@ model CustomOrderItem {
   orderId      String
   description  String
   qty          Int      @default(1)
+  uom          String?
   unitPrice    Int
   lineTotal    Int
   createdAt    DateTime @default(now())
@@ -205,6 +209,21 @@ model CustomOrderItem {
   order        Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@index([orderId])
+}
+
+
+model Payment {
+  id          String   @id @default(cuid())
+  orderId     String
+  paymentDate DateTime
+  paymentMode String
+  amount      Int
+  createdAt   DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([paymentDate])
 }
 
 model OrderFile {
