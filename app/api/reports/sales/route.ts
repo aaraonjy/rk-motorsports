@@ -7,9 +7,10 @@ function getOrderTypeLabel(value?: string | null) {
   return value === "CUSTOM_ORDER" ? "Custom Order" : "Standard Tuning";
 }
 
-function getTuningTypeLabel(value?: string | null) {
-  if (value === "ECU_TCU") return "ECU + TCU";
-  if (value === "TCU") return "TCU";
+function getTuningTypeLabel(order: OrderWithRelations) {
+  if (order.orderType === "CUSTOM_ORDER") return "-";
+  if (order.tuningType === "ECU_TCU") return "ECU + TCU";
+  if (order.tuningType === "TCU") return "TCU";
   return "ECU";
 }
 
@@ -18,7 +19,7 @@ function getOrderTitle(order: OrderWithRelations) {
     return order.customTitle || "Custom Order";
   }
 
-  return order.selectedTuneLabel || `${getTuningTypeLabel(order.tuningType)} Tune`;
+  return order.selectedTuneLabel || `${getTuningTypeLabel(order)} Tune`;
 }
 
 function getOrderAmount(order: OrderWithRelations) {
@@ -28,7 +29,6 @@ function getOrderAmount(order: OrderWithRelations) {
 
   return order.totalAmount ?? 0;
 }
-
 
 function getReportDisplayStatus(order: OrderWithRelations) {
   const isAdminCreatedOrder = !!order.createdByAdminId;
@@ -45,7 +45,7 @@ function getReportDisplayStatus(order: OrderWithRelations) {
 }
 
 function getReportDisplayStatusLabel(order: OrderWithRelations) {
-  return getReportDisplayStatus(order).replaceAll("_", " ");
+  return String(getReportDisplayStatus(order) || "").replace(/_/g, " ");
 }
 
 function escapeCsvValue(value: string | number | null | undefined) {
@@ -115,7 +115,7 @@ export async function GET(req: Request) {
       order.user?.phone || "",
       getOrderTypeLabel(order.orderType),
       getOrderTitle(order),
-      getTuningTypeLabel(order.tuningType),
+      getTuningTypeLabel(order),
       order.vehicleNo || "",
       getReportDisplayStatusLabel(order),
       getOrderAmount(order),

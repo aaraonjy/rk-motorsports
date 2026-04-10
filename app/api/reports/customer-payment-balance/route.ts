@@ -45,6 +45,41 @@ function getReportDisplayStatusLabel(order: OrderWithRelations) {
   }
 }
 
+function getPaymentModeLabel(value?: string | null) {
+  const normalized = String(value || "").trim().toUpperCase();
+
+  switch (normalized) {
+    case "CASH":
+      return "Cash";
+    case "BANK_TRANSFER":
+      return "Bank Transfer";
+    case "CARD":
+    case "CARD_PAYMENT":
+      return "Card Payment";
+    case "QR":
+    case "QR_PAYMENT":
+      return "QR Payment";
+    default:
+      return String(value || "").trim() || "Other";
+  }
+}
+
+function getPaymentBreakdown(order: OrderWithRelations) {
+  const payments = order.payments || [];
+  if (payments.length === 0) return "";
+
+  const grouped = new Map<string, number>();
+
+  for (const payment of payments) {
+    const key = getPaymentModeLabel(payment.paymentMode);
+    grouped.set(key, (grouped.get(key) || 0) + Number(payment.amount || 0));
+  }
+
+  return Array.from(grouped.entries())
+    .map(([mode, amount]) => `${mode}: ${amount}`)
+    .join(" | ");
+}
+
 function escapeCsvValue(value: string | number | null | undefined) {
   const normalized = String(value ?? "");
   const escaped = normalized.replace(/"/g, '""');
@@ -110,6 +145,7 @@ export async function GET(req: Request) {
       "Total Paid",
       "Outstanding Balance",
       "Payment Status",
+      "Payment Breakdown",
     ],
     ...filteredOrders.map((order) => [
       new Intl.DateTimeFormat("en-GB").format(new Date(order.createdAt)),
@@ -123,6 +159,7 @@ export async function GET(req: Request) {
       order.totalPaid ?? 0,
       getOrderOutstandingBalance(order),
       getPaymentStatusLabel(order),
+      getPaymentBreakdown(order),
     ]),
   ];
 
