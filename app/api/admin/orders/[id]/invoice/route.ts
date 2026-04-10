@@ -38,11 +38,28 @@ function getPaymentStatus(totalPaid: number, outstandingBalance: number) {
   return "PARTIALLY PAID";
 }
 
+function formatPaymentModeLabel(paymentMode?: string | null) {
+  const normalized = String(paymentMode || "").trim().toUpperCase();
+
+  switch (normalized) {
+    case "CASH":
+      return "Cash";
+    case "BANK_TRANSFER":
+      return "Bank Transfer";
+    case "CARD_PAYMENT":
+      return "Card Payment";
+    case "QR_PAYMENT":
+      return "QR Payment";
+    default:
+      return paymentMode ? String(paymentMode).trim() : "Other";
+  }
+}
+
 function groupPaymentsByMode(payments: Array<{ paymentMode: string; amount: number }>) {
   const grouped = new Map<string, number>();
 
   for (const payment of payments) {
-    const key = String(payment.paymentMode || "").trim() || "Other";
+    const key = formatPaymentModeLabel(payment.paymentMode);
     grouped.set(key, (grouped.get(key) || 0) + Number(payment.amount || 0));
   }
 
@@ -270,7 +287,7 @@ function drawPaymentSummary(params: {
   });
 
   y -= 22;
-  drawText(page, font, bold, "Payment Summary", left, y, 10, true);
+  drawText(page, font, bold, "Payment Summary", labelX, y, 10, true);
 
   y -= 20;
   drawText(page, font, bold, "Payment Status:", labelX, y, 10, true);
@@ -372,29 +389,27 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
 
     if (isCustomOrder) {
       const descX = left + 10;
-      const qtyX = right - 245;
-      const uomX = right - 200;
-      const unitX = right - 145;
-      const totalX = right - 80;
+      const qtyX = right - 125;
+      const uomX = right - 80;
+      const itemQtyX = right - 245;
+      const itemUomX = right - 200;
+      const itemUnitX = right - 145;
+      const itemTotalX = right - 80;
 
       drawText(page, font, bold, "Description", descX, headerY + 9, 10, true);
       drawText(page, font, bold, "Qty", qtyX, headerY + 9, 10, true);
       drawText(page, font, bold, "UOM", uomX, headerY + 9, 10, true);
-      drawText(page, font, bold, "Unit Price", unitX, headerY + 9, 10, true);
-      drawText(page, font, bold, "Total", totalX, headerY + 9, 10, true);
 
       let y = headerY - 24;
       const rowHeight = 22;
 
-      const titleLines = wrapText(order.customTitle || "-", 52);
+      const titleLines = wrapText(order.customTitle || "-", 58);
       for (const line of titleLines) {
         drawText(page, font, bold, line, descX, y, 9, false);
         y -= 11;
       }
       drawText(page, font, bold, "1", qtyX, headerY - 18, 9);
       drawText(page, font, bold, "-", uomX, headerY - 18, 9);
-      drawText(page, font, bold, formatMoney(order.customGrandTotal ?? order.totalAmount), unitX, headerY - 18, 9);
-      drawText(page, font, bold, formatMoney(order.customGrandTotal ?? order.totalAmount), totalX, headerY - 18, 9);
 
       y -= 8;
 
@@ -406,7 +421,14 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
       if (order.customItems.length > 0) {
         y -= 10;
         drawText(page, font, bold, "Item Breakdown", descX, y, 10, true);
-        y -= 14;
+        y -= 16;
+
+        drawText(page, font, bold, "Description", descX + 8, y, 9, true);
+        drawText(page, font, bold, "Qty", itemQtyX, y, 9, true);
+        drawText(page, font, bold, "UOM", itemUomX, y, 9, true);
+        drawText(page, font, bold, "Unit Price", itemUnitX, y, 9, true);
+        drawText(page, font, bold, "Total", itemTotalX, y, 9, true);
+        y -= 12;
 
         for (const item of order.customItems) {
           if (y < 180) break;
@@ -415,10 +437,10 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
           if (itemLines[1]) {
             drawText(page, font, bold, itemLines[1], descX + 8, y - 10, 9);
           }
-          drawText(page, font, bold, String(item.qty), qtyX, y, 9);
-          drawText(page, font, bold, item.uom || "-", uomX, y, 9);
-          drawText(page, font, bold, formatMoney(item.unitPrice), unitX, y, 9);
-          drawText(page, font, bold, formatMoney(item.lineTotal), totalX, y, 9);
+          drawText(page, font, bold, String(item.qty), itemQtyX, y, 9);
+          drawText(page, font, bold, item.uom || "-", itemUomX, y, 9);
+          drawText(page, font, bold, formatMoney(item.unitPrice), itemUnitX, y, 9);
+          drawText(page, font, bold, formatMoney(item.lineTotal), itemTotalX, y, 9);
           y -= itemLines.length > 1 ? rowHeight + 10 : rowHeight;
         }
       }
