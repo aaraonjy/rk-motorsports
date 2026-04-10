@@ -479,16 +479,6 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
         payments: order.payments,
       });
 
-      if (isPresent(order.internalRemarks)) {
-        y -= 28;
-        drawText(page, font, bold, "Remarks:", left, y, 10, true);
-        y -= 14;
-        for (const line of wrapText(order.internalRemarks || "", 82)) {
-          drawText(page, font, bold, line, left, y, 9);
-          y -= 11;
-        }
-      }
-
       y -= 28;
       drawText(page, font, bold, "Thank you for your business.", left, y, 10);
       y -= 14;
