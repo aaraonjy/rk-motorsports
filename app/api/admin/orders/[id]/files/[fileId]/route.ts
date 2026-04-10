@@ -40,10 +40,10 @@ export async function GET(
 
     const contentType =
       file.mimeType ||
-      result?.contentType ||
+      result.headers.get("content-type") ||
       "application/octet-stream";
 
-    return new NextResponse(result.body, {
+    return new NextResponse(result.stream, {
       headers: {
         "Content-Type": contentType,
         "Content-Disposition": `inline; filename="${file.fileName}"`,
