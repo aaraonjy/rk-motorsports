@@ -16,7 +16,7 @@ export default async function AdminReportsPage() {
           Choose a report type to filter, preview on screen, and export as CSV.
         </p>
 
-        <div className="mt-8 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+        <div className="mt-8 grid gap-6 md:grid-cols-2 xl:grid-cols-5">
           <Link
             href="/admin/reports/sales"
             className="card-rk block rounded-3xl border border-white/10 p-6 transition hover:border-white/20 hover:bg-white/[0.03]"
@@ -76,6 +76,23 @@ export default async function AdminReportsPage() {
             <h2 className="mt-3 text-2xl font-semibold text-white">Revenue Summary</h2>
             <p className="mt-3 text-sm leading-6 text-white/60">
               Review revenue totals with filters, switch between yearly, monthly, or daily grouping, and export as CSV.
+            </p>
+            <div className="mt-6 inline-flex rounded-full border border-white/15 px-4 py-2 text-sm text-white/80">
+              View Report
+            </div>
+          </Link>
+
+          <Link
+            href="/admin/reports/customer-payment-balance"
+            className="card-rk block rounded-3xl border border-white/10 p-6 transition hover:border-white/20 hover:bg-white/[0.03]"
+          >
+            <div className="text-xs font-semibold uppercase tracking-[0.22em] text-white/45">
+              Available
+            </div>
+            <h2 className="mt-3 text-2xl font-semibold text-white">Customer Payment Balance Report</h2>
+            <p className="mt-3 text-sm leading-6 text-white/60">
+              Review custom order payment balances with filters for customer, date range, order status,
+              payment status, outstanding records, and export as CSV.
             </p>
             <div className="mt-6 inline-flex rounded-full border border-white/15 px-4 py-2 text-sm text-white/80">
               View Report
