@@ -18,6 +18,12 @@ type CustomOrderInitialData = {
   totalPaid?: number | null;
   outstandingBalance?: number | null;
   payments?: PaymentHistoryItem[];
+  existingSupportingFiles?: Array<{
+    id: string;
+    fileName: string;
+    storagePath: string;
+    mimeType?: string | null;
+  }>;
   items: Array<{
     id: string;
     description: string;
@@ -396,6 +402,35 @@ export function CustomOrderForm({
                     </button>
                   </div>
                 ))}
+              </div>
+            ) : null}
+
+            {initialData?.existingSupportingFiles?.length ? (
+              <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 p-4">
+                <div className="text-xs font-semibold uppercase tracking-[0.18em] text-white/45">
+                  Existing Supporting Documents
+                </div>
+                <div className="mt-3 space-y-2">
+                  {initialData.existingSupportingFiles.map((file) => (
+                    <div
+                      key={file.id}
+                      className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white/80"
+                    >
+                      <div className="min-w-0">
+                        <div className="truncate font-medium text-white">{file.fileName}</div>
+                        <div className="mt-1 text-xs text-white/45">Already uploaded</div>
+                      </div>
+                      <a
+                        href={file.storagePath}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="rounded-xl border border-white/15 px-3 py-2 text-sm text-white/70 transition hover:bg-white/10 hover:text-white"
+                      >
+                        View
+                      </a>
+                    </div>
+                  ))}
+                </div>
               </div>
             ) : null}
           </div>

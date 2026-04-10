@@ -36,6 +36,12 @@ export default async function AdminEditCustomOrderPage({
       payments: {
         orderBy: { paymentDate: "asc" },
       },
+      files: {
+        where: {
+          kind: "SUPPORTING_DOC",
+        },
+        orderBy: { createdAt: "asc" },
+      },
     },
   });
 
@@ -127,6 +133,12 @@ export default async function AdminEditCustomOrderPage({
                 paymentDate: new Date(payment.paymentDate).toLocaleDateString("en-GB"),
                 paymentMode: payment.paymentMode,
                 amount: payment.amount,
+              })),
+              existingSupportingFiles: order.files.map((file) => ({
+                id: file.id,
+                fileName: file.fileName,
+                storagePath: file.storagePath,
+                mimeType: file.mimeType,
               })),
               items: order.customItems.map((item) => ({
                 id: item.id,
