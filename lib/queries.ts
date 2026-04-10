@@ -72,6 +72,70 @@ type AllOrdersOptions = {
   pageSize?: number;
 };
 
+function buildPaymentStatusWhere(filters?: AllOrdersOptions): Prisma.OrderWhereInput | null {
+  const wantsPaymentStatus = filters?.paymentStatus && filters.paymentStatus !== "ALL";
+  const wantsOutstandingOnly = !!filters?.outstandingOnly;
+
+  if (!wantsPaymentStatus && !wantsOutstandingOnly) return null;
+
+  const customOrderBase: Prisma.OrderWhereInput = {
+    orderType: "CUSTOM_ORDER",
+    status: {
+      notIn: ["COMPLETED", "CANCELLED"],
+    },
+  };
+
+  if (wantsOutstandingOnly && !wantsPaymentStatus) {
+    return {
+      ...customOrderBase,
+      outstandingBalance: {
+        gt: 0,
+      },
+    };
+  }
+
+  if (filters?.paymentStatus === "UNPAID") {
+    return {
+      ...customOrderBase,
+      totalPaid: 0,
+      ...(wantsOutstandingOnly
+        ? {
+            outstandingBalance: {
+              gt: 0,
+            },
+          }
+        : {}),
+    };
+  }
+
+  if (filters?.paymentStatus === "PARTIALLY_PAID") {
+    return {
+      ...customOrderBase,
+      totalPaid: {
+        gt: 0,
+      },
+      outstandingBalance: {
+        gt: 0,
+      },
+    };
+  }
+
+  if (filters?.paymentStatus === "PAID") {
+    return {
+      orderType: "CUSTOM_ORDER",
+      outstandingBalance: 0,
+      ...(wantsOutstandingOnly
+        ? {
+            id: "__NO_MATCH__",
+          }
+        : {}),
+    };
+  }
+
+  return null;
+}
+
+
 export async function getAllOrders(filters?: AllOrdersOptions) {
   const page = Math.max(1, filters?.page ?? 1);
   const pageSize = Math.max(1, filters?.pageSize ?? 5);
@@ -94,34 +158,7 @@ export async function getAllOrders(filters?: AllOrdersOptions) {
     }
   }
 
-  const paymentWhere: Prisma.OrderWhereInput =
-    filters?.paymentStatus === "UNPAID"
-      ? {
-          orderType: "CUSTOM_ORDER",
-          totalPaid: 0,
-          outstandingBalance: { gt: 0 },
-        }
-      : filters?.paymentStatus === "PARTIALLY_PAID"
-        ? {
-            orderType: "CUSTOM_ORDER",
-            totalPaid: { gt: 0 },
-            outstandingBalance: { gt: 0 },
-          }
-        : filters?.paymentStatus === "PAID"
-          ? {
-              orderType: "CUSTOM_ORDER",
-              outstandingBalance: 0,
-            }
-          : {};
-
-  const outstandingWhere: Prisma.OrderWhereInput = filters?.outstandingOnly
-    ? {
-        orderType: "CUSTOM_ORDER",
-        outstandingBalance: { gt: 0 },
-      }
-    : {};
-
-  const where: Prisma.OrderWhereInput = {
+  const baseWhere: Prisma.OrderWhereInput = {
     ...(filters?.status && filters.status !== "ALL"
       ? { status: filters.status as any }
       : {}),
@@ -175,10 +212,16 @@ export async function getAllOrders(filters?: AllOrdersOptions) {
     ...(filters?.orderType && filters.orderType !== "ALL"
       ? { orderType: filters.orderType as any }
       : {}),
-    ...paymentWhere,
-    ...outstandingWhere,
     ...(Object.keys(createdAt).length > 0 ? { createdAt } : {}),
   };
+
+  const paymentStatusWhere = buildPaymentStatusWhere(filters);
+
+  const where: Prisma.OrderWhereInput = paymentStatusWhere
+    ? {
+        AND: [baseWhere, paymentStatusWhere],
+      }
+    : baseWhere;
 
   const [orders, totalCount] = await Promise.all([
     db.order.findMany({

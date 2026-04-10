@@ -342,19 +342,6 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               </div>
             </div>
 
-            <div className="flex items-end">
-              <label className="inline-flex items-center gap-3 rounded-xl border border-white/15 bg-black/50 px-4 py-3 text-sm text-white/80">
-                <input
-                  type="checkbox"
-                  name="outstandingOnly"
-                  value="1"
-                  defaultChecked={outstandingOnly}
-                  className="h-4 w-4 rounded border-white/20 bg-black/40"
-                />
-                Outstanding Only
-              </label>
-            </div>
-
             <div>
               <label className="mb-2 block text-sm text-white/65">
                 Date From
@@ -379,20 +366,34 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               />
             </div>
 
-            <div className="md:col-span-2 xl:col-span-4 flex flex-wrap items-end gap-3">
+            <div className="md:col-span-2 xl:col-span-4 flex flex-wrap items-center justify-between gap-3">
               <input type="hidden" name="page" value="1" />
-              <button
-                type="submit"
-                className="rounded-xl border border-white/15 bg-black/30 px-4 py-3 hover:bg-white/10"
-              >
-                Apply
-              </button>
-              <a
-                href="/admin"
-                className="rounded-xl border border-white/15 bg-black/30 px-4 py-3 text-white/70 hover:bg-white/10"
-              >
-                Reset
-              </a>
+
+              <label className="inline-flex items-center gap-2 text-sm text-white/70">
+                <input
+                  type="checkbox"
+                  name="outstandingOnly"
+                  value="1"
+                  defaultChecked={outstandingOnly}
+                  className="h-4 w-4 rounded border border-white/20 bg-black/40"
+                />
+                Outstanding Only
+              </label>
+
+              <div className="flex flex-wrap items-end gap-3">
+                <button
+                  type="submit"
+                  className="rounded-xl border border-white/15 bg-black/30 px-4 py-3 hover:bg-white/10"
+                >
+                  Apply
+                </button>
+                <a
+                  href="/admin"
+                  className="rounded-xl border border-white/15 bg-black/30 px-4 py-3 text-white/70 hover:bg-white/10"
+                >
+                  Reset
+                </a>
+              </div>
             </div>
           </form>
 
