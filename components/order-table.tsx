@@ -1400,13 +1400,6 @@ export function OrderTable({
                         </div>
                       ) : null}
 
-                      {admin && order.creditNote ? (
-                        <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-200">
-                          <div className="font-semibold">Credited by: {order.creditNote.cnNo}</div>
-                          <div className="mt-1 text-red-200/80">Reason: {getCreditNoteReasonLabel(order.creditNote.reasonType)}</div>
-                        </div>
-                      ) : null}
-
                       {requestDetailsText ? (
                         <button
                           type="button"
@@ -1421,6 +1414,13 @@ export function OrderTable({
                         >
                           View Request
                         </button>
+                      ) : null}
+
+                      {admin && order.creditNote ? (
+                        <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+                          <div className="font-semibold">Credited by: {order.creditNote.cnNo}</div>
+                          <div className="mt-1 text-red-200/80">Reason: {getCreditNoteReasonLabel(order.creditNote.reasonType)}</div>
+                        </div>
                       ) : null}
                     </div>
                   </td>
@@ -1592,18 +1592,13 @@ export function OrderTable({
                           ) : null}
 
                           {admin && order.creditNote ? (
-                            <>
-                              <span className="inline-flex w-full min-h-[44px] items-center justify-center rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-center text-sm whitespace-normal text-red-300">
-                                Credited
-                              </span>
-                              <Link
-                                href={`/api/admin/credit-notes/${order.creditNote.id}`}
-                                className="inline-flex w-full min-h-[44px] flex-col items-center justify-center rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-center text-sm whitespace-normal leading-5 transition hover:bg-red-500/15 text-red-200"
-                              >
-                                <span>Download</span>
-                                <span>Credit Note</span>
-                              </Link>
-                            </>
+                            <Link
+                              href={`/api/admin/credit-notes/${order.creditNote.id}`}
+                              className="inline-flex w-full min-h-[44px] flex-col items-center justify-center rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center text-sm whitespace-normal leading-5 transition hover:bg-white/10"
+                            >
+                              <span>Download</span>
+                              <span>Credit Note</span>
+                            </Link>
                           ) : null}
 
                           {(isAdminCreatedOrder || (!isAdminCreatedOrder && ["READY_FOR_DOWNLOAD", "COMPLETED"].includes(order.status))) ? (

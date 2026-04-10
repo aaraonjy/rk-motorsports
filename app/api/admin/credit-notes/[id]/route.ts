@@ -191,7 +191,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
       }
     }
 
-    y -= 12;
+    y -= 24;
     page.drawRectangle({ x: left, y, width: width - 100, height: 28, color: rgb(0.95, 0.95, 0.95), borderWidth: 0.5, borderColor: rgb(0.8, 0.8, 0.8) });
     drawText(page, font, bold, "Description", left + 10, y + 9, 10, true);
     drawText(page, font, bold, "Qty", right - 215, y + 9, 10, true);
@@ -212,8 +212,10 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     y -= 8;
     page.drawLine({ start: { x: left, y }, end: { x: right, y }, thickness: 1, color: rgb(0.85, 0.85, 0.85) });
     y -= 28;
-    drawText(page, font, bold, "Credit Note Total:", rightColumnX - 40, y, 12, true);
-    drawText(page, font, bold, `- ${formatMoney(creditNote.amount)}`, rightColumnX + 40, y, 12, true);
+    const totalLabelX = right - 165;
+    const totalValueX = right - 80;
+    drawText(page, font, bold, "Total:", totalLabelX, y, 12, true);
+    drawText(page, font, bold, `- ${formatMoney(creditNote.amount)}`, totalValueX, y, 12, true);
 
     y -= 36;
     drawText(page, font, bold, "This Credit Note is issued for the reference invoice above.", left, y, 10);
