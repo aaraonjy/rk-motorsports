@@ -93,7 +93,7 @@ function getReportDisplayStatusLabel(order: OrderWithRelations) {
     case "PAID":
       return "Paid";
     default:
-      return order.status.replaceAll("_", " ");
+      return String(order.status || "").replace(/_/g, " ");
   }
 }
 
