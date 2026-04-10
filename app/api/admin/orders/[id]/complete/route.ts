@@ -30,6 +30,18 @@ export async function POST(
     const isCustomOrder = order.orderType === "CUSTOM_ORDER";
 
     if (isCustomOrder) {
+      const outstandingBalance = Math.max(
+        order.outstandingBalance ?? ((order.customGrandTotal || order.totalAmount || 0) - (order.totalPaid || 0)),
+        0
+      );
+
+      if (outstandingBalance > 0) {
+        return NextResponse.redirect(
+          new URL("/admin?success=custom_order_payment_outstanding", req.url),
+          303
+        );
+      }
+
       await db.order.update({
         where: { id },
         data: { status: "COMPLETED" },

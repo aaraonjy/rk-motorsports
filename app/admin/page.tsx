@@ -77,6 +77,12 @@ function getAdminBanner(success?: string): BannerState {
         title: "Cancelled",
         message: "Order cancelled successfully.",
       };
+    case "custom_order_payment_outstanding":
+      return {
+        tone: "cancelled",
+        title: "Payment Outstanding",
+        message: "Custom order cannot be completed until full payment is received.",
+      };
     default:
       return null;
   }

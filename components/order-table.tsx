@@ -182,6 +182,44 @@ function getOrderOutstandingBalance(order: OrderWithRelations) {
   return Math.max(outstanding, 0);
 }
 
+function getCustomPaymentStatusMeta(order: OrderWithRelations) {
+  const totalPaid = getOrderTotalPaid(order);
+  const outstandingBalance = getOrderOutstandingBalance(order);
+
+  if (order.status === "COMPLETED") {
+    return {
+      label: "Completed",
+      className: getStatusBadge("COMPLETED"),
+    };
+  }
+
+  if (order.status === "CANCELLED") {
+    return {
+      label: "Cancelled",
+      className: getStatusBadge("CANCELLED"),
+    };
+  }
+
+  if (outstandingBalance === 0) {
+    return {
+      label: "Paid",
+      className: getStatusBadge("PAID"),
+    };
+  }
+
+  if (totalPaid > 0) {
+    return {
+      label: "Partially Paid",
+      className: "inline-flex min-w-[122px] items-center justify-center rounded-full border border-violet-500/30 bg-violet-500/15 px-3 py-1 text-center text-xs font-semibold text-violet-300",
+    };
+  }
+
+  return {
+    label: "Unpaid",
+    className: getStatusBadge("AWAITING_PAYMENT"),
+  };
+}
+
 function VehicleDetails({ order }: { order: OrderWithRelations }) {
   return (
     <div className="space-y-1 text-sm leading-6">
@@ -1080,21 +1118,31 @@ export function OrderTable({
                 ? order.status === "COMPLETED"
                 : order.status === "READY_FOR_DOWNLOAD" || order.status === "COMPLETED";
 
-              const customerPaymentStatusLabel =
-                order.status === "AWAITING_PAYMENT" && paymentProof ? "Payment Uploaded" : statusLabel;
+              const customPaymentStatusMeta = customOrder
+                ? getCustomPaymentStatusMeta(order)
+                : null;
 
-              const customerPaymentStatusClass =
-                order.status === "AWAITING_PAYMENT" && paymentProof
+              const customerPaymentStatusLabel = customPaymentStatusMeta
+                ? customPaymentStatusMeta.label
+                : order.status === "AWAITING_PAYMENT" && paymentProof
+                  ? "Payment Uploaded"
+                  : statusLabel;
+
+              const customerPaymentStatusClass = customPaymentStatusMeta
+                ? customPaymentStatusMeta.className
+                : order.status === "AWAITING_PAYMENT" && paymentProof
                   ? "inline-flex min-w-[122px] items-center justify-center rounded-full border border-cyan-500/30 bg-cyan-500/15 px-3 py-1 text-center text-xs font-semibold text-cyan-300"
                   : statusBadgeClass;
 
-              const adminPaymentStatusLabel =
-                !isAdminCreatedOrder && order.status === "AWAITING_PAYMENT" && paymentProof
+              const adminPaymentStatusLabel = customPaymentStatusMeta
+                ? customPaymentStatusMeta.label
+                : !isAdminCreatedOrder && order.status === "AWAITING_PAYMENT" && paymentProof
                   ? "Payment Received"
                   : statusLabel;
 
-              const adminPaymentStatusClass =
-                !isAdminCreatedOrder && order.status === "AWAITING_PAYMENT" && paymentProof
+              const adminPaymentStatusClass = customPaymentStatusMeta
+                ? customPaymentStatusMeta.className
+                : !isAdminCreatedOrder && order.status === "AWAITING_PAYMENT" && paymentProof
                   ? "inline-flex min-w-[122px] items-center justify-center rounded-full border border-cyan-500/30 bg-cyan-500/15 px-3 py-1 text-center text-xs font-semibold text-cyan-300"
                   : statusBadgeClass;
 

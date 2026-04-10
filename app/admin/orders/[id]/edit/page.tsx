@@ -10,10 +10,6 @@ type EditOrderPageProps = {
   }>;
 };
 
-function formatDisplayDate(value: Date) {
-  return value.toLocaleDateString("en-GB");
-}
-
 export default async function AdminEditCustomOrderPage({
   params,
 }: EditOrderPageProps) {
@@ -128,7 +124,7 @@ export default async function AdminEditCustomOrderPage({
               outstandingBalance: order.outstandingBalance,
               payments: order.payments.map((payment) => ({
                 id: payment.id,
-                paymentDate: formatDisplayDate(payment.paymentDate),
+                paymentDate: new Date(payment.paymentDate).toLocaleDateString("en-GB"),
                 paymentMode: payment.paymentMode,
                 amount: payment.amount,
               })),
