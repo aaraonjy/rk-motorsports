@@ -670,171 +670,6 @@ function ReleaseOrderModal({
 }
 
 
-function AddPaymentModal({
-  isOpen,
-  orderId,
-  grandTotal,
-  totalPaid,
-  outstandingBalance,
-  onClose,
-}: {
-  isOpen: boolean;
-  orderId: string | null;
-  grandTotal: number;
-  totalPaid: number;
-  outstandingBalance: number;
-  onClose: () => void;
-}) {
-  const router = useRouter();
-  const [paymentDate, setPaymentDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [paymentMode, setPaymentMode] = useState("CASH");
-  const [amount, setAmount] = useState("");
-  const [submitError, setSubmitError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  if (!isOpen || !orderId) return null;
-
-  const maxPayable = Math.max(outstandingBalance, 0);
-
-  return (
-    <div className="fixed inset-0 z-[116] flex items-center justify-center bg-black/70 px-4">
-      <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-zinc-950 p-6 shadow-2xl">
-        <div>
-          <h3 className="text-lg font-semibold text-white">Add Payment</h3>
-          <p className="mt-1 text-sm text-white/50">
-            Record a payment for this custom order. Total paid cannot exceed the grand total.
-          </p>
-        </div>
-
-        <div className="mt-4 grid gap-3 rounded-xl border border-white/10 bg-black/25 p-4 text-sm text-white/75 sm:grid-cols-3">
-          <div>
-            <div className="text-white/45">Grand Total</div>
-            <div className="mt-1 font-semibold text-white">{formatCurrency(grandTotal)}</div>
-          </div>
-          <div>
-            <div className="text-white/45">Total Paid</div>
-            <div className="mt-1 font-semibold text-white">{formatCurrency(totalPaid)}</div>
-          </div>
-          <div>
-            <div className="text-white/45">Outstanding</div>
-            <div className="mt-1 font-semibold text-amber-200">{formatCurrency(outstandingBalance)}</div>
-          </div>
-        </div>
-
-        <form
-          className="mt-6 space-y-4"
-          onSubmit={async (e) => {
-            e.preventDefault();
-            if (!orderId) return;
-
-            setSubmitError(null);
-            setIsSubmitting(true);
-
-            try {
-              const response = await fetch(`/api/admin/orders/${orderId}/payments`, {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                  paymentDate,
-                  paymentMode,
-                  amount,
-                }),
-              });
-
-              const data = (await response.json()) as ApiResponse;
-
-              if (!response.ok || !data.ok) {
-                setSubmitError(data.error || "Unable to add payment right now.");
-                return;
-              }
-
-              setAmount("");
-              setSubmitError(null);
-              onClose();
-              router.refresh();
-            } catch {
-              setSubmitError("Unable to add payment right now.");
-            } finally {
-              setIsSubmitting(false);
-            }
-          }}
-        >
-          <div>
-            <label className="mb-2 block text-sm text-white/70">Payment Date</label>
-            <input
-              type="date"
-              value={paymentDate}
-              onChange={(e) => setPaymentDate(e.target.value)}
-              className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white outline-none transition hover:border-white/20 focus:border-white/25"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="mb-2 block text-sm text-white/70">Payment Mode</label>
-            <div className="relative">
-              <select
-                value={paymentMode}
-                onChange={(e) => setPaymentMode(e.target.value)}
-                className="w-full appearance-none rounded-xl border border-white/10 bg-black/40 px-4 py-3 pr-12 text-sm text-white outline-none transition hover:border-white/20 focus:border-white/25"
-              >
-                <option value="CASH">Cash</option>
-                <option value="CARD">Card Payment</option>
-                <option value="BANK_TRANSFER">Bank Transfer</option>
-                <option value="QR">QR Payment</option>
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/60">▾</div>
-            </div>
-          </div>
-
-          <div>
-            <label className="mb-2 block text-sm text-white/70">Amount (RM)</label>
-            <input
-              type="number"
-              min="0"
-              step="1"
-              max={maxPayable}
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="0"
-              className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/30 hover:border-white/20 focus:border-white/25"
-              required
-            />
-            <p className="mt-2 text-xs text-white/45">Maximum payable now: {formatCurrency(maxPayable)}</p>
-          </div>
-
-          {submitError ? (
-            <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
-              <div className="font-semibold uppercase tracking-[0.18em] text-red-300/80">Add Payment Failed</div>
-              <p className="mt-2 leading-6">{submitError}</p>
-            </div>
-          ) : null}
-
-          <div className="flex items-center justify-end gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={isSubmitting}
-              className="rounded-xl border border-white/15 px-4 py-2.5 text-sm text-white/75 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting || maxPayable <= 0}
-              className="rounded-xl border border-amber-500/40 px-4 py-2.5 text-sm text-amber-300 transition hover:bg-amber-500/10 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {isSubmitting ? "Saving..." : "Save Payment"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-
 function UploadConfirmModal({
   isOpen,
   mode,
@@ -1188,7 +1023,6 @@ export function OrderTable({
   const [customerCancelOrderId, setCustomerCancelOrderId] = useState<string | null>(null);
   const [releaseOrderId, setReleaseOrderId] = useState<string | null>(null);
   const [uploadModal, setUploadModal] = useState<UploadModalState>(null);
-  const [addPaymentOrder, setAddPaymentOrder] = useState<OrderWithRelations | null>(null);
 
   return (
     <>
@@ -1450,16 +1284,6 @@ export function OrderTable({
                             </Link>
                           ) : null}
 
-                          {customOrder && !["COMPLETED", "CANCELLED"].includes(order.status) && getOrderOutstandingBalance(order) > 0 ? (
-                            <button
-                              type="button"
-                              onClick={() => setAddPaymentOrder(order)}
-                              className="w-full rounded-xl border border-amber-500/40 px-3 py-2 text-center text-sm whitespace-normal text-amber-300 transition hover:bg-amber-500/10"
-                            >
-                              Add Payment
-                            </button>
-                          ) : null}
-
                           {isAdminCreatedOrder && ["FILE_RECEIVED", "IN_PROGRESS", "AWAITING_PAYMENT", "PAID"].includes(order.status) ? (
                             <button
                               type="button"
@@ -1622,15 +1446,6 @@ export function OrderTable({
         isOpen={releaseOrderId !== null}
         orderId={releaseOrderId}
         onClose={() => setReleaseOrderId(null)}
-      />
-
-      <AddPaymentModal
-        isOpen={addPaymentOrder !== null}
-        orderId={addPaymentOrder?.id || null}
-        grandTotal={addPaymentOrder ? getCustomOrderGrandTotal(addPaymentOrder) : 0}
-        totalPaid={addPaymentOrder ? getOrderTotalPaid(addPaymentOrder) : 0}
-        outstandingBalance={addPaymentOrder ? getOrderOutstandingBalance(addPaymentOrder) : 0}
-        onClose={() => setAddPaymentOrder(null)}
       />
 
       <UploadConfirmModal
