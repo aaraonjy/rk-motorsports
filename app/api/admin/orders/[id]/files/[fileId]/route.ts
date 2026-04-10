@@ -38,6 +38,10 @@ export async function GET(
       access: "private",
     });
 
+    if (!result) {
+      return NextResponse.json({ message: "Blob file not found" }, { status: 404 });
+    }
+
     const contentType =
       file.mimeType ||
       result.headers.get("content-type") ||
