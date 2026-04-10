@@ -9,6 +9,7 @@ import {
   OrderFile,
   OrderItem,
   OrderRevision,
+  CreditNote,
   Payment,
   Product,
   User,
@@ -52,6 +53,7 @@ export type OrderWithRelations = Order & {
   totalPaid?: number | null;
   outstandingBalance?: number | null;
   payments?: Payment[];
+  creditNote?: CreditNote | null;
 };
 
 type UploadModalState =
@@ -156,6 +158,26 @@ function getPaymentModeLabel(value?: string | null) {
       return "Bank Transfer";
     case "QR":
       return "QR Payment";
+    default:
+      return value || "-";
+  }
+}
+
+
+function getCreditNoteReasonLabel(value?: string | null) {
+  switch (value) {
+    case "CUSTOMER_CANCEL_ORDER":
+      return "Customer Cancel Order";
+    case "PRICING_CORRECTION":
+      return "Pricing Correction";
+    case "OVERCHARGE_ADJUSTMENT":
+      return "Overcharge Adjustment";
+    case "DUPLICATE_INVOICE":
+      return "Duplicate Invoice";
+    case "SERVICE_NOT_PROCEEDED":
+      return "Service Not Proceeded";
+    case "OTHER":
+      return "Other";
     default:
       return value || "-";
   }
@@ -708,6 +730,96 @@ function ReleaseOrderModal({
 }
 
 
+
+function CreateCreditNoteModal({
+  isOpen,
+  orderId,
+  onClose,
+}: {
+  isOpen: boolean;
+  orderId: string | null;
+  onClose: () => void;
+}) {
+  const [reasonType, setReasonType] = useState("CUSTOMER_CANCEL_ORDER");
+  const [remarks, setRemarks] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  if (!isOpen || !orderId) return null;
+
+  return (
+    <div className="fixed inset-0 z-[116] flex items-center justify-center bg-black/70 px-4">
+      <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-zinc-950 p-6 shadow-2xl">
+        <div>
+          <h3 className="text-lg font-semibold text-white">Create Credit Note</h3>
+          <p className="mt-1 text-sm text-white/50">
+            This will create a full Credit Note for the completed order. Payment records will remain unchanged.
+          </p>
+        </div>
+
+        <form
+          action={`/api/admin/orders/${orderId}/credit-note`}
+          method="post"
+          className="mt-5 space-y-4"
+          onSubmit={() => setIsSubmitting(true)}
+        >
+          <div>
+            <label className="mb-2 block text-sm text-white/70">Reason Type</label>
+            <div className="relative">
+              <select
+                name="reasonType"
+                value={reasonType}
+                onChange={(e) => setReasonType(e.target.value)}
+                className="w-full appearance-none rounded-xl border border-white/10 bg-black/40 px-4 py-3 pr-12 text-sm text-white outline-none transition hover:border-white/20 focus:border-white/25"
+                disabled={isSubmitting}
+              >
+                <option value="CUSTOMER_CANCEL_ORDER">Customer Cancel Order</option>
+                <option value="PRICING_CORRECTION">Pricing Correction</option>
+                <option value="OVERCHARGE_ADJUSTMENT">Overcharge Adjustment</option>
+                <option value="DUPLICATE_INVOICE">Duplicate Invoice</option>
+                <option value="SERVICE_NOT_PROCEEDED">Service Not Proceeded</option>
+                <option value="OTHER">Other</option>
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/60">▾</div>
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm text-white/70">Remarks {reasonType === "OTHER" ? <span className="text-red-300">*</span> : <span className="text-white/40">(optional)</span>}</label>
+            <textarea
+              name="reasonRemarks"
+              value={remarks}
+              onChange={(e) => setRemarks(e.target.value)}
+              placeholder="Enter Credit Note remarks"
+              required={reasonType === "OTHER"}
+              className="min-h-[110px] w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/30 hover:border-white/20 focus:border-white/25 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={isSubmitting}
+            />
+          </div>
+
+          <div className="flex items-center justify-end gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isSubmitting}
+              className="rounded-xl border border-white/15 px-4 py-2.5 text-sm text-white/75 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Cancel
+            </button>
+
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="rounded-xl border border-red-500/40 px-4 py-2.5 text-sm text-red-300 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isSubmitting ? "Creating..." : "Create Credit Note"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 function UploadConfirmModal({
   isOpen,
   mode,
@@ -1060,6 +1172,7 @@ export function OrderTable({
   const [cancelOrderId, setCancelOrderId] = useState<string | null>(null);
   const [customerCancelOrderId, setCustomerCancelOrderId] = useState<string | null>(null);
   const [releaseOrderId, setReleaseOrderId] = useState<string | null>(null);
+  const [createCreditNoteOrderId, setCreateCreditNoteOrderId] = useState<string | null>(null);
   const [uploadModal, setUploadModal] = useState<UploadModalState>(null);
 
   return (
@@ -1223,6 +1336,13 @@ export function OrderTable({
                           <div className="mt-1 text-white/40">
                             This request could not be processed after review. Please contact us for clarification.
                           </div>
+                        </div>
+                      ) : null}
+
+                      {admin && order.creditNote ? (
+                        <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+                          <div className="font-semibold">Credited by: {order.creditNote.cnNo}</div>
+                          <div className="mt-1 text-red-200/80">Reason: {getCreditNoteReasonLabel(order.creditNote.reasonType)}</div>
                         </div>
                       ) : null}
 
@@ -1400,6 +1520,31 @@ export function OrderTable({
                             </span>
                           ) : null}
 
+                          {admin && order.status === "COMPLETED" && !order.creditNote ? (
+                            <button
+                              type="button"
+                              onClick={() => setCreateCreditNoteOrderId(order.id)}
+                              className="w-full rounded-xl border border-red-500/40 px-3 py-2 text-center text-sm whitespace-normal text-red-300 transition hover:bg-red-500/10"
+                            >
+                              Create Credit Note
+                            </button>
+                          ) : null}
+
+                          {admin && order.creditNote ? (
+                            <>
+                              <span className="inline-flex w-full min-h-[44px] items-center justify-center rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-center text-sm whitespace-normal text-red-300">
+                                Credited
+                              </span>
+                              <Link
+                                href={`/api/admin/credit-notes/${order.creditNote.id}`}
+                                className="inline-flex w-full min-h-[44px] flex-col items-center justify-center rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-center text-sm whitespace-normal leading-5 transition hover:bg-red-500/15 text-red-200"
+                              >
+                                <span>Download</span>
+                                <span>Credit Note</span>
+                              </Link>
+                            </>
+                          ) : null}
+
                           {(isAdminCreatedOrder || (!isAdminCreatedOrder && ["READY_FOR_DOWNLOAD", "COMPLETED"].includes(order.status))) ? (
                             <Link
                               href={`/api/admin/orders/${order.id}/invoice`}
@@ -1494,6 +1639,12 @@ export function OrderTable({
         isOpen={releaseOrderId !== null}
         orderId={releaseOrderId}
         onClose={() => setReleaseOrderId(null)}
+      />
+
+      <CreateCreditNoteModal
+        isOpen={createCreditNoteOrderId !== null}
+        orderId={createCreditNoteOrderId}
+        onClose={() => setCreateCreditNoteOrderId(null)}
       />
 
       <UploadConfirmModal

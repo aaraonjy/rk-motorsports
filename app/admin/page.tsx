@@ -103,6 +103,12 @@ function getAdminBanner(success?: string): BannerState {
         title: "Success",
         message: "Custom order updated successfully.",
       };
+    case "credit_note_created":
+      return {
+        tone: "success",
+        title: "Success",
+        message: "Credit Note created successfully.",
+      };
     default:
       return null;
   }

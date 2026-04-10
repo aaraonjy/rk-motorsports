@@ -41,6 +41,7 @@ export async function getRecentOrdersForUser(
         payments: {
           orderBy: { paymentDate: "asc" },
         },
+        creditNote: true,
       },
       orderBy: { createdAt: "desc" },
       skip,
@@ -242,6 +243,7 @@ export async function getAllOrders(filters?: AllOrdersOptions) {
         payments: {
           orderBy: { paymentDate: "asc" },
         },
+        creditNote: true,
       },
       orderBy: { createdAt: "desc" },
       skip,

@@ -19,3 +19,11 @@ export function generateOrderNumber() {
   const r = Math.floor(1000 + Math.random() * 9000);
   return `RK-${p}-${r}`;
 }
+
+
+export function generateCreditNoteNumber() {
+  const d = new Date();
+  const p = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
+  const r = Math.floor(1000 + Math.random() * 9000);
+  return `RK-CN-${p}-${r}`;
+}

@@ -71,8 +71,10 @@ model User {
   createdAt          DateTime       @default(now())
   updatedAt          DateTime       @updatedAt
   orders             Order[]        @relation("CustomerOrders")
-  adminCreatedOrders Order[]        @relation("AdminCreatedOrders")
-  notifications      Notification[]
+  adminCreatedOrders      Order[]        @relation("AdminCreatedOrders")
+  creditNotes            CreditNote[]    @relation("CustomerCreditNotes")
+  adminCreatedCreditNotes CreditNote[]   @relation("AdminCreatedCreditNotes")
+  notifications          Notification[]
 }
 
 model VehicleBrand {
@@ -181,6 +183,7 @@ model Order {
   revisions              OrderRevision[]
   notifications          Notification[]
   payments               Payment[]
+  creditNote             CreditNote?
 
   @@index([createdByAdminId])
   @@index([orderType])
@@ -252,6 +255,47 @@ model OrderRevision {
 
   @@unique([orderId, revisionNo, revisionTarget])
   @@index([orderId, createdAt])
+}
+
+
+model CreditNote {
+  id                   String           @id @default(cuid())
+  cnNo                 String           @unique
+  cnDate               DateTime         @default(now())
+  orderId              String           @unique
+  customerId           String
+  referenceOrderNumber String
+  reasonType           String
+  reasonRemarks        String?
+  amount               Int
+  createdByAdminId     String
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+
+  order                Order            @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  customer             User             @relation("CustomerCreditNotes", fields: [customerId], references: [id], onDelete: Cascade)
+  createdByAdmin       User             @relation("AdminCreatedCreditNotes", fields: [createdByAdminId], references: [id], onDelete: Restrict)
+  items                CreditNoteItem[]
+
+  @@index([customerId])
+  @@index([createdByAdminId])
+  @@index([cnDate])
+}
+
+model CreditNoteItem {
+  id           String     @id @default(cuid())
+  creditNoteId String
+  description  String
+  qty          Int        @default(1)
+  uom          String?
+  unitPrice    Int
+  lineTotal    Int
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  creditNote   CreditNote @relation(fields: [creditNoteId], references: [id], onDelete: Cascade)
+
+  @@index([creditNoteId])
 }
 
 model Notification {
