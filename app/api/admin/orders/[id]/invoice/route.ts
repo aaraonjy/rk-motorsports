@@ -32,6 +32,23 @@ function isPresent(value?: string | null | number) {
   return !!String(value ?? "").trim();
 }
 
+function getPaymentStatus(totalPaid: number, outstandingBalance: number) {
+  if (Number(totalPaid || 0) <= 0) return "UNPAID";
+  if (Number(outstandingBalance || 0) <= 0) return "PAID";
+  return "PARTIALLY PAID";
+}
+
+function groupPaymentsByMode(payments: Array<{ paymentMode: string; amount: number }>) {
+  const grouped = new Map<string, number>();
+
+  for (const payment of payments) {
+    const key = String(payment.paymentMode || "").trim() || "Other";
+    grouped.set(key, (grouped.get(key) || 0) + Number(payment.amount || 0));
+  }
+
+  return Array.from(grouped.entries()).map(([mode, amount]) => ({ mode, amount }));
+}
+
 function drawText(
   page: PDFPage,
   font: PDFFont,
@@ -226,6 +243,61 @@ function buildStandardLines(order: {
   return lines;
 }
 
+function drawPaymentSummary(params: {
+  page: PDFPage;
+  font: PDFFont;
+  bold: PDFFont;
+  left: number;
+  right: number;
+  startY: number;
+  totalPaid: number;
+  outstandingBalance: number;
+  payments: Array<{ paymentMode: string; amount: number }>;
+}) {
+  const { page, font, bold, left, right, startY, totalPaid, outstandingBalance, payments } = params;
+  const paymentStatus = getPaymentStatus(totalPaid, outstandingBalance);
+  const groupedPayments = groupPaymentsByMode(payments);
+  const labelX = right - 190;
+  const valueX = right - 80;
+
+  let y = startY;
+
+  page.drawLine({
+    start: { x: left, y },
+    end: { x: right, y },
+    thickness: 1,
+    color: rgb(0.85, 0.85, 0.85),
+  });
+
+  y -= 22;
+  drawText(page, font, bold, "Payment Summary", left, y, 10, true);
+
+  y -= 20;
+  drawText(page, font, bold, "Payment Status:", labelX, y, 10, true);
+  drawText(page, font, bold, paymentStatus, valueX, y, 10);
+
+  y -= 18;
+  drawText(page, font, bold, "Total Paid:", labelX, y, 10, true);
+  drawText(page, font, bold, formatMoney(totalPaid), valueX, y, 10);
+
+  y -= 18;
+  drawText(page, font, bold, "Outstanding:", labelX, y, 10, true);
+  drawText(page, font, bold, formatMoney(outstandingBalance), valueX, y, 10);
+
+  if (groupedPayments.length > 0) {
+    y -= 24;
+    drawText(page, font, bold, "Payment Breakdown:", left, y, 10, true);
+    y -= 14;
+
+    for (const payment of groupedPayments) {
+      drawText(page, font, bold, `${payment.mode}: ${formatMoney(payment.amount)}`, left + 10, y, 9);
+      y -= 12;
+    }
+  }
+
+  return y;
+}
+
 export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }) {
   try {
     const user = await getSessionUser();
@@ -242,6 +314,9 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
         user: true,
         customItems: {
           orderBy: { createdAt: "asc" },
+        },
+        payments: {
+          orderBy: { paymentDate: "asc" },
         },
       },
     });
@@ -297,24 +372,27 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
 
     if (isCustomOrder) {
       const descX = left + 10;
-      const qtyX = right - 220;
-      const unitX = right - 155;
+      const qtyX = right - 245;
+      const uomX = right - 200;
+      const unitX = right - 145;
       const totalX = right - 80;
 
       drawText(page, font, bold, "Description", descX, headerY + 9, 10, true);
       drawText(page, font, bold, "Qty", qtyX, headerY + 9, 10, true);
+      drawText(page, font, bold, "UOM", uomX, headerY + 9, 10, true);
       drawText(page, font, bold, "Unit Price", unitX, headerY + 9, 10, true);
       drawText(page, font, bold, "Total", totalX, headerY + 9, 10, true);
 
       let y = headerY - 24;
       const rowHeight = 22;
 
-      const titleLines = wrapText(order.customTitle || "-", 58);
+      const titleLines = wrapText(order.customTitle || "-", 52);
       for (const line of titleLines) {
         drawText(page, font, bold, line, descX, y, 9, false);
         y -= 11;
       }
       drawText(page, font, bold, "1", qtyX, headerY - 18, 9);
+      drawText(page, font, bold, "-", uomX, headerY - 18, 9);
       drawText(page, font, bold, formatMoney(order.customGrandTotal ?? order.totalAmount), unitX, headerY - 18, 9);
       drawText(page, font, bold, formatMoney(order.customGrandTotal ?? order.totalAmount), totalX, headerY - 18, 9);
 
@@ -331,13 +409,14 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
         y -= 14;
 
         for (const item of order.customItems) {
-          if (y < 120) break;
-          const itemLines = wrapText(item.description, 48);
+          if (y < 180) break;
+          const itemLines = wrapText(item.description, 40);
           drawText(page, font, bold, itemLines[0], descX + 8, y, 9);
           if (itemLines[1]) {
             drawText(page, font, bold, itemLines[1], descX + 8, y - 10, 9);
           }
           drawText(page, font, bold, String(item.qty), qtyX, y, 9);
+          drawText(page, font, bold, item.uom || "-", uomX, y, 9);
           drawText(page, font, bold, formatMoney(item.unitPrice), unitX, y, 9);
           drawText(page, font, bold, formatMoney(item.lineTotal), totalX, y, 9);
           y -= itemLines.length > 1 ? rowHeight + 10 : rowHeight;
@@ -364,8 +443,21 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
       drawText(page, font, bold, "Grand Total:", rightColumnX - 110, y, 12, true);
       drawText(page, font, bold, formatMoney(order.customGrandTotal ?? order.totalAmount), rightColumnX, y, 12, true);
 
+      y -= 28;
+      y = drawPaymentSummary({
+        page,
+        font,
+        bold,
+        left,
+        right,
+        startY: y,
+        totalPaid: order.totalPaid ?? 0,
+        outstandingBalance: order.outstandingBalance ?? 0,
+        payments: order.payments,
+      });
+
       if (isPresent(order.internalRemarks)) {
-        y -= 40;
+        y -= 28;
         drawText(page, font, bold, "Remarks:", left, y, 10, true);
         y -= 14;
         for (const line of wrapText(order.internalRemarks || "", 82)) {
@@ -404,7 +496,20 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
       drawText(page, font, bold, "Grand Total:", rightColumnX - 110, y, 12, true);
       drawText(page, font, bold, formatMoney(order.totalAmount), rightColumnX, y, 12, true);
 
-      y -= 54;
+      y -= 28;
+      y = drawPaymentSummary({
+        page,
+        font,
+        bold,
+        left,
+        right,
+        startY: y,
+        totalPaid: order.totalPaid ?? 0,
+        outstandingBalance: order.outstandingBalance ?? 0,
+        payments: order.payments,
+      });
+
+      y -= 28;
       drawText(page, font, bold, "Thank you for your business.", left, y, 10);
       y -= 14;
       drawText(page, font, bold, "We appreciate your support and trust in RK Motorsports.", left, y, 10);
