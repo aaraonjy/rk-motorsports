@@ -288,6 +288,12 @@ function drawPaymentSummary(params: {
 
   y -= 22;
   drawText(page, font, bold, "Payment Summary", labelX, y, 10, true);
+  page.drawLine({
+    start: { x: labelX, y: y - 3 },
+    end: { x: labelX + 95, y: y - 3 },
+    thickness: 0.8,
+    color: rgb(0, 0, 0),
+  });
 
   y -= 20;
   drawText(page, font, bold, "Payment Status:", labelX, y, 10, true);
@@ -389,18 +395,14 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
 
     if (isCustomOrder) {
       const descX = left + 10;
-      const qtyX = right - 125;
-      const uomX = right - 80;
       const itemQtyX = right - 245;
       const itemUomX = right - 200;
       const itemUnitX = right - 145;
       const itemTotalX = right - 80;
 
       drawText(page, font, bold, "Description", descX, headerY + 9, 10, true);
-      drawText(page, font, bold, "Qty", qtyX, headerY + 9, 10, true);
-      drawText(page, font, bold, "UOM", uomX, headerY + 9, 10, true);
 
-      let y = headerY - 24;
+      let y = headerY - 30;
       const rowHeight = 22;
 
       const titleLines = wrapText(order.customTitle || "-", 58);
@@ -408,9 +410,6 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
         drawText(page, font, bold, line, descX, y, 9, false);
         y -= 11;
       }
-      drawText(page, font, bold, "1", qtyX, headerY - 18, 9);
-      drawText(page, font, bold, "-", uomX, headerY - 18, 9);
-
       y -= 8;
 
       if (isPresent(order.vehicleNo)) {
