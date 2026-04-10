@@ -118,6 +118,7 @@ export function CustomOrderForm({
       : [createEmptyRow()]
   );
   const [submitError, setSubmitError] = useState("");
+  const [supportingFiles, setSupportingFiles] = useState<File[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const normalizedRows = useMemo(
@@ -187,6 +188,36 @@ export function CustomOrderForm({
     });
   }
 
+  function handleSupportingFilesChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const selectedFiles = Array.from(event.target.files || []);
+
+    if (selectedFiles.length === 0) return;
+
+    const combinedFiles = [...supportingFiles, ...selectedFiles];
+
+    if (combinedFiles.length > 5) {
+      setSubmitError("Maximum 5 supporting files are allowed.");
+      event.target.value = "";
+      return;
+    }
+
+    const totalSize = combinedFiles.reduce((sum, file) => sum + file.size, 0);
+    if (totalSize > 25 * 1024 * 1024) {
+      setSubmitError("Total supporting file size must not exceed 25MB.");
+      event.target.value = "";
+      return;
+    }
+
+    setSubmitError("");
+    setSupportingFiles(combinedFiles);
+    event.target.value = "";
+  }
+
+  function removeSupportingFile(indexToRemove: number) {
+    setSupportingFiles((prev) => prev.filter((_, index) => index !== indexToRemove));
+    setSubmitError("");
+  }
+
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSubmitError("");
@@ -218,30 +249,43 @@ export function CustomOrderForm({
       return;
     }
 
+    if (supportingFiles.length > 5) {
+      setSubmitError("Maximum 5 supporting files are allowed.");
+      return;
+    }
+
+    const supportingFilesTotalSize = supportingFiles.reduce((sum, file) => sum + file.size, 0);
+    if (supportingFilesTotalSize > 25 * 1024 * 1024) {
+      setSubmitError("Total supporting file size must not exceed 25MB.");
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
+      const formData = new FormData();
+      formData.append("orderType", "CUSTOM_ORDER");
+      formData.append("customerId", customerId);
+      formData.append("customTitle", title.trim());
+      formData.append("vehicleNo", vehicleNo.trim());
+      formData.append("internalRemarks", internalRemarks.trim());
+      formData.append("customSubtotal", String(subtotal));
+      formData.append("customDiscount", String(discountAmount));
+      formData.append("customGrandTotal", String(grandTotal));
+      formData.append("paymentDate", paymentDate);
+      formData.append("paymentMode", paymentMode);
+      formData.append("paymentAmount", String(projectedPaymentAmount));
+      formData.append("items", JSON.stringify(items));
+
+      supportingFiles.forEach((file) => {
+        formData.append("supportingFiles", file);
+      });
+
       const response = await fetch(
         isEditMode ? `/api/admin/orders/${orderId}` : "/api/admin/orders",
         {
           method: isEditMode ? "PUT" : "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            orderType: "CUSTOM_ORDER",
-            customerId,
-            customTitle: title.trim(),
-            vehicleNo: vehicleNo.trim(),
-            internalRemarks: internalRemarks.trim(),
-            customSubtotal: subtotal,
-            customDiscount: discountAmount,
-            customGrandTotal: grandTotal,
-            paymentDate,
-            paymentMode,
-            paymentAmount: projectedPaymentAmount,
-            items,
-          }),
+          body: formData,
         }
       );
 
@@ -315,6 +359,45 @@ export function CustomOrderForm({
               onChange={(e) => setInternalRemarks(e.target.value)}
               placeholder="Internal admin note. This does not need to appear on the customer-facing invoice."
             />
+          </div>
+
+          <div>
+            <label className="label-rk">Supporting Documents (optional)</label>
+            <input
+              type="file"
+              accept="image/*,video/*"
+              multiple
+              onChange={handleSupportingFilesChange}
+              className="input-rk file:mr-4 file:rounded-lg file:border-0 file:bg-amber-500/10 file:px-3 file:py-2 file:text-sm file:font-medium file:text-amber-200"
+            />
+            <p className="mt-2 text-xs text-white/45">
+              Upload up to 5 image/video files, with a total combined size of 25MB.
+            </p>
+
+            {supportingFiles.length ? (
+              <div className="mt-4 space-y-2">
+                {supportingFiles.map((file, index) => (
+                  <div
+                    key={`${file.name}-${file.size}-${index}`}
+                    className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white/80"
+                  >
+                    <div className="min-w-0">
+                      <div className="truncate font-medium text-white">{file.name}</div>
+                      <div className="mt-1 text-xs text-white/45">
+                        {(file.size / (1024 * 1024)).toFixed(2)} MB
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeSupportingFile(index)}
+                      className="rounded-xl border border-white/15 px-3 py-2 text-sm text-white/70 transition hover:bg-white/10 hover:text-white"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : null}
           </div>
         </div>
 

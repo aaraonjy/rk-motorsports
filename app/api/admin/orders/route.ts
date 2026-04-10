@@ -4,6 +4,7 @@ import { getSessionUser } from "@/lib/auth";
 import { generateOrderNumber } from "@/lib/utils";
 import { createAdminNotification } from "@/lib/notifications";
 import { calculatePaymentSummary } from "@/lib/payment-summary";
+import { saveFile } from "@/lib/storage";
 
 type CustomOrderItemPayload = {
   description: string;
@@ -13,20 +14,6 @@ type CustomOrderItemPayload = {
   uom?: string | null;
 };
 
-type CreateCustomOrderPayload = {
-  orderType?: string;
-  customerId?: string;
-  customTitle?: string;
-  vehicleNo?: string;
-  internalRemarks?: string;
-  customSubtotal?: number;
-  customDiscount?: number;
-  customGrandTotal?: number;
-  paymentDate?: string;
-  paymentMode?: string;
-  paymentAmount?: number | string;
-  items?: CustomOrderItemPayload[];
-};
 
 function sanitizeWholeNumber(value: unknown) {
   const parsed = Number(value);
@@ -36,6 +23,10 @@ function sanitizeWholeNumber(value: unknown) {
 
 function isAllowedPaymentMode(value: string) {
   return ["CASH", "CARD", "BANK_TRANSFER", "QR"].includes(value);
+}
+
+function isAllowedSupportingFile(file: File) {
+  return file.type.startsWith("image/") || file.type.startsWith("video/");
 }
 
 export async function POST(req: Request) {
@@ -56,22 +47,24 @@ export async function POST(req: Request) {
       );
     }
 
-    const body = (await req.json()) as CreateCustomOrderPayload;
+    const form = await req.formData();
+    const orderType = String(form.get("orderType") || "").trim();
 
-    if (body.orderType !== "CUSTOM_ORDER") {
+    if (orderType !== "CUSTOM_ORDER") {
       return NextResponse.json(
         { ok: false, error: "Unsupported order type." },
         { status: 400 }
       );
     }
 
-    const customerId = String(body.customerId || "").trim();
-    const customTitle = String(body.customTitle || "").trim();
-    const vehicleNo = String(body.vehicleNo || "").trim().toUpperCase();
-    const internalRemarks = String(body.internalRemarks || "").trim();
-    const items = Array.isArray(body.items) ? body.items : [];
-    const paymentMode = String(body.paymentMode || "CASH").trim().toUpperCase();
-    const paymentAmount = sanitizeWholeNumber(body.paymentAmount);
+    const customerId = String(form.get("customerId") || "").trim();
+    const customTitle = String(form.get("customTitle") || "").trim();
+    const vehicleNo = String(form.get("vehicleNo") || "").trim().toUpperCase();
+    const internalRemarks = String(form.get("internalRemarks") || "").trim();
+    const itemsRaw = String(form.get("items") || "[]");
+    const items = JSON.parse(itemsRaw) as CustomOrderItemPayload[];
+    const paymentMode = String(form.get("paymentMode") || "CASH").trim().toUpperCase();
+    const paymentAmount = sanitizeWholeNumber(form.get("paymentAmount"));
 
     if (!customerId) {
       return NextResponse.json(
@@ -134,15 +127,45 @@ export async function POST(req: Request) {
       (sum, item) => sum + item.lineTotal,
       0
     );
-    const customDiscount = Math.max(0, sanitizeWholeNumber(body.customDiscount));
+    const customDiscount = Math.max(0, sanitizeWholeNumber(form.get("customDiscount")));
     const calculatedGrandTotal = Math.max(calculatedSubtotal - customDiscount, 0);
 
-    const customSubtotal = sanitizeWholeNumber(body.customSubtotal);
-    const customGrandTotal = sanitizeWholeNumber(body.customGrandTotal);
+    const customSubtotal = sanitizeWholeNumber(form.get("customSubtotal"));
+    const customGrandTotal = sanitizeWholeNumber(form.get("customGrandTotal"));
 
     if (customSubtotal !== calculatedSubtotal || customGrandTotal !== calculatedGrandTotal) {
       return NextResponse.json(
         { ok: false, error: "Order totals are invalid. Please refresh and try again." },
+        { status: 400 }
+      );
+    }
+
+    const supportingFiles = form
+      .getAll("supportingFiles")
+      .filter((value): value is File => value instanceof File && value.size > 0);
+
+    if (supportingFiles.length > 5) {
+      return NextResponse.json(
+        { ok: false, error: "Maximum 5 supporting files are allowed." },
+        { status: 400 }
+      );
+    }
+
+    const supportingFilesTotalSize = supportingFiles.reduce(
+      (sum, file) => sum + file.size,
+      0
+    );
+
+    if (supportingFilesTotalSize > 25 * 1024 * 1024) {
+      return NextResponse.json(
+        { ok: false, error: "Total supporting file size must not exceed 25MB." },
+        { status: 400 }
+      );
+    }
+
+    if (!supportingFiles.every(isAllowedSupportingFile)) {
+      return NextResponse.json(
+        { ok: false, error: "Supporting documents only allow image or video files." },
         { status: 400 }
       );
     }
@@ -161,7 +184,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const paymentDateRaw = String(body.paymentDate || "").trim();
+    const paymentDateRaw = String(form.get("paymentDate") || "").trim();
     const paymentDate = paymentDateRaw ? new Date(paymentDateRaw) : new Date();
     if (paymentAmount > 0) {
       if (Number.isNaN(paymentDate.getTime())) {
@@ -177,6 +200,23 @@ export async function POST(req: Request) {
       paymentAmount > 0 ? [{ amount: paymentAmount }] : [],
       calculatedGrandTotal
     );
+
+    const supportingFilesToCreate: Array<{
+      kind: string;
+      fileName: string;
+      storagePath: string;
+      mimeType: string | null;
+    }> = [];
+
+    for (const file of supportingFiles) {
+      const savedFile = await saveFile(file, "custom-order-supporting-doc");
+      supportingFilesToCreate.push({
+        kind: "SUPPORTING_DOC",
+        fileName: savedFile.fileName,
+        storagePath: savedFile.storagePath,
+        mimeType: savedFile.mimeType,
+      });
+    }
 
     const requestDetailsLines = [
       `Order Type: Custom Order`,
@@ -210,6 +250,11 @@ export async function POST(req: Request) {
         customItems: {
           create: normalizedItems,
         },
+        files: supportingFilesToCreate.length
+          ? {
+              create: supportingFilesToCreate,
+            }
+          : undefined,
         payments:
           paymentAmount > 0
             ? {

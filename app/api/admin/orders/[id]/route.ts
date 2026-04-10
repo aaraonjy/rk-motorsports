@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
 import { calculatePaymentSummary } from "@/lib/payment-summary";
+import { saveFile } from "@/lib/storage";
 
 type CustomOrderItemPayload = {
   description: string;
@@ -11,20 +12,6 @@ type CustomOrderItemPayload = {
   uom?: string | null;
 };
 
-type UpdateCustomOrderPayload = {
-  orderType?: string;
-  customerId?: string;
-  customTitle?: string;
-  vehicleNo?: string;
-  internalRemarks?: string;
-  customSubtotal?: number;
-  customDiscount?: number;
-  customGrandTotal?: number;
-  paymentDate?: string;
-  paymentMode?: string;
-  paymentAmount?: number | string;
-  items?: CustomOrderItemPayload[];
-};
 
 function sanitizeWholeNumber(value: unknown) {
   const parsed = Number(value);
@@ -34,6 +21,10 @@ function sanitizeWholeNumber(value: unknown) {
 
 function isAllowedPaymentMode(value: string) {
   return ["CASH", "CARD", "BANK_TRANSFER", "QR"].includes(value);
+}
+
+function isAllowedSupportingFile(file: File) {
+  return file.type.startsWith("image/") || file.type.startsWith("video/");
 }
 
 export async function PUT(
@@ -58,7 +49,7 @@ export async function PUT(
     }
 
     const { id } = await ctx.params;
-    const body = (await req.json()) as UpdateCustomOrderPayload;
+    const form = await req.formData();
 
     const order = await db.order.findUnique({
       where: { id },
@@ -88,14 +79,15 @@ export async function PUT(
       );
     }
 
-    const customerId = String(body.customerId || "").trim();
-    const customTitle = String(body.customTitle || "").trim();
-    const submittedVehicleNo = String(body.vehicleNo || "").trim().toUpperCase();
+    const customerId = String(form.get("customerId") || "").trim();
+    const customTitle = String(form.get("customTitle") || "").trim();
+    const submittedVehicleNo = String(form.get("vehicleNo") || "").trim().toUpperCase();
     const vehicleNo = submittedVehicleNo || order.vehicleNo || "";
-    const internalRemarks = String(body.internalRemarks || "").trim();
-    const items = Array.isArray(body.items) ? body.items : [];
-    const paymentMode = String(body.paymentMode || "CASH").trim().toUpperCase();
-    const paymentAmount = sanitizeWholeNumber(body.paymentAmount);
+    const internalRemarks = String(form.get("internalRemarks") || "").trim();
+    const itemsRaw = String(form.get("items") || "[]");
+    const items = JSON.parse(itemsRaw) as CustomOrderItemPayload[];
+    const paymentMode = String(form.get("paymentMode") || "CASH").trim().toUpperCase();
+    const paymentAmount = sanitizeWholeNumber(form.get("paymentAmount"));
 
     if (!customerId || customerId !== order.userId) {
       return NextResponse.json(
@@ -140,11 +132,11 @@ export async function PUT(
       (sum, item) => sum + item.lineTotal,
       0
     );
-    const customDiscount = Math.max(0, sanitizeWholeNumber(body.customDiscount));
+    const customDiscount = Math.max(0, sanitizeWholeNumber(form.get("customDiscount")));
     const calculatedGrandTotal = Math.max(calculatedSubtotal - customDiscount, 0);
 
-    const customSubtotal = sanitizeWholeNumber(body.customSubtotal);
-    const customGrandTotal = sanitizeWholeNumber(body.customGrandTotal);
+    const customSubtotal = sanitizeWholeNumber(form.get("customSubtotal"));
+    const customGrandTotal = sanitizeWholeNumber(form.get("customGrandTotal"));
 
     if (customSubtotal !== calculatedSubtotal || customGrandTotal !== calculatedGrandTotal) {
       return NextResponse.json(
@@ -158,6 +150,36 @@ export async function PUT(
     if (calculatedGrandTotal < existingTotalPaid) {
       return NextResponse.json(
         { ok: false, error: "Grand total cannot be lower than the total paid amount." },
+        { status: 400 }
+      );
+    }
+
+    const supportingFiles = form
+      .getAll("supportingFiles")
+      .filter((value): value is File => value instanceof File && value.size > 0);
+
+    if (supportingFiles.length > 5) {
+      return NextResponse.json(
+        { ok: false, error: "Maximum 5 supporting files are allowed." },
+        { status: 400 }
+      );
+    }
+
+    const supportingFilesTotalSize = supportingFiles.reduce(
+      (sum, file) => sum + file.size,
+      0
+    );
+
+    if (supportingFilesTotalSize > 25 * 1024 * 1024) {
+      return NextResponse.json(
+        { ok: false, error: "Total supporting file size must not exceed 25MB." },
+        { status: 400 }
+      );
+    }
+
+    if (!supportingFiles.every(isAllowedSupportingFile)) {
+      return NextResponse.json(
+        { ok: false, error: "Supporting documents only allow image or video files." },
         { status: 400 }
       );
     }
@@ -178,7 +200,7 @@ export async function PUT(
       );
     }
 
-    const paymentDateRaw = String(body.paymentDate || "").trim();
+    const paymentDateRaw = String(form.get("paymentDate") || "").trim();
     const paymentDate = paymentDateRaw ? new Date(paymentDateRaw) : new Date();
     if (paymentAmount > 0) {
       if (Number.isNaN(paymentDate.getTime())) {
@@ -207,6 +229,23 @@ export async function PUT(
       `New Payment Added: RM${paymentAmount}`,
       `Items: ${normalizedItems.length}`,
     ];
+
+    const supportingFilesToCreate: Array<{
+      kind: string;
+      fileName: string;
+      storagePath: string;
+      mimeType: string | null;
+    }> = [];
+
+    for (const file of supportingFiles) {
+      const savedFile = await saveFile(file, "custom-order-supporting-doc");
+      supportingFilesToCreate.push({
+        kind: "SUPPORTING_DOC",
+        fileName: savedFile.fileName,
+        storagePath: savedFile.storagePath,
+        mimeType: savedFile.mimeType,
+      });
+    }
 
     await db.$transaction(async (tx) => {
       await tx.customOrderItem.deleteMany({
