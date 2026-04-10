@@ -9,6 +9,7 @@ export async function GET(
 ) {
   try {
     const user = await getSessionUser();
+
     if (!user) {
       return NextResponse.redirect(new URL("/login", req.url), 303);
     }
@@ -20,7 +21,9 @@ export async function GET(
         id: fileId,
         orderId: id,
       },
-      include: { order: true },
+      include: {
+        order: true,
+      },
     });
 
     if (!file) {
@@ -37,7 +40,7 @@ export async function GET(
 
     const contentType =
       file.mimeType ||
-      result.contentType ||
+      result?.contentType ||
       "application/octet-stream";
 
     return new NextResponse(result.body, {
