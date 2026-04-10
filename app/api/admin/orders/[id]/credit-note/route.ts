@@ -3,6 +3,12 @@ import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { generateCreditNoteNumber } from "@/lib/utils";
 
+type ApiResponse = {
+  ok: boolean;
+  error?: string;
+  redirectTo?: string;
+};
+
 const ALLOWED_REASON_TYPES = [
   "CUSTOMER_CANCEL_ORDER",
   "PRICING_CORRECTION",
@@ -11,6 +17,17 @@ const ALLOWED_REASON_TYPES = [
   "SERVICE_NOT_PROCEEDED",
   "OTHER",
 ] as const;
+
+function respondCreditNote(req: Request, payload: ApiResponse, status = 200) {
+  const isClientSubmit = req.headers.get("x-rk-client-submit") === "1";
+
+  if (isClientSubmit) {
+    return NextResponse.json(payload, { status });
+  }
+
+  const redirectTo = payload.redirectTo || "/admin";
+  return NextResponse.redirect(new URL(redirectTo, req.url), 303);
+}
 
 function buildStandardCreditNoteDescription(order: {
   selectedTuneLabel?: string | null;
@@ -40,11 +57,11 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     const reasonRemarks = typeof reasonRemarksRaw === "string" && reasonRemarksRaw.trim() ? reasonRemarksRaw.trim() : null;
 
     if (!ALLOWED_REASON_TYPES.includes(reasonType as (typeof ALLOWED_REASON_TYPES)[number])) {
-      return NextResponse.redirect(new URL("/admin", req.url), 303);
+      return respondCreditNote(req, { ok: false, redirectTo: "/admin" }, 400);
     }
 
     if (reasonType === "OTHER" && !reasonRemarks) {
-      return NextResponse.redirect(new URL("/admin", req.url), 303);
+      return respondCreditNote(req, { ok: false, redirectTo: "/admin" }, 400);
     }
 
     const order = await db.order.findUnique({
@@ -57,11 +74,11 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     });
 
     if (!order) {
-      return NextResponse.redirect(new URL("/admin", req.url), 303);
+      return respondCreditNote(req, { ok: false, redirectTo: "/admin" }, 400);
     }
 
     if (order.status !== "COMPLETED" || order.creditNote) {
-      return NextResponse.redirect(new URL("/admin", req.url), 303);
+      return respondCreditNote(req, { ok: false, redirectTo: "/admin" }, 400);
     }
 
     const amount = order.orderType === "CUSTOM_ORDER"
@@ -69,7 +86,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       : Math.max(order.totalAmount || 0, 0);
 
     if (amount <= 0) {
-      return NextResponse.redirect(new URL("/admin", req.url), 303);
+      return respondCreditNote(req, { ok: false, redirectTo: "/admin" }, 400);
     }
 
     const items = order.orderType === "CUSTOM_ORDER" && order.customItems.length > 0
@@ -104,9 +121,9 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       },
     });
 
-    return NextResponse.redirect(new URL("/admin?success=credit_note_created", req.url), 303);
+    return respondCreditNote(req, { ok: true, redirectTo: "/admin?success=credit_note_created" });
   } catch (error) {
     console.error("POST /api/admin/orders/[id]/credit-note failed:", error);
-    return NextResponse.redirect(new URL("/login", req.url), 303);
+    return respondCreditNote(req, { ok: false, redirectTo: "/login", error: "Unable to create Credit Note right now." }, 500);
   }
 }

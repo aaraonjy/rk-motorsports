@@ -740,8 +740,10 @@ function CreateCreditNoteModal({
   orderId: string | null;
   onClose: () => void;
 }) {
+  const router = useRouter();
   const [reasonType, setReasonType] = useState("CUSTOMER_CANCEL_ORDER");
   const [remarks, setRemarks] = useState("");
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!isOpen || !orderId) return null;
@@ -760,7 +762,56 @@ function CreateCreditNoteModal({
           action={`/api/admin/orders/${orderId}/credit-note`}
           method="post"
           className="mt-5 space-y-4"
-          onSubmit={() => setIsSubmitting(true)}
+          onSubmit={async (e) => {
+            e.preventDefault();
+            setSubmitError(null);
+            setIsSubmitting(true);
+
+            try {
+              const formData = new FormData(e.currentTarget);
+              const response = await fetch(`/api/admin/orders/${orderId}/credit-note`, {
+                method: "POST",
+                body: formData,
+                headers: {
+                  "x-rk-client-submit": "1",
+                },
+              });
+
+              const contentType = response.headers.get("content-type") || "";
+
+              if (contentType.includes("application/json")) {
+                const data = (await response.json()) as ApiResponse;
+
+                if (!response.ok || !data.ok) {
+                  setSubmitError(data.error || "Unable to create Credit Note right now. Please try again.");
+                  return;
+                }
+
+                setRemarks("");
+                setReasonType("CUSTOMER_CANCEL_ORDER");
+                setSubmitError(null);
+                onClose();
+                router.push(data.redirectTo || "/admin");
+                router.refresh();
+                return;
+              }
+
+              if (!response.ok) {
+                setSubmitError("Unable to create Credit Note right now. Please try again.");
+                return;
+              }
+
+              setRemarks("");
+              setReasonType("CUSTOMER_CANCEL_ORDER");
+              setSubmitError(null);
+              onClose();
+              router.refresh();
+            } catch {
+              setSubmitError("Unable to create Credit Note right now. Please try again.");
+            } finally {
+              setIsSubmitting(false);
+            }
+          }}
         >
           <div>
             <label className="mb-2 block text-sm text-white/70">Reason Type</label>
@@ -796,10 +847,20 @@ function CreateCreditNoteModal({
             />
           </div>
 
+          {submitError ? (
+            <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
+              <div className="font-semibold uppercase tracking-[0.18em] text-red-300/80">Create Failed</div>
+              <p className="mt-2 leading-6">{submitError}</p>
+            </div>
+          ) : null}
+
           <div className="flex items-center justify-end gap-3">
             <button
               type="button"
-              onClick={onClose}
+              onClick={() => {
+                setSubmitError(null);
+                onClose();
+              }}
               disabled={isSubmitting}
               className="rounded-xl border border-white/15 px-4 py-2.5 text-sm text-white/75 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
             >
