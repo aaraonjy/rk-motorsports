@@ -91,6 +91,18 @@ function getAdminBanner(success?: string): BannerState {
         title: "Payment Outstanding",
         message: "Custom order cannot be completed until full payment is received.",
       };
+    case "custom_order_created":
+      return {
+        tone: "success",
+        title: "Success",
+        message: "Custom order created successfully.",
+      };
+    case "custom_order_updated":
+      return {
+        tone: "success",
+        title: "Success",
+        message: "Custom order updated successfully.",
+      };
     default:
       return null;
   }

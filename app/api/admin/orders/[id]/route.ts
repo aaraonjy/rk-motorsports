@@ -268,6 +268,12 @@ export async function PUT(
           customItems: {
             create: normalizedItems,
           },
+          files:
+            supportingFilesToCreate.length
+              ? {
+                  create: supportingFilesToCreate,
+                }
+              : undefined,
         },
       });
 
@@ -285,7 +291,7 @@ export async function PUT(
 
     return NextResponse.json({
       ok: true,
-      redirectTo: "/admin",
+      redirectTo: "/admin?success=custom_order_updated",
     });
   } catch (error) {
     console.error("PUT /api/admin/orders/[id] failed:", error);

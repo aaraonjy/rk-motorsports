@@ -281,7 +281,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       ok: true,
-      redirectTo: "/admin",
+      redirectTo: "/admin?success=custom_order_created",
     });
   } catch (error) {
     console.error("POST /api/admin/orders failed:", error);
