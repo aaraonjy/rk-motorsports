@@ -10,6 +10,10 @@ type EditOrderPageProps = {
   }>;
 };
 
+function formatDisplayDate(value: Date) {
+  return value.toLocaleDateString("en-GB");
+}
+
 export default async function AdminEditCustomOrderPage({
   params,
 }: EditOrderPageProps) {
@@ -32,6 +36,9 @@ export default async function AdminEditCustomOrderPage({
       },
       customItems: {
         orderBy: { createdAt: "asc" },
+      },
+      payments: {
+        orderBy: { paymentDate: "asc" },
       },
     },
   });
@@ -114,13 +121,23 @@ export default async function AdminEditCustomOrderPage({
             initialData={{
               orderId: order.id,
               customTitle: order.customTitle,
+              vehicleNo: order.vehicleNo,
               internalRemarks: order.internalRemarks,
               customDiscount: order.customDiscount,
+              totalPaid: order.totalPaid,
+              outstandingBalance: order.outstandingBalance,
+              payments: order.payments.map((payment) => ({
+                id: payment.id,
+                paymentDate: formatDisplayDate(payment.paymentDate),
+                paymentMode: payment.paymentMode,
+                amount: payment.amount,
+              })),
               items: order.customItems.map((item) => ({
                 id: item.id,
                 description: item.description,
                 qty: item.qty,
                 unitPrice: item.unitPrice,
+                uom: item.uom,
               })),
             }}
           />

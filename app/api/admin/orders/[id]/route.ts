@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
+import { calculatePaymentSummary } from "@/lib/payment-summary";
 
 type CustomOrderItemPayload = {
   description: string;
   qty: number;
-  uom?: string | null;
   unitPrice: number;
   lineTotal: number;
+  uom?: string | null;
 };
 
 type UpdateCustomOrderPayload = {
@@ -19,6 +20,9 @@ type UpdateCustomOrderPayload = {
   customSubtotal?: number;
   customDiscount?: number;
   customGrandTotal?: number;
+  paymentDate?: string;
+  paymentMode?: string;
+  paymentAmount?: number | string;
   items?: CustomOrderItemPayload[];
 };
 
@@ -26,6 +30,10 @@ function sanitizeWholeNumber(value: unknown) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed < 0) return 0;
   return Math.floor(parsed);
+}
+
+function isAllowedPaymentMode(value: string) {
+  return ["CASH", "CARD", "BANK_TRANSFER", "QR"].includes(value);
 }
 
 export async function PUT(
@@ -56,6 +64,13 @@ export async function PUT(
       where: { id },
       include: {
         customItems: true,
+        payments: {
+          orderBy: { paymentDate: "asc" },
+          select: {
+            id: true,
+            amount: true,
+          },
+        },
       },
     });
 
@@ -79,6 +94,8 @@ export async function PUT(
     const vehicleNo = submittedVehicleNo || order.vehicleNo || "";
     const internalRemarks = String(body.internalRemarks || "").trim();
     const items = Array.isArray(body.items) ? body.items : [];
+    const paymentMode = String(body.paymentMode || "CASH").trim().toUpperCase();
+    const paymentAmount = sanitizeWholeNumber(body.paymentAmount);
 
     if (!customerId || customerId !== order.userId) {
       return NextResponse.json(
@@ -98,16 +115,16 @@ export async function PUT(
       .map((item) => {
         const description = String(item.description || "").trim();
         const qty = Math.max(1, sanitizeWholeNumber(item.qty));
-        const uom = String(item.uom || "").trim();
         const unitPrice = Math.max(0, sanitizeWholeNumber(item.unitPrice));
         const lineTotal = qty * unitPrice;
+        const uom = String(item.uom || "").trim();
 
         return {
           description,
           qty,
-          uom: uom || null,
           unitPrice,
           lineTotal,
+          uom: uom || null,
         };
       })
       .filter((item) => item.description.length > 0);
@@ -136,6 +153,49 @@ export async function PUT(
       );
     }
 
+    const existingTotalPaid = order.payments.reduce((sum, payment) => sum + payment.amount, 0);
+
+    if (calculatedGrandTotal < existingTotalPaid) {
+      return NextResponse.json(
+        { ok: false, error: "Grand total cannot be lower than the total paid amount." },
+        { status: 400 }
+      );
+    }
+
+    if (paymentAmount > 0 && !isAllowedPaymentMode(paymentMode)) {
+      return NextResponse.json(
+        { ok: false, error: "Invalid payment mode." },
+        { status: 400 }
+      );
+    }
+
+    const currentOutstandingBalance = Math.max(calculatedGrandTotal - existingTotalPaid, 0);
+
+    if (paymentAmount > currentOutstandingBalance) {
+      return NextResponse.json(
+        { ok: false, error: "Payment amount cannot exceed the outstanding balance." },
+        { status: 400 }
+      );
+    }
+
+    const paymentDateRaw = String(body.paymentDate || "").trim();
+    const paymentDate = paymentDateRaw ? new Date(paymentDateRaw) : new Date();
+    if (paymentAmount > 0) {
+      if (Number.isNaN(paymentDate.getTime())) {
+        return NextResponse.json(
+          { ok: false, error: "Invalid payment date." },
+          { status: 400 }
+        );
+      }
+      paymentDate.setHours(0, 0, 0, 0);
+    }
+
+    const newPayments = [
+      ...order.payments.map((payment) => ({ amount: payment.amount })),
+      ...(paymentAmount > 0 ? [{ amount: paymentAmount }] : []),
+    ];
+    const paymentSummary = calculatePaymentSummary(newPayments, calculatedGrandTotal);
+
     const requestDetailsLines = [
       `Order Type: Custom Order`,
       `Title / Summary: ${customTitle}`,
@@ -144,6 +204,7 @@ export async function PUT(
       `Subtotal: RM${calculatedSubtotal}`,
       `Discount: RM${customDiscount}`,
       `Grand Total: RM${calculatedGrandTotal}`,
+      `New Payment Added: RM${paymentAmount}`,
       `Items: ${normalizedItems.length}`,
     ];
 
@@ -162,16 +223,25 @@ export async function PUT(
           customDiscount,
           customGrandTotal: calculatedGrandTotal,
           totalAmount: calculatedGrandTotal,
-          outstandingBalance: Math.max(
-            calculatedGrandTotal - (order.totalPaid || 0),
-            0
-          ),
+          totalPaid: paymentSummary.totalPaid,
+          outstandingBalance: paymentSummary.outstandingBalance,
           requestDetails: requestDetailsLines.join("\n"),
           customItems: {
             create: normalizedItems,
           },
         },
       });
+
+      if (paymentAmount > 0) {
+        await tx.payment.create({
+          data: {
+            orderId: order.id,
+            paymentDate,
+            paymentMode,
+            amount: paymentAmount,
+          },
+        });
+      }
     });
 
     return NextResponse.json({

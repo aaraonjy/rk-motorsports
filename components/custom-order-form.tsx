@@ -2,12 +2,22 @@
 
 import { useMemo, useState } from "react";
 
+type PaymentHistoryItem = {
+  id: string;
+  paymentDate: string;
+  paymentMode: string;
+  amount: number;
+};
+
 type CustomOrderInitialData = {
   orderId: string;
   customTitle: string | null;
   vehicleNo?: string | null;
   internalRemarks: string | null;
   customDiscount: number | null;
+  totalPaid?: number | null;
+  outstandingBalance?: number | null;
+  payments?: PaymentHistoryItem[];
   items: Array<{
     id: string;
     description: string;
@@ -64,6 +74,21 @@ function formatCurrency(value: number) {
   }).format(value);
 }
 
+function getPaymentModeLabel(value: string) {
+  switch (value) {
+    case "CASH":
+      return "Cash";
+    case "CARD":
+      return "Card Payment";
+    case "BANK_TRANSFER":
+      return "Bank Transfer";
+    case "QR":
+      return "QR Payment";
+    default:
+      return value || "-";
+  }
+}
+
 export function CustomOrderForm({
   customerId,
   orderId,
@@ -73,10 +98,14 @@ export function CustomOrderForm({
   errorTitle = "Create Order Failed",
 }: CustomOrderFormProps) {
   const isEditMode = !!orderId;
+  const existingTotalPaid = Number(initialData?.totalPaid ?? 0);
   const [title, setTitle] = useState(initialData?.customTitle || "");
   const [vehicleNo, setVehicleNo] = useState(initialData?.vehicleNo || "");
   const [internalRemarks, setInternalRemarks] = useState(initialData?.internalRemarks || "");
   const [discount, setDiscount] = useState(String(initialData?.customDiscount ?? 0));
+  const [paymentDate, setPaymentDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [paymentMode, setPaymentMode] = useState("CASH");
+  const [paymentAmount, setPaymentAmount] = useState("0");
   const [rows, setRows] = useState<CustomLineItem[]>(
     initialData?.items?.length
       ? initialData.items.map((item) => ({
@@ -119,6 +148,14 @@ export function CustomOrderForm({
   );
 
   const grandTotal = Math.max(subtotal - discountAmount, 0);
+  const normalizedPaymentAmount = useMemo(
+    () => Math.max(0, parseWholeNumber(paymentAmount || "0")),
+    [paymentAmount]
+  );
+  const maxNewPayment = Math.max(grandTotal - existingTotalPaid, 0);
+  const projectedPaymentAmount = Math.min(normalizedPaymentAmount, maxNewPayment);
+  const projectedTotalPaid = existingTotalPaid + projectedPaymentAmount;
+  const projectedOutstandingBalance = Math.max(grandTotal - projectedTotalPaid, 0);
 
   const hasAtLeastOneValidRow = normalizedRows.some(
     (row) => row.description.trim() && row.qty > 0 && row.unitPrice >= 0
@@ -171,6 +208,16 @@ export function CustomOrderForm({
       return;
     }
 
+    if (grandTotal < existingTotalPaid) {
+      setSubmitError("Grand total cannot be lower than the total paid amount.");
+      return;
+    }
+
+    if (projectedPaymentAmount > maxNewPayment) {
+      setSubmitError("Payment amount cannot exceed the outstanding balance.");
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -190,6 +237,9 @@ export function CustomOrderForm({
             customSubtotal: subtotal,
             customDiscount: discountAmount,
             customGrandTotal: grandTotal,
+            paymentDate,
+            paymentMode,
+            paymentAmount: projectedPaymentAmount,
             items,
           }),
         }
@@ -397,6 +447,94 @@ export function CustomOrderForm({
               <span className="text-xl font-bold text-amber-200">
                 {formatCurrency(grandTotal)}
               </span>
+            </div>
+          </div>
+
+          <div className="mt-8 border-t border-white/10 pt-8">
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/45">
+              Payment Details
+            </p>
+            <p className="mt-3 text-sm text-white/60">
+              Record payment on the same form before submitting the order. Leave amount as RM0 if no payment is received yet.
+            </p>
+
+            <div className="mt-6 space-y-4">
+              <div>
+                <label className="label-rk">Payment Date</label>
+                <input
+                  type="date"
+                  className="input-rk"
+                  value={paymentDate}
+                  onChange={(e) => setPaymentDate(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <label className="label-rk">Payment Mode</label>
+                <div className="relative">
+                  <select
+                    value={paymentMode}
+                    onChange={(e) => setPaymentMode(e.target.value)}
+                    className="input-rk appearance-none pr-12"
+                  >
+                    <option value="CASH">Cash</option>
+                    <option value="CARD">Card Payment</option>
+                    <option value="BANK_TRANSFER">Bank Transfer</option>
+                    <option value="QR">QR Payment</option>
+                  </select>
+                  <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/60">▾</div>
+                </div>
+              </div>
+
+              <div>
+                <label className="label-rk">Payment Amount (RM)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  max={maxNewPayment}
+                  className="input-rk"
+                  value={paymentAmount}
+                  onChange={(e) => setPaymentAmount(e.target.value)}
+                  placeholder="0"
+                />
+                <p className="mt-2 text-xs text-white/45">
+                  Maximum payable now: {formatCurrency(maxNewPayment)}
+                </p>
+              </div>
+
+              <div className="grid gap-3 rounded-2xl border border-white/10 bg-black/25 p-4 text-sm text-white/75 sm:grid-cols-3">
+                <div>
+                  <div className="text-white/45">Current Paid</div>
+                  <div className="mt-1 font-semibold text-white">{formatCurrency(existingTotalPaid)}</div>
+                </div>
+                <div>
+                  <div className="text-white/45">After Submit</div>
+                  <div className="mt-1 font-semibold text-white">{formatCurrency(projectedTotalPaid)}</div>
+                </div>
+                <div>
+                  <div className="text-white/45">Outstanding</div>
+                  <div className="mt-1 font-semibold text-amber-200">{formatCurrency(projectedOutstandingBalance)}</div>
+                </div>
+              </div>
+
+              {initialData?.payments?.length ? (
+                <div className="rounded-2xl border border-white/10 bg-black/25 p-4">
+                  <div className="text-xs font-semibold uppercase tracking-[0.18em] text-white/45">
+                    Payment History
+                  </div>
+                  <div className="mt-3 space-y-2">
+                    {initialData.payments.map((payment) => (
+                      <div key={payment.id} className="rounded-xl border border-white/8 bg-black/20 p-3 text-sm text-white/80">
+                        <div className="font-medium text-white">
+                          {formatCurrency(payment.amount)} • {getPaymentModeLabel(payment.paymentMode)}
+                        </div>
+                        <div className="mt-1 text-xs text-white/45">{payment.paymentDate}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </div>
           </div>
 

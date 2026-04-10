@@ -3,13 +3,14 @@ import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
 import { generateOrderNumber } from "@/lib/utils";
 import { createAdminNotification } from "@/lib/notifications";
+import { calculatePaymentSummary } from "@/lib/payment-summary";
 
 type CustomOrderItemPayload = {
   description: string;
   qty: number;
-  uom?: string | null;
   unitPrice: number;
   lineTotal: number;
+  uom?: string | null;
 };
 
 type CreateCustomOrderPayload = {
@@ -21,6 +22,9 @@ type CreateCustomOrderPayload = {
   customSubtotal?: number;
   customDiscount?: number;
   customGrandTotal?: number;
+  paymentDate?: string;
+  paymentMode?: string;
+  paymentAmount?: number | string;
   items?: CustomOrderItemPayload[];
 };
 
@@ -28,6 +32,10 @@ function sanitizeWholeNumber(value: unknown) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed < 0) return 0;
   return Math.floor(parsed);
+}
+
+function isAllowedPaymentMode(value: string) {
+  return ["CASH", "CARD", "BANK_TRANSFER", "QR"].includes(value);
 }
 
 export async function POST(req: Request) {
@@ -62,6 +70,8 @@ export async function POST(req: Request) {
     const vehicleNo = String(body.vehicleNo || "").trim().toUpperCase();
     const internalRemarks = String(body.internalRemarks || "").trim();
     const items = Array.isArray(body.items) ? body.items : [];
+    const paymentMode = String(body.paymentMode || "CASH").trim().toUpperCase();
+    const paymentAmount = sanitizeWholeNumber(body.paymentAmount);
 
     if (!customerId) {
       return NextResponse.json(
@@ -99,16 +109,16 @@ export async function POST(req: Request) {
       .map((item) => {
         const description = String(item.description || "").trim();
         const qty = Math.max(1, sanitizeWholeNumber(item.qty));
-        const uom = String(item.uom || "").trim();
         const unitPrice = Math.max(0, sanitizeWholeNumber(item.unitPrice));
         const lineTotal = qty * unitPrice;
+        const uom = String(item.uom || "").trim();
 
         return {
           description,
           qty,
-          uom: uom || null,
           unitPrice,
           lineTotal,
+          uom: uom || null,
         };
       })
       .filter((item) => item.description.length > 0);
@@ -137,6 +147,37 @@ export async function POST(req: Request) {
       );
     }
 
+    if (paymentAmount > 0 && !isAllowedPaymentMode(paymentMode)) {
+      return NextResponse.json(
+        { ok: false, error: "Invalid payment mode." },
+        { status: 400 }
+      );
+    }
+
+    if (paymentAmount > calculatedGrandTotal) {
+      return NextResponse.json(
+        { ok: false, error: "Payment amount cannot exceed the grand total." },
+        { status: 400 }
+      );
+    }
+
+    const paymentDateRaw = String(body.paymentDate || "").trim();
+    const paymentDate = paymentDateRaw ? new Date(paymentDateRaw) : new Date();
+    if (paymentAmount > 0) {
+      if (Number.isNaN(paymentDate.getTime())) {
+        return NextResponse.json(
+          { ok: false, error: "Invalid payment date." },
+          { status: 400 }
+        );
+      }
+      paymentDate.setHours(0, 0, 0, 0);
+    }
+
+    const paymentSummary = calculatePaymentSummary(
+      paymentAmount > 0 ? [{ amount: paymentAmount }] : [],
+      calculatedGrandTotal
+    );
+
     const requestDetailsLines = [
       `Order Type: Custom Order`,
       `Title / Summary: ${customTitle}`,
@@ -145,6 +186,7 @@ export async function POST(req: Request) {
       `Subtotal: RM${calculatedSubtotal}`,
       `Discount: RM${customDiscount}`,
       `Grand Total: RM${calculatedGrandTotal}`,
+      `Initial Payment: RM${paymentAmount}`,
       `Items: ${normalizedItems.length}`,
     ];
 
@@ -162,12 +204,22 @@ export async function POST(req: Request) {
         customDiscount,
         customGrandTotal: calculatedGrandTotal,
         totalAmount: calculatedGrandTotal,
-        totalPaid: 0,
-        outstandingBalance: calculatedGrandTotal,
+        totalPaid: paymentSummary.totalPaid,
+        outstandingBalance: paymentSummary.outstandingBalance,
         requestDetails: requestDetailsLines.join("\n"),
         customItems: {
           create: normalizedItems,
         },
+        payments:
+          paymentAmount > 0
+            ? {
+                create: {
+                  paymentDate,
+                  paymentMode,
+                  amount: paymentAmount,
+                },
+              }
+            : undefined,
       },
     });
 
