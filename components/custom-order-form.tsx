@@ -325,7 +325,7 @@ export function CustomOrderForm({
                   </div>
 
                   <div>
-                    <label className="label-rk">UOM (optional)</label>
+                    <label className="label-rk">UOM</label>
                     <input
                       className="input-rk"
                       value={row.uom}
