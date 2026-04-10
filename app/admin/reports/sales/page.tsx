@@ -36,9 +36,10 @@ function getOrderTypeLabel(value?: string | null) {
   return value === "CUSTOM_ORDER" ? "Custom Order" : "Standard Tuning";
 }
 
-function getTuningTypeLabel(value?: string | null) {
-  if (value === "ECU_TCU") return "ECU + TCU";
-  if (value === "TCU") return "TCU";
+function getTuningTypeLabel(order: OrderWithRelations) {
+  if (order.orderType === "CUSTOM_ORDER") return "-";
+  if (order.tuningType === "ECU_TCU") return "ECU + TCU";
+  if (order.tuningType === "TCU") return "TCU";
   return "ECU";
 }
 
@@ -47,7 +48,7 @@ function getOrderTitle(order: OrderWithRelations) {
     return order.customTitle || "Custom Order";
   }
 
-  return order.selectedTuneLabel || `${getTuningTypeLabel(order.tuningType)} Tune`;
+  return order.selectedTuneLabel || `${getTuningTypeLabel(order)} Tune`;
 }
 
 function getOrderAmount(order: OrderWithRelations) {
@@ -89,7 +90,7 @@ function getReportDisplayStatusLabel(order: OrderWithRelations) {
     case "PAID":
       return "Paid";
     default:
-      return getReportDisplayStatus(order).replaceAll("_", " ");
+      return String(getReportDisplayStatus(order) || "").replace(/_/g, " ");
   }
 }
 
@@ -420,7 +421,7 @@ export default async function SalesReportPage({
                           {getOrderTitle(order)}
                         </td>
                         <td className="px-6 py-5 text-white/65">
-                          {getTuningTypeLabel(order.tuningType)}
+                          {getTuningTypeLabel(order)}
                         </td>
                         <td className="px-6 py-5 text-white/90">
                           {order.vehicleNo || "-"}

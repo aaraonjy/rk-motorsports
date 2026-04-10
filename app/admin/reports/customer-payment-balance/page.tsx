@@ -3,6 +3,7 @@ import { getSessionUser } from "@/lib/auth";
 import { getAllOrders } from "@/lib/queries";
 import { redirect } from "next/navigation";
 import { type OrderWithRelations } from "@/components/order-table";
+import { CustomerPaymentBalanceTable } from "@/components/reports/customer-payment-balance-table";
 
 type CustomerPaymentBalanceReportPageProps = {
   searchParams?: Promise<{
@@ -117,6 +118,25 @@ function getReportStatusBadgeClass(order: OrderWithRelations) {
   }
 }
 
+function getPaymentModeLabel(value?: string | null) {
+  const normalized = String(value || "").trim().toUpperCase();
+
+  switch (normalized) {
+    case "CASH":
+      return "Cash";
+    case "BANK_TRANSFER":
+      return "Bank Transfer";
+    case "CARD":
+    case "CARD_PAYMENT":
+      return "Card Payment";
+    case "QR":
+    case "QR_PAYMENT":
+      return "QR Payment";
+    default:
+      return String(value || "").trim() || "Other";
+  }
+}
+
 function buildQueryString(params: Record<string, string | undefined>) {
   const searchParams = new URLSearchParams();
 
@@ -180,6 +200,27 @@ export default async function CustomerPaymentBalanceReportPage({
     dateFrom,
     dateTo,
   });
+
+  const tableRows = filteredOrders.map((order) => ({
+    id: order.id,
+    date: formatDate(new Date(order.createdAt)),
+    orderNumber: order.orderNumber,
+    customerName: order.user?.name || "-",
+    vehicleNo: order.vehicleNo || "-",
+    orderStatusLabel: getReportDisplayStatusLabel(order),
+    orderStatusBadgeClass: getReportStatusBadgeClass(order),
+    grandTotal: formatCurrency(getOrderAmount(order)),
+    totalPaid: formatCurrency(order.totalPaid ?? 0),
+    outstandingBalance: formatCurrency(getOrderOutstandingBalance(order)),
+    paymentStatusLabel: getPaymentStatusLabel(order),
+    paymentStatusBadgeClass: getPaymentStatusBadgeClass(order),
+    paymentRecords: (order.payments || []).map((payment) => ({
+      id: payment.id,
+      paymentDate: formatDate(new Date(payment.paymentDate)),
+      paymentMode: getPaymentModeLabel(payment.paymentMode),
+      amount: formatCurrency(Number(payment.amount || 0)),
+    })),
+  }));
 
   return (
     <section className="section-pad">
@@ -391,71 +432,12 @@ export default async function CustomerPaymentBalanceReportPage({
               <div>
                 <h2 className="text-2xl font-semibold text-white">Report Preview</h2>
                 <p className="mt-2 text-sm text-white/60">
-                  Showing {filteredOrders.length} record{filteredOrders.length === 1 ? "" : "s"}.
+                  Showing {tableRows.length} record{tableRows.length === 1 ? "" : "s"}.
                 </p>
               </div>
             </div>
 
-            {filteredOrders.length === 0 ? (
-              <div className="px-6 py-12 text-center text-white/55">
-                No report data found for the selected filters.
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full text-left text-sm text-white/80">
-                  <thead className="bg-black/30 text-white/50">
-                    <tr>
-                      <th className="px-6 py-4 font-medium">Date</th>
-                      <th className="px-6 py-4 font-medium">Order No.</th>
-                      <th className="px-6 py-4 font-medium">Customer</th>
-                      <th className="px-6 py-4 font-medium">Vehicle No.</th>
-                      <th className="px-6 py-4 font-medium">Order Status</th>
-                      <th className="px-6 py-4 font-medium text-right">Grand Total</th>
-                      <th className="px-6 py-4 font-medium text-right">Total Paid</th>
-                      <th className="px-6 py-4 font-medium text-right">Outstanding Balance</th>
-                      <th className="px-6 py-4 font-medium">Payment Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredOrders.map((order) => (
-                      <tr key={order.id} className="border-t border-white/10 align-top">
-                        <td className="px-6 py-5 text-white/65">
-                          {formatDate(new Date(order.createdAt))}
-                        </td>
-                        <td className="px-6 py-5 font-medium text-white">
-                          {order.orderNumber}
-                        </td>
-                        <td className="px-6 py-5 text-white/90">
-                          {order.user?.name || "-"}
-                        </td>
-                        <td className="px-6 py-5 text-white/90">
-                          {order.vehicleNo || "-"}
-                        </td>
-                        <td className="px-6 py-5 text-white/65">
-                          <span className={getReportStatusBadgeClass(order)}>
-                            {getReportDisplayStatusLabel(order)}
-                          </span>
-                        </td>
-                        <td className="px-6 py-5 text-right font-medium text-white">
-                          {formatCurrency(getOrderAmount(order))}
-                        </td>
-                        <td className="px-6 py-5 text-right font-medium text-white">
-                          {formatCurrency(order.totalPaid ?? 0)}
-                        </td>
-                        <td className="px-6 py-5 text-right font-medium text-white">
-                          {formatCurrency(getOrderOutstandingBalance(order))}
-                        </td>
-                        <td className="px-6 py-5 text-white/65">
-                          <span className={getPaymentStatusBadgeClass(order)}>
-                            {getPaymentStatusLabel(order)}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+            <CustomerPaymentBalanceTable rows={tableRows} />
           </div>
         </div>
       </div>
