@@ -196,11 +196,6 @@ function formatDisplayDate(value?: string | Date | null) {
   return date.toLocaleDateString("en-GB");
 }
 
-function getTransactionBadge(kind: "ORDER" | "CN") {
-  return kind === "CN"
-    ? "inline-flex min-w-[88px] items-center justify-center rounded-full border border-red-500/30 bg-red-500/15 px-3 py-1 text-center text-xs font-semibold text-red-300"
-    : "inline-flex min-w-[88px] items-center justify-center rounded-full border border-white/15 bg-white/10 px-3 py-1 text-center text-xs font-semibold text-white/80";
-}
 
 function getDisplayRows(orders: OrderWithRelations[], transactionView: TransactionView): DisplayRow[] {
   if (transactionView === "ORDER") {
@@ -1278,7 +1273,6 @@ export function OrderTable({
           <thead className="bg-black/50 text-white/65">
             <tr>
               <th className="px-4 py-4 w-[160px]">Transaction</th>
-              <th className="px-4 py-4 w-[90px]">Type</th>
               {admin ? <th className="px-4 py-4 w-[130px]">Customer</th> : null}
               <th className="px-4 py-4">Vehicle</th>
               <th className="px-4 py-4 w-[180px]">Status</th>
@@ -1392,10 +1386,6 @@ export function OrderTable({
                       <div className="text-red-200/60 text-xs">Ref: {order.orderNumber}</div>
                     </td>
 
-                    <td className="px-4 py-4 align-top">
-                      <span className={getTransactionBadge("CN")}>CN</span>
-                    </td>
-
                     {admin ? (
                       <td className="px-4 py-4">
                         <CustomerDetails user={order.user} />
@@ -1476,10 +1466,6 @@ export function OrderTable({
                         hour12: true,
                       })}
                     </div>
-                  </td>
-
-                  <td className="px-4 py-4 align-top">
-                    <span className={getTransactionBadge("ORDER")}>ORDER</span>
                   </td>
 
                   {admin ? (
