@@ -207,8 +207,7 @@ export async function GET(req: Request) {
 
   const csv = csvRows
     .map((row) => row.map((cell) => escapeCsvValue(cell)).join(","))
-    .join("
-");
+    .join("\n");
 
   return new NextResponse(csv, {
     status: 200,
