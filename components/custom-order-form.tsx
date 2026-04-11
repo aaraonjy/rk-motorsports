@@ -95,6 +95,14 @@ function getPaymentModeLabel(value: string) {
   }
 }
 
+function hasSpacing(value: string) {
+  return /\s/.test(value);
+}
+
+function removeSpacing(value: string) {
+  return value.replace(/\s+/g, "");
+}
+
 export function CustomOrderForm({
   customerId,
   orderId,
@@ -107,6 +115,7 @@ export function CustomOrderForm({
   const existingTotalPaid = Number(initialData?.totalPaid ?? 0);
   const [title, setTitle] = useState(initialData?.customTitle || "");
   const [vehicleNo, setVehicleNo] = useState(initialData?.vehicleNo || "");
+  const [vehicleNoError, setVehicleNoError] = useState("");
   const [internalRemarks, setInternalRemarks] = useState(initialData?.internalRemarks || "");
   const [discount, setDiscount] = useState(String(initialData?.customDiscount ?? 0));
   const [paymentDate, setPaymentDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -227,6 +236,11 @@ export function CustomOrderForm({
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSubmitError("");
+
+    if (hasSpacing(vehicleNo)) {
+      setVehicleNoError("No spacing is allowed in Vehicle No.");
+      return;
+    }
 
     if (disableSubmit) return;
 
@@ -349,12 +363,27 @@ export function CustomOrderForm({
             <input
               className="input-rk"
               value={vehicleNo}
-              onChange={(e) => setVehicleNo(e.target.value)}
+              onChange={(e) => {
+                const nextValue = e.target.value.toUpperCase();
+                const hadSpacing = hasSpacing(nextValue);
+                setVehicleNo(removeSpacing(nextValue));
+                setVehicleNoError(hadSpacing ? "No spacing is allowed in Vehicle No." : "");
+              }}
+              onPaste={(e) => {
+                const pastedValue = e.clipboardData.getData("text");
+                if (hasSpacing(pastedValue)) {
+                  setVehicleNoError("No spacing is allowed in Vehicle No.");
+                }
+              }}
               placeholder="e.g. VXX1234"
             />
-            <p className="mt-2 text-xs text-white/45">
-              Used for workshop reference, invoice display, and admin search.
-            </p>
+            {vehicleNoError ? (
+              <p className="mt-2 text-xs text-red-300">{vehicleNoError}</p>
+            ) : (
+              <p className="mt-2 text-xs text-white/45">
+                Used for workshop reference, invoice display, and admin search.
+              </p>
+            )}
           </div>
 
           <div>

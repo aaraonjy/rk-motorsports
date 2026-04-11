@@ -29,6 +29,10 @@ function isAllowedSupportingFile(file: File) {
   return file.type.startsWith("image/") || file.type.startsWith("video/");
 }
 
+function hasSpacing(value: string) {
+  return /\s/.test(value);
+}
+
 export async function POST(req: Request) {
   try {
     const user = await getSessionUser();
@@ -59,7 +63,8 @@ export async function POST(req: Request) {
 
     const customerId = String(form.get("customerId") || "").trim();
     const customTitle = String(form.get("customTitle") || "").trim();
-    const vehicleNo = String(form.get("vehicleNo") || "").trim().toUpperCase();
+    const rawVehicleNo = String(form.get("vehicleNo") || "");
+    const vehicleNo = rawVehicleNo.trim().toUpperCase();
     const internalRemarks = String(form.get("internalRemarks") || "").trim();
     const itemsRaw = String(form.get("items") || "[]");
     const items = JSON.parse(itemsRaw) as CustomOrderItemPayload[];
@@ -76,6 +81,13 @@ export async function POST(req: Request) {
     if (!customTitle) {
       return NextResponse.json(
         { ok: false, error: "Order title / summary is required." },
+        { status: 400 }
+      );
+    }
+
+    if (hasSpacing(rawVehicleNo)) {
+      return NextResponse.json(
+        { ok: false, error: "No spacing is allowed in Vehicle No." },
         { status: 400 }
       );
     }
