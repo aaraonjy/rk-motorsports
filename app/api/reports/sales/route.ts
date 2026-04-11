@@ -3,6 +3,22 @@ import { getSessionUser } from "@/lib/auth";
 import { getAllOrders } from "@/lib/queries";
 import { type OrderWithRelations } from "@/components/order-table";
 
+type CsvTransactionRow = {
+  date: Date;
+  docNo: string;
+  transactionType: "ORDER" | "CN";
+  customer: string;
+  customerEmail: string;
+  customerPhone: string;
+  orderType: string;
+  titleSummary: string;
+  tuningType: string;
+  vehicleNo: string;
+  status: string;
+  referenceInvoiceNo: string;
+  amount: number;
+};
+
 function getOrderTypeLabel(value?: string | null) {
   return value === "CUSTOM_ORDER" ? "Custom Order" : "Standard Tuning";
 }
@@ -48,10 +64,99 @@ function getReportDisplayStatusLabel(order: OrderWithRelations) {
   return String(getReportDisplayStatus(order) || "").replace(/_/g, " ");
 }
 
+function getCreditNoteReasonLabel(value?: string | null) {
+  switch (value) {
+    case "CUSTOMER_CANCEL_ORDER":
+      return "Customer Cancel Order";
+    case "PRICING_CORRECTION":
+      return "Pricing Correction";
+    case "OVERCHARGE_ADJUSTMENT":
+      return "Overcharge Adjustment";
+    case "DUPLICATE_INVOICE":
+      return "Duplicate Invoice";
+    case "SERVICE_NOT_PROCEEDED":
+      return "Service Not Proceeded";
+    case "OTHER":
+      return "Other";
+    default:
+      return value || "-";
+  }
+}
+
 function escapeCsvValue(value: string | number | null | undefined) {
   const normalized = String(value ?? "");
   const escaped = normalized.replace(/"/g, '""');
   return `"${escaped}"`;
+}
+
+function isWithinDateRange(value: Date, dateFrom?: string, dateTo?: string) {
+  const time = value.getTime();
+  if (dateFrom) {
+    const start = new Date(dateFrom);
+    if (!Number.isNaN(start.getTime()) && time < start.getTime()) return false;
+  }
+
+  if (dateTo) {
+    const end = new Date(dateTo);
+    if (!Number.isNaN(end.getTime())) {
+      end.setHours(23, 59, 59, 999);
+      if (time > end.getTime()) return false;
+    }
+  }
+
+  return true;
+}
+
+function buildRows(
+  orders: OrderWithRelations[],
+  dateFrom?: string,
+  dateTo?: string
+): CsvTransactionRow[] {
+  const rows: CsvTransactionRow[] = [];
+
+  for (const order of orders) {
+    const orderDate = new Date(order.createdAt);
+    if (isWithinDateRange(orderDate, dateFrom, dateTo)) {
+      rows.push({
+        date: orderDate,
+        docNo: order.orderNumber,
+        transactionType: "ORDER",
+        customer: order.user?.name || "",
+        customerEmail: order.user?.email || "",
+        customerPhone: order.user?.phone || "",
+        orderType: getOrderTypeLabel(order.orderType),
+        titleSummary: getOrderTitle(order),
+        tuningType: getTuningTypeLabel(order),
+        vehicleNo: order.vehicleNo || "",
+        status: getReportDisplayStatusLabel(order),
+        referenceInvoiceNo: "",
+        amount: getOrderAmount(order),
+      });
+    }
+
+    if (order.creditNote) {
+      const cnDate = new Date(order.creditNote.cnDate);
+      if (isWithinDateRange(cnDate, dateFrom, dateTo)) {
+        rows.push({
+          date: cnDate,
+          docNo: order.creditNote.cnNo,
+          transactionType: "CN",
+          customer: order.user?.name || "",
+          customerEmail: order.user?.email || "",
+          customerPhone: order.user?.phone || "",
+          orderType: getOrderTypeLabel(order.orderType),
+          titleSummary: `Credit Note - ${getCreditNoteReasonLabel(order.creditNote.reasonType)}`,
+          tuningType: getTuningTypeLabel(order),
+          vehicleNo: order.vehicleNo || "",
+          status: "Credit Note",
+          referenceInvoiceNo: order.orderNumber,
+          amount: -Math.abs(order.creditNote.amount || 0),
+        });
+      }
+    }
+  }
+
+  return rows.sort((a, b) => b.date.getTime() - a.date.getTime());
 }
 
 export async function GET(req: Request) {
@@ -81,8 +186,6 @@ export async function GET(req: Request) {
     customerKeyword,
     tuningType,
     orderType,
-    dateFrom,
-    dateTo,
     page: 1,
     pageSize: 10000,
   })) as {
@@ -93,10 +196,13 @@ export async function GET(req: Request) {
     totalPages: number;
   };
 
-  const rows = [
+  const rows = buildRows(result.orders, dateFrom, dateTo);
+
+  const csvRows = [
     [
       "Date",
-      "Order No.",
+      "Doc No.",
+      "Transaction Type",
       "Customer",
       "Customer Email",
       "Customer Phone",
@@ -105,26 +211,30 @@ export async function GET(req: Request) {
       "Tuning Type",
       "Vehicle No.",
       "Status",
-      "Total",
+      "Reference Invoice No.",
+      "Amount",
     ],
-    ...result.orders.map((order) => [
-      new Intl.DateTimeFormat("en-GB").format(new Date(order.createdAt)),
-      order.orderNumber,
-      order.user?.name || "",
-      order.user?.email || "",
-      order.user?.phone || "",
-      getOrderTypeLabel(order.orderType),
-      getOrderTitle(order),
-      getTuningTypeLabel(order),
-      order.vehicleNo || "",
-      getReportDisplayStatusLabel(order),
-      getOrderAmount(order),
+    ...rows.map((row) => [
+      new Intl.DateTimeFormat("en-GB").format(row.date),
+      row.docNo,
+      row.transactionType,
+      row.customer,
+      row.customerEmail,
+      row.customerPhone,
+      row.orderType,
+      row.titleSummary,
+      row.tuningType,
+      row.vehicleNo,
+      row.status,
+      row.referenceInvoiceNo,
+      row.amount,
     ]),
   ];
 
-  const csv = rows
+  const csv = csvRows
     .map((row) => row.map((cell) => escapeCsvValue(cell)).join(","))
-    .join("\n");
+    .join("
+");
 
   return new NextResponse(csv, {
     status: 200,

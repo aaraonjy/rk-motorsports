@@ -16,6 +16,23 @@ type SalesReportPageProps = {
   }>;
 };
 
+type SalesTransactionRow = {
+  id: string;
+  date: Date;
+  docNo: string;
+  transactionType: "ORDER" | "CN";
+  customerName: string;
+  customerEmail: string;
+  customerPhone: string;
+  orderTypeLabel: string;
+  titleSummary: string;
+  tuningTypeLabel: string;
+  vehicleNo: string;
+  statusLabel: string;
+  referenceInvoiceNo: string;
+  amount: number;
+};
+
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("en-MY", {
     style: "currency",
@@ -94,25 +111,117 @@ function getReportDisplayStatusLabel(order: OrderWithRelations) {
   }
 }
 
-function getReportStatusBadgeClass(order: OrderWithRelations) {
-  switch (getReportDisplayStatus(order)) {
-    case "RECEIVED":
-    case "FILE_RECEIVED":
+function getReportStatusBadgeClass(label: string) {
+  switch (label) {
+    case "Received":
       return "inline-flex min-w-[112px] items-center justify-center rounded-full border border-sky-500/30 bg-sky-500/15 px-3 py-1 text-center text-xs font-semibold text-sky-300";
-    case "COMPLETED":
-    case "READY_FOR_DOWNLOAD":
+    case "Completed":
       return "inline-flex min-w-[112px] items-center justify-center rounded-full border border-emerald-500/30 bg-emerald-500/15 px-3 py-1 text-center text-xs font-semibold text-emerald-300";
-    case "CANCELLED":
+    case "Cancelled":
       return "inline-flex min-w-[112px] items-center justify-center rounded-full border border-red-500/30 bg-red-500/15 px-3 py-1 text-center text-xs font-semibold text-red-300";
-    case "IN_PROGRESS":
+    case "In Progress":
       return "inline-flex min-w-[112px] items-center justify-center rounded-full border border-violet-500/30 bg-violet-500/15 px-3 py-1 text-center text-xs font-semibold text-violet-300";
-    case "AWAITING_PAYMENT":
+    case "Pending Payment":
       return "inline-flex min-w-[112px] items-center justify-center rounded-full border border-amber-500/30 bg-amber-500/15 px-3 py-1 text-center text-xs font-semibold text-amber-300";
-    case "PAID":
+    case "Paid":
       return "inline-flex min-w-[112px] items-center justify-center rounded-full border border-cyan-500/30 bg-cyan-500/15 px-3 py-1 text-center text-xs font-semibold text-cyan-300";
     default:
+      if (label.startsWith("Credit Note")):
+        return "inline-flex min-w-[112px] items-center justify-center rounded-full border border-red-500/30 bg-red-500/15 px-3 py-1 text-center text-xs font-semibold text-red-300";
       return "inline-flex min-w-[112px] items-center justify-center rounded-full border border-white/15 bg-white/10 px-3 py-1 text-center text-xs font-semibold text-white/80";
   }
+}
+
+function getCreditNoteReasonLabel(value?: string | null) {
+  switch (value) {
+    case "CUSTOMER_CANCEL_ORDER":
+      return "Customer Cancel Order";
+    case "PRICING_CORRECTION":
+      return "Pricing Correction";
+    case "OVERCHARGE_ADJUSTMENT":
+      return "Overcharge Adjustment";
+    case "DUPLICATE_INVOICE":
+      return "Duplicate Invoice";
+    case "SERVICE_NOT_PROCEEDED":
+      return "Service Not Proceeded";
+    case "OTHER":
+      return "Other";
+    default:
+      return value || "-";
+  }
+}
+
+function isWithinDateRange(value: Date, dateFrom?: string, dateTo?: string) {
+  const time = value.getTime();
+  if (dateFrom) {
+    const start = new Date(dateFrom);
+    if (!Number.isNaN(start.getTime()) && time < start.getTime()) return false;
+  }
+
+  if (dateTo) {
+    const end = new Date(dateTo);
+    if (!Number.isNaN(end.getTime())) {
+      end.setHours(23, 59, 59, 999);
+      if (time > end.getTime()) return false;
+    }
+  }
+
+  return true;
+}
+
+function buildSalesTransactionRows(
+  orders: OrderWithRelations[],
+  dateFrom?: string,
+  dateTo?: string
+): SalesTransactionRow[] {
+  const rows: SalesTransactionRow[] = [];
+
+  for (const order of orders) {
+    const orderDate = new Date(order.createdAt);
+
+    if (isWithinDateRange(orderDate, dateFrom, dateTo)) {
+      rows.push({
+        id: `order-${order.id}`,
+        date: orderDate,
+        docNo: order.orderNumber,
+        transactionType: "ORDER",
+        customerName: order.user?.name || "-",
+        customerEmail: order.user?.email || "-",
+        customerPhone: order.user?.phone || "-",
+        orderTypeLabel: getOrderTypeLabel(order.orderType),
+        titleSummary: getOrderTitle(order),
+        tuningTypeLabel: getTuningTypeLabel(order),
+        vehicleNo: order.vehicleNo || "-",
+        statusLabel: getReportDisplayStatusLabel(order),
+        referenceInvoiceNo: "-",
+        amount: getOrderAmount(order),
+      });
+    }
+
+    if (order.creditNote) {
+      const cnDate = new Date(order.creditNote.cnDate);
+      if (isWithinDateRange(cnDate, dateFrom, dateTo)) {
+        rows.push({
+          id: `cn-${order.creditNote.id}`,
+          date: cnDate,
+          docNo: order.creditNote.cnNo,
+          transactionType: "CN",
+          customerName: order.user?.name || "-",
+          customerEmail: order.user?.email || "-",
+          customerPhone: order.user?.phone || "-",
+          orderTypeLabel: getOrderTypeLabel(order.orderType),
+          titleSummary: `Credit Note - ${getCreditNoteReasonLabel(order.creditNote.reasonType)}`,
+          tuningTypeLabel: getTuningTypeLabel(order),
+          vehicleNo: order.vehicleNo || "-",
+          statusLabel: `Credit Note`,
+          referenceInvoiceNo: order.orderNumber,
+          amount: -Math.abs(order.creditNote.amount || 0),
+        });
+      }
+    }
+  }
+
+  return rows.sort((a, b) => b.date.getTime() - a.date.getTime());
 }
 
 function buildQueryString(params: Record<string, string | undefined>) {
@@ -149,10 +258,8 @@ export default async function SalesReportPage({
     customerKeyword,
     tuningType,
     orderType,
-    dateFrom,
-    dateTo,
     page: 1,
-    pageSize: 1000,
+    pageSize: 10000,
   })) as {
     orders: OrderWithRelations[];
     totalCount: number;
@@ -160,6 +267,8 @@ export default async function SalesReportPage({
     pageSize: number;
     totalPages: number;
   };
+
+  const transactionRows = buildSalesTransactionRows(result.orders, dateFrom, dateTo);
 
   const exportQuery = buildQueryString({
     status,
@@ -190,7 +299,8 @@ export default async function SalesReportPage({
           <div className="card-rk p-6 text-white/75">
             <p>
               Use the filters below to narrow down the sales report by order number, customer,
-              vehicle number, status, tuning type, order type, or date range.
+              vehicle number, status, tuning type, order type, or date range. Credit Notes are
+              included as separate negative transactions for calculation purposes.
             </p>
           </div>
 
@@ -203,7 +313,7 @@ export default async function SalesReportPage({
                 type="text"
                 name="search"
                 defaultValue={search}
-                placeholder="Search order number"
+                placeholder="Search order number or CN number"
                 className="w-full rounded-xl border border-white/15 bg-black/50 px-4 py-3 text-white outline-none placeholder:text-white/35"
               />
             </div>
@@ -377,12 +487,12 @@ export default async function SalesReportPage({
               <div>
                 <h2 className="text-2xl font-semibold text-white">Report Preview</h2>
                 <p className="mt-2 text-sm text-white/60">
-                  Showing {result.orders.length} record{result.orders.length === 1 ? "" : "s"}.
+                  Showing {transactionRows.length} transaction record{transactionRows.length === 1 ? "" : "s"}.
                 </p>
               </div>
             </div>
 
-            {result.orders.length === 0 ? (
+            {transactionRows.length === 0 ? (
               <div className="px-6 py-12 text-center text-white/55">
                 No report data found for the selected filters.
               </div>
@@ -392,47 +502,53 @@ export default async function SalesReportPage({
                   <thead className="bg-black/30 text-white/50">
                     <tr>
                       <th className="px-6 py-4 font-medium">Date</th>
-                      <th className="px-6 py-4 font-medium">Order No.</th>
+                      <th className="px-6 py-4 font-medium">Doc No.</th>
+                      <th className="px-6 py-4 font-medium">Transaction Type</th>
                       <th className="px-6 py-4 font-medium">Customer</th>
                       <th className="px-6 py-4 font-medium">Order Type</th>
                       <th className="px-6 py-4 font-medium">Title / Summary</th>
                       <th className="px-6 py-4 font-medium">Tuning Type</th>
                       <th className="px-6 py-4 font-medium">Vehicle No.</th>
                       <th className="px-6 py-4 font-medium">Status</th>
-                      <th className="px-6 py-4 font-medium text-right">Total</th>
+                      <th className="px-6 py-4 font-medium">Reference Invoice</th>
+                      <th className="px-6 py-4 font-medium text-right">Amount</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {result.orders.map((order) => (
-                      <tr key={order.id} className="border-t border-white/10 align-top">
-                        <td className="px-6 py-5 text-white/65">
-                          {formatDate(new Date(order.createdAt))}
+                    {transactionRows.map((row) => (
+                      <tr key={row.id} className="border-t border-white/10 align-top">
+                        <td className="px-6 py-5 text-white/90">{formatDate(row.date)}</td>
+                        <td className={`px-6 py-5 font-medium ${row.transactionType === "CN" ? "text-red-200" : "text-white"}`}>
+                          {row.docNo}
                         </td>
-                        <td className="px-6 py-5 font-medium text-white">
-                          {order.orderNumber}
-                        </td>
-                        <td className="px-6 py-5 text-white/90">
-                          {order.user?.name || "-"}
-                        </td>
-                        <td className="px-6 py-5 text-white/65">
-                          {getOrderTypeLabel(order.orderType)}
-                        </td>
-                        <td className="px-6 py-5 text-white/90">
-                          {getOrderTitle(order)}
-                        </td>
-                        <td className="px-6 py-5 text-white/65">
-                          {getTuningTypeLabel(order)}
-                        </td>
-                        <td className="px-6 py-5 text-white/90">
-                          {order.vehicleNo || "-"}
-                        </td>
-                        <td className="px-6 py-5 text-white/65">
-                          <span className={getReportStatusBadgeClass(order)}>
-                            {getReportDisplayStatusLabel(order)}
+                        <td className="px-6 py-5">
+                          <span
+                            className={
+                              row.transactionType === "CN"
+                                ? "inline-flex min-w-[88px] items-center justify-center rounded-full border border-red-500/30 bg-red-500/15 px-3 py-1 text-center text-xs font-semibold text-red-300"
+                                : "inline-flex min-w-[88px] items-center justify-center rounded-full border border-white/15 bg-white/10 px-3 py-1 text-center text-xs font-semibold text-white/80"
+                            }
+                          >
+                            {row.transactionType}
                           </span>
                         </td>
-                        <td className="px-6 py-5 text-right font-medium text-white">
-                          {formatCurrency(getOrderAmount(order))}
+                        <td className="px-6 py-5 text-white/90">
+                          <div>{row.customerName}</div>
+                          <div className="mt-1 text-xs text-white/45">{row.customerPhone}</div>
+                          <div className="text-xs text-white/45">{row.customerEmail}</div>
+                        </td>
+                        <td className="px-6 py-5 text-white/90">{row.orderTypeLabel}</td>
+                        <td className="px-6 py-5 text-white/90">{row.titleSummary}</td>
+                        <td className="px-6 py-5 text-white/90">{row.tuningTypeLabel}</td>
+                        <td className="px-6 py-5 text-white/90">{row.vehicleNo}</td>
+                        <td className="px-6 py-5">
+                          <span className={getReportStatusBadgeClass(row.statusLabel)}>
+                            {row.statusLabel}
+                          </span>
+                        </td>
+                        <td className="px-6 py-5 text-white/90">{row.referenceInvoiceNo}</td>
+                        <td className={`px-6 py-5 text-right font-medium ${row.transactionType === "CN" ? "text-red-200" : "text-white"}`}>
+                          {formatCurrency(row.amount)}
                         </td>
                       </tr>
                     ))}

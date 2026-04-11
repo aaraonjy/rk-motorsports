@@ -14,13 +14,20 @@ type RevenueSummaryPageProps = {
   }>;
 };
 
+type RevenueTransaction = {
+  date: Date;
+  transactionType: "ORDER" | "CN";
+  amount: number;
+};
+
 type RevenueRow = {
   periodKey: string;
   periodLabel: string;
-  totalOrders: number;
-  totalRevenue: number;
-  completedRevenue: number;
-  pendingRevenue: number;
+  orderTransactions: number;
+  cnTransactions: number;
+  grossSales: number;
+  creditNoteTotal: number;
+  netSales: number;
 };
 
 function formatCurrency(value: number) {
@@ -39,18 +46,54 @@ function getOrderAmount(order: OrderWithRelations) {
   return order.totalAmount ?? 0;
 }
 
-function getDisplayStatus(order: OrderWithRelations) {
-  const isAdminCreatedOrder = !!order.createdByAdminId;
-
-  if (
-    isAdminCreatedOrder &&
-    order.status !== "COMPLETED" &&
-    order.status !== "CANCELLED"
-  ) {
-    return "FILE_RECEIVED";
+function isWithinDateRange(value: Date, dateFrom?: string, dateTo?: string) {
+  const time = value.getTime();
+  if (dateFrom) {
+    const start = new Date(dateFrom);
+    if (!Number.isNaN(start.getTime()) && time < start.getTime()) return false;
   }
 
-  return order.status;
+  if (dateTo) {
+    const end = new Date(dateTo);
+    if (!Number.isNaN(end.getTime())) {
+      end.setHours(23, 59, 59, 999);
+      if (time > end.getTime()) return false;
+    }
+  }
+
+  return true;
+}
+
+function buildTransactions(
+  orders: OrderWithRelations[],
+  dateFrom?: string,
+  dateTo?: string
+): RevenueTransaction[] {
+  const rows: RevenueTransaction[] = [];
+
+  for (const order of orders) {
+    const orderDate = new Date(order.createdAt);
+    if (isWithinDateRange(orderDate, dateFrom, dateTo)) {
+      rows.push({
+        date: orderDate,
+        transactionType: "ORDER",
+        amount: getOrderAmount(order),
+      });
+    }
+
+    if (order.creditNote) {
+      const cnDate = new Date(order.creditNote.cnDate);
+      if (isWithinDateRange(cnDate, dateFrom, dateTo)) {
+        rows.push({
+          date: cnDate,
+          transactionType: "CN",
+          amount: Math.abs(order.creditNote.amount || 0),
+        });
+      }
+    }
+  }
+
+  return rows;
 }
 
 function buildPeriod(dateValue: Date, viewBy: string) {
@@ -85,35 +128,35 @@ function buildPeriod(dateValue: Date, viewBy: string) {
   };
 }
 
-function buildRevenueRows(orders: OrderWithRelations[], viewBy: string) {
+function buildRevenueRows(transactions: RevenueTransaction[], viewBy: string) {
   const map = new Map<string, RevenueRow>();
 
-  for (const order of orders) {
-    const createdAt = new Date(order.createdAt);
-    const period = buildPeriod(createdAt, viewBy);
-    const amount = getOrderAmount(order);
-    const displayStatus = getDisplayStatus(order);
+  for (const transaction of transactions) {
+    const period = buildPeriod(transaction.date, viewBy);
 
     if (!map.has(period.key)) {
       map.set(period.key, {
         periodKey: period.key,
         periodLabel: period.label,
-        totalOrders: 0,
-        totalRevenue: 0,
-        completedRevenue: 0,
-        pendingRevenue: 0,
+        orderTransactions: 0,
+        cnTransactions: 0,
+        grossSales: 0,
+        creditNoteTotal: 0,
+        netSales: 0,
       });
     }
 
     const row = map.get(period.key)!;
-    row.totalOrders += 1;
-    row.totalRevenue += amount;
 
-    if (displayStatus === "COMPLETED" || displayStatus === "READY_FOR_DOWNLOAD") {
-      row.completedRevenue += amount;
-    } else if (displayStatus !== "CANCELLED") {
-      row.pendingRevenue += amount;
+    if (transaction.transactionType === "ORDER") {
+      row.orderTransactions += 1;
+      row.grossSales += transaction.amount;
+    } else {
+      row.cnTransactions += 1;
+      row.creditNoteTotal += transaction.amount;
     }
+
+    row.netSales = row.grossSales - row.creditNoteTotal;
   }
 
   return Array.from(map.values()).sort((a, b) => a.periodKey.localeCompare(b.periodKey));
@@ -141,15 +184,16 @@ export default async function RevenueSummaryPage({
   const params = (await searchParams) || {};
   const status = params.status || "ALL";
   const orderType = params.orderType || "ALL";
-  const viewBy = params.viewBy === "YEARLY" || params.viewBy === "DAILY" ? params.viewBy : "MONTHLY";
+  const viewBy =
+    params.viewBy === "YEARLY" || params.viewBy === "DAILY"
+      ? params.viewBy
+      : "MONTHLY";
   const dateFrom = params.dateFrom || "";
   const dateTo = params.dateTo || "";
 
   const result = (await getAllOrders({
     status,
     orderType,
-    dateFrom,
-    dateTo,
     page: 1,
     pageSize: 10000,
   })) as {
@@ -160,23 +204,19 @@ export default async function RevenueSummaryPage({
     totalPages: number;
   };
 
-  const rows = buildRevenueRows(result.orders, viewBy);
+  const transactions = buildTransactions(result.orders, dateFrom, dateTo);
+  const rows = buildRevenueRows(transactions, viewBy);
 
-  const totalRevenue = result.orders.reduce((sum, order) => sum + getOrderAmount(order), 0);
-  const completedRevenue = result.orders.reduce((sum, order) => {
-    const displayStatus = getDisplayStatus(order);
-    return displayStatus === "COMPLETED" || displayStatus === "READY_FOR_DOWNLOAD"
-      ? sum + getOrderAmount(order)
-      : sum;
-  }, 0);
-  const pendingRevenue = result.orders.reduce((sum, order) => {
-    const displayStatus = getDisplayStatus(order);
-    return displayStatus !== "CANCELLED" &&
-      displayStatus !== "COMPLETED" &&
-      displayStatus !== "READY_FOR_DOWNLOAD"
-      ? sum + getOrderAmount(order)
-      : sum;
-  }, 0);
+  const grossSales = transactions
+    .filter((item) => item.transactionType === "ORDER")
+    .reduce((sum, item) => sum + item.amount, 0);
+
+  const creditNoteTotal = transactions
+    .filter((item) => item.transactionType === "CN")
+    .reduce((sum, item) => sum + item.amount, 0);
+
+  const netSales = grossSales - creditNoteTotal;
+  const totalTransactions = transactions.length;
 
   const exportQuery = buildQueryString({
     status,
@@ -204,7 +244,7 @@ export default async function RevenueSummaryPage({
         <div className="mt-8 space-y-4">
           <div className="card-rk p-6 text-white/75">
             <p>
-              Use the filters below to summarize revenue by yearly, monthly, or daily view. Monthly is the default view for easier management reporting.
+              Use the filters below to summarize revenue by yearly, monthly, or daily view. Monthly is the default view for easier management reporting. Credit Notes are deducted separately from Gross Sales to calculate Net Sales.
             </p>
           </div>
 
@@ -330,27 +370,27 @@ export default async function RevenueSummaryPage({
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <div className="card-rk p-6">
-              <p className="text-sm text-white/45">Total Revenue</p>
-              <p className="mt-3 text-3xl font-bold text-white">{formatCurrency(totalRevenue)}</p>
+              <p className="text-sm text-white/45">Gross Sales</p>
+              <p className="mt-3 text-3xl font-bold text-white">{formatCurrency(grossSales)}</p>
             </div>
             <div className="card-rk p-6">
-              <p className="text-sm text-white/45">Completed Revenue</p>
-              <p className="mt-3 text-3xl font-bold text-white">{formatCurrency(completedRevenue)}</p>
+              <p className="text-sm text-white/45">Credit Note Total</p>
+              <p className="mt-3 text-3xl font-bold text-red-200">{formatCurrency(creditNoteTotal)}</p>
             </div>
             <div className="card-rk p-6">
-              <p className="text-sm text-white/45">Pending Revenue</p>
-              <p className="mt-3 text-3xl font-bold text-white">{formatCurrency(pendingRevenue)}</p>
+              <p className="text-sm text-white/45">Net Sales</p>
+              <p className="mt-3 text-3xl font-bold text-white">{formatCurrency(netSales)}</p>
             </div>
             <div className="card-rk p-6">
-              <p className="text-sm text-white/45">Total Orders</p>
-              <p className="mt-3 text-3xl font-bold text-white">{result.orders.length}</p>
+              <p className="text-sm text-white/45">Total Transactions</p>
+              <p className="mt-3 text-3xl font-bold text-white">{totalTransactions}</p>
             </div>
           </div>
 
           <div className="card-rk overflow-hidden">
             <div className="flex flex-col gap-3 border-b border-white/10 px-6 py-5 md:flex-row md:items-center md:justify-between">
               <div>
-                <h2 className="text-2xl font-semibold text-white">Revenue Preview</h2>
+                <h2 className="text-2xl font-semibold text-white">Summary Preview</h2>
                 <p className="mt-2 text-sm text-white/60">
                   Showing {rows.length} grouped record{rows.length === 1 ? "" : "s"}.
                 </p>
@@ -359,7 +399,7 @@ export default async function RevenueSummaryPage({
 
             {rows.length === 0 ? (
               <div className="px-6 py-12 text-center text-white/55">
-                No revenue data found for the selected filters.
+                No summary data found for the selected filters.
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -369,30 +409,22 @@ export default async function RevenueSummaryPage({
                       <th className="px-6 py-4 font-medium">
                         {viewBy === "YEARLY" ? "Year" : viewBy === "DAILY" ? "Date" : "Month"}
                       </th>
-                      <th className="px-6 py-4 font-medium text-right">Orders</th>
-                      <th className="px-6 py-4 font-medium text-right">Revenue</th>
-                      <th className="px-6 py-4 font-medium text-right">Completed Revenue</th>
-                      <th className="px-6 py-4 font-medium text-right">Pending Revenue</th>
+                      <th className="px-6 py-4 font-medium text-right">Order Transactions</th>
+                      <th className="px-6 py-4 font-medium text-right">CN Transactions</th>
+                      <th className="px-6 py-4 font-medium text-right">Gross Sales</th>
+                      <th className="px-6 py-4 font-medium text-right">Credit Note Total</th>
+                      <th className="px-6 py-4 font-medium text-right">Net Sales</th>
                     </tr>
                   </thead>
                   <tbody>
                     {rows.map((row) => (
                       <tr key={row.periodKey} className="border-t border-white/10 align-top">
-                        <td className="px-6 py-5 font-medium text-white">
-                          {row.periodLabel}
-                        </td>
-                        <td className="px-6 py-5 text-right text-white/90">
-                          {row.totalOrders}
-                        </td>
-                        <td className="px-6 py-5 text-right font-medium text-white">
-                          {formatCurrency(row.totalRevenue)}
-                        </td>
-                        <td className="px-6 py-5 text-right text-emerald-300">
-                          {formatCurrency(row.completedRevenue)}
-                        </td>
-                        <td className="px-6 py-5 text-right text-amber-300">
-                          {formatCurrency(row.pendingRevenue)}
-                        </td>
+                        <td className="px-6 py-5 font-medium text-white">{row.periodLabel}</td>
+                        <td className="px-6 py-5 text-right text-white/90">{row.orderTransactions}</td>
+                        <td className="px-6 py-5 text-right text-red-200">{row.cnTransactions}</td>
+                        <td className="px-6 py-5 text-right text-white/90">{formatCurrency(row.grossSales)}</td>
+                        <td className="px-6 py-5 text-right text-red-200">{formatCurrency(row.creditNoteTotal)}</td>
+                        <td className="px-6 py-5 text-right font-medium text-white">{formatCurrency(row.netSales)}</td>
                       </tr>
                     ))}
                   </tbody>

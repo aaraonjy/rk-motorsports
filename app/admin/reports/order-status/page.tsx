@@ -23,7 +23,8 @@ function formatCurrency(value: number) {
   }).format(value);
 }
 
-function formatDate(value: Date) {
+function formatDate(value: Date | null) {
+  if (!value) return "-";
   return new Intl.DateTimeFormat("en-MY", {
     year: "numeric",
     month: "2-digit",
@@ -185,7 +186,8 @@ export default async function OrderStatusReportPage({
           <div className="card-rk p-6 text-white/75">
             <p>
               Use the filters below to review order status records by customer, vehicle number, status,
-              tuning type, order type, or date range.
+              tuning type, order type, or date range. If an order has a Credit Note, the report will
+              show the CN reference separately.
             </p>
           </div>
 
@@ -351,37 +353,40 @@ export default async function OrderStatusReportPage({
                       <th className="px-6 py-4 font-medium">Tuning Type</th>
                       <th className="px-6 py-4 font-medium">Vehicle No.</th>
                       <th className="px-6 py-4 font-medium">Status</th>
+                      <th className="px-6 py-4 font-medium">Credit Note Ref</th>
                       <th className="px-6 py-4 font-medium text-right">Total</th>
                     </tr>
                   </thead>
                   <tbody>
                     {result.orders.map((order) => (
                       <tr key={order.id} className="border-t border-white/10 align-top">
-                        <td className="px-6 py-5 text-white/65">
-                          {formatDate(new Date(order.createdAt))}
-                        </td>
-                        <td className="px-6 py-5 font-medium text-white">
-                          {order.orderNumber}
-                        </td>
+                        <td className="px-6 py-5 text-white/90">{formatDate(new Date(order.createdAt))}</td>
+                        <td className="px-6 py-5 font-medium text-white">{order.orderNumber}</td>
                         <td className="px-6 py-5 text-white/90">
-                          {order.user?.name || "-"}
+                          <div>{order.user?.name || "-"}</div>
+                          <div className="mt-1 text-xs text-white/45">{order.user?.phone || "-"}</div>
+                          <div className="text-xs text-white/45">{order.user?.email || "-"}</div>
                         </td>
-                        <td className="px-6 py-5 text-white/65">
-                          {getOrderTypeLabel(order.orderType)}
-                        </td>
+                        <td className="px-6 py-5 text-white/90">{getOrderTypeLabel(order.orderType)}</td>
+                        <td className="px-6 py-5 text-white/90">{getOrderTitle(order)}</td>
                         <td className="px-6 py-5 text-white/90">
-                          {getOrderTitle(order)}
+                          {order.orderType === "CUSTOM_ORDER" ? "-" : getTuningTypeLabel(order.tuningType)}
                         </td>
-                        <td className="px-6 py-5 text-white/65">
-                          {getTuningTypeLabel(order.tuningType)}
-                        </td>
-                        <td className="px-6 py-5 text-white/90">
-                          {order.vehicleNo || "-"}
-                        </td>
-                        <td className="px-6 py-5 text-white/65">
+                        <td className="px-6 py-5 text-white/90">{order.vehicleNo || "-"}</td>
+                        <td className="px-6 py-5">
                           <span className={getReportStatusBadgeClass(order)}>
                             {getReportDisplayStatusLabel(order)}
                           </span>
+                        </td>
+                        <td className="px-6 py-5">
+                          {order.creditNote ? (
+                            <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+                              <div className="font-semibold">{order.creditNote.cnNo}</div>
+                              <div className="mt-1 text-red-200/80">{formatDate(new Date(order.creditNote.cnDate))}</div>
+                            </div>
+                          ) : (
+                            <span className="text-white/45">-</span>
+                          )}
                         </td>
                         <td className="px-6 py-5 text-right font-medium text-white">
                           {formatCurrency(getOrderAmount(order))}

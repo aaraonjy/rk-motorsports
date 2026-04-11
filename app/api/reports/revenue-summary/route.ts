@@ -3,13 +3,20 @@ import { getSessionUser } from "@/lib/auth";
 import { getAllOrders } from "@/lib/queries";
 import { type OrderWithRelations } from "@/components/order-table";
 
+type RevenueTransaction = {
+  date: Date;
+  transactionType: "ORDER" | "CN";
+  amount: number;
+};
+
 type RevenueRow = {
   periodKey: string;
   periodLabel: string;
-  totalOrders: number;
-  totalRevenue: number;
-  completedRevenue: number;
-  pendingRevenue: number;
+  orderTransactions: number;
+  cnTransactions: number;
+  grossSales: number;
+  creditNoteTotal: number;
+  netSales: number;
 };
 
 function getOrderAmount(order: OrderWithRelations) {
@@ -18,20 +25,6 @@ function getOrderAmount(order: OrderWithRelations) {
   }
 
   return order.totalAmount ?? 0;
-}
-
-function getDisplayStatus(order: OrderWithRelations) {
-  const isAdminCreatedOrder = !!order.createdByAdminId;
-
-  if (
-    isAdminCreatedOrder &&
-    order.status !== "COMPLETED" &&
-    order.status !== "CANCELLED"
-  ) {
-    return "FILE_RECEIVED";
-  }
-
-  return order.status;
 }
 
 function buildPeriod(dateValue: Date, viewBy: string) {
@@ -66,44 +59,94 @@ function buildPeriod(dateValue: Date, viewBy: string) {
   };
 }
 
-function buildRevenueRows(orders: OrderWithRelations[], viewBy: string) {
-  const map = new Map<string, RevenueRow>();
+function escapeCsvValue(value: string | number | null | undefined) {
+  const normalized = String(value ?? "");
+  const escaped = normalized.replace(/"/g, '""');
+  return `"${escaped}"`;
+}
+
+function isWithinDateRange(value: Date, dateFrom?: string, dateTo?: string) {
+  const time = value.getTime();
+  if (dateFrom) {
+    const start = new Date(dateFrom);
+    if (!Number.isNaN(start.getTime()) && time < start.getTime()) return false;
+  }
+
+  if (dateTo) {
+    const end = new Date(dateTo);
+    if (!Number.isNaN(end.getTime())) {
+      end.setHours(23, 59, 59, 999);
+      if (time > end.getTime()) return false;
+    }
+  }
+
+  return true;
+}
+
+function buildTransactions(
+  orders: OrderWithRelations[],
+  dateFrom?: string,
+  dateTo?: string
+): RevenueTransaction[] {
+  const rows: RevenueTransaction[] = [];
 
   for (const order of orders) {
-    const createdAt = new Date(order.createdAt);
-    const period = buildPeriod(createdAt, viewBy);
-    const amount = getOrderAmount(order);
-    const displayStatus = getDisplayStatus(order);
+    const orderDate = new Date(order.createdAt);
+    if (isWithinDateRange(orderDate, dateFrom, dateTo)) {
+      rows.push({
+        date: orderDate,
+        transactionType: "ORDER",
+        amount: getOrderAmount(order),
+      });
+    }
+
+    if (order.creditNote) {
+      const cnDate = new Date(order.creditNote.cnDate);
+      if (isWithinDateRange(cnDate, dateFrom, dateTo)) {
+        rows.push({
+          date: cnDate,
+          transactionType: "CN",
+          amount: Math.abs(order.creditNote.amount || 0),
+        });
+      }
+    }
+  }
+
+  return rows;
+}
+
+function buildRevenueRows(transactions: RevenueTransaction[], viewBy: string) {
+  const map = new Map<string, RevenueRow>();
+
+  for (const transaction of transactions) {
+    const period = buildPeriod(transaction.date, viewBy);
 
     if (!map.has(period.key)) {
       map.set(period.key, {
         periodKey: period.key,
         periodLabel: period.label,
-        totalOrders: 0,
-        totalRevenue: 0,
-        completedRevenue: 0,
-        pendingRevenue: 0,
+        orderTransactions: 0,
+        cnTransactions: 0,
+        grossSales: 0,
+        creditNoteTotal: 0,
+        netSales: 0,
       });
     }
 
     const row = map.get(period.key)!;
-    row.totalOrders += 1;
-    row.totalRevenue += amount;
 
-    if (displayStatus === "COMPLETED" || displayStatus === "READY_FOR_DOWNLOAD") {
-      row.completedRevenue += amount;
-    } else if (displayStatus !== "CANCELLED") {
-      row.pendingRevenue += amount;
+    if (transaction.transactionType === "ORDER") {
+      row.orderTransactions += 1;
+      row.grossSales += transaction.amount;
+    } else {
+      row.cnTransactions += 1;
+      row.creditNoteTotal += transaction.amount;
     }
+
+    row.netSales = row.grossSales - row.creditNoteTotal;
   }
 
   return Array.from(map.values()).sort((a, b) => a.periodKey.localeCompare(b.periodKey));
-}
-
-function escapeCsvValue(value: string | number | null | undefined) {
-  const normalized = String(value ?? "");
-  const escaped = normalized.replace(/"/g, '""');
-  return `"${escaped}"`;
 }
 
 export async function GET(req: Request) {
@@ -130,8 +173,6 @@ export async function GET(req: Request) {
   const result = (await getAllOrders({
     status,
     orderType,
-    dateFrom,
-    dateTo,
     page: 1,
     pageSize: 10000,
   })) as {
@@ -142,28 +183,32 @@ export async function GET(req: Request) {
     totalPages: number;
   };
 
-  const rows = buildRevenueRows(result.orders, viewBy);
+  const transactions = buildTransactions(result.orders, dateFrom, dateTo);
+  const rows = buildRevenueRows(transactions, viewBy);
 
   const csvRows = [
     [
       viewBy === "YEARLY" ? "Year" : viewBy === "DAILY" ? "Date" : "Month",
-      "Orders",
-      "Revenue",
-      "Completed Revenue",
-      "Pending Revenue",
+      "Order Transactions",
+      "CN Transactions",
+      "Gross Sales",
+      "Credit Note Total",
+      "Net Sales",
     ],
     ...rows.map((row) => [
       row.periodLabel,
-      row.totalOrders,
-      row.totalRevenue,
-      row.completedRevenue,
-      row.pendingRevenue,
+      row.orderTransactions,
+      row.cnTransactions,
+      row.grossSales,
+      row.creditNoteTotal,
+      row.netSales,
     ]),
   ];
 
   const csv = csvRows
     .map((row) => row.map((cell) => escapeCsvValue(cell)).join(","))
-    .join("\n");
+    .join("
+");
 
   return new NextResponse(csv, {
     status: 200,
