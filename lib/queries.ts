@@ -66,6 +66,7 @@ type AllOrdersOptions = {
   tuningType?: string;
   orderType?: string;
   paymentStatus?: string;
+  transactionView?: string;
   outstandingOnly?: boolean;
   dateFrom?: string;
   dateTo?: string;
@@ -165,10 +166,24 @@ export async function getAllOrders(filters?: AllOrdersOptions) {
       : {}),
     ...(filters?.search
       ? {
-          orderNumber: {
-            contains: filters.search,
-            mode: "insensitive",
-          },
+          OR: [
+            {
+              orderNumber: {
+                contains: filters.search,
+                mode: "insensitive",
+              },
+            },
+            {
+              creditNote: {
+                is: {
+                  cnNo: {
+                    contains: filters.search,
+                    mode: "insensitive",
+                  },
+                },
+              },
+            },
+          ],
         }
       : {}),
     ...(filters?.customerKeyword
@@ -212,6 +227,9 @@ export async function getAllOrders(filters?: AllOrdersOptions) {
       : {}),
     ...(filters?.orderType && filters.orderType !== "ALL"
       ? { orderType: filters.orderType as any }
+      : {}),
+    ...(filters?.transactionView === "CN"
+      ? { creditNote: { isNot: null } }
       : {}),
     ...(Object.keys(createdAt).length > 0 ? { createdAt } : {}),
   };

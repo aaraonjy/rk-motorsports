@@ -79,6 +79,12 @@ type ApiResponse = {
   retryAfterText?: string;
 };
 
+type TransactionView = "ALL" | "ORDER" | "CN";
+
+type DisplayRow =
+  | { kind: "ORDER"; order: OrderWithRelations }
+  | { kind: "CN"; order: OrderWithRelations; creditNote: CreditNote };
+
 function getStatusBadge(status: string) {
   switch (status) {
     case "AWAITING_PAYMENT":
@@ -188,6 +194,32 @@ function formatDisplayDate(value?: string | Date | null) {
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return "-";
   return date.toLocaleDateString("en-GB");
+}
+
+function getTransactionBadge(kind: "ORDER" | "CN") {
+  return kind === "CN"
+    ? "inline-flex min-w-[88px] items-center justify-center rounded-full border border-red-500/30 bg-red-500/15 px-3 py-1 text-center text-xs font-semibold text-red-300"
+    : "inline-flex min-w-[88px] items-center justify-center rounded-full border border-white/15 bg-white/10 px-3 py-1 text-center text-xs font-semibold text-white/80";
+}
+
+function getDisplayRows(orders: OrderWithRelations[], transactionView: TransactionView): DisplayRow[] {
+  if (transactionView === "ORDER") {
+    return orders.map((order) => ({ kind: "ORDER", order }));
+  }
+
+  if (transactionView === "CN") {
+    return orders
+      .filter((order) => !!order.creditNote)
+      .map((order) => ({ kind: "CN", order, creditNote: order.creditNote as CreditNote }));
+  }
+
+  return orders.flatMap((order) => {
+    const rows: DisplayRow[] = [{ kind: "ORDER", order }];
+    if (order.creditNote) {
+      rows.push({ kind: "CN", order, creditNote: order.creditNote });
+    }
+    return rows;
+  });
 }
 
 function getCustomOrderGrandTotal(order: OrderWithRelations) {
@@ -1225,9 +1257,11 @@ function CustomerDetails({ user }: { user?: User }) {
 export function OrderTable({
   orders,
   admin = false,
+  transactionView = "ORDER",
 }: {
   orders: OrderWithRelations[];
   admin?: boolean;
+  transactionView?: TransactionView;
 }) {
   const [activeRequest, setActiveRequest] = useState<{ details: string; title: string; subtitle: string } | null>(null);
   const [cancelOrderId, setCancelOrderId] = useState<string | null>(null);
@@ -1235,6 +1269,7 @@ export function OrderTable({
   const [releaseOrderId, setReleaseOrderId] = useState<string | null>(null);
   const [createCreditNoteOrderId, setCreateCreditNoteOrderId] = useState<string | null>(null);
   const [uploadModal, setUploadModal] = useState<UploadModalState>(null);
+  const displayRows = getDisplayRows(orders, admin ? transactionView : "ORDER");
 
   return (
     <>
@@ -1242,7 +1277,8 @@ export function OrderTable({
         <table className="min-w-full table-fixed text-left text-sm">
           <thead className="bg-black/50 text-white/65">
             <tr>
-              <th className="px-4 py-4 w-[140px]">Order</th>
+              <th className="px-4 py-4 w-[160px]">Transaction</th>
+              <th className="px-4 py-4 w-[90px]">Type</th>
               {admin ? <th className="px-4 py-4 w-[130px]">Customer</th> : null}
               <th className="px-4 py-4">Vehicle</th>
               <th className="px-4 py-4 w-[180px]">Status</th>
@@ -1253,7 +1289,10 @@ export function OrderTable({
           </thead>
 
           <tbody>
-            {orders.map((order) => {
+            {displayRows.map((row) => {
+              const order = row.order;
+              const isCreditNoteRow = row.kind === "CN";
+              const creditNote = row.kind === "CN" ? row.creditNote : order.creditNote;
               const customOrder = isCustomOrder(order);
               const tuningType = order.tuningType || "ECU";
               const needsEcu = !customOrder && (tuningType === "ECU" || tuningType === "ECU_TCU");
@@ -1341,6 +1380,87 @@ export function OrderTable({
                   ].join("\n")
                 : order.requestDetails || "";
 
+              if (isCreditNoteRow && creditNote) {
+                return (
+                  <tr
+                    key={`cn-${creditNote.id}`}
+                    className="border-t border-red-500/15 align-top bg-red-500/[0.04] transition-colors hover:bg-red-500/[0.06]"
+                  >
+                    <td className="px-4 py-4">
+                      <div className="font-semibold break-words text-red-200">{creditNote.cnNo}</div>
+                      <div className="text-red-200/75">{formatDisplayDate(creditNote.cnDate)}</div>
+                      <div className="text-red-200/60 text-xs">Ref: {order.orderNumber}</div>
+                    </td>
+
+                    <td className="px-4 py-4 align-top">
+                      <span className={getTransactionBadge("CN")}>CN</span>
+                    </td>
+
+                    {admin ? (
+                      <td className="px-4 py-4">
+                        <CustomerDetails user={order.user} />
+                      </td>
+                    ) : null}
+
+                    <td className="px-4 py-4">
+                      <div className="space-y-2 text-sm leading-6">
+                        <div>
+                          <span className="text-white/45">Reference Invoice:</span>{" "}
+                          <span className="text-white/90">{creditNote.referenceOrderNumber}</span>
+                        </div>
+                        <div>
+                          <span className="text-white/45">Order Type:</span>{" "}
+                          <span className="text-white/90">{customOrder ? "Custom Order" : "Standard Tuning"}</span>
+                        </div>
+                        <div>
+                          <span className="text-white/45">Reason:</span>{" "}
+                          <span className="text-red-200">{getCreditNoteReasonLabel(creditNote.reasonType)}</span>
+                        </div>
+                        {creditNote.reasonRemarks ? (
+                          <div>
+                            <span className="text-white/45">Remarks:</span>{" "}
+                            <span className="text-white/90">{creditNote.reasonRemarks}</span>
+                          </div>
+                        ) : null}
+                      </div>
+                    </td>
+
+                    <td className="px-4 py-4 align-top">
+                      <div className="flex flex-col items-start gap-3">
+                        <span className="inline-flex min-w-[122px] items-center justify-center rounded-full border border-red-500/30 bg-red-500/15 px-3 py-1 text-center text-xs font-semibold text-red-300">
+                          Credited
+                        </span>
+                        <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+                          <div className="font-semibold">CN No: {creditNote.cnNo}</div>
+                          <div className="mt-1 text-red-200/80">Issued on {formatDisplayDate(creditNote.cnDate)}</div>
+                        </div>
+                      </div>
+                    </td>
+
+                    <td className="px-4 py-4 whitespace-nowrap align-top text-red-200">- {formatCurrency(creditNote.amount)}</td>
+
+                    <td className="px-4 py-4 align-top">
+                      <div className="w-full max-w-[190px] rounded-xl border border-red-500/20 bg-red-500/10 p-3">
+                        <div className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-red-200/80">Credit Note</div>
+                        <div className="text-xs text-red-200/80">Separate CN transaction linked to the original invoice above.</div>
+                      </div>
+                    </td>
+
+                    <td className="px-4 py-4 align-top">
+                      <div className="flex w-full max-w-[170px] flex-col gap-2">
+                        <Link
+                          href={`/api/admin/credit-notes/${creditNote.id}`}
+                          className="inline-flex w-full min-h-[44px] flex-col items-center justify-center rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center text-sm whitespace-normal leading-5 transition hover:bg-white/10"
+                        >
+                          <span>Download</span>
+                          <span>Credit Note</span>
+                        </Link>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              }
+
               return (
                 <tr
                   key={order.id}
@@ -1356,6 +1476,10 @@ export function OrderTable({
                         hour12: true,
                       })}
                     </div>
+                  </td>
+
+                  <td className="px-4 py-4 align-top">
+                    <span className={getTransactionBadge("ORDER")}>ORDER</span>
                   </td>
 
                   {admin ? (
