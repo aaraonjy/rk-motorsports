@@ -235,6 +235,7 @@ export async function POST(req: Request) {
         orderNumber: generateOrderNumber(),
         userId: customer.id,
         createdByAdminId: user.id,
+        source: "ADMIN_PORTAL",
         status: "AWAITING_PAYMENT",
         orderType: "CUSTOM_ORDER",
         customTitle,

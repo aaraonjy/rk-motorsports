@@ -12,6 +12,7 @@ type AdminPageProps = {
     customerKeyword?: string;
     tuningType?: string;
     orderType?: string;
+    source?: string;
     paymentStatus?: string;
     outstandingOnly?: string;
     dateFrom?: string;
@@ -149,6 +150,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const customerKeyword = params.customerKeyword || "";
   const tuningType = params.tuningType || "ALL";
   const orderType = params.orderType || "ALL";
+  const source = params.source || "ALL";
   const paymentStatus = params.paymentStatus || "ALL";
   const outstandingOnly = params.outstandingOnly === "1";
   const dateFrom = params.dateFrom || "";
@@ -163,6 +165,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     customerKeyword,
     tuningType,
     orderType,
+    source,
     paymentStatus,
     outstandingOnly,
     dateFrom,
@@ -193,7 +196,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           <div className="card-rk p-6 text-white/75">
             <p>
               Search by transaction number, customer name, phone number, email, vehicle no, status,
-              tuning type, order type, transaction type, or date range to manage customer orders more efficiently.
+              tuning type, order type, source, transaction type, or date range to manage customer orders more efficiently.
             </p>
           </div>
 
@@ -309,6 +312,39 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   <option value="ALL">All Order Types</option>
                   <option value="STANDARD_TUNING">Standard Tuning</option>
                   <option value="CUSTOM_ORDER">Custom Order</option>
+                </select>
+
+                <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/60">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    className="h-5 w-5"
+                    aria-hidden="true"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.51a.75.75 0 0 1-1.08 0l-4.25-4.51a.75.75 0 0 1 .02-1.06Z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm text-white/65">
+                Source
+              </label>
+              <div className="relative">
+                <select
+                  name="source"
+                  defaultValue={source}
+                  className="w-full appearance-none rounded-xl border border-white/15 bg-black/50 px-4 py-3 pr-12 text-white outline-none"
+                >
+                  <option value="ALL">All Sources</option>
+                  <option value="ONLINE_PORTAL">Online Portal</option>
+                  <option value="ADMIN_PORTAL">Admin Portal</option>
                 </select>
 
                 <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/60">
@@ -463,6 +499,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               customerKeyword: customerKeyword || undefined,
               tuningType: tuningType !== "ALL" ? tuningType : undefined,
               orderType: orderType !== "ALL" ? orderType : undefined,
+              source: source !== "ALL" ? source : undefined,
               paymentStatus: paymentStatus !== "ALL" ? paymentStatus : undefined,
               transactionView: transactionView !== "ALL" ? transactionView : undefined,
               outstandingOnly: outstandingOnly ? "1" : undefined,

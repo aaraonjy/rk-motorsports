@@ -57,6 +57,11 @@ enum OrderType {
   CUSTOM_ORDER
 }
 
+enum OrderSource {
+  ONLINE_PORTAL
+  ADMIN_PORTAL
+}
+
 model User {
   id                 String         @id @default(cuid())
   name               String
@@ -132,6 +137,7 @@ model Order {
   orderNumber            String            @unique
   status                 OrderStatus       @default(AWAITING_PAYMENT)
   orderType              OrderType         @default(STANDARD_TUNING)
+  source                 OrderSource       @default(ONLINE_PORTAL)
   notes                  String?
   requestDetails         String?
   tuningType             TuningType        @default(ECU)
@@ -187,6 +193,7 @@ model Order {
 
   @@index([createdByAdminId])
   @@index([orderType])
+  @@index([source])
 }
 
 model OrderItem {

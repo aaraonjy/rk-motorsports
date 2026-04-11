@@ -301,6 +301,7 @@ export async function POST(req: Request) {
         orderNumber,
         userId: orderUserId,
         createdByAdminId,
+        source: adminMode ? "ADMIN_PORTAL" : "ONLINE_PORTAL",
         totalAmount: finalTotal,
         requestDetails,
         tuningType,

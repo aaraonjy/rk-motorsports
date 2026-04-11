@@ -65,6 +65,7 @@ type AllOrdersOptions = {
   customerKeyword?: string;
   tuningType?: string;
   orderType?: string;
+  source?: string;
   paymentStatus?: string;
   transactionView?: string;
   outstandingOnly?: boolean;
@@ -227,6 +228,9 @@ export async function getAllOrders(filters?: AllOrdersOptions) {
       : {}),
     ...(filters?.orderType && filters.orderType !== "ALL"
       ? { orderType: filters.orderType as any }
+      : {}),
+    ...(filters?.source && filters.source !== "ALL"
+      ? { source: filters.source as any }
       : {}),
     ...(filters?.transactionView === "CN"
       ? { creditNote: { isNot: null } }
