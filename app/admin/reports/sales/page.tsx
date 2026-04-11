@@ -126,8 +126,9 @@ function getReportStatusBadgeClass(label: string) {
     case "Paid":
       return "inline-flex min-w-[112px] items-center justify-center rounded-full border border-cyan-500/30 bg-cyan-500/15 px-3 py-1 text-center text-xs font-semibold text-cyan-300";
     default:
-      if (label.startsWith("Credit Note")):
+      if (label.startsWith("Credit Note")) {
         return "inline-flex min-w-[112px] items-center justify-center rounded-full border border-red-500/30 bg-red-500/15 px-3 py-1 text-center text-xs font-semibold text-red-300";
+      }
       return "inline-flex min-w-[112px] items-center justify-center rounded-full border border-white/15 bg-white/10 px-3 py-1 text-center text-xs font-semibold text-white/80";
   }
 }
