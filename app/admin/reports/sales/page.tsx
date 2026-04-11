@@ -211,7 +211,7 @@ function buildSalesTransactionRows(
           customerEmail: order.user?.email || "-",
           customerPhone: order.user?.phone || "-",
           orderTypeLabel: getOrderTypeLabel(order.orderType),
-          titleSummary: `Credit Note - ${getCreditNoteReasonLabel(order.creditNote.reasonType)}`,
+          titleSummary: getCreditNoteReasonLabel(order.creditNote.reasonType),
           tuningTypeLabel: getTuningTypeLabel(order),
           vehicleNo: order.vehicleNo || "-",
           statusLabel: `Credit Note`,
