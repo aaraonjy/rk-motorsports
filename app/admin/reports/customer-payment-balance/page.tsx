@@ -34,17 +34,17 @@ function formatDate(value: Date) {
 }
 
 function getOrderAmount(order: OrderWithRelations) {
-  return order.customGrandTotal ?? order.totalAmount ?? 0;
+  return Number(order.customGrandTotal ?? order.totalAmount ?? 0);
 }
 
 function getOrderOutstandingBalance(order: OrderWithRelations) {
   const grandTotal = getOrderAmount(order);
-  const outstanding = order.outstandingBalance ?? Math.max(grandTotal - (order.totalPaid ?? 0), 0);
-  return Math.max(outstanding, 0);
+  const outstanding = Number(order.outstandingBalance ?? Math.max(grandTotal - Number(order.totalPaid ?? 0), 0));
+  return Math.max(Number(outstanding), 0);
 }
 
 function getPaymentStatusLabel(order: OrderWithRelations) {
-  const totalPaid = order.totalPaid ?? 0;
+  const totalPaid = Number(order.totalPaid ?? 0);
   const outstandingBalance = getOrderOutstandingBalance(order);
 
   if (order.status === "COMPLETED") return "Completed";
@@ -55,7 +55,7 @@ function getPaymentStatusLabel(order: OrderWithRelations) {
 }
 
 function getPaymentStatusBadgeClass(order: OrderWithRelations) {
-  const totalPaid = order.totalPaid ?? 0;
+  const totalPaid = Number(order.totalPaid ?? 0);
   const outstandingBalance = getOrderOutstandingBalance(order);
 
   if (order.status === "COMPLETED") {

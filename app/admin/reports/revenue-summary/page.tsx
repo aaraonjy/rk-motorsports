@@ -40,10 +40,10 @@ function formatCurrency(value: number) {
 
 function getOrderAmount(order: OrderWithRelations) {
   if (order.orderType === "CUSTOM_ORDER") {
-    return order.customGrandTotal ?? order.totalAmount ?? 0;
+    return Number(order.customGrandTotal ?? order.totalAmount ?? 0);
   }
 
-  return order.totalAmount ?? 0;
+  return Number(order.totalAmount ?? 0);
 }
 
 function isWithinDateRange(value: Date, dateFrom?: string, dateTo?: string) {
@@ -87,7 +87,7 @@ function buildTransactions(
         rows.push({
           date: cnDate,
           transactionType: "CN",
-          amount: Math.abs(order.creditNote.amount || 0),
+          amount: Math.abs(Number(order.creditNote.amount || 0)),
         });
       }
     }

@@ -70,10 +70,10 @@ function getOrderTitle(order: OrderWithRelations) {
 
 function getOrderAmount(order: OrderWithRelations) {
   if (order.orderType === "CUSTOM_ORDER") {
-    return order.customGrandTotal ?? order.totalAmount ?? 0;
+    return Number(order.customGrandTotal ?? order.totalAmount ?? 0);
   }
 
-  return order.totalAmount ?? 0;
+  return Number(order.totalAmount ?? 0);
 }
 
 function getReportDisplayStatus(order: OrderWithRelations) {
@@ -216,7 +216,7 @@ function buildSalesTransactionRows(
           vehicleNo: order.vehicleNo || "-",
           statusLabel: `Credit Note`,
           referenceInvoiceNo: order.orderNumber,
-          amount: -Math.abs(order.creditNote.amount || 0),
+          amount: -Math.abs(Number(order.creditNote.amount || 0)),
         });
       }
     }

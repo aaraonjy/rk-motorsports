@@ -52,10 +52,10 @@ function getOrderTitle(order: OrderWithRelations) {
 
 function getOrderAmount(order: OrderWithRelations) {
   if (order.orderType === "CUSTOM_ORDER") {
-    return order.customGrandTotal ?? order.totalAmount ?? 0;
+    return Number(order.customGrandTotal ?? order.totalAmount ?? 0);
   }
 
-  return order.totalAmount ?? 0;
+  return Number(order.totalAmount ?? 0);
 }
 
 function getReportDisplayStatus(order: OrderWithRelations) {
