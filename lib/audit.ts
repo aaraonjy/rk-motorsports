@@ -48,22 +48,44 @@ export function extractUserAgent(headers: Headers) {
 }
 
 function resolveLocationFromHeaders(headers: Headers) {
-  const country =
+  const countryCode =
     headers.get("x-vercel-ip-country") ||
-    headers.get("x-country-code") ||
     headers.get("cf-ipcountry") ||
     null;
 
-  const region =
+  const regionCode =
     headers.get("x-vercel-ip-country-region") ||
-    headers.get("x-region") ||
-    headers.get("x-appengine-region") ||
     null;
 
   const city =
     headers.get("x-vercel-ip-city") ||
-    headers.get("x-city") ||
     null;
+
+  const countryMap: Record<string, string> = {
+    MY: "Malaysia",
+  };
+
+  const regionMap: Record<string, string> = {
+    "01": "Johor",
+    "02": "Kedah",
+    "03": "Kelantan",
+    "04": "Melaka",
+    "05": "Negeri Sembilan",
+    "06": "Pahang",
+    "07": "Penang",
+    "08": "Perak",
+    "09": "Perlis",
+    "10": "Selangor",
+    "11": "Terengganu",
+    "12": "Sabah",
+    "13": "Sarawak",
+    "14": "Kuala Lumpur",
+    "15": "Labuan",
+    "16": "Putrajaya",
+  };
+
+  const country = countryCode ? countryMap[countryCode] || countryCode : null;
+  const region = regionCode ? regionMap[regionCode] || regionCode : null;
 
   const parts = [city, region, country].filter(Boolean);
   return parts.length > 0 ? parts.join(", ") : null;
