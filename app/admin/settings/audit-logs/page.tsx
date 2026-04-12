@@ -139,16 +139,17 @@ export default async function AuditLogsPage({ searchParams }: AuditLogsPageProps
     <section className="section-pad">
       <div className="container-rk">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-          <div>
+          <div className="w-full">
             <p className="text-sm font-semibold uppercase tracking-[0.24em] text-red-400/80">Global Settings</p>
             <h1 className="mt-3 text-4xl font-bold">Audit Logs</h1>
             <p className="mt-4 max-w-3xl text-white/70">
               Review admin activity history across authentication, orders, payments, credit notes, payment slip updates,
               and report exports.
             </p>
-            <CleanupAuditLogsResult />
           </div>
         </div>
+
+        <CleanupAuditLogsResult />
 
         <form method="get" className="mt-4 card-rk p-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
