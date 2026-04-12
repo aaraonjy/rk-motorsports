@@ -170,6 +170,26 @@ function getPaymentModeLabel(value?: string | null) {
 }
 
 
+function getCreditNoteReasonLabel(value?: string | null) {
+  switch (value) {
+    case "CUSTOMER_CANCEL_ORDER":
+      return "Customer Cancel Order";
+    case "PRICING_CORRECTION":
+      return "Pricing Correction";
+    case "OVERCHARGE_ADJUSTMENT":
+      return "Overcharge Adjustment";
+    case "DUPLICATE_INVOICE":
+      return "Duplicate Invoice";
+    case "SERVICE_NOT_PROCEEDED":
+      return "Service Not Proceeded";
+    case "OTHER":
+      return "Other";
+    default:
+      return value || "-";
+  }
+}
+
+
 function formatDisplayDate(value?: string | Date | null) {
   if (!value) return "-";
   const date = value instanceof Date ? value : new Date(value);
