@@ -148,13 +148,6 @@ export default async function AuditLogsPage({ searchParams }: AuditLogsPageProps
           </div>
         </div>
 
-        <div className="mt-8 card-rk p-6 text-white/75">
-          <p>
-            Batch 3B adds audit log export, document reference filtering, and a 180-day retention cleanup option while
-            preserving your existing audit logic.
-          </p>
-        </div>
-
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap gap-3">
             {[1, 7, 30].map((period) => {
