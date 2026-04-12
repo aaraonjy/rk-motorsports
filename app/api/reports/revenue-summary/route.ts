@@ -199,9 +199,9 @@ export async function GET(req: Request) {
       row.periodLabel,
       row.orderTransactions,
       row.cnTransactions,
-      row.grossSales,
-      row.creditNoteTotal,
-      row.netSales,
+      formatCsvMoney(row.grossSales),
+      formatCsvMoney(row.creditNoteTotal),
+      formatCsvMoney(row.netSales),
     ]),
   ];
 

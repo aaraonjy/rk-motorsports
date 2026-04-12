@@ -227,7 +227,7 @@ export async function GET(req: Request) {
       row.vehicleNo,
       row.status,
       row.referenceInvoiceNo,
-      row.amount,
+      formatCsvMoney(row.amount),
     ]),
   ];
 

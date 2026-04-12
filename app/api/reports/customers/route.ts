@@ -66,7 +66,7 @@ export async function GET(req: Request) {
       customer.accountSource === "ADMIN" ? "Admin Created" : "Self Registered",
       customer.portalAccess ? "Enabled" : "Disabled",
       customer.totalOrders,
-      customer.totalSpent,
+      formatCsvMoney(customer.totalSpent),
       customer.lastOrderDate ? customer.lastOrderDate.toISOString() : "",
     ]),
   ];
