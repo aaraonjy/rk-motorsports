@@ -9,10 +9,10 @@ type AddPaymentPayload = {
   amount?: number | string;
 };
 
-function sanitizeWholeNumber(value: unknown) {
+function sanitizeMoneyAmount(value: unknown) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed < 0) return 0;
-  return Math.floor(parsed);
+  return Math.round((parsed + Number.EPSILON) * 100) / 100;
 }
 
 function isAllowedPaymentMode(value: string) {
@@ -73,9 +73,12 @@ export async function POST(
     }
 
     const paymentMode = String(body.paymentMode || "").trim().toUpperCase();
-    const amount = sanitizeWholeNumber(body.amount);
-    const grandTotal = order.customGrandTotal || order.totalAmount || 0;
-    const currentOutstandingBalance = Math.max(grandTotal - (order.totalPaid || 0), 0);
+    const amount = sanitizeMoneyAmount(body.amount);
+    const grandTotal = Number(order.customGrandTotal ?? order.totalAmount ?? 0);
+    const currentOutstandingBalance = Math.max(
+      grandTotal - Number(order.totalPaid ?? 0),
+      0
+    );
 
     if (!isAllowedPaymentMode(paymentMode)) {
       return NextResponse.json(
@@ -110,7 +113,10 @@ export async function POST(
 
     paymentDate.setHours(0, 0, 0, 0);
 
-    const allPayments = [...order.payments.map((payment) => ({ amount: payment.amount })), { amount }];
+    const allPayments = [
+      ...order.payments.map((payment) => ({ amount: Number(payment.amount || 0) })),
+      { amount },
+    ];
     const summary = calculatePaymentSummary(allPayments, grandTotal);
 
     await db.$transaction(async (tx) => {
@@ -126,8 +132,8 @@ export async function POST(
       await tx.order.update({
         where: { id: order.id },
         data: {
-          totalPaid: summary.totalPaid,
-          outstandingBalance: summary.outstandingBalance,
+          totalPaid: Number(summary.totalPaid || 0),
+          outstandingBalance: Number(summary.outstandingBalance || 0),
         },
       });
     });
