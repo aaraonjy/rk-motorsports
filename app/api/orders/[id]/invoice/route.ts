@@ -15,7 +15,7 @@ function formatDate(value: Date) {
   return new Date(value).toLocaleDateString("en-MY");
 }
 
-function formatMoney(value: number | string | null | undefined) {
+function formatMoney(value: unknown) {
   return `RM ${Number(value || 0).toFixed(2)}`;
 }
 
@@ -55,7 +55,7 @@ function formatPaymentModeLabel(paymentMode?: string | null) {
   }
 }
 
-function groupPaymentsByMode(payments: Array<{ paymentMode: string; amount: number }>) {
+function groupPaymentsByMode(payments: Array<{ paymentMode: string; amount: unknown }>) {
   const grouped = new Map<string, number>();
 
   for (const payment of payments) {
@@ -272,7 +272,7 @@ function drawPaymentSummary(params: {
   startY: number;
   totalPaid: number;
   outstandingBalance: number;
-  payments: Array<{ paymentMode: string; amount: number }>;
+  payments: Array<{ paymentMode: string; amount: unknown }>;
 }) {
   const { page, font, bold, left, right, startY, totalPaid, outstandingBalance, payments } = params;
   const paymentStatus = getPaymentStatus(totalPaid, outstandingBalance);
