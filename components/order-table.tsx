@@ -463,7 +463,7 @@ function CustomOrderDetails({ order }: { order: OrderWithRelations }) {
                   <div className="font-medium text-white/90">{item.description}</div>
                   <div className="text-xs text-white/55">
                     Qty {item.qty}
-                    {item.uom ? ` ${item.uom}` : ""} × {formatCurrency(item.unitPrice)} = {formatCurrency(item.lineTotal)}
+                    {item.uom ? ` ${item.uom}` : ""} × {formatCurrency(Number(item.unitPrice ?? 0))} = {formatCurrency(Number(item.lineTotal ?? 0))}
                   </div>
                 </div>
               ))}
@@ -1367,7 +1367,7 @@ export function OrderTable({
                     ...(order.customItems && order.customItems.length > 0
                       ? order.customItems.map(
                           (item, index) =>
-                            `${index + 1}. ${item.description} | Qty: ${item.qty}${item.uom ? ` ${item.uom}` : ""} | Unit Price: ${formatCurrency(item.unitPrice)} | Total: ${formatCurrency(item.lineTotal)}`
+                            `${index + 1}. ${item.description} | Qty: ${item.qty}${item.uom ? ` ${item.uom}` : ""} | Unit Price: ${formatCurrency(Number(item.unitPrice ?? 0))} | Total: ${formatCurrency(Number(item.lineTotal ?? 0))}`
                         )
                       : ["No line items"]),
                     ...(order.internalRemarks ? ["", `Internal Remarks: ${order.internalRemarks}`] : []),
