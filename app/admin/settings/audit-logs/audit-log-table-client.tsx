@@ -1,4 +1,4 @@
-"use client";
+\"use client\";
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
@@ -94,6 +94,25 @@ function JsonBlock({ value }: { value: unknown }) {
   );
 }
 
+function getActionTone(log: AuditLogRow) {
+  const moduleName = log.module.toUpperCase();
+  const actionName = log.action.toUpperCase();
+
+  if (moduleName === "CREDIT NOTES") {
+    return "text-amber-200";
+  }
+
+  if (actionName === "CANCEL" || actionName === "FAILED_LOGIN") {
+    return "text-red-300";
+  }
+
+  if (actionName === "COMPLETE" || actionName === "LOGIN" || actionName === "EXPORT") {
+    return "text-emerald-300";
+  }
+
+  return "text-white";
+}
+
 export function AuditLogTableClient({ logs, currentPage, totalPages, currentQuery }: AuditLogTableClientProps) {
   const [selectedLog, setSelectedLog] = useState<AuditLogRow | null>(null);
 
@@ -136,6 +155,8 @@ export function AuditLogTableClient({ logs, currentPage, totalPages, currentQuer
               ) : (
                 logs.map((log) => {
                   const formatted = formatDateTime(log.createdAt);
+                  const actionTone = getActionTone(log);
+
                   return (
                     <tr key={log.id} className="border-t border-white/8">
                       <td className="px-5 py-4 align-top">
@@ -147,12 +168,12 @@ export function AuditLogTableClient({ logs, currentPage, totalPages, currentQuer
                         <div className="mt-1 text-xs text-white/45">{log.userEmail || "-"}</div>
                       </td>
                       <td className="px-5 py-4 align-top">
-                        <div className="font-medium text-white">{log.description}</div>
+                        <div className={`font-medium ${actionTone}`}>{log.description}</div>
                         <div className="mt-1 text-xs text-white/45">{log.module} / {log.action}</div>
                       </td>
                       <td className="px-5 py-4 align-top">{log.entityCode || "-"}</td>
                       <td className="px-5 py-4 align-top">{log.ipAddress || "-"}</td>
-                      <td className="px-5 py-4 align-top">{log.location || "-"}</td>
+                      <td className="px-5 py-4 align-top">{log.location || log.ipAddress || "-"}</td>
                       <td className="px-5 py-4 align-top">
                         <span
                           className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
@@ -262,7 +283,7 @@ export function AuditLogTableClient({ logs, currentPage, totalPages, currentQuer
                   <div><span className="text-white/45">User:</span> {selectedLog.userName || "System"}</div>
                   <div><span className="text-white/45">Email:</span> {selectedLog.userEmail || "-"}</div>
                   <div><span className="text-white/45">IP:</span> {selectedLog.ipAddress || "-"}</div>
-                  <div><span className="text-white/45">Location:</span> {selectedLog.location || "-"}</div>
+                  <div><span className="text-white/45">Location:</span> {selectedLog.location || selectedLog.ipAddress || "-"}</div>
                   <div><span className="text-white/45">User Agent:</span> {selectedLog.userAgent || "-"}</div>
                   <div><span className="text-white/45">Request ID:</span> {selectedLog.requestId || "-"}</div>
                 </div>
@@ -271,11 +292,11 @@ export function AuditLogTableClient({ logs, currentPage, totalPages, currentQuer
 
             <div className="mt-6 grid gap-4 md:grid-cols-2">
               <div>
-                <div className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-white/45">Old Values</div>
+                <div className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-white/45">Before Change</div>
                 <JsonBlock value={selectedLog.oldValues} />
               </div>
               <div>
-                <div className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-white/45">New Values</div>
+                <div className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-white/45">After Change</div>
                 <JsonBlock value={selectedLog.newValues} />
               </div>
             </div>

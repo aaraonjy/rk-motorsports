@@ -57,7 +57,7 @@ export async function resolveLocationFromIp(ipAddress?: string | null) {
     });
 
     if (!response.ok) {
-      return null;
+      return `IP: ${ipAddress}`;
     }
 
     const data = (await response.json()) as {
@@ -68,13 +68,13 @@ export async function resolveLocationFromIp(ipAddress?: string | null) {
     };
 
     if (data.success === false) {
-      return null;
+      return `IP: ${ipAddress}`;
     }
 
-    const parts = [data.region, data.country].filter(Boolean);
-    return parts.length > 0 ? parts.join(", ") : null;
+    const parts = [data.city, data.region, data.country].filter(Boolean);
+    return parts.length > 0 ? parts.join(", ") : `IP: ${ipAddress}`;
   } catch {
-    return null;
+    return `IP: ${ipAddress}`;
   }
 }
 
@@ -101,7 +101,6 @@ export async function createAuditLog(input: AuditLogInput) {
     },
   });
 }
-
 
 type AuditRequestUser = {
   id?: string | null;

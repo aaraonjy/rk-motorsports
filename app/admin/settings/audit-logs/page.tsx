@@ -15,13 +15,30 @@ type AuditLogsPageProps = {
   }>;
 };
 
-const PERIOD_OPTIONS = [30, 60, 90, 120] as const;
+const PERIOD_OPTIONS = [1, 7, 30, 60, 90, 120] as const;
 const PAGE_SIZE = 25;
 
 function getDateFromPeriod(period: number) {
   const date = new Date();
   date.setDate(date.getDate() - period);
   return date;
+}
+
+function getQuickFilterLabel(period: number) {
+  switch (period) {
+    case 1:
+      return "Today";
+    case 7:
+      return "Last 7 days";
+    case 30:
+      return "Last 30 days";
+    default:
+      return `Last ${period} days`;
+  }
+}
+
+function buildQuickFilterHref(period: number) {
+  return `/admin/settings/audit-logs?period=${period}`;
 }
 
 export default async function AuditLogsPage({ searchParams }: AuditLogsPageProps) {
@@ -121,8 +138,27 @@ export default async function AuditLogsPage({ searchParams }: AuditLogsPageProps
 
         <div className="mt-8 card-rk p-6 text-white/75">
           <p>
-            Batch 2B includes report export logging, payment slip replacement logging, audit log details view, and paginated audit browsing.
+            Batch 3A improves location fallback, audit details readability, critical action visibility, and quick time filters without changing your existing audit business logic.
           </p>
+        </div>
+
+        <div className="mt-4 flex flex-wrap gap-3">
+          {[1, 7, 30].map((period) => {
+            const isActive = selectedPeriod === period;
+            return (
+              <a
+                key={period}
+                href={buildQuickFilterHref(period)}
+                className={`rounded-2xl border px-4 py-2 text-sm font-semibold transition ${
+                  isActive
+                    ? "border-red-500/40 bg-red-500/10 text-red-200"
+                    : "border-white/15 text-white/75 hover:bg-white/10 hover:text-white"
+                }`}
+              >
+                {getQuickFilterLabel(period)}
+              </a>
+            );
+          })}
         </div>
 
         <form method="get" className="mt-4 card-rk grid gap-4 p-6 md:grid-cols-2 xl:grid-cols-3">
@@ -131,7 +167,7 @@ export default async function AuditLogsPage({ searchParams }: AuditLogsPageProps
             <div className="relative">
               <select name="period" defaultValue={String(selectedPeriod)} className="w-full appearance-none rounded-xl border border-white/15 bg-black/50 px-4 py-3 pr-12 text-white outline-none">
                 {PERIOD_OPTIONS.map((period) => (
-                  <option key={period} value={period}>Last {period} days</option>
+                  <option key={period} value={period}>{getQuickFilterLabel(period)}</option>
                 ))}
               </select>
               <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/60">
