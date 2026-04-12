@@ -62,6 +62,11 @@ enum OrderSource {
   ADMIN_PORTAL
 }
 
+enum DocType {
+  CS
+  INV
+}
+
 model User {
   id                 String         @id @default(cuid())
   name               String
@@ -138,6 +143,7 @@ model Order {
   status                 OrderStatus       @default(AWAITING_PAYMENT)
   orderType              OrderType         @default(STANDARD_TUNING)
   source                 OrderSource       @default(ONLINE_PORTAL)
+  docType                DocType?
   notes                  String?
   requestDetails         String?
   tuningType             TuningType        @default(ECU)
@@ -194,6 +200,7 @@ model Order {
   @@index([createdByAdminId])
   @@index([orderType])
   @@index([source])
+  @@index([docType])
 }
 
 model OrderItem {

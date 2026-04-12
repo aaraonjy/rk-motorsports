@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
-import { generateOrderNumber } from "@/lib/utils";
+import { generateOrderDocumentNumber } from "@/lib/document-number";
 import {
   saveFile,
   validatePackageUploadFiles,
@@ -239,6 +239,7 @@ export async function POST(req: Request) {
 
     const calculatedTotal = calculatedBaseTotal + calculatedAddOnTotal;
     const finalTotal = estimatedTotalRaw > 0 ? estimatedTotalRaw : calculatedTotal;
+    const docType = "INV";
 
     const requestDetailsLines = [
       `Tuning Type: ${tuningType}`,
@@ -267,7 +268,7 @@ export async function POST(req: Request) {
     ];
 
     const requestDetails = requestDetailsLines.join("\n");
-    const orderNumber = generateOrderNumber();
+    const orderNumber = await generateOrderDocumentNumber(docType);
 
     const filesToCreate: Array<{
       kind: string;
@@ -302,6 +303,7 @@ export async function POST(req: Request) {
         userId: orderUserId,
         createdByAdminId,
         source: adminMode ? "ADMIN_PORTAL" : "ONLINE_PORTAL",
+        docType,
         totalAmount: finalTotal,
         requestDetails,
         tuningType,

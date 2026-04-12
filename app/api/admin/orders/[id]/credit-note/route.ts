@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { generateCreditNoteNumber } from "@/lib/utils";
+import { generateCreditNoteDocumentNumber } from "@/lib/document-number";
 
 type ApiResponse = {
   ok: boolean;
@@ -109,7 +109,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
 
     await db.creditNote.create({
       data: {
-        cnNo: generateCreditNoteNumber(cnDate),
+        cnNo: await generateCreditNoteDocumentNumber(cnDate),
         cnDate,
         orderId: order.id,
         customerId: order.userId,

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
-import { generateOrderNumber } from "@/lib/utils";
+import { generateOrderDocumentNumber } from "@/lib/document-number";
 import { createAdminNotification } from "@/lib/notifications";
 import { calculatePaymentSummary } from "@/lib/payment-summary";
 import { saveFile } from "@/lib/storage";
@@ -230,6 +230,9 @@ export async function POST(req: Request) {
       });
     }
 
+    const docType = paymentSummary.outstandingBalance > 0 ? "INV" : "CS";
+    const orderNumber = await generateOrderDocumentNumber(docType);
+
     const requestDetailsLines = [
       `Order Type: Custom Order`,
       `Title / Summary: ${customTitle}`,
@@ -244,10 +247,11 @@ export async function POST(req: Request) {
 
     const order = await db.order.create({
       data: {
-        orderNumber: generateOrderNumber(),
+        orderNumber,
         userId: customer.id,
         createdByAdminId: user.id,
         source: "ADMIN_PORTAL",
+        docType,
         status: "AWAITING_PAYMENT",
         orderType: "CUSTOM_ORDER",
         customTitle,
