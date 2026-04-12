@@ -3,6 +3,7 @@ import Image from "next/image";
 import { getSessionUser } from "@/lib/auth";
 import { AdminNotificationBell } from "@/components/admin-notification-bell";
 import { SiteHeaderClient } from "@/components/site-header-client";
+import { AdminGlobalSettingsMenu } from "@/components/admin-global-settings-menu";
 
 const publicNav = [
   ["Services", "/#services"],
@@ -47,6 +48,7 @@ export async function SiteHeader() {
                 {label}
               </Link>
             ))}
+            {user?.role === "ADMIN" ? <AdminGlobalSettingsMenu /> : null}
           </nav>
 
           <div className="hidden h-6 w-px bg-white/10 md:block" />

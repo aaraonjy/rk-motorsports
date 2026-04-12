@@ -330,3 +330,31 @@ model Notification {
   @@index([userId, isRead, createdAt])
   @@index([orderId, createdAt])
 }
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  createdAt   DateTime @default(now())
+  userId      String?
+  userName    String?
+  userEmail   String?
+  userRole    String?
+  module      String
+  action      String
+  entityType  String?
+  entityId    String?
+  entityCode  String?
+  description String
+  oldValues   Json?
+  newValues   Json?
+  ipAddress   String?
+  location    String?
+  userAgent   String?
+  status      String
+  requestId   String?
+
+  @@index([createdAt])
+  @@index([module, action])
+  @@index([status, createdAt])
+  @@index([entityType, entityId])
+  @@index([userEmail, createdAt])
+}
