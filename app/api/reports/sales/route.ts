@@ -250,7 +250,7 @@ export async function GET(req: Request) {
       entityType: "Report",
       entityCode: "Sales Report",
       description: `${user.name} exported Sales Report.`,
-      newValues: { status, search, customerKeyword, tuningType, orderType, source, paymentStatus, documentType, dateFrom, dateTo },
+      newValues: { status, search, customerKeyword, tuningType, orderType, dateFrom, dateTo },
       status: "SUCCESS",
     });
   } catch (error) {
