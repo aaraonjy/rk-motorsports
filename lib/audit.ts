@@ -48,15 +48,26 @@ export function extractUserAgent(headers: Headers) {
 }
 
 export async function resolveLocationFromIp(ipAddress?: string | null) {
-  if (!ipAddress || ipAddress === "127.0.0.1") return null;
+  if (!ipAddress || ipAddress === "127.0.0.1") {
+    console.log("[audit] location skip: missing or localhost IP", { ipAddress });
+    return null;
+  }
 
   try {
-    const response = await fetch(`https://ipwho.is/${encodeURIComponent(ipAddress)}`, {
+    const url = `https://ipwho.is/${encodeURIComponent(ipAddress)}`;
+    const response = await fetch(url, {
       method: "GET",
       cache: "no-store",
     });
 
+    console.log("[audit] ipwho.is response", {
+      ipAddress,
+      status: response.status,
+      ok: response.ok,
+    });
+
     if (!response.ok) {
+      console.log("[audit] ipwho.is non-ok fallback", { ipAddress });
       return `IP: ${ipAddress}`;
     }
 
@@ -65,15 +76,31 @@ export async function resolveLocationFromIp(ipAddress?: string | null) {
       country?: string | null;
       region?: string | null;
       city?: string | null;
+      message?: string | null;
     };
 
+    console.log("[audit] ipwho.is payload", {
+      ipAddress,
+      success: data.success,
+      city: data.city,
+      region: data.region,
+      country: data.country,
+      message: data.message,
+    });
+
     if (data.success === false) {
+      console.log("[audit] ipwho.is success=false fallback", { ipAddress, data });
       return `IP: ${ipAddress}`;
     }
 
     const parts = [data.city, data.region, data.country].filter(Boolean);
-    return parts.length > 0 ? parts.join(", ") : `IP: ${ipAddress}`;
-  } catch {
+    const location = parts.length > 0 ? parts.join(", ") : `IP: ${ipAddress}`;
+
+    console.log("[audit] resolved location", { ipAddress, location });
+
+    return location;
+  } catch (error) {
+    console.error("[audit] location lookup failed", { ipAddress, error });
     return `IP: ${ipAddress}`;
   }
 }
