@@ -101,3 +101,34 @@ export async function createAuditLog(input: AuditLogInput) {
     },
   });
 }
+
+
+type AuditRequestUser = {
+  id?: string | null;
+  name?: string | null;
+  email?: string | null;
+  role?: string | null;
+};
+
+type AuditLogFromRequestInput = Omit<AuditLogInput, "userId" | "userName" | "userEmail" | "userRole" | "ipAddress" | "location" | "userAgent"> & {
+  req: Request | Headers;
+  user?: AuditRequestUser | null;
+};
+
+export async function createAuditLogFromRequest(input: AuditLogFromRequestInput) {
+  const headers = input.req instanceof Headers ? input.req : input.req.headers;
+  const ipAddress = extractIpAddress(headers);
+  const userAgent = extractUserAgent(headers);
+  const location = await resolveLocationFromIp(ipAddress);
+
+  return createAuditLog({
+    ...input,
+    userId: input.user?.id ?? null,
+    userName: input.user?.name ?? null,
+    userEmail: input.user?.email ?? null,
+    userRole: input.user?.role ?? null,
+    ipAddress,
+    location,
+    userAgent,
+  });
+}
