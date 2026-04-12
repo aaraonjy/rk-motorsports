@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
+import { createAuditLogFromRequest } from "@/lib/audit";
 import { getCustomersReport } from "@/lib/queries";
 
 function formatCsvMoney(value: unknown) {
@@ -79,6 +80,22 @@ export async function GET(req: Request) {
   const csv = rows
     .map((row) => row.map((cell) => escapeCsvValue(cell)).join(","))
     .join("\n");
+
+  try {
+    await createAuditLogFromRequest({
+      req,
+      user,
+      module: "Reports",
+      action: "EXPORT",
+      entityType: "Report",
+      entityCode: "Customers Report",
+      description: `${user.name} exported Customers Report.`,
+      newValues: { search, source, portalAccess, dateFrom, dateTo },
+      status: "SUCCESS",
+    });
+  } catch (error) {
+    console.error("Audit log creation failed:", error);
+  }
 
   return new NextResponse(csv, {
     status: 200,

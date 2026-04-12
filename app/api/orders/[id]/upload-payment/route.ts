@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { saveFile, validateSinglePaymentUploadFile } from "@/lib/storage";
+import { createAuditLogFromRequest } from "@/lib/audit";
 import {
   buildRateLimitHeaders,
   checkRateLimit,
@@ -130,6 +131,36 @@ export async function POST(
       } catch (err) {
         console.error("Admin notification failed:", err);
       }
+    }
+
+    try {
+      await createAuditLogFromRequest({
+        req,
+        user,
+        module: "Payments",
+        action: existingPayment ? "REPLACE_SLIP" : "UPLOAD_SLIP",
+        entityType: "PaymentSlip",
+        entityId: order.id,
+        entityCode: order.orderNumber,
+        description: `${user.name} ${existingPayment ? "replaced" : "uploaded"} payment slip for order ${order.orderNumber}.`,
+        oldValues: existingPayment
+          ? {
+              fileName: existingPayment.fileName,
+              storagePath: existingPayment.storagePath,
+              mimeType: existingPayment.mimeType,
+            }
+          : null,
+        newValues: {
+          fileName: saved.fileName,
+          storagePath: saved.storagePath,
+          mimeType: saved.mimeType,
+          uploadedByRole: user.role,
+          orderStatus: !isAdminUploadingForAdminCreatedOrder ? "AWAITING_PAYMENT" : order.status,
+        },
+        status: "SUCCESS",
+      });
+    } catch (error) {
+      console.error("Audit log creation failed:", error);
     }
 
     const success = existingPayment ? "payment_replaced" : "payment_uploaded";
