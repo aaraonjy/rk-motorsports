@@ -115,43 +115,6 @@ function getActionTone(log: AuditLogRow) {
   return "text-white";
 }
 
-function getModuleBadgeClass(moduleName: string) {
-  switch (moduleName.toUpperCase()) {
-    case "AUTHENTICATION":
-      return "border-sky-500/30 bg-sky-500/15 text-sky-300";
-    case "ORDERS":
-      return "border-violet-500/30 bg-violet-500/15 text-violet-300";
-    case "PAYMENTS":
-      return "border-cyan-500/30 bg-cyan-500/15 text-cyan-300";
-    case "CREDIT NOTES":
-      return "border-amber-500/30 bg-amber-500/15 text-amber-300";
-    case "REPORTS":
-      return "border-emerald-500/30 bg-emerald-500/15 text-emerald-300";
-    default:
-      return "border-white/15 bg-white/10 text-white/75";
-  }
-}
-
-function getActionBadgeClass(actionName: string) {
-  switch (actionName.toUpperCase()) {
-    case "CANCEL":
-    case "FAILED_LOGIN":
-      return "border-red-500/30 bg-red-500/15 text-red-300";
-    case "COMPLETE":
-    case "LOGIN":
-    case "EXPORT":
-      return "border-emerald-500/30 bg-emerald-500/15 text-emerald-300";
-    case "CREATE":
-    case "UPLOAD_SLIP":
-    case "REPLACE_SLIP":
-      return "border-cyan-500/30 bg-cyan-500/15 text-cyan-300";
-    case "UPDATE":
-      return "border-violet-500/30 bg-violet-500/15 text-violet-300";
-    default:
-      return "border-white/15 bg-white/10 text-white/75";
-  }
-}
-
 export function AuditLogTableClient({ logs, currentPage, totalPages, currentQuery }: AuditLogTableClientProps) {
   const [selectedLog, setSelectedLog] = useState<AuditLogRow | null>(null);
 
@@ -208,10 +171,6 @@ export function AuditLogTableClient({ logs, currentPage, totalPages, currentQuer
                       </td>
                       <td className="px-5 py-4 align-top">
                         <div className={`font-medium ${actionTone}`}>{log.description}</div>
-                        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-                          <span className={`inline-flex rounded-full border px-2.5 py-1 font-semibold ${getModuleBadgeClass(log.module)}`}>{log.module}</span>
-                          <span className={`inline-flex rounded-full border px-2.5 py-1 font-semibold ${getActionBadgeClass(log.action)}`}>{log.action}</span>
-                        </div>
                       </td>
                       <td className="px-5 py-4 align-top">{log.entityCode || "-"}</td>
                       <td className="px-5 py-4 align-top">{log.ipAddress || "-"}</td>
