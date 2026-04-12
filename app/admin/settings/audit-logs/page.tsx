@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { redirect } from "next/navigation";
 import { AuditLogTableClient } from "./audit-log-table-client";
 import { CleanupAuditLogsButton } from "./cleanup-audit-logs-button";
+import { CleanupAuditLogsResult } from "./cleanup-audit-logs-result";
 
 type AuditLogsPageProps = {
   searchParams?: Promise<{
@@ -145,6 +146,7 @@ export default async function AuditLogsPage({ searchParams }: AuditLogsPageProps
               Review admin activity history across authentication, orders, payments, credit notes, payment slip updates,
               and report exports.
             </p>
+            <CleanupAuditLogsResult />
           </div>
         </div>
 

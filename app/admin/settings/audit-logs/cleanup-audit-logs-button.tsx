@@ -10,23 +10,28 @@ type CleanupAuditLogsButtonProps = {
 type CleanupState =
   | { tone: "success"; message: string }
   | { tone: "neutral"; message: string }
-  | { tone: "error"; message: string }
-  | null;
+  | { tone: "error"; message: string };
 
 export function CleanupAuditLogsButton({ retentionDays }: CleanupAuditLogsButtonProps) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [result, setResult] = useState<CleanupState>(null);
 
   function closeModal() {
     if (isSubmitting) return;
     setIsModalOpen(false);
   }
 
+  function emitResult(result: CleanupState) {
+    window.dispatchEvent(
+      new CustomEvent("rk-audit-cleanup-result", {
+        detail: result,
+      })
+    );
+  }
+
   async function handleCleanup() {
     setIsSubmitting(true);
-    setResult(null);
 
     try {
       const response = await fetch("/api/admin/settings/audit-logs/cleanup", {
@@ -41,7 +46,7 @@ export function CleanupAuditLogsButton({ retentionDays }: CleanupAuditLogsButton
       const data = await response.json();
 
       if (!response.ok || !data.ok) {
-        setResult({
+        emitResult({
           tone: "error",
           message: data.error || "Unable to clean audit logs right now.",
         });
@@ -49,7 +54,7 @@ export function CleanupAuditLogsButton({ retentionDays }: CleanupAuditLogsButton
       }
 
       setIsModalOpen(false);
-      setResult(
+      emitResult(
         data.deletedCount > 0
           ? {
               tone: "success",
@@ -62,7 +67,7 @@ export function CleanupAuditLogsButton({ retentionDays }: CleanupAuditLogsButton
       );
       router.refresh();
     } catch {
-      setResult({
+      emitResult({
         tone: "error",
         message: "Unable to clean audit logs right now.",
       });
@@ -71,34 +76,16 @@ export function CleanupAuditLogsButton({ retentionDays }: CleanupAuditLogsButton
     }
   }
 
-  const resultClassName =
-    result?.tone === "success"
-      ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200"
-      : result?.tone === "neutral"
-        ? "border-white/15 bg-white/5 text-white/70"
-        : "border-red-500/30 bg-red-500/10 text-red-200";
-
   return (
     <>
-      <div className="flex flex-col items-end gap-3">
-        <button
-          type="button"
-          onClick={() => {
-            setResult(null);
-            setIsModalOpen(true);
-          }}
-          disabled={isSubmitting}
-          className="rounded-2xl border border-red-500/30 px-5 py-3 text-sm font-semibold text-red-200 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {isSubmitting ? "Cleaning..." : `Delete Logs > ${retentionDays} Days`}
-        </button>
-
-        {result ? (
-          <div className={`max-w-md rounded-2xl border px-4 py-3 text-sm ${resultClassName}`}>
-            {result.message}
-          </div>
-        ) : null}
-      </div>
+      <button
+        type="button"
+        onClick={() => setIsModalOpen(true)}
+        disabled={isSubmitting}
+        className="rounded-2xl border border-red-500/30 px-5 py-3 text-sm font-semibold text-red-200 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {isSubmitting ? "Cleaning..." : `Delete Logs > ${retentionDays} Days`}
+      </button>
 
       {isModalOpen ? (
         <div className="fixed inset-0 z-[160] flex items-center justify-center bg-black/75 px-4 py-6">
