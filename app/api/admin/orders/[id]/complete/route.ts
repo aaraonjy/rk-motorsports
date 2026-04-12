@@ -30,8 +30,12 @@ export async function POST(
     const isCustomOrder = order.orderType === "CUSTOM_ORDER";
 
     if (isCustomOrder) {
+      const fallbackOutstanding =
+        Number(order.customGrandTotal || order.totalAmount || 0) -
+        Number(order.totalPaid || 0);
+
       const outstandingBalance = Math.max(
-        order.outstandingBalance ?? ((order.customGrandTotal || order.totalAmount || 0) - (order.totalPaid || 0)),
+        Number(order.outstandingBalance ?? fallbackOutstanding),
         0
       );
 
@@ -93,8 +97,8 @@ export async function POST(
             order.tuningType === "ECU_TCU"
               ? "Payment received, your tuned ECU and TCU files are ready to download."
               : order.tuningType === "TCU"
-              ? "Payment received, your tuned TCU file is ready to download."
-              : "Payment received, your tuned ECU file is ready to download.",
+                ? "Payment received, your tuned TCU file is ready to download."
+                : "Payment received, your tuned ECU file is ready to download.",
           orderId: id,
         },
       });

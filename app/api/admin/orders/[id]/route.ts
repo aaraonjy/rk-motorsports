@@ -18,16 +18,6 @@ function sanitizeWholeNumber(value: unknown) {
   return Math.floor(parsed);
 }
 
-function sanitizeMoneyAmount(value: unknown) {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed) || parsed < 0) return 0;
-  return Math.round((parsed + Number.EPSILON) * 100) / 100;
-}
-
-function nearlyEqual(a: number, b: number) {
-  return Math.abs(a - b) < 0.005;
-}
-
 function isAllowedPaymentMode(value: string) {
   return ["CASH", "CARD", "BANK_TRANSFER", "QR"].includes(value);
 }
@@ -101,7 +91,7 @@ export async function PUT(
     const itemsRaw = String(form.get("items") || "[]");
     const items = JSON.parse(itemsRaw) as CustomOrderItemPayload[];
     const paymentMode = String(form.get("paymentMode") || "CASH").trim().toUpperCase();
-    const paymentAmount = sanitizeMoneyAmount(form.get("paymentAmount"));
+    const paymentAmount = sanitizeWholeNumber(form.get("paymentAmount"));
 
     if (!customerId || customerId !== order.userId) {
       return NextResponse.json(
@@ -128,8 +118,8 @@ export async function PUT(
       .map((item) => {
         const description = String(item.description || "").trim();
         const qty = Math.max(1, sanitizeWholeNumber(item.qty));
-        const unitPrice = Math.max(0, sanitizeMoneyAmount(item.unitPrice));
-        const lineTotal = Math.round((qty * unitPrice + Number.EPSILON) * 100) / 100;
+        const unitPrice = Math.max(0, sanitizeWholeNumber(item.unitPrice));
+        const lineTotal = qty * unitPrice;
         const uom = String(item.uom || "").trim();
 
         return {
@@ -149,24 +139,27 @@ export async function PUT(
       );
     }
 
-    const calculatedSubtotal = Math.round((normalizedItems.reduce(
+    const calculatedSubtotal = normalizedItems.reduce(
       (sum, item) => sum + item.lineTotal,
       0
-    ) + Number.EPSILON) * 100) / 100;
-    const customDiscount = Math.max(0, sanitizeMoneyAmount(form.get("customDiscount")));
-    const calculatedGrandTotal = Math.round((Math.max(calculatedSubtotal - customDiscount, 0) + Number.EPSILON) * 100) / 100;
+    );
+    const customDiscount = Math.max(0, sanitizeWholeNumber(form.get("customDiscount")));
+    const calculatedGrandTotal = Math.max(calculatedSubtotal - customDiscount, 0);
 
-    const customSubtotal = sanitizeMoneyAmount(form.get("customSubtotal"));
-    const customGrandTotal = sanitizeMoneyAmount(form.get("customGrandTotal"));
+    const customSubtotal = sanitizeWholeNumber(form.get("customSubtotal"));
+    const customGrandTotal = sanitizeWholeNumber(form.get("customGrandTotal"));
 
-    if (!nearlyEqual(customSubtotal, calculatedSubtotal) || !nearlyEqual(customGrandTotal, calculatedGrandTotal)) {
+    if (customSubtotal !== calculatedSubtotal || customGrandTotal !== calculatedGrandTotal) {
       return NextResponse.json(
         { ok: false, error: "Order totals are invalid. Please refresh and try again." },
         { status: 400 }
       );
     }
 
-    const existingTotalPaid = order.payments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
+    const existingTotalPaid = order.payments.reduce(
+      (sum, payment) => sum + Number(payment.amount || 0),
+      0
+    );
 
     if (calculatedGrandTotal < existingTotalPaid) {
       return NextResponse.json(
@@ -212,7 +205,7 @@ export async function PUT(
       );
     }
 
-    const currentOutstandingBalance = Math.round((Math.max(calculatedGrandTotal - existingTotalPaid, 0) + Number.EPSILON) * 100) / 100;
+    const currentOutstandingBalance = Math.max(calculatedGrandTotal - existingTotalPaid, 0);
 
     if (paymentAmount > currentOutstandingBalance) {
       return NextResponse.json(
@@ -241,14 +234,13 @@ export async function PUT(
 
     const requestDetailsLines = [
       `Order Type: Custom Order`,
-      `Document Date: ${new Date(order.documentDate || order.createdAt).toISOString().slice(0, 10)}`,
       `Title / Summary: ${customTitle}`,
       `Vehicle No: ${vehicleNo || "None"}`,
       `Internal Remarks: ${internalRemarks || "None"}`,
-      `Subtotal: RM${calculatedSubtotal.toFixed(2)}`,
-      `Discount: RM${customDiscount.toFixed(2)}`,
-      `Grand Total: RM${calculatedGrandTotal.toFixed(2)}`,
-      `New Payment Added: RM${paymentAmount.toFixed(2)}`,
+      `Subtotal: RM${calculatedSubtotal}`,
+      `Discount: RM${customDiscount}`,
+      `Grand Total: RM${calculatedGrandTotal}`,
+      `New Payment Added: RM${paymentAmount}`,
       `Items: ${normalizedItems.length}`,
     ];
 
@@ -284,8 +276,8 @@ export async function PUT(
           customDiscount,
           customGrandTotal: calculatedGrandTotal,
           totalAmount: calculatedGrandTotal,
-          totalPaid: Number(paymentSummary.totalPaid || 0),
-          outstandingBalance: Number(paymentSummary.outstandingBalance || 0),
+          totalPaid: paymentSummary.totalPaid,
+          outstandingBalance: paymentSummary.outstandingBalance,
           requestDetails: requestDetailsLines.join("\n"),
           customItems: {
             create: normalizedItems,
