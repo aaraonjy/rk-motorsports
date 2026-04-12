@@ -4,10 +4,13 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  CustomOrderItem,
   Order,
   OrderFile,
   OrderItem,
   OrderRevision,
+  CreditNote,
+  Payment,
   Product,
   User,
 } from "@prisma/client";
@@ -26,6 +29,7 @@ export type OrderWithRelations = Order & {
   files: OrderFile[];
   revisions: (OrderRevision & { orderFile: OrderFile })[];
   items: (OrderItem & { product: Product })[];
+  customItems?: CustomOrderItem[];
   engineModel?: string | null;
   engineCapacity?: string | number | null;
   currentEcuSetupStage?: string | null;
@@ -36,8 +40,20 @@ export type OrderWithRelations = Order & {
   engineMods?: string | null;
   engineModsOther?: string | null;
   additionalDetails?: string | null;
+  createdByAdminId?: string | null;
   cancelledBy?: "CUSTOMER" | "ADMIN" | null;
   cancelReason?: string | null;
+  orderType?: "STANDARD_TUNING" | "CUSTOM_ORDER" | null;
+  customTitle?: string | null;
+  internalRemarks?: string | null;
+  customSubtotal?: number | null;
+  customDiscount?: number | null;
+  customGrandTotal?: number | null;
+  vehicleNo?: string | null;
+  totalPaid?: number | null;
+  outstandingBalance?: number | null;
+  payments?: Payment[];
+  creditNote?: CreditNote | null;
 };
 
 type UploadModalState =
@@ -47,12 +63,13 @@ type UploadModalState =
         | "admin-upload-tcu"
         | "admin-upload-revision-ecu"
         | "admin-upload-revision-tcu"
+        | "admin-upload-payment"
+        | "admin-replace-payment"
         | "customer-upload-payment"
         | "customer-replace-payment";
       orderId: string;
     }
   | null;
-
 
 type ApiResponse = {
   ok?: boolean;
@@ -61,6 +78,12 @@ type ApiResponse = {
   retryAfterSeconds?: number;
   retryAfterText?: string;
 };
+
+type TransactionView = "ALL" | "ORDER" | "CN";
+
+type DisplayRow =
+  | { kind: "ORDER"; order: OrderWithRelations }
+  | { kind: "CN"; order: OrderWithRelations; creditNote: CreditNote };
 
 function getStatusBadge(status: string) {
   switch (status) {
@@ -121,6 +144,129 @@ function formatStoredList(value?: string | null) {
     .map((item) => item.trim())
     .filter(Boolean)
     .join(", ");
+}
+
+function isCustomOrder(order: OrderWithRelations) {
+  return order.orderType === "CUSTOM_ORDER";
+}
+
+function isPaymentMode(value: string) {
+  return ["CASH", "CARD", "BANK_TRANSFER", "QR"].includes(value);
+}
+
+function getPaymentModeLabel(value?: string | null) {
+  switch (value) {
+    case "CASH":
+      return "Cash";
+    case "CARD":
+      return "Card Payment";
+    case "BANK_TRANSFER":
+      return "Bank Transfer";
+    case "QR":
+      return "QR Payment";
+    default:
+      return value || "-";
+  }
+}
+
+function getCreditNoteReasonLabel(value?: string | null) {
+  switch (value) {
+    case "CUSTOMER_CANCEL_ORDER":
+      return "Customer Cancel Order";
+    case "PRICING_CORRECTION":
+      return "Pricing Correction";
+    case "OVERCHARGE_ADJUSTMENT":
+      return "Overcharge Adjustment";
+    case "DUPLICATE_INVOICE":
+      return "Duplicate Invoice";
+    case "SERVICE_NOT_PROCEEDED":
+      return "Service Not Proceeded";
+    case "OTHER":
+      return "Other";
+    default:
+      return value || "-";
+  }
+}
+
+
+function formatDisplayDate(value?: string | Date | null) {
+  if (!value) return "-";
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleDateString("en-GB");
+}
+
+
+function getDisplayRows(orders: OrderWithRelations[], transactionView: TransactionView): DisplayRow[] {
+  if (transactionView === "ORDER") {
+    return orders.map((order) => ({ kind: "ORDER", order }));
+  }
+
+  if (transactionView === "CN") {
+    return orders
+      .filter((order) => !!order.creditNote)
+      .map((order) => ({ kind: "CN", order, creditNote: order.creditNote as CreditNote }));
+  }
+
+  return orders.flatMap((order) => {
+    const rows: DisplayRow[] = [{ kind: "ORDER", order }];
+    if (order.creditNote) {
+      rows.push({ kind: "CN", order, creditNote: order.creditNote });
+    }
+    return rows;
+  });
+}
+
+function getCustomOrderGrandTotal(order: OrderWithRelations) {
+  return Number(order.customGrandTotal ?? order.totalAmount ?? 0);
+}
+
+function getOrderTotalPaid(order: OrderWithRelations) {
+  return Number(order.totalPaid ?? 0);
+}
+
+function getOrderOutstandingBalance(order: OrderWithRelations) {
+  const grandTotal = getCustomOrderGrandTotal(order);
+  const outstanding = Number(order.outstandingBalance ?? Math.max(grandTotal - getOrderTotalPaid(order), 0));
+  return Math.max(outstanding, 0);
+}
+
+function getCustomPaymentStatusMeta(order: OrderWithRelations) {
+  const totalPaid = getOrderTotalPaid(order);
+  const outstandingBalance = getOrderOutstandingBalance(order);
+
+  if (order.status === "COMPLETED") {
+    return {
+      label: "Completed",
+      className: getStatusBadge("COMPLETED"),
+    };
+  }
+
+  if (order.status === "CANCELLED") {
+    return {
+      label: "Cancelled",
+      className: getStatusBadge("CANCELLED"),
+    };
+  }
+
+  if (outstandingBalance === 0) {
+    return {
+      label: "Paid",
+      className: getStatusBadge("PAID"),
+    };
+  }
+
+  if (totalPaid > 0) {
+    return {
+      label: "Partially Paid",
+      className: "inline-flex min-w-[122px] items-center justify-center rounded-full border border-violet-500/30 bg-violet-500/15 px-3 py-1 text-center text-xs font-semibold text-violet-300",
+    };
+  }
+
+  return {
+    label: "Unpaid",
+    className: getStatusBadge("AWAITING_PAYMENT"),
+  };
 }
 
 function VehicleDetails({ order }: { order: OrderWithRelations }) {
@@ -250,15 +396,147 @@ function VehicleDetails({ order }: { order: OrderWithRelations }) {
       ) : null}
 
       {(order.tuningType === "ECU" || order.tuningType === "ECU_TCU" || !order.tuningType) &&
-        order.ecuStage !== "Stage 1" &&
-        order.waterMethanolInjection &&
-        order.waterMethanolInjection !== "Not selected" ? (
-          <div>
-            <span className="text-white/45">Water Methanol Injection:</span>{" "}
-            <span className="text-white/90">
-              {order.waterMethanolInjection}
-            </span>
+      order.ecuStage !== "Stage 1" &&
+      order.waterMethanolInjection &&
+      order.waterMethanolInjection !== "Not selected" ? (
+        <div>
+          <span className="text-white/45">Water Methanol Injection:</span>{" "}
+          <span className="text-white/90">{order.waterMethanolInjection}</span>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function CustomOrderDetails({ order }: { order: OrderWithRelations }) {
+  const items = order.customItems || [];
+  const payments = [...(order.payments || [])].sort(
+    (a, b) => new Date(a.paymentDate).getTime() - new Date(b.paymentDate).getTime()
+  );
+  const [isItemsOpen, setIsItemsOpen] = useState(false);
+  const [isPaymentsOpen, setIsPaymentsOpen] = useState(false);
+  const grandTotal = getCustomOrderGrandTotal(order);
+  const totalPaid = getOrderTotalPaid(order);
+  const outstandingBalance = getOrderOutstandingBalance(order);
+
+  return (
+    <div className="space-y-3 text-sm leading-6">
+      <div>
+        <span className="text-white/45">Order Type:</span>{" "}
+        <span className="text-white/90">Custom Order</span>
+      </div>
+
+      <div>
+        <span className="text-white/45">Description:</span>{" "}
+        <span className="text-white/90">{order.customTitle || "-"}</span>
+      </div>
+
+      {order.vehicleNo ? (
+        <div>
+          <span className="text-white/45">Vehicle No:</span>{" "}
+          <span className="text-white/90">{order.vehicleNo}</span>
+        </div>
+      ) : null}
+
+      <div>
+        <span className="text-white/45">Item Count:</span>{" "}
+        <span className="text-white/90">{items.length}</span>
+      </div>
+
+      {items.length > 0 ? (
+        <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+          <button
+            type="button"
+            onClick={() => setIsItemsOpen((prev) => !prev)}
+            className="flex w-full items-center justify-between gap-3 text-left transition hover:text-white"
+          >
+            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-white/45">
+              Line Items
+            </div>
+            <span className="text-sm text-white/60">{isItemsOpen ? "▴" : "▾"}</span>
+          </button>
+
+          {isItemsOpen ? (
+            <div className="mt-3 space-y-2">
+              {items.map((item) => (
+                <div key={item.id} className="rounded-lg border border-white/8 bg-black/20 p-2.5">
+                  <div className="font-medium text-white/90">{item.description}</div>
+                  <div className="text-xs text-white/55">
+                    Qty {item.qty}
+                    {item.uom ? ` ${item.uom}` : ""} × {formatCurrency(Number(item.unitPrice ?? 0))} = {formatCurrency(Number(item.lineTotal ?? 0))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      <div>
+        <span className="text-white/45">Subtotal:</span>{" "}
+        <span className="text-white/90">{formatCurrency(Number(order.customSubtotal ?? order.totalAmount ?? 0))}</span>
+      </div>
+
+      <div>
+        <span className="text-white/45">Discount:</span>{" "}
+        <span className="text-white/90">{formatCurrency(Number(order.customDiscount ?? 0))}</span>
+      </div>
+
+      <div>
+        <span className="text-white/45">Grand Total:</span>{" "}
+        <span className="text-white/90">{formatCurrency(grandTotal)}</span>
+      </div>
+
+      <div>
+        <span className="text-white/45">Total Paid:</span>{" "}
+        <span className="text-white/90">{formatCurrency(totalPaid)}</span>
+      </div>
+
+      <div>
+        <span className="text-white/45">Outstanding Balance:</span>{" "}
+        <span className="text-amber-200">{formatCurrency(outstandingBalance)}</span>
+      </div>
+
+      <div>
+        <span className="text-white/45">Payment Status:</span>{" "}
+        <span className="text-white/90">
+          {outstandingBalance === 0 ? "Paid" : totalPaid > 0 ? "Partially Paid" : "Unpaid"}
+        </span>
+      </div>
+
+      <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+        <button
+          type="button"
+          onClick={() => setIsPaymentsOpen((prev) => !prev)}
+          className="flex w-full items-center justify-between gap-3 text-left transition hover:text-white"
+        >
+          <div className="text-xs font-semibold uppercase tracking-[0.18em] text-white/45">
+            Payment History
           </div>
+          <span className="text-sm text-white/60">{isPaymentsOpen ? "▴" : "▾"}</span>
+        </button>
+
+        {isPaymentsOpen ? (
+          payments.length > 0 ? (
+            <div className="mt-3 space-y-2">
+              {payments.map((payment) => (
+                <div key={payment.id} className="rounded-lg border border-white/8 bg-black/20 p-2.5">
+                  <div className="font-medium text-white/90">{formatCurrency(Number(payment.amount ?? 0))} • {getPaymentModeLabel(payment.paymentMode)}</div>
+                  <div className="text-xs text-white/55">{formatDisplayDate(payment.paymentDate)}</div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-3 text-xs text-white/45">No payment recorded yet</div>
+          )
+        ) : null}
+      </div>
+
+      {order.internalRemarks ? (
+        <div>
+          <span className="text-white/45">Internal Remarks:</span>{" "}
+          <span className="text-white/90">{order.internalRemarks}</span>
+        </div>
       ) : null}
     </div>
   );
@@ -268,10 +546,14 @@ function RequestDetailsModal({
   isOpen,
   onClose,
   details,
+  title = "Request Details",
+  subtitle = "Submitted tuning requirements",
 }: {
   isOpen: boolean;
   onClose: () => void;
   details: string;
+  title?: string;
+  subtitle?: string;
 }) {
   if (!isOpen) return null;
 
@@ -280,10 +562,8 @@ function RequestDetailsModal({
       <div className="w-full max-w-2xl rounded-2xl border border-white/10 bg-zinc-950 p-6 shadow-2xl">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h3 className="text-lg font-semibold text-white">Request Details</h3>
-            <p className="mt-1 text-sm text-white/50">
-              Submitted tuning requirements
-            </p>
+            <h3 className="text-lg font-semibold text-white">{title}</h3>
+            <p className="mt-1 text-sm text-white/50">{subtitle}</p>
           </div>
 
           <button
@@ -296,9 +576,7 @@ function RequestDetailsModal({
         </div>
 
         <div className="mt-5 rounded-xl border border-white/10 bg-black/40 p-4">
-          <pre className="whitespace-pre-wrap text-sm leading-7 text-white/85">
-            {details}
-          </pre>
+          <pre className="whitespace-pre-wrap text-sm leading-7 text-white/85">{details}</pre>
         </div>
       </div>
     </div>
@@ -391,9 +669,7 @@ function CustomerCancelModal({
       <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-zinc-950 p-6 shadow-2xl">
         <div>
           <h3 className="text-lg font-semibold text-white">Cancel Order</h3>
-          <p className="mt-1 text-sm text-white/50">
-            Are you sure you want to cancel this order?
-          </p>
+          <p className="mt-1 text-sm text-white/50">Are you sure you want to cancel this order?</p>
         </div>
 
         <form
@@ -443,12 +719,10 @@ function ReleaseOrderModal({
     <div className="fixed inset-0 z-[115] flex items-center justify-center bg-black/70 px-4">
       <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-zinc-950 p-6 shadow-2xl">
         <div>
-          <h3 className="text-lg font-semibold text-white">
-            Release Download
-          </h3>
+          <h3 className="text-lg font-semibold text-white">Release Download</h3>
           <p className="mt-1 text-sm text-white/50">
-            Proceed only after you have manually verified the payment. This will
-            release the tuned file(s) for customer download.
+            Proceed only after you have manually verified the payment. This will release the tuned file(s)
+            for customer download.
           </p>
         </div>
 
@@ -482,6 +756,158 @@ function ReleaseOrderModal({
   );
 }
 
+
+
+function CreateCreditNoteModal({
+  isOpen,
+  orderId,
+  onClose,
+}: {
+  isOpen: boolean;
+  orderId: string | null;
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  const [reasonType, setReasonType] = useState("CUSTOMER_CANCEL_ORDER");
+  const [remarks, setRemarks] = useState("");
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  if (!isOpen || !orderId) return null;
+
+  return (
+    <div className="fixed inset-0 z-[116] flex items-center justify-center bg-black/70 px-4">
+      <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-zinc-950 p-6 shadow-2xl">
+        <div>
+          <h3 className="text-lg font-semibold text-white">Create Credit Note</h3>
+          <p className="mt-1 text-sm text-white/50">
+            This will create a full Credit Note for the completed order. Payment records will remain unchanged.
+          </p>
+        </div>
+
+        <form
+          action={`/api/admin/orders/${orderId}/credit-note`}
+          method="post"
+          className="mt-5 space-y-4"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            setSubmitError(null);
+            setIsSubmitting(true);
+
+            try {
+              const formData = new FormData(e.currentTarget);
+              const response = await fetch(`/api/admin/orders/${orderId}/credit-note`, {
+                method: "POST",
+                body: formData,
+                headers: {
+                  "x-rk-client-submit": "1",
+                },
+              });
+
+              const contentType = response.headers.get("content-type") || "";
+
+              if (contentType.includes("application/json")) {
+                const data = (await response.json()) as ApiResponse;
+
+                if (!response.ok || !data.ok) {
+                  setSubmitError(data.error || "Unable to create Credit Note right now. Please try again.");
+                  return;
+                }
+
+                setRemarks("");
+                setReasonType("CUSTOMER_CANCEL_ORDER");
+                setSubmitError(null);
+                onClose();
+                router.push(data.redirectTo || "/admin");
+                router.refresh();
+                return;
+              }
+
+              if (!response.ok) {
+                setSubmitError("Unable to create Credit Note right now. Please try again.");
+                return;
+              }
+
+              setRemarks("");
+              setReasonType("CUSTOMER_CANCEL_ORDER");
+              setSubmitError(null);
+              onClose();
+              router.refresh();
+            } catch {
+              setSubmitError("Unable to create Credit Note right now. Please try again.");
+            } finally {
+              setIsSubmitting(false);
+            }
+          }}
+        >
+          <div>
+            <label className="mb-2 block text-sm text-white/70">Reason Type</label>
+            <div className="relative">
+              <select
+                name="reasonType"
+                value={reasonType}
+                onChange={(e) => setReasonType(e.target.value)}
+                className="w-full appearance-none rounded-xl border border-white/10 bg-black/40 px-4 py-3 pr-12 text-sm text-white outline-none transition hover:border-white/20 focus:border-white/25"
+                disabled={isSubmitting}
+              >
+                <option value="CUSTOMER_CANCEL_ORDER">Customer Cancel Order</option>
+                <option value="PRICING_CORRECTION">Pricing Correction</option>
+                <option value="OVERCHARGE_ADJUSTMENT">Overcharge Adjustment</option>
+                <option value="DUPLICATE_INVOICE">Duplicate Invoice</option>
+                <option value="SERVICE_NOT_PROCEEDED">Service Not Proceeded</option>
+                <option value="OTHER">Other</option>
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/60">▾</div>
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm text-white/70">Remarks {reasonType === "OTHER" ? <span className="text-red-300">*</span> : <span className="text-white/40">(optional)</span>}</label>
+            <textarea
+              name="reasonRemarks"
+              value={remarks}
+              onChange={(e) => setRemarks(e.target.value)}
+              placeholder="Enter Credit Note remarks"
+              required={reasonType === "OTHER"}
+              className="min-h-[110px] w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/30 hover:border-white/20 focus:border-white/25 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={isSubmitting}
+            />
+          </div>
+
+          {submitError ? (
+            <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
+              <div className="font-semibold uppercase tracking-[0.18em] text-red-300/80">Create Failed</div>
+              <p className="mt-2 leading-6">{submitError}</p>
+            </div>
+          ) : null}
+
+          <div className="flex items-center justify-end gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                setSubmitError(null);
+                onClose();
+              }}
+              disabled={isSubmitting}
+              className="rounded-xl border border-white/15 px-4 py-2.5 text-sm text-white/75 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Cancel
+            </button>
+
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="rounded-xl border border-red-500/40 px-4 py-2.5 text-sm text-red-300 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isSubmitting ? "Creating..." : "Create Credit Note"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 function UploadConfirmModal({
   isOpen,
   mode,
@@ -505,16 +931,19 @@ function UploadConfirmModal({
   const isAdminUploadTcu = mode === "admin-upload-tcu";
   const isAdminRevisionEcu = mode === "admin-upload-revision-ecu";
   const isAdminRevisionTcu = mode === "admin-upload-revision-tcu";
-  const isReplace = mode === "customer-replace-payment";
-  const isCustomerPayment =
-    mode === "customer-upload-payment" || mode === "customer-replace-payment";
+  const isReplace = mode === "customer-replace-payment" || mode === "admin-replace-payment";
+  const isPaymentUpload =
+    mode === "customer-upload-payment" ||
+    mode === "customer-replace-payment" ||
+    mode === "admin-upload-payment" ||
+    mode === "admin-replace-payment";
 
   const action =
     isAdminUploadEcu || isAdminUploadTcu
       ? `/api/admin/orders/${orderId}/upload`
       : isAdminRevisionEcu || isAdminRevisionTcu
         ? `/api/admin/orders/${orderId}/upload-revision`
-        : `/api/orders/${orderId}/payment`;
+        : `/api/orders/${orderId}/upload-payment`;
 
   const title = isAdminUploadEcu
     ? "Upload Tuned ECU File"
@@ -528,81 +957,69 @@ function UploadConfirmModal({
             ? "Replace Payment Slip"
             : "Upload Payment Slip";
 
-  const buttonLabel =
-    isAdminRevisionEcu || isAdminRevisionTcu
-      ? "Upload Revision"
-      : isReplace
-        ? "Confirm Replace"
-        : "Confirm Upload";
+  const buttonLabel = isAdminRevisionEcu || isAdminRevisionTcu ? "Upload Revision" : isReplace ? "Confirm Replace" : "Confirm Upload";
 
   const target =
-    isAdminUploadTcu || isAdminRevisionTcu
-      ? "TCU"
-      : isAdminUploadEcu || isAdminRevisionEcu
-        ? "ECU"
-        : "";
+    isAdminUploadTcu || isAdminRevisionTcu ? "TCU" : isAdminUploadEcu || isAdminRevisionEcu ? "ECU" : "";
 
   return (
     <div className="fixed inset-0 z-[112] flex items-center justify-center bg-black/70 px-4">
       <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-zinc-950 p-6 shadow-2xl">
         <div>
           <h3 className="text-lg font-semibold text-white">{title}</h3>
-          <p className="mt-1 text-sm text-white/50">
-            Please confirm the upload for this order.
-          </p>
+          <p className="mt-1 text-sm text-white/50">Please confirm the upload for this order.</p>
         </div>
 
+        <form
+          action={action}
+          method="post"
+          encType="multipart/form-data"
+          className="mt-6 space-y-4"
+          onSubmit={async (e) => {
+            if (fileError) {
+              e.preventDefault();
+              return;
+            }
 
-<form
-  action={action}
-  method="post"
-  encType="multipart/form-data"
-  className="mt-6 space-y-4"
-  onSubmit={async (e) => {
-    if (fileError) {
-      e.preventDefault();
-      return;
-    }
+            if (!isPaymentUpload) {
+              setIsSubmitting(true);
+              return;
+            }
 
-    if (!isCustomerPayment) {
-      setIsSubmitting(true);
-      return;
-    }
+            e.preventDefault();
+            setSubmitError(null);
+            setIsSubmitting(true);
 
-    e.preventDefault();
-    setSubmitError(null);
-    setIsSubmitting(true);
+            try {
+              const formData = new FormData(e.currentTarget);
+              const response = await fetch(action, {
+                method: "POST",
+                body: formData,
+                headers: {
+                  "x-rk-client-submit": "1",
+                },
+              });
 
-    try {
-      const formData = new FormData(e.currentTarget);
-      const response = await fetch(action, {
-        method: "POST",
-        body: formData,
-        headers: {
-          "x-rk-client-submit": "1",
-        },
-      });
+              const data = (await response.json()) as ApiResponse;
 
-      const data = (await response.json()) as ApiResponse;
+              if (!response.ok || !data.ok) {
+                setSubmitError(data.error || "Unable to upload payment slip right now. Please try again.");
+                return;
+              }
 
-      if (!response.ok || !data.ok) {
-        setSubmitError(data.error || "Unable to upload payment slip right now. Please try again.");
-        return;
-      }
-
-      setRemark("");
-      setFileError(null);
-      setSubmitError(null);
-      onClose();
-      router.push(data.redirectTo || "/dashboard");
-      router.refresh();
-    } catch {
-      setSubmitError("Unable to upload payment slip right now. Please try again.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  }}
->
+              setRemark("");
+              setFileError(null);
+              setSubmitError(null);
+              onClose();
+              router.push(data.redirectTo || "/dashboard");
+              router.refresh();
+            } catch {
+              setSubmitError("Unable to upload payment slip right now. Please try again.");
+            } finally {
+              setIsSubmitting(false);
+            }
+          }}
+        >
           {target ? <input type="hidden" name="target" value={target} /> : null}
 
           <div>
@@ -616,10 +1033,7 @@ function UploadConfirmModal({
                     : "file"
               }
               accept={
-                isAdminUploadEcu ||
-                isAdminUploadTcu ||
-                isAdminRevisionEcu ||
-                isAdminRevisionTcu
+                isAdminUploadEcu || isAdminUploadTcu || isAdminRevisionEcu || isAdminRevisionTcu
                   ? ".bin,.ori,.hex,.frf,.sgo,.read,.full,.mod"
                   : ".jpg,.jpeg,.png,.webp,.pdf"
               }
@@ -635,9 +1049,7 @@ function UploadConfirmModal({
                 }
 
                 if (file.size > MAX_FILE_SIZE) {
-                  setFileError(
-                    "File size limit exceeded. Maximum allowed size is 10MB."
-                  );
+                  setFileError("File size limit exceeded. Maximum allowed size is 10MB.");
                   e.target.value = "";
                   return;
                 }
@@ -645,21 +1057,14 @@ function UploadConfirmModal({
                 const fileName = file.name.toLowerCase().trim();
 
                 const allowedExtensions =
-                  isAdminUploadEcu ||
-                  isAdminUploadTcu ||
-                  isAdminRevisionEcu ||
-                  isAdminRevisionTcu
+                  isAdminUploadEcu || isAdminUploadTcu || isAdminRevisionEcu || isAdminRevisionTcu
                     ? [".bin", ".ori", ".hex", ".frf", ".sgo", ".read", ".full", ".mod"]
                     : [".jpg", ".jpeg", ".png", ".webp", ".pdf"];
 
-                const isValid = allowedExtensions.some((ext) =>
-                  fileName.endsWith(ext)
-                );
+                const isValid = allowedExtensions.some((ext) => fileName.endsWith(ext));
 
                 if (!isValid) {
-                  setFileError(
-                    `Invalid file type. Only ${allowedExtensions.join(", ")} files are allowed.`
-                  );
+                  setFileError(`Invalid file type. Only ${allowedExtensions.join(", ")} files are allowed.`);
                   e.target.value = "";
                   return;
                 }
@@ -667,11 +1072,7 @@ function UploadConfirmModal({
                 setFileError(null);
               }}
             />
-            {fileError ? (
-              <p className="mt-2 text-sm font-medium text-red-400">
-                {fileError}
-              </p>
-            ) : null}
+            {fileError ? <p className="mt-2 text-sm font-medium text-red-400">{fileError}</p> : null}
           </div>
 
           {isAdminRevisionEcu || isAdminRevisionTcu ? (
@@ -692,9 +1093,7 @@ function UploadConfirmModal({
 
           {submitError ? (
             <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
-              <div className="font-semibold uppercase tracking-[0.18em] text-red-300/80">
-                Upload Failed
-              </div>
+              <div className="font-semibold uppercase tracking-[0.18em] text-red-300/80">Upload Failed</div>
               <p className="mt-2 leading-6">{submitError}</p>
             </div>
           ) : null}
@@ -751,16 +1150,13 @@ function RevisionFiles({
         onClick={() => setIsOpen((prev) => !prev)}
         className="inline-block w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-left hover:bg-white/10"
       >
-        {admin ? "Revision Files" : "Rev File"}
+        {"Revision File"}
       </button>
 
       {isOpen ? (
         <div className="mt-2 space-y-2">
           {orderedRevisions.map((revision) => (
-            <div
-              key={revision.id}
-              className="rounded-xl border border-white/10 bg-black/20 p-3"
-            >
+            <div key={revision.id} className="rounded-xl border border-white/10 bg-black/20 p-3">
               <Link
                 href={`/api/files/${revision.orderFile.id}/download`}
                 className="inline-block w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-left text-sm hover:bg-white/10"
@@ -768,11 +1164,7 @@ function RevisionFiles({
                 {admin ? `Download Rev ${revision.revisionNo}` : `Rev ${revision.revisionNo}`}
               </Link>
 
-              {admin ? (
-                <div className="mt-2 text-xs text-white/45">
-                  Remark: {revision.remark}
-                </div>
-              ) : null}
+              {admin ? <div className="mt-2 text-xs text-white/45">Remark: {revision.remark}</div> : null}
             </div>
           ))}
         </div>
@@ -798,9 +1190,7 @@ function FileSection({
 }) {
   return (
     <div className="w-full max-w-[190px] rounded-xl border border-white/10 bg-black/25 p-3">
-      <div className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-white/45">
-        {title}
-      </div>
+      <div className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-white/45">{title}</div>
 
       <div className="flex flex-col gap-2">
         {originalFile ? (
@@ -823,12 +1213,28 @@ function FileSection({
           </Link>
         ) : null}
 
-        <RevisionFiles
-          revisions={revisions}
-          admin={admin}
-          canDownload={canDownloadTuned}
-        />
+        <RevisionFiles revisions={revisions} admin={admin} canDownload={canDownloadTuned} />
       </div>
+    </div>
+  );
+}
+
+function CustomOrderFileSection({ paymentProof }: { paymentProof: OrderFile | undefined }) {
+  return (
+    <div className="flex w-full max-w-[190px] flex-col gap-3">
+      <div className="w-full max-w-[190px] rounded-xl border border-white/10 bg-black/25 p-3">
+        <div className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-white/45">Custom Order</div>
+        <div className="text-xs text-white/45">No ECU / TCU file workflow</div>
+      </div>
+
+      {paymentProof ? (
+        <Link
+          href={`/api/files/${paymentProof.id}/download`}
+          className="inline-block rounded-xl border border-white/15 bg-black/30 px-3 py-2 hover:bg-white/10"
+        >
+          Payment Slip
+        </Link>
+      ) : null}
     </div>
   );
 }
@@ -846,15 +1252,19 @@ function CustomerDetails({ user }: { user?: User }) {
 export function OrderTable({
   orders,
   admin = false,
+  transactionView = "ORDER",
 }: {
   orders: OrderWithRelations[];
   admin?: boolean;
+  transactionView?: TransactionView;
 }) {
-  const [activeRequest, setActiveRequest] = useState<string | null>(null);
+  const [activeRequest, setActiveRequest] = useState<{ details: string; title: string; subtitle: string } | null>(null);
   const [cancelOrderId, setCancelOrderId] = useState<string | null>(null);
   const [customerCancelOrderId, setCustomerCancelOrderId] = useState<string | null>(null);
   const [releaseOrderId, setReleaseOrderId] = useState<string | null>(null);
+  const [createCreditNoteOrderId, setCreateCreditNoteOrderId] = useState<string | null>(null);
   const [uploadModal, setUploadModal] = useState<UploadModalState>(null);
+  const displayRows = getDisplayRows(orders, admin ? transactionView : "ORDER");
 
   return (
     <>
@@ -862,7 +1272,7 @@ export function OrderTable({
         <table className="min-w-full table-fixed text-left text-sm">
           <thead className="bg-black/50 text-white/65">
             <tr>
-              <th className="px-4 py-4 w-[140px]">Order</th>
+              <th className="px-4 py-4 w-[160px]">Transaction</th>
               {admin ? <th className="px-4 py-4 w-[130px]">Customer</th> : null}
               <th className="px-4 py-4">Vehicle</th>
               <th className="px-4 py-4 w-[180px]">Status</th>
@@ -873,77 +1283,174 @@ export function OrderTable({
           </thead>
 
           <tbody>
-            {orders.map((order) => {
+            {displayRows.map((row) => {
+              const order = row.order;
+              const isCreditNoteRow = row.kind === "CN";
+              const creditNote = row.kind === "CN" ? row.creditNote : order.creditNote;
+              const customOrder = isCustomOrder(order);
               const tuningType = order.tuningType || "ECU";
-              const needsEcu = tuningType === "ECU" || tuningType === "ECU_TCU";
-              const needsTcu = tuningType === "TCU" || tuningType === "ECU_TCU";
+              const needsEcu = !customOrder && (tuningType === "ECU" || tuningType === "ECU_TCU");
+              const needsTcu = !customOrder && (tuningType === "TCU" || tuningType === "ECU_TCU");
 
-              const customerOriginalLegacy = order.files.find(
-                (f) => f.kind === "CUSTOMER_ORIGINAL"
-              );
-
-              const customerEcu =
-                order.files.find((f) => f.kind === "CUSTOMER_ECU") ||
-                (needsEcu ? customerOriginalLegacy || null : null);
-
-              const customerTcu =
-                order.files.find((f) => f.kind === "CUSTOMER_TCU") || null;
-
+              const customerOriginalLegacy = order.files.find((f) => f.kind === "CUSTOMER_ORIGINAL");
+              const customerEcu = order.files.find((f) => f.kind === "CUSTOMER_ECU") || (needsEcu ? customerOriginalLegacy || null : null);
+              const customerTcu = order.files.find((f) => f.kind === "CUSTOMER_TCU") || null;
               const adminEcu =
                 order.files.find((f) => f.kind === "ADMIN_ECU") ||
                 order.files.find((f) => f.kind === "ADMIN_COMPLETED") ||
                 null;
-
-              const adminTcu =
-                order.files.find((f) => f.kind === "ADMIN_TCU") || null;
-
-              const paymentProof = order.files.find(
-                (f) => f.kind === "CUSTOMER_PAYMENT_PROOF"
-              );
+              const adminTcu = order.files.find((f) => f.kind === "ADMIN_TCU") || null;
+              const paymentProof = order.files.find((f) => f.kind === "CUSTOMER_PAYMENT_PROOF");
+              const isAdminCreatedOrder = !!order.createdByAdminId;
 
               const ecuRevisions = order.revisions
-                .filter(
-                  (revision) =>
-                    getRevisionTargetLabel(revision.revisionTarget) === "ECU"
-                )
+                .filter((revision) => getRevisionTargetLabel(revision.revisionTarget) === "ECU")
                 .sort((a, b) => b.revisionNo - a.revisionNo);
 
               const tcuRevisions = order.revisions
-                .filter(
-                  (revision) =>
-                    getRevisionTargetLabel(revision.revisionTarget) === "TCU"
-                )
+                .filter((revision) => getRevisionTargetLabel(revision.revisionTarget) === "TCU")
                 .sort((a, b) => b.revisionNo - a.revisionNo);
 
-              const statusLabel = getStatusLabel(order.status);
-              const statusBadgeClass = getStatusBadge(order.status);
+              const displayStatus =
+                isAdminCreatedOrder && order.status !== "COMPLETED" && order.status !== "CANCELLED"
+                  ? "FILE_RECEIVED"
+                  : order.status;
 
-              const hasAllAdminFiles =
-                (!needsEcu || !!adminEcu) && (!needsTcu || !!adminTcu);
+              const statusLabel = getStatusLabel(displayStatus);
+              const statusBadgeClass = getStatusBadge(displayStatus);
 
-              const customerCanDownload =
-                order.status === "READY_FOR_DOWNLOAD" ||
-                order.status === "COMPLETED";
+              const hasAllAdminFiles = customOrder ? true : (!needsEcu || !!adminEcu) && (!needsTcu || !!adminTcu);
 
-              const customerPaymentStatusLabel =
-                order.status === "AWAITING_PAYMENT" && paymentProof
+              const customerCanDownload = isAdminCreatedOrder
+                ? order.status === "COMPLETED"
+                : order.status === "READY_FOR_DOWNLOAD" || order.status === "COMPLETED";
+
+              const customPaymentStatusMeta = customOrder
+                ? getCustomPaymentStatusMeta(order)
+                : null;
+
+              const customerPaymentStatusLabel = customPaymentStatusMeta
+                ? customPaymentStatusMeta.label
+                : order.status === "AWAITING_PAYMENT" && paymentProof
                   ? "Payment Uploaded"
                   : statusLabel;
 
-              const customerPaymentStatusClass =
-                order.status === "AWAITING_PAYMENT" && paymentProof
+              const customerPaymentStatusClass = customPaymentStatusMeta
+                ? customPaymentStatusMeta.className
+                : order.status === "AWAITING_PAYMENT" && paymentProof
                   ? "inline-flex min-w-[122px] items-center justify-center rounded-full border border-cyan-500/30 bg-cyan-500/15 px-3 py-1 text-center text-xs font-semibold text-cyan-300"
                   : statusBadgeClass;
 
-              const adminPaymentStatusLabel =
-                order.status === "AWAITING_PAYMENT" && paymentProof
+              const adminPaymentStatusLabel = customPaymentStatusMeta
+                ? customPaymentStatusMeta.label
+                : !isAdminCreatedOrder && order.status === "AWAITING_PAYMENT" && paymentProof
                   ? "Payment Received"
                   : statusLabel;
 
-              const adminPaymentStatusClass =
-                order.status === "AWAITING_PAYMENT" && paymentProof
+              const adminPaymentStatusClass = customPaymentStatusMeta
+                ? customPaymentStatusMeta.className
+                : !isAdminCreatedOrder && order.status === "AWAITING_PAYMENT" && paymentProof
                   ? "inline-flex min-w-[122px] items-center justify-center rounded-full border border-cyan-500/30 bg-cyan-500/15 px-3 py-1 text-center text-xs font-semibold text-cyan-300"
                   : statusBadgeClass;
+
+              const requestTitle = customOrder ? "Custom Order Details" : "Request Details";
+              const requestSubtitle = customOrder ? "Submitted custom order summary" : "Submitted tuning requirements";
+              const requestDetailsText = customOrder
+                ? [
+                    `Order Type: Custom Order`,
+                    `Title / Summary: ${order.customTitle || "-"}`,
+                    `Subtotal: ${formatCurrency(Number(order.customSubtotal ?? order.totalAmount ?? 0))}`,
+                    `Discount: ${formatCurrency(Number(order.customDiscount ?? 0))}`,
+                    `Grand Total: ${formatCurrency(Number(order.customGrandTotal ?? order.totalAmount ?? 0))}`,
+                    "",
+                    "Line Items:",
+                    ...(order.customItems && order.customItems.length > 0
+                      ? order.customItems.map(
+                          (item, index) =>
+                            `${index + 1}. ${item.description} | Qty: ${item.qty}${item.uom ? ` ${item.uom}` : ""} | Unit Price: ${formatCurrency(Number(item.unitPrice ?? 0))} | Total: ${formatCurrency(Number(item.lineTotal ?? 0))}`
+                        )
+                      : ["No line items"]),
+                    ...(order.internalRemarks ? ["", `Internal Remarks: ${order.internalRemarks}`] : []),
+                  ].join("\n")
+                : order.requestDetails || "";
+
+              if (isCreditNoteRow && creditNote) {
+                return (
+                  <tr
+                    key={`cn-${creditNote.id}`}
+                    className="border-t border-red-500/15 align-top bg-red-500/[0.04] transition-colors hover:bg-red-500/[0.06]"
+                  >
+                    <td className="px-4 py-4">
+                      <div className="font-semibold break-words text-red-200">{creditNote.cnNo}</div>
+                      <div className="text-red-200/75">{formatDisplayDate(creditNote.cnDate)}</div>
+                      <div className="text-red-200/60 text-xs">Ref: {order.orderNumber}</div>
+                    </td>
+
+
+                    {admin ? (
+                      <td className="px-4 py-4">
+                        <CustomerDetails user={order.user} />
+                      </td>
+                    ) : null}
+
+                    <td className="px-4 py-4">
+                      <div className="space-y-2 text-sm leading-6">
+                        <div>
+                          <span className="text-white/45">Reference Invoice:</span>{" "}
+                          <span className="text-white/90">{creditNote.referenceOrderNumber}</span>
+                        </div>
+                        <div>
+                          <span className="text-white/45">Order Type:</span>{" "}
+                          <span className="text-white/90">{customOrder ? "Custom Order" : "Standard Tuning"}</span>
+                        </div>
+                        <div>
+                          <span className="text-white/45">Reason:</span>{" "}
+                          <span className="text-red-200">{getCreditNoteReasonLabel(creditNote.reasonType)}</span>
+                        </div>
+                        {creditNote.reasonRemarks ? (
+                          <div>
+                            <span className="text-white/45">Remarks:</span>{" "}
+                            <span className="text-white/90">{creditNote.reasonRemarks}</span>
+                          </div>
+                        ) : null}
+                      </div>
+                    </td>
+
+                    <td className="px-4 py-4 align-top">
+                      <div className="flex flex-col items-start gap-3">
+                        <span className="inline-flex min-w-[122px] items-center justify-center rounded-full border border-red-500/30 bg-red-500/15 px-3 py-1 text-center text-xs font-semibold text-red-300">
+                          Credited
+                        </span>
+                        <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+                          <div className="font-semibold">CN No: {creditNote.cnNo}</div>
+                          <div className="mt-1 text-red-200/80">Issued on {formatDisplayDate(creditNote.cnDate)}</div>
+                        </div>
+                      </div>
+                    </td>
+
+                    <td className="px-4 py-4 whitespace-nowrap align-top text-red-200">- {formatCurrency(Number(creditNote.amount ?? 0))}</td>
+
+                    <td className="px-4 py-4 align-top">
+                      <div className="w-full max-w-[190px] rounded-xl border border-red-500/20 bg-red-500/10 p-3">
+                        <div className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-red-200/80">Credit Note</div>
+                        <div className="text-xs text-red-200/80">Separate CN transaction linked to the original invoice above.</div>
+                      </div>
+                    </td>
+
+                    <td className="px-4 py-4 align-top">
+                      <div className="flex w-full max-w-[170px] flex-col gap-2">
+                        <Link
+                          href={`/api/admin/credit-notes/${creditNote.id}`}
+                          className="inline-flex w-full min-h-[44px] flex-col items-center justify-center rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center text-sm whitespace-normal leading-5 transition hover:bg-white/10"
+                        >
+                          <span>Download</span>
+                          <span>Credit Note</span>
+                        </Link>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              }
 
               return (
                 <tr
@@ -952,16 +1459,14 @@ export function OrderTable({
                 >
                   <td className="px-4 py-4">
                     <div className="font-semibold break-words">{order.orderNumber}</div>
-                    <div className="text-white/45">
-                      {new Date(order.createdAt).toLocaleDateString()}
-                    </div>
+                    <div className="text-white/45">{new Date(order.createdAt).toLocaleDateString()}</div>
                     <div className="text-white/35 text-xs">
-                    {new Date(order.createdAt).toLocaleTimeString([], {
-                      hour: "numeric",
-                      minute: "2-digit",
-                      hour12: true,
-                    })}
-                  </div>
+                      {new Date(order.createdAt).toLocaleTimeString([], {
+                        hour: "numeric",
+                        minute: "2-digit",
+                        hour12: true,
+                      })}
+                    </div>
                   </td>
 
                   {admin ? (
@@ -970,9 +1475,7 @@ export function OrderTable({
                     </td>
                   ) : null}
 
-                  <td className="px-4 py-4">
-                    <VehicleDetails order={order} />
-                  </td>
+                  <td className="px-4 py-4">{customOrder ? <CustomOrderDetails order={order} /> : <VehicleDetails order={order} />}</td>
 
                   <td className="px-4 py-4 align-top">
                     <div className="flex flex-col items-start gap-3">
@@ -980,107 +1483,98 @@ export function OrderTable({
                         {admin ? adminPaymentStatusLabel : customerPaymentStatusLabel}
                       </span>
 
-                      {admin &&
-                      order.status === "AWAITING_PAYMENT" &&
-                      !paymentProof ? (
-                        <div className="text-sm text-amber-300/90">
-                          Waiting for payment proof
-                        </div>
+                      {admin && !isAdminCreatedOrder && order.status === "AWAITING_PAYMENT" && !paymentProof ? (
+                        <div className="text-sm text-amber-300/90">Waiting for payment proof</div>
                       ) : null}
 
-                      {admin &&
-                      order.status === "AWAITING_PAYMENT" &&
-                      paymentProof &&
-                      hasAllAdminFiles ? (
-                        <div className="text-sm text-emerald-300/90">
-                          Ready to Release
-                        </div>
+                      {admin && !isAdminCreatedOrder && order.status === "AWAITING_PAYMENT" && paymentProof && hasAllAdminFiles ? (
+                        <div className="text-sm text-emerald-300/90">Ready to Release</div>
                       ) : null}
 
-                      {!admin &&
-                      order.status === "AWAITING_PAYMENT" &&
-                      paymentProof &&
-                      hasAllAdminFiles ? (
-                        <div className="text-sm text-cyan-300/90">
-                          Awaiting Admin Release
-                        </div>
+                      {!admin && order.status === "AWAITING_PAYMENT" && paymentProof && hasAllAdminFiles ? (
+                        <div className="text-sm text-cyan-300/90">Awaiting Admin Release</div>
                       ) : null}
 
                       {admin && order.status === "CANCELLED" && order.cancelledBy ? (
                         <div className="text-xs text-white/45">
-                          Cancelled by{" "}
-                          {order.cancelledBy === "ADMIN" ? "admin" : "customer"}
+                          Cancelled by {order.cancelledBy === "ADMIN" ? "admin" : "customer"}
                           {order.cancelReason ? ` • ${order.cancelReason}` : ""}
                         </div>
-                      ) : !admin &&
-                        order.status === "CANCELLED" &&
-                        order.cancelledBy === "CUSTOMER" ? (
-                        <div className="text-xs text-white/45">
-                          Cancelled by you
-                        </div>
-                      ) : !admin &&
-                        order.status === "CANCELLED" &&
-                        order.cancelledBy === "ADMIN" ? (
+                      ) : !admin && order.status === "CANCELLED" && order.cancelledBy === "CUSTOMER" ? (
+                        <div className="text-xs text-white/45">Cancelled by you</div>
+                      ) : !admin && order.status === "CANCELLED" && order.cancelledBy === "ADMIN" ? (
                         <div className="text-xs text-white/45">
                           Cancelled by RK Motorsports
                           <div className="mt-1 text-white/40">
-                            This request could not be processed after review.
-                            Please contact us for clarification.
+                            This request could not be processed after review. Please contact us for clarification.
                           </div>
                         </div>
                       ) : null}
 
-                      {order.requestDetails ? (
+                      {requestDetailsText ? (
                         <button
                           type="button"
                           onClick={() =>
-                            setActiveRequest(order.requestDetails || "")
+                            setActiveRequest({
+                              details: requestDetailsText,
+                              title: requestTitle,
+                              subtitle: requestSubtitle,
+                            })
                           }
                           className="inline-flex min-w-[122px] items-center justify-center rounded-full border border-white/12 bg-white/[0.03] px-3 py-1.5 text-xs font-medium text-white/72 transition hover:border-white/20 hover:bg-white/[0.07] hover:text-white"
                         >
                           View Request
                         </button>
                       ) : null}
+
+                      {admin && order.creditNote ? (
+                        <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+                          <div className="font-semibold">CN No: {order.creditNote.cnNo}</div>
+                          <div className="mt-1 text-red-200/80">Reason: {getCreditNoteReasonLabel(order.creditNote.reasonType)}</div>
+                        </div>
+                      ) : null}
                     </div>
                   </td>
 
-                  <td className="px-4 py-4 whitespace-nowrap align-top">
-                    {formatCurrency(order.totalAmount)}
-                  </td>
+                  <td className="px-4 py-4 whitespace-nowrap align-top">{formatCurrency(Number(order.totalAmount ?? 0))}</td>
 
                   <td className="px-4 py-4 align-top">
-                    <div className="flex w-full max-w-[190px] flex-col gap-3">
-                      {needsEcu ? (
-                        <FileSection
-                          title="ECU"
-                          originalFile={customerEcu}
-                          tunedFile={adminEcu}
-                          revisions={ecuRevisions}
-                          admin={admin}
-                          canDownloadTuned={customerCanDownload}
-                        />
-                      ) : null}
+                    {customOrder ? (
+                      <CustomOrderFileSection paymentProof={paymentProof} />
+                    ) : (
+                      <div className="flex w-full max-w-[190px] flex-col gap-3">
+                        {needsEcu ? (
+                          <FileSection
+                            title="ECU"
+                            originalFile={customerEcu}
+                            tunedFile={adminEcu}
+                            revisions={ecuRevisions}
+                            admin={admin}
+                            canDownloadTuned={customerCanDownload}
+                          />
+                        ) : null}
 
-                      {needsTcu ? (
-                        <FileSection
-                          title="TCU"
-                          originalFile={customerTcu}
-                          tunedFile={adminTcu}
-                          revisions={tcuRevisions}
-                          admin={admin}
-                          canDownloadTuned={customerCanDownload}
-                        />
-                      ) : null}
+                        {needsTcu ? (
+                          <FileSection
+                            title="TCU"
+                            originalFile={customerTcu}
+                            tunedFile={adminTcu}
+                            revisions={tcuRevisions}
+                            admin={admin}
+                            canDownloadTuned={customerCanDownload}
+                          />
+                        ) : null}
 
-                      {paymentProof ? (
-                        <Link
-                          href={`/api/files/${paymentProof.id}/download`}
-                          className="inline-block rounded-xl border border-white/15 bg-black/30 px-3 py-2 hover:bg-white/10"
-                        >
-                          Payment Slip
-                        </Link>
-                      ) : null}
-                    </div>
+                        {paymentProof ? (
+                          <Link
+                            href={`/api/files/${paymentProof.id}/download`}
+                            className="inline-block rounded-xl border border-white/15 bg-black/30 px-3 py-2 hover:bg-white/10"
+                          >
+                            Payment Slip
+                          </Link>
+                        ) : null}
+                      </div>
+                    )}
                   </td>
 
                   <td className="px-4 py-4 align-top">
@@ -1089,123 +1583,154 @@ export function OrderTable({
                         <span className="text-red-400">Order Cancelled</span>
                       ) : (
                         <div className="flex w-full max-w-[170px] flex-col gap-2">
-                          {needsEcu && !adminEcu ? (
+                          {!customOrder && needsEcu && !adminEcu ? (
                             <button
                               type="button"
-                              onClick={() =>
-                                setUploadModal({
-                                  action: "admin-upload-ecu",
-                                  orderId: order.id,
-                                })
-                              }
-                              className="w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center text-sm transition hover:bg-white/10"
+                              onClick={() => setUploadModal({ action: "admin-upload-ecu", orderId: order.id })}
+                              className="w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center text-sm whitespace-normal transition hover:bg-white/10"
                             >
                               Upload Tuned ECU
                             </button>
                           ) : null}
 
-                          {needsTcu && !adminTcu ? (
+                          {!customOrder && needsTcu && !adminTcu ? (
                             <button
                               type="button"
-                              onClick={() =>
-                                setUploadModal({
-                                  action: "admin-upload-tcu",
-                                  orderId: order.id,
-                                })
-                              }
-                              className="w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center text-sm transition hover:bg-white/10"
+                              onClick={() => setUploadModal({ action: "admin-upload-tcu", orderId: order.id })}
+                              className="w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center text-sm whitespace-normal transition hover:bg-white/10"
                             >
                               Upload Tuned TCU
                             </button>
                           ) : null}
 
-                          {["FILE_RECEIVED", "IN_PROGRESS", "AWAITING_PAYMENT"].includes(
-                            order.status
-                          ) ? (
+                          {["FILE_RECEIVED", "IN_PROGRESS", "AWAITING_PAYMENT", "PAID"].includes(order.status) ? (
                             <button
                               type="button"
                               onClick={() => setCancelOrderId(order.id)}
-                              className="w-full rounded-xl border border-red-500/40 px-3 py-2 text-center text-sm text-red-400 transition hover:bg-red-500/10"
+                              className="w-full rounded-xl border border-red-500/40 px-3 py-2 text-center text-sm whitespace-normal text-red-400 transition hover:bg-red-500/10"
                             >
                               Admin Cancel Order
                             </button>
                           ) : null}
 
-                          {order.status === "AWAITING_PAYMENT" &&
-                          paymentProof &&
-                          hasAllAdminFiles ? (
+                          {customOrder &&
+                          !["COMPLETED", "CANCELLED"].includes(order.status) ? (
+                            <Link
+                              href={`/admin/orders/${order.id}/edit`}
+                              className="inline-flex w-full min-h-[44px] flex-col items-center justify-center rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center text-sm whitespace-normal leading-5 transition hover:bg-white/10"
+                            >
+                              <span>Edit</span>
+                              <span>Order</span>
+                            </Link>
+                          ) : null}
+
+                          {isAdminCreatedOrder && ["FILE_RECEIVED", "IN_PROGRESS", "AWAITING_PAYMENT", "PAID"].includes(order.status) ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setUploadModal({
+                                  action: paymentProof ? "admin-replace-payment" : "admin-upload-payment",
+                                  orderId: order.id,
+                                })
+                              }
+                              className="w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center text-sm whitespace-normal transition hover:bg-white/10"
+                            >
+                              {paymentProof ? "Replace Payment Slip" : "Upload Payment Slip"}
+                            </button>
+                          ) : null}
+
+                          {!isAdminCreatedOrder && order.status === "AWAITING_PAYMENT" && paymentProof && hasAllAdminFiles ? (
                             <button
                               type="button"
                               onClick={() => setReleaseOrderId(order.id)}
-                              className="w-full rounded-xl border border-emerald-500/40 px-3 py-2 text-center text-sm text-emerald-400 transition hover:bg-emerald-500/10"
+                              className="w-full rounded-xl border border-emerald-500/40 px-3 py-2 text-center text-sm whitespace-normal text-emerald-400 transition hover:bg-emerald-500/10"
                             >
                               Release Download
                             </button>
                           ) : null}
 
-                          {["READY_FOR_DOWNLOAD", "COMPLETED"].includes(order.status) &&
-                          needsEcu &&
-                          adminEcu ? (
+                          {isAdminCreatedOrder && hasAllAdminFiles && order.status !== "COMPLETED" ? (
+                            <form action={`/api/admin/orders/${order.id}/complete`} method="post">
+                              <button
+                                type="submit"
+                                className="w-full rounded-xl border border-emerald-500/40 px-3 py-2 text-center text-sm text-emerald-400 transition hover:bg-emerald-500/10 whitespace-normal leading-tight"
+                              >
+                                <>
+                                  Complete <br /> Order
+                                </>
+                              </button>
+                            </form>
+                          ) : null}
+
+                          {!customOrder &&
+                          ((isAdminCreatedOrder && !!adminEcu) ||
+                            (["READY_FOR_DOWNLOAD", "COMPLETED"].includes(order.status) && needsEcu && adminEcu)) ? (
                             <button
                               type="button"
-                              onClick={() =>
-                                setUploadModal({
-                                  action: "admin-upload-revision-ecu",
-                                  orderId: order.id,
-                                })
-                              }
-                              className="w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center text-sm transition hover:bg-white/10"
+                              onClick={() => setUploadModal({ action: "admin-upload-revision-ecu", orderId: order.id })}
+                              className="w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center text-sm whitespace-normal transition hover:bg-white/10"
                             >
                               Upload ECU Revision
                             </button>
                           ) : null}
 
-                          {["READY_FOR_DOWNLOAD", "COMPLETED"].includes(order.status) &&
-                          needsTcu &&
-                          adminTcu ? (
+                          {!customOrder &&
+                          ((isAdminCreatedOrder && !!adminTcu) ||
+                            (["READY_FOR_DOWNLOAD", "COMPLETED"].includes(order.status) && needsTcu && adminTcu)) ? (
                             <button
                               type="button"
-                              onClick={() =>
-                                setUploadModal({
-                                  action: "admin-upload-revision-tcu",
-                                  orderId: order.id,
-                                })
-                              }
-                              className="w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center text-sm transition hover:bg-white/10"
+                              onClick={() => setUploadModal({ action: "admin-upload-revision-tcu", orderId: order.id })}
+                              className="w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center text-sm whitespace-normal transition hover:bg-white/10"
                             >
                               Upload TCU Revision
                             </button>
                           ) : null}
 
-                          {["READY_FOR_DOWNLOAD", "COMPLETED"].includes(order.status) ? (
-                            <>
-                              <span className="inline-flex w-full items-center justify-center rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-center text-sm text-emerald-400">
-                                Download Released
-                              </span>
+                          {!isAdminCreatedOrder && ["READY_FOR_DOWNLOAD", "COMPLETED"].includes(order.status) ? (
+                            <span className="inline-flex w-full min-h-[44px] items-center justify-center rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-center text-sm whitespace-normal text-emerald-400">
+                              Download Released
+                            </span>
+                          ) : null}
 
-                              <a
-                                href={`/api/admin/orders/${order.id}/invoice`}
-                                className="w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center text-sm transition hover:bg-white/10"
-                              >
-                                Download Invoice
-                              </a>
-                            </>
+                          {admin && order.status === "COMPLETED" && !order.creditNote ? (
+                            <button
+                              type="button"
+                              onClick={() => setCreateCreditNoteOrderId(order.id)}
+                              className="w-full rounded-xl border border-red-500/40 px-3 py-2 text-center text-sm whitespace-normal text-red-300 transition hover:bg-red-500/10"
+                            >
+                              Create Credit Note
+                            </button>
+                          ) : null}
+
+                          {admin && order.creditNote ? (
+                            <Link
+                              href={`/api/admin/credit-notes/${order.creditNote.id}`}
+                              className="inline-flex w-full min-h-[44px] flex-col items-center justify-center rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center text-sm whitespace-normal leading-5 transition hover:bg-white/10"
+                            >
+                              <span>Download</span>
+                              <span>Credit Note</span>
+                            </Link>
+                          ) : null}
+
+                          {(isAdminCreatedOrder || (!isAdminCreatedOrder && ["READY_FOR_DOWNLOAD", "COMPLETED"].includes(order.status))) ? (
+                            <Link
+                              href={`/api/admin/orders/${order.id}/invoice`}
+                              className="inline-flex w-full min-h-[44px] flex-col items-center justify-center rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center text-sm whitespace-normal leading-5 transition hover:bg-white/10"
+                            >
+                              <span>Download</span>
+                              <span>Invoice</span>
+                            </Link>
                           ) : null}
                         </div>
                       )
                     ) : order.status === "CANCELLED" ? (
                       <span className="text-red-400">Cancelled</span>
-                    ) : order.status === "AWAITING_PAYMENT" && hasAllAdminFiles ? (
+                    ) : !isAdminCreatedOrder && order.status === "AWAITING_PAYMENT" && hasAllAdminFiles ? (
                       <div className="flex w-full max-w-[170px] flex-col gap-2">
                         {paymentProof ? (
                           <button
                             type="button"
-                            onClick={() =>
-                              setUploadModal({
-                                action: "customer-replace-payment",
-                                orderId: order.id,
-                              })
-                            }
+                            onClick={() => setUploadModal({ action: "customer-replace-payment", orderId: order.id })}
                             className="rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-white/80 hover:bg-white/10"
                           >
                             Replace Payment Slip
@@ -1213,17 +1738,30 @@ export function OrderTable({
                         ) : (
                           <button
                             type="button"
-                            onClick={() =>
-                              setUploadModal({
-                                action: "customer-upload-payment",
-                                orderId: order.id,
-                              })
-                            }
+                            onClick={() => setUploadModal({ action: "customer-upload-payment", orderId: order.id })}
                             className="rounded-xl border border-amber-500/40 px-3 py-2 text-amber-300 hover:bg-amber-500/10"
                           >
                             Upload Payment Slip
                           </button>
                         )}
+
+                        <Link
+                          href={`/api/admin/orders/${order.id}/invoice`}
+                          className="inline-flex w-full min-h-[44px] flex-col items-center justify-center rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center text-sm whitespace-normal leading-5 transition hover:bg-white/10"
+                        >
+                          <span>Download</span>
+                          <span>Invoice</span>
+                        </Link>
+                      </div>
+                    ) : ["READY_FOR_DOWNLOAD", "COMPLETED"].includes(order.status) ? (
+                      <div className="flex w-full max-w-[170px] flex-col gap-2">
+                        <Link
+                          href={`/api/admin/orders/${order.id}/invoice`}
+                          className="inline-flex w-full min-h-[44px] flex-col items-center justify-center rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center text-sm whitespace-normal leading-5 transition hover:bg-white/10"
+                        >
+                          <span>Download</span>
+                          <span>Invoice</span>
+                        </Link>
                       </div>
                     ) : ["FILE_RECEIVED", "IN_PROGRESS"].includes(order.status) ? (
                       <button
@@ -1247,7 +1785,9 @@ export function OrderTable({
       <RequestDetailsModal
         isOpen={activeRequest !== null}
         onClose={() => setActiveRequest(null)}
-        details={activeRequest || ""}
+        details={activeRequest?.details || ""}
+        title={activeRequest?.title || "Request Details"}
+        subtitle={activeRequest?.subtitle || "Submitted tuning requirements"}
       />
 
       <AdminCancelModal
@@ -1266,6 +1806,12 @@ export function OrderTable({
         isOpen={releaseOrderId !== null}
         orderId={releaseOrderId}
         onClose={() => setReleaseOrderId(null)}
+      />
+
+      <CreateCreditNoteModal
+        isOpen={createCreditNoteOrderId !== null}
+        orderId={createCreditNoteOrderId}
+        onClose={() => setCreateCreditNoteOrderId(null)}
       />
 
       <UploadConfirmModal
