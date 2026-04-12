@@ -48,59 +48,23 @@ export function extractUserAgent(headers: Headers) {
 }
 
 export async function resolveLocationFromIp(ipAddress?: string | null) {
-  if (!ipAddress || ipAddress === "127.0.0.1") {
-    console.log("[audit] location skip: missing or localhost IP", { ipAddress });
-    return null;
-  }
+  if (!ipAddress || ipAddress === "127.0.0.1") return null;
 
   try {
-    const url = `https://ipwho.is/${encodeURIComponent(ipAddress)}`;
-    const response = await fetch(url, {
+    const response = await fetch(`https://ipapi.co/${encodeURIComponent(ipAddress)}/json/`, {
       method: "GET",
       cache: "no-store",
     });
 
-    console.log("[audit] ipwho.is response", {
-      ipAddress,
-      status: response.status,
-      ok: response.ok,
-    });
-
     if (!response.ok) {
-      console.log("[audit] ipwho.is non-ok fallback", { ipAddress });
       return `IP: ${ipAddress}`;
     }
 
-    const data = (await response.json()) as {
-      success?: boolean;
-      country?: string | null;
-      region?: string | null;
-      city?: string | null;
-      message?: string | null;
-    };
+    const data = await response.json();
 
-    console.log("[audit] ipwho.is payload", {
-      ipAddress,
-      success: data.success,
-      city: data.city,
-      region: data.region,
-      country: data.country,
-      message: data.message,
-    });
-
-    if (data.success === false) {
-      console.log("[audit] ipwho.is success=false fallback", { ipAddress, data });
-      return `IP: ${ipAddress}`;
-    }
-
-    const parts = [data.city, data.region, data.country].filter(Boolean);
-    const location = parts.length > 0 ? parts.join(", ") : `IP: ${ipAddress}`;
-
-    console.log("[audit] resolved location", { ipAddress, location });
-
-    return location;
-  } catch (error) {
-    console.error("[audit] location lookup failed", { ipAddress, error });
+    const parts = [data.city, data.region, data.country_name].filter(Boolean);
+    return parts.length > 0 ? parts.join(", ") : `IP: ${ipAddress}`;
+  } catch {
     return `IP: ${ipAddress}`;
   }
 }
