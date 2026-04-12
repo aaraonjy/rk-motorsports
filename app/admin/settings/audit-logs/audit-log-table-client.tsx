@@ -35,9 +35,19 @@ type AuditLogTableClientProps = {
   };
 };
 
-function formatDateTime(value: string) {
+type FormattedDateTime = {
+  datePart: string;
+  timePart: string;
+};
+
+function formatDateTime(value: string): FormattedDateTime {
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "-";
+  if (Number.isNaN(date.getTime())) {
+    return {
+      datePart: "-",
+      timePart: "-",
+    };
+  }
 
   const datePart = new Intl.DateTimeFormat("en-GB", {
     day: "2-digit",
