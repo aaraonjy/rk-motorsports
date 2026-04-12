@@ -67,7 +67,7 @@ type AllOrdersOptions = {
   orderType?: string;
   source?: string;
   paymentStatus?: string;
-  transactionView?: string;
+  documentType?: string;
   outstandingOnly?: boolean;
   dateFrom?: string;
   dateTo?: string;
@@ -137,7 +137,6 @@ function buildPaymentStatusWhere(filters?: AllOrdersOptions): Prisma.OrderWhereI
 
   return null;
 }
-
 
 export async function getAllOrders(filters?: AllOrdersOptions) {
   const page = Math.max(1, filters?.page ?? 1);
@@ -232,7 +231,13 @@ export async function getAllOrders(filters?: AllOrdersOptions) {
     ...(filters?.source && filters.source !== "ALL"
       ? { source: filters.source as any }
       : {}),
-    ...(filters?.transactionView === "CN"
+    ...(filters?.documentType === "CS"
+      ? { docType: "CS" }
+      : {}),
+    ...(filters?.documentType === "INV"
+      ? { docType: "INV" }
+      : {}),
+    ...(filters?.documentType === "CN"
       ? { creditNote: { isNot: null } }
       : {}),
     ...(Object.keys(createdAt).length > 0 ? { createdAt } : {}),
@@ -535,10 +540,10 @@ export async function getCustomerByIdWithIntelligence(customerId: string) {
 
   const totalOrders = customer.orders.length;
   const totalSpent = customer.orders.reduce((sum, order) => {
-    return sum + (order.orderType === "CUSTOM_ORDER" ? order.customGrandTotal || 0 : order.totalAmount || 0);
+    return sum + Number(order.orderType === "CUSTOM_ORDER" ? order.customGrandTotal || 0 : order.totalAmount || 0);
   }, 0);
 
-  const averageOrderValue = totalOrders > 0 ? Math.round(totalSpent / totalOrders) : 0;
+  const averageOrderValue = totalOrders > 0 ? Math.round((totalSpent / totalOrders) * 100) / 100 : 0;
   const lastOrderDate = totalOrders > 0 ? customer.orders[0].createdAt : null;
 
   return {
