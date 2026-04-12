@@ -3,11 +3,38 @@ import { getSessionUser } from "@/lib/auth";
 import { getCustomerByIdWithIntelligence } from "@/lib/queries";
 import { redirect, notFound } from "next/navigation";
 
+type DecimalLike = {
+  toNumber?: () => number;
+  toString?: () => string;
+};
+
+function toSafeNumber(value: unknown) {
+  if (typeof value === "number") return value;
+
+  if (value && typeof value === "object") {
+    const maybeDecimal = value as DecimalLike;
+
+    if (typeof maybeDecimal.toNumber === "function") {
+      const converted = maybeDecimal.toNumber();
+      return Number.isFinite(converted) ? converted : 0;
+    }
+
+    if (typeof maybeDecimal.toString === "function") {
+      const converted = Number(maybeDecimal.toString());
+      return Number.isFinite(converted) ? converted : 0;
+    }
+  }
+
+  const converted = Number(value);
+  return Number.isFinite(converted) ? converted : 0;
+}
+
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("en-MY", {
     style: "currency",
     currency: "MYR",
-    maximumFractionDigits: 0,
+    maximumFractionDigits: 2,
+    minimumFractionDigits: 2,
   }).format(value);
 }
 
@@ -56,12 +83,12 @@ function getOrderTitle(order: {
 
 function getOrderDisplayAmount(order: {
   orderType: "STANDARD_TUNING" | "CUSTOM_ORDER";
-  totalAmount: number;
-  customGrandTotal: number;
+  totalAmount: unknown;
+  customGrandTotal: unknown;
 }) {
   return order.orderType === "CUSTOM_ORDER"
-    ? order.customGrandTotal || 0
-    : order.totalAmount || 0;
+    ? toSafeNumber(order.customGrandTotal)
+    : toSafeNumber(order.totalAmount);
 }
 
 function getCustomerProfileDisplayStatus(order: {
