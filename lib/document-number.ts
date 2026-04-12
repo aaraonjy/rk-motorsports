@@ -29,7 +29,7 @@ function getNextSequence(currentValue?: string | null) {
 }
 
 export async function generateOrderDocumentNumber(docType: OrderDocType, date: Date = new Date()) {
-  const { dateStamp, monthStamp } = getMalaysiaDateParts(date);
+  const { monthStamp } = getMalaysiaDateParts(date);
 
   const latestOrder = await db.order.findFirst({
     where: {
@@ -48,11 +48,11 @@ export async function generateOrderDocumentNumber(docType: OrderDocType, date: D
   });
 
   const nextSequence = getNextSequence(latestOrder?.orderNumber);
-  return `${docType}-${dateStamp}-${nextSequence}`;
+  return `${docType}-${monthStamp}-${nextSequence}`;
 }
 
 export async function generateCreditNoteDocumentNumber(date: Date = new Date()) {
-  const { dateStamp, monthStamp } = getMalaysiaDateParts(date);
+  const { monthStamp } = getMalaysiaDateParts(date);
 
   const latestCreditNote = await db.creditNote.findFirst({
     where: {
@@ -70,5 +70,5 @@ export async function generateCreditNoteDocumentNumber(date: Date = new Date()) 
   });
 
   const nextSequence = getNextSequence(latestCreditNote?.cnNo);
-  return `CN-${dateStamp}-${nextSequence}`;
+  return `CN-${monthStamp}-${nextSequence}`;
 }
