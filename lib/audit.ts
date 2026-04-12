@@ -62,7 +62,7 @@ export async function resolveLocationFromIp(ipAddress?: string | null) {
 
     const data = await response.json();
 
-    const parts = [data.city, data.region, data.country_name].filter(Boolean);
+    const parts = [data.region, data.country_name].filter(Boolean);
     return parts.length > 0 ? parts.join(", ") : `IP: ${ipAddress}`;
   } catch {
     return `IP: ${ipAddress}`;
