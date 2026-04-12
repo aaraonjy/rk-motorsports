@@ -47,6 +47,28 @@ export function extractUserAgent(headers: Headers) {
   return headers.get("user-agent") || null;
 }
 
+function resolveLocationFromHeaders(headers: Headers) {
+  const country =
+    headers.get("x-vercel-ip-country") ||
+    headers.get("x-country-code") ||
+    headers.get("cf-ipcountry") ||
+    null;
+
+  const region =
+    headers.get("x-vercel-ip-country-region") ||
+    headers.get("x-region") ||
+    headers.get("x-appengine-region") ||
+    null;
+
+  const city =
+    headers.get("x-vercel-ip-city") ||
+    headers.get("x-city") ||
+    null;
+
+  const parts = [city, region, country].filter(Boolean);
+  return parts.length > 0 ? parts.join(", ") : null;
+}
+
 export async function resolveLocationFromIp(ipAddress?: string | null) {
   if (!ipAddress || ipAddress === "127.0.0.1") return null;
 
@@ -100,7 +122,10 @@ type AuditRequestUser = {
   role?: string | null;
 };
 
-type AuditLogFromRequestInput = Omit<AuditLogInput, "userId" | "userName" | "userEmail" | "userRole" | "ipAddress" | "location" | "userAgent"> & {
+type AuditLogFromRequestInput = Omit<
+  AuditLogInput,
+  "userId" | "userName" | "userEmail" | "userRole" | "ipAddress" | "location" | "userAgent"
+> & {
   req: Request | Headers;
   user?: AuditRequestUser | null;
 };
@@ -109,7 +134,9 @@ export async function createAuditLogFromRequest(input: AuditLogFromRequestInput)
   const headers = input.req instanceof Headers ? input.req : input.req.headers;
   const ipAddress = extractIpAddress(headers);
   const userAgent = extractUserAgent(headers);
-  const location = await resolveLocationFromIp(ipAddress);
+
+  const headerLocation = resolveLocationFromHeaders(headers);
+  const location = headerLocation || (await resolveLocationFromIp(ipAddress));
 
   return createAuditLog({
     ...input,
