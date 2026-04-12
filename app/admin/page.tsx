@@ -19,7 +19,7 @@ type AdminPageProps = {
     dateTo?: string;
     page?: string;
     success?: string;
-    transactionView?: string;
+    documentType?: string;
   }>;
 };
 
@@ -156,7 +156,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const dateFrom = params.dateFrom || "";
   const dateTo = params.dateTo || "";
   const page = Math.max(1, Number(params.page || "1") || 1);
-  const transactionView = params.transactionView || "ALL";
+  const documentType = params.documentType || "ALL";
   const banner = getAdminBanner(params.success);
 
   const result = (await getAllOrders({
@@ -172,7 +172,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     dateTo,
     page,
     pageSize: 5,
-    transactionView,
+    documentType,
   })) as {
     orders: OrderWithRelations[];
     totalCount: number;
@@ -196,7 +196,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           <div className="card-rk p-6 text-white/75">
             <p>
               Search by transaction number, customer name, phone number, email, vehicle no, status,
-              tuning type, order type, source, transaction type, or date range to manage customer orders more efficiently.
+              tuning type, order type, source, document type, or date range to manage customer orders more efficiently.
             </p>
           </div>
 
@@ -401,17 +401,18 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
 
             <div>
               <label className="mb-2 block text-sm text-white/65">
-                Transaction Type
+                Document Type
               </label>
               <div className="relative">
                 <select
-                  name="transactionView"
-                  defaultValue={transactionView}
+                  name="documentType"
+                  defaultValue={documentType}
                   className="w-full appearance-none rounded-xl border border-white/15 bg-black/50 px-4 py-3 pr-12 text-white outline-none"
                 >
                   <option value="ALL">All Transactions</option>
-                  <option value="ORDER">Order / Invoice Transactions</option>
-                  <option value="CN">Credit Note Transactions</option>
+                  <option value="CS">Cash Sales</option>
+                  <option value="INV">Invoice</option>
+                  <option value="CN">Credit Note</option>
                 </select>
 
                 <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/60">
@@ -487,7 +488,11 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             </div>
           </form>
 
-          <OrderTable orders={result.orders} admin transactionView={transactionView as "ALL" | "ORDER" | "CN"} />
+          <OrderTable
+            orders={result.orders}
+            admin
+            transactionView={(documentType === "CN" ? "CN" : documentType === "ALL" ? "ALL" : "ORDER") as "ALL" | "ORDER" | "CN"}
+          />
 
           <PaginationControls
             currentPage={result.currentPage}
@@ -501,7 +506,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               orderType: orderType !== "ALL" ? orderType : undefined,
               source: source !== "ALL" ? source : undefined,
               paymentStatus: paymentStatus !== "ALL" ? paymentStatus : undefined,
-              transactionView: transactionView !== "ALL" ? transactionView : undefined,
+              documentType: documentType !== "ALL" ? documentType : undefined,
               outstandingOnly: outstandingOnly ? "1" : undefined,
               dateFrom: dateFrom || undefined,
               dateTo: dateTo || undefined,

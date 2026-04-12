@@ -67,7 +67,7 @@ type AllOrdersOptions = {
   orderType?: string;
   source?: string;
   paymentStatus?: string;
-  transactionView?: string;
+  documentType?: string;
   outstandingOnly?: boolean;
   dateFrom?: string;
   dateTo?: string;
@@ -232,7 +232,13 @@ export async function getAllOrders(filters?: AllOrdersOptions) {
     ...(filters?.source && filters.source !== "ALL"
       ? { source: filters.source as any }
       : {}),
-    ...(filters?.transactionView === "CN"
+    ...(filters?.documentType === "CS"
+      ? { docType: "CS" as any }
+      : {}),
+    ...(filters?.documentType === "INV"
+      ? { docType: "INV" as any }
+      : {}),
+    ...(filters?.documentType === "CN"
       ? { creditNote: { isNot: null } }
       : {}),
     ...(Object.keys(createdAt).length > 0 ? { createdAt } : {}),

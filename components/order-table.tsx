@@ -44,7 +44,6 @@ export type OrderWithRelations = Order & {
   cancelledBy?: "CUSTOMER" | "ADMIN" | null;
   cancelReason?: string | null;
   orderType?: "STANDARD_TUNING" | "CUSTOM_ORDER" | null;
-  docType?: "CS" | "INV" | null;
   customTitle?: string | null;
   internalRemarks?: string | null;
   customSubtotal?: number | null;
@@ -170,50 +169,6 @@ function getPaymentModeLabel(value?: string | null) {
   }
 }
 
-function getDocTypeMeta(value?: string | null) {
-  switch (value) {
-    case "CS":
-      return {
-        label: "CS",
-        className: "inline-flex min-w-[72px] items-center justify-center rounded-full border border-emerald-500/30 bg-emerald-500/15 px-3 py-1 text-center text-xs font-semibold text-emerald-300",
-      };
-    case "INV":
-      return {
-        label: "INV",
-        className: "inline-flex min-w-[72px] items-center justify-center rounded-full border border-sky-500/30 bg-sky-500/15 px-3 py-1 text-center text-xs font-semibold text-sky-300",
-      };
-    case "CN":
-      return {
-        label: "CN",
-        className: "inline-flex min-w-[72px] items-center justify-center rounded-full border border-red-500/30 bg-red-500/15 px-3 py-1 text-center text-xs font-semibold text-red-300",
-      };
-    default:
-      return {
-        label: "-",
-        className: "inline-flex min-w-[72px] items-center justify-center rounded-full border border-white/15 bg-white/10 px-3 py-1 text-center text-xs font-semibold text-white/70",
-      };
-  }
-}
-
-
-function getCreditNoteReasonLabel(value?: string | null) {
-  switch (value) {
-    case "CUSTOMER_CANCEL_ORDER":
-      return "Customer Cancel Order";
-    case "PRICING_CORRECTION":
-      return "Pricing Correction";
-    case "OVERCHARGE_ADJUSTMENT":
-      return "Overcharge Adjustment";
-    case "DUPLICATE_INVOICE":
-      return "Duplicate Invoice";
-    case "SERVICE_NOT_PROCEEDED":
-      return "Service Not Proceeded";
-    case "OTHER":
-      return "Other";
-    default:
-      return value || "-";
-  }
-}
 
 function formatDisplayDate(value?: string | Date | null) {
   if (!value) return "-";
@@ -1299,7 +1254,6 @@ export function OrderTable({
           <thead className="bg-black/50 text-white/65">
             <tr>
               <th className="px-4 py-4 w-[160px]">Transaction</th>
-              {admin ? <th className="px-4 py-4 w-[100px]">DocType</th> : null}
               {admin ? <th className="px-4 py-4 w-[130px]">Customer</th> : null}
               <th className="px-4 py-4">Vehicle</th>
               <th className="px-4 py-4 w-[180px]">Status</th>
@@ -1413,11 +1367,6 @@ export function OrderTable({
                       <div className="text-red-200/60 text-xs">Ref: {order.orderNumber}</div>
                     </td>
 
-                    {admin ? (
-                      <td className="px-4 py-4 align-top">
-                        <span className={getDocTypeMeta("CN").className}>{getDocTypeMeta("CN").label}</span>
-                      </td>
-                    ) : null}
 
                     {admin ? (
                       <td className="px-4 py-4">
@@ -1500,12 +1449,6 @@ export function OrderTable({
                       })}
                     </div>
                   </td>
-
-                  {admin ? (() => { const docTypeMeta = getDocTypeMeta(order.docType); return (
-                    <td className="px-4 py-4 align-top">
-                      <span className={docTypeMeta.className}>{docTypeMeta.label}</span>
-                    </td>
-                  ); })() : null}
 
                   {admin ? (
                     <td className="px-4 py-4">
