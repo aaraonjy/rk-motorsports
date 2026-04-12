@@ -80,7 +80,7 @@ function getPaymentBreakdown(order: OrderWithRelations) {
     .join(" | ");
 }
 
-function escapeCsvValue(value: string | number | null | undefined) {
+function escapeCsvValue(value: unknown) {
   const normalized = String(value ?? "");
   const escaped = normalized.replace(/"/g, '""');
   return `"${escaped}"`;

@@ -706,7 +706,7 @@ export function CustomOrderForm({
                     {initialData.payments.map((payment) => (
                       <div key={payment.id} className="rounded-xl border border-white/8 bg-black/20 p-3 text-sm text-white/80">
                         <div className="font-medium text-white">
-                          {formatCurrency(payment.amount)} • {getPaymentModeLabel(payment.paymentMode)}
+                          {formatCurrency(Number(payment.amount ?? 0))} • {getPaymentModeLabel(payment.paymentMode)}
                         </div>
                         <div className="mt-1 text-xs text-white/45">{payment.paymentDate}</div>
                       </div>

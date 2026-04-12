@@ -227,7 +227,7 @@ function getOrderTotalPaid(order: OrderWithRelations) {
 
 function getOrderOutstandingBalance(order: OrderWithRelations) {
   const grandTotal = getCustomOrderGrandTotal(order);
-  const outstanding = order.outstandingBalance ?? Math.max(grandTotal - getOrderTotalPaid(order), 0);
+  const outstanding = Number(order.outstandingBalance ?? Math.max(grandTotal - getOrderTotalPaid(order), 0));
   return Math.max(outstanding, 0);
 }
 
@@ -521,7 +521,7 @@ function CustomOrderDetails({ order }: { order: OrderWithRelations }) {
             <div className="mt-3 space-y-2">
               {payments.map((payment) => (
                 <div key={payment.id} className="rounded-lg border border-white/8 bg-black/20 p-2.5">
-                  <div className="font-medium text-white/90">{formatCurrency(payment.amount)} • {getPaymentModeLabel(payment.paymentMode)}</div>
+                  <div className="font-medium text-white/90">{formatCurrency(Number(payment.amount ?? 0))} • {getPaymentModeLabel(payment.paymentMode)}</div>
                   <div className="text-xs text-white/55">{formatDisplayDate(payment.paymentDate)}</div>
                 </div>
               ))}
@@ -1428,7 +1428,7 @@ export function OrderTable({
                       </div>
                     </td>
 
-                    <td className="px-4 py-4 whitespace-nowrap align-top text-red-200">- {formatCurrency(creditNote.amount)}</td>
+                    <td className="px-4 py-4 whitespace-nowrap align-top text-red-200">- {formatCurrency(Number(creditNote.amount ?? 0))}</td>
 
                     <td className="px-4 py-4 align-top">
                       <div className="w-full max-w-[190px] rounded-xl border border-red-500/20 bg-red-500/10 p-3">

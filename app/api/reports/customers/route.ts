@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { getCustomersReport } from "@/lib/queries";
 
-function escapeCsvValue(value: string | number | null | undefined) {
+function escapeCsvValue(value: unknown) {
   const normalized = String(value ?? "");
   const escaped = normalized.replace(/"/g, '""');
   return `"${escaped}"`;

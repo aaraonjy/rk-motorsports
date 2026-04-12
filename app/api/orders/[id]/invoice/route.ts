@@ -478,8 +478,8 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
         left,
         right,
         startY: y,
-        totalPaid: order.totalPaid ?? 0,
-        outstandingBalance: order.outstandingBalance ?? 0,
+        totalPaid: Number(order.totalPaid ?? 0),
+        outstandingBalance: Number(order.outstandingBalance ?? 0),
         payments: order.payments,
       });
 

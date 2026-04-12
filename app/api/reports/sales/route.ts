@@ -83,7 +83,7 @@ function getCreditNoteReasonLabel(value?: string | null) {
   }
 }
 
-function escapeCsvValue(value: string | number | null | undefined) {
+function escapeCsvValue(value: unknown) {
   const normalized = String(value ?? "");
   const escaped = normalized.replace(/"/g, '""');
   return `"${escaped}"`;
