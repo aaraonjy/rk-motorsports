@@ -12,11 +12,20 @@ type CustomOrderItemPayload = {
   uom?: string | null;
 };
 
-
 function sanitizeWholeNumber(value: unknown) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed < 0) return 0;
   return Math.floor(parsed);
+}
+
+function sanitizeMoneyAmount(value: unknown) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) return 0;
+  return Math.round((parsed + Number.EPSILON) * 100) / 100;
+}
+
+function nearlyEqual(a: number, b: number) {
+  return Math.abs(a - b) < 0.005;
 }
 
 function isAllowedPaymentMode(value: string) {
@@ -92,7 +101,7 @@ export async function PUT(
     const itemsRaw = String(form.get("items") || "[]");
     const items = JSON.parse(itemsRaw) as CustomOrderItemPayload[];
     const paymentMode = String(form.get("paymentMode") || "CASH").trim().toUpperCase();
-    const paymentAmount = sanitizeWholeNumber(form.get("paymentAmount"));
+    const paymentAmount = sanitizeMoneyAmount(form.get("paymentAmount"));
 
     if (!customerId || customerId !== order.userId) {
       return NextResponse.json(
@@ -119,8 +128,8 @@ export async function PUT(
       .map((item) => {
         const description = String(item.description || "").trim();
         const qty = Math.max(1, sanitizeWholeNumber(item.qty));
-        const unitPrice = Math.max(0, sanitizeWholeNumber(item.unitPrice));
-        const lineTotal = qty * unitPrice;
+        const unitPrice = Math.max(0, sanitizeMoneyAmount(item.unitPrice));
+        const lineTotal = Math.round((qty * unitPrice + Number.EPSILON) * 100) / 100;
         const uom = String(item.uom || "").trim();
 
         return {
@@ -140,24 +149,28 @@ export async function PUT(
       );
     }
 
-    const calculatedSubtotal = normalizedItems.reduce(
-      (sum, item) => sum + item.lineTotal,
-      0
-    );
-    const customDiscount = Math.max(0, sanitizeWholeNumber(form.get("customDiscount")));
-    const calculatedGrandTotal = Math.max(calculatedSubtotal - customDiscount, 0);
+    const calculatedSubtotal = Math.round(
+      (normalizedItems.reduce((sum, item) => sum + item.lineTotal, 0) + Number.EPSILON) * 100
+    ) / 100;
+    const customDiscount = Math.max(0, sanitizeMoneyAmount(form.get("customDiscount")));
+    const calculatedGrandTotal = Math.round(
+      (Math.max(calculatedSubtotal - customDiscount, 0) + Number.EPSILON) * 100
+    ) / 100;
 
-    const customSubtotal = sanitizeWholeNumber(form.get("customSubtotal"));
-    const customGrandTotal = sanitizeWholeNumber(form.get("customGrandTotal"));
+    const customSubtotal = sanitizeMoneyAmount(form.get("customSubtotal"));
+    const customGrandTotal = sanitizeMoneyAmount(form.get("customGrandTotal"));
 
-    if (customSubtotal !== calculatedSubtotal || customGrandTotal !== calculatedGrandTotal) {
+    if (!nearlyEqual(customSubtotal, calculatedSubtotal) || !nearlyEqual(customGrandTotal, calculatedGrandTotal)) {
       return NextResponse.json(
         { ok: false, error: "Order totals are invalid. Please refresh and try again." },
         { status: 400 }
       );
     }
 
-    const existingTotalPaid = order.payments.reduce((sum, payment) => sum + payment.amount, 0);
+    const existingTotalPaid = order.payments.reduce(
+      (sum, payment) => sum + Number(payment.amount || 0),
+      0
+    );
 
     if (calculatedGrandTotal < existingTotalPaid) {
       return NextResponse.json(
@@ -225,7 +238,7 @@ export async function PUT(
     }
 
     const newPayments = [
-      ...order.payments.map((payment) => ({ amount: payment.amount })),
+      ...order.payments.map((payment) => ({ amount: Number(payment.amount || 0) })),
       ...(paymentAmount > 0 ? [{ amount: paymentAmount }] : []),
     ];
     const paymentSummary = calculatePaymentSummary(newPayments, calculatedGrandTotal);
@@ -274,8 +287,8 @@ export async function PUT(
           customDiscount,
           customGrandTotal: calculatedGrandTotal,
           totalAmount: calculatedGrandTotal,
-          totalPaid: paymentSummary.totalPaid,
-          outstandingBalance: paymentSummary.outstandingBalance,
+          totalPaid: Number(paymentSummary.totalPaid || 0),
+          outstandingBalance: Number(paymentSummary.outstandingBalance || 0),
           requestDetails: requestDetailsLines.join("\n"),
           customItems: {
             create: normalizedItems,
@@ -306,7 +319,7 @@ export async function PUT(
       redirectTo: "/admin?success=custom_order_updated",
     });
   } catch (error) {
-    console.error("PUT /api/admin/orders/[id] failed:", error);
+    console.error("PUT /api/admin/orders/[id]/upload failed:", error);
     return NextResponse.json(
       { ok: false, error: "Unable to update custom order right now." },
       { status: 500 }
