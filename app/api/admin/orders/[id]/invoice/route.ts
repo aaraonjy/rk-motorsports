@@ -15,7 +15,7 @@ function formatDate(value: Date) {
   return new Date(value).toLocaleDateString("en-MY");
 }
 
-function formatMoney(value: number | string | null | undefined) {
+function formatMoney(value: unknown) {
   return `RM ${Number(value || 0).toFixed(2)}`;
 }
 
@@ -47,15 +47,17 @@ function formatPaymentModeLabel(paymentMode?: string | null) {
     case "BANK_TRANSFER":
       return "Bank Transfer";
     case "CARD_PAYMENT":
+    case "CARD":
       return "Card Payment";
     case "QR_PAYMENT":
+    case "QR":
       return "QR Payment";
     default:
       return paymentMode ? String(paymentMode).trim() : "Other";
   }
 }
 
-function groupPaymentsByMode(payments: Array<{ paymentMode: string; amount: number }>) {
+function groupPaymentsByMode(payments: Array<{ paymentMode: string; amount: unknown }>) {
   const grouped = new Map<string, number>();
 
   for (const payment of payments) {
@@ -120,8 +122,9 @@ function drawInvoiceHeader(params: {
   customerName?: string | null;
   customerPhone?: string | null;
   customerEmail?: string | null;
+  docType?: string | null;
 }) {
-  const { pdfDoc, page, font, bold, left, right, height, orderNumber, invoiceDate, customerName, customerPhone, customerEmail } = params;
+  const { pdfDoc, page, font, bold, left, right, height, orderNumber, invoiceDate, customerName, customerPhone, customerEmail, docType } = params;
   const rightColumnX = right - 80;
 
   let logoBottomY = height - 100;
@@ -143,12 +146,10 @@ function drawInvoiceHeader(params: {
         height: h,
       });
     })
-    .catch(() => {
-      // keep invoice generation working even if logo is missing
-    })
+    .catch(() => {})
     .then(() => {
       const titleY = height - 84;
-      drawText(page, font, bold, "INVOICE", rightColumnX, titleY, 18, true);
+      drawText(page, font, bold, docType === "CS" ? "CASH SALE" : "INVOICE", rightColumnX, titleY, 18, true);
 
       let y = logoBottomY - 26;
       drawText(page, font, bold, "34, Jalan Tembaga SD 5/2b,", left, y);
@@ -169,7 +170,7 @@ function drawInvoiceHeader(params: {
       });
 
       y -= 20;
-      drawText(page, font, bold, `Invoice No: ${orderNumber}`, left, y, 10, true);
+      drawText(page, font, bold, `${docType === "CS" ? "Cash Sale" : "Invoice"} No: ${orderNumber}`, left, y, 10, true);
       drawText(page, font, bold, `Date: ${formatDate(invoiceDate)}`, rightColumnX, y, 10, true);
 
       y -= 28;
@@ -185,31 +186,7 @@ function drawInvoiceHeader(params: {
     });
 }
 
-function buildStandardLines(order: {
-  tuningType?: string | null;
-  vehicleBrand?: string | null;
-  vehicleModel?: string | null;
-  engineModel?: string | null;
-  vehicleYear?: string | null;
-  engineCapacity?: string | null;
-  ecuStage?: string | null;
-  currentEcuSetupStage?: string | null;
-  turboType?: string | null;
-  turboSpec?: string | null;
-  hardwareMods?: string | null;
-  fuelSystemMods?: string | null;
-  engineMods?: string | null;
-  engineModsOther?: string | null;
-  additionalDetails?: string | null;
-  ecuType?: string | null;
-  ecuReadTool?: string | null;
-  fuelGrade?: string | null;
-  waterMethanolInjection?: string | null;
-  tcuStage?: string | null;
-  tcuType?: string | null;
-  tcuReadTool?: string | null;
-  tcuVersion?: string | null;
-}) {
+function buildStandardLines(order: any) {
   const lines: string[] = [];
 
   if (isPresent(order.tuningType)) {
@@ -269,7 +246,7 @@ function drawPaymentSummary(params: {
   startY: number;
   totalPaid: number;
   outstandingBalance: number;
-  payments: Array<{ paymentMode: string; amount: number }>;
+  payments: Array<{ paymentMode: string; amount: unknown }>;
 }) {
   const { page, font, bold, left, right, startY, totalPaid, outstandingBalance, payments } = params;
   const paymentStatus = getPaymentStatus(totalPaid, outstandingBalance);
@@ -367,6 +344,8 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     const left = 50;
     const right = width - 50;
 
+    const invoiceDate = (order.documentDate as Date | null) || order.createdAt;
+
     const { y: headerStartY, rightColumnX } = await drawInvoiceHeader({
       pdfDoc,
       page,
@@ -376,10 +355,11 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
       right,
       height,
       orderNumber: order.orderNumber,
-      invoiceDate: order.createdAt,
+      invoiceDate,
       customerName: order.user?.name,
       customerPhone: order.user?.phone,
       customerEmail: order.user?.email,
+      docType: order.docType,
     });
 
     const isCustomOrder = order.orderType === "CUSTOM_ORDER";
@@ -474,8 +454,8 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
         left,
         right,
         startY: y,
-        totalPaid: order.totalPaid ?? 0,
-        outstandingBalance: order.outstandingBalance ?? 0,
+        totalPaid: Number(order.totalPaid ?? 0),
+        outstandingBalance: Number(order.outstandingBalance ?? 0),
         payments: order.payments,
       });
 
@@ -510,20 +490,17 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
       drawText(page, font, bold, formatMoney(order.totalAmount), rightColumnX, y, 12, true);
 
       y -= 28;
-
-      y -= 28;
       drawText(page, font, bold, "Thank you for your business.", left, y, 10);
       y -= 14;
       drawText(page, font, bold, "We appreciate your support and trust in RK Motorsports.", left, y, 10);
     }
 
     const pdfBytes = await pdfDoc.save();
-    const fileSuffix = order.orderNumber.replace(/^RK-/, "");
 
     return new NextResponse(new Uint8Array(pdfBytes), {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="RK-INV-${fileSuffix}.pdf"`,
+        "Content-Disposition": `attachment; filename="${order.orderNumber}.pdf"`,
         "Cache-Control": "private, no-store",
       },
     });

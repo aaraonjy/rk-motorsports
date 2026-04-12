@@ -14,11 +14,20 @@ type CustomOrderItemPayload = {
   uom?: string | null;
 };
 
-
 function sanitizeWholeNumber(value: unknown) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed < 0) return 0;
   return Math.floor(parsed);
+}
+
+function sanitizeMoneyAmount(value: unknown) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) return 0;
+  return Math.round((parsed + Number.EPSILON) * 100) / 100;
+}
+
+function nearlyEqual(a: number, b: number) {
+  return Math.abs(a - b) < 0.005;
 }
 
 function isAllowedPaymentMode(value: string) {
@@ -69,7 +78,7 @@ export async function POST(req: Request) {
     const itemsRaw = String(form.get("items") || "[]");
     const items = JSON.parse(itemsRaw) as CustomOrderItemPayload[];
     const paymentMode = String(form.get("paymentMode") || "CASH").trim().toUpperCase();
-    const paymentAmount = sanitizeWholeNumber(form.get("paymentAmount"));
+    const paymentAmount = sanitizeMoneyAmount(form.get("paymentAmount"));
 
     if (!customerId) {
       return NextResponse.json(
@@ -114,8 +123,8 @@ export async function POST(req: Request) {
       .map((item) => {
         const description = String(item.description || "").trim();
         const qty = Math.max(1, sanitizeWholeNumber(item.qty));
-        const unitPrice = Math.max(0, sanitizeWholeNumber(item.unitPrice));
-        const lineTotal = qty * unitPrice;
+        const unitPrice = Math.max(0, sanitizeMoneyAmount(item.unitPrice));
+        const lineTotal = Math.round((qty * unitPrice + Number.EPSILON) * 100) / 100;
         const uom = String(item.uom || "").trim();
 
         return {
@@ -135,17 +144,17 @@ export async function POST(req: Request) {
       );
     }
 
-    const calculatedSubtotal = normalizedItems.reduce(
+    const calculatedSubtotal = Math.round((normalizedItems.reduce(
       (sum, item) => sum + item.lineTotal,
       0
-    );
-    const customDiscount = Math.max(0, sanitizeWholeNumber(form.get("customDiscount")));
-    const calculatedGrandTotal = Math.max(calculatedSubtotal - customDiscount, 0);
+    ) + Number.EPSILON) * 100) / 100;
+    const customDiscount = Math.max(0, sanitizeMoneyAmount(form.get("customDiscount")));
+    const calculatedGrandTotal = Math.round((Math.max(calculatedSubtotal - customDiscount, 0) + Number.EPSILON) * 100) / 100;
 
-    const customSubtotal = sanitizeWholeNumber(form.get("customSubtotal"));
-    const customGrandTotal = sanitizeWholeNumber(form.get("customGrandTotal"));
+    const customSubtotal = sanitizeMoneyAmount(form.get("customSubtotal"));
+    const customGrandTotal = sanitizeMoneyAmount(form.get("customGrandTotal"));
 
-    if (customSubtotal !== calculatedSubtotal || customGrandTotal !== calculatedGrandTotal) {
+    if (!nearlyEqual(customSubtotal, calculatedSubtotal) || !nearlyEqual(customGrandTotal, calculatedGrandTotal)) {
       return NextResponse.json(
         { ok: false, error: "Order totals are invalid. Please refresh and try again." },
         { status: 400 }
@@ -196,6 +205,16 @@ export async function POST(req: Request) {
       );
     }
 
+    const documentDateRaw = String(form.get("documentDate") || "").trim();
+    const documentDate = documentDateRaw ? new Date(documentDateRaw) : new Date();
+    if (Number.isNaN(documentDate.getTime())) {
+      return NextResponse.json(
+        { ok: false, error: "Invalid document date." },
+        { status: 400 }
+      );
+    }
+    documentDate.setHours(0, 0, 0, 0);
+
     const paymentDateRaw = String(form.get("paymentDate") || "").trim();
     const paymentDate = paymentDateRaw ? new Date(paymentDateRaw) : new Date();
     if (paymentAmount > 0) {
@@ -230,18 +249,19 @@ export async function POST(req: Request) {
       });
     }
 
-    const docType = paymentSummary.outstandingBalance > 0 ? "INV" : "CS";
-    const orderNumber = await generateOrderDocumentNumber(docType);
+    const docType = Number(paymentSummary.outstandingBalance || 0) > 0 ? "INV" : "CS";
+    const orderNumber = await generateOrderDocumentNumber(docType, documentDate);
 
     const requestDetailsLines = [
       `Order Type: Custom Order`,
+      `Document Date: ${documentDateRaw || documentDate.toISOString().slice(0, 10)}`,
       `Title / Summary: ${customTitle}`,
       `Vehicle No: ${vehicleNo || "None"}`,
       `Internal Remarks: ${internalRemarks || "None"}`,
-      `Subtotal: RM${calculatedSubtotal}`,
-      `Discount: RM${customDiscount}`,
-      `Grand Total: RM${calculatedGrandTotal}`,
-      `Initial Payment: RM${paymentAmount}`,
+      `Subtotal: RM${calculatedSubtotal.toFixed(2)}`,
+      `Discount: RM${customDiscount.toFixed(2)}`,
+      `Grand Total: RM${calculatedGrandTotal.toFixed(2)}`,
+      `Initial Payment: RM${paymentAmount.toFixed(2)}`,
       `Items: ${normalizedItems.length}`,
     ];
 
@@ -254,6 +274,7 @@ export async function POST(req: Request) {
         docType,
         status: "AWAITING_PAYMENT",
         orderType: "CUSTOM_ORDER",
+        documentDate,
         customTitle,
         vehicleNo: vehicleNo || null,
         internalRemarks: internalRemarks || null,
@@ -261,8 +282,8 @@ export async function POST(req: Request) {
         customDiscount,
         customGrandTotal: calculatedGrandTotal,
         totalAmount: calculatedGrandTotal,
-        totalPaid: paymentSummary.totalPaid,
-        outstandingBalance: paymentSummary.outstandingBalance,
+        totalPaid: Number(paymentSummary.totalPaid || 0),
+        outstandingBalance: Number(paymentSummary.outstandingBalance || 0),
         requestDetails: requestDetailsLines.join("\n"),
         customItems: {
           create: normalizedItems,

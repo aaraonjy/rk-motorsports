@@ -108,7 +108,7 @@ export default async function AdminEditCustomOrderPage({
 
             <div>
               <div className="text-sm text-white/45">Current Grand Total</div>
-              <div className="mt-2 text-lg font-semibold text-white">RM {Number(order.totalAmount || 0).toFixed(0)}</div>
+              <div className="mt-2 text-lg font-semibold text-white">RM {Number(order.totalAmount || 0).toFixed(2)}</div>
             </div>
           </div>
         </div>
@@ -123,16 +123,17 @@ export default async function AdminEditCustomOrderPage({
             initialData={{
               orderId: order.id,
               customTitle: order.customTitle,
+              documentDate: new Date(order.documentDate || order.createdAt).toISOString().slice(0, 10),
               vehicleNo: order.vehicleNo,
               internalRemarks: order.internalRemarks,
-              customDiscount: order.customDiscount,
-              totalPaid: order.totalPaid,
-              outstandingBalance: order.outstandingBalance,
+              customDiscount: Number(order.customDiscount ?? 0),
+              totalPaid: Number(order.totalPaid ?? 0),
+              outstandingBalance: Number(order.outstandingBalance ?? 0),
               payments: order.payments.map((payment) => ({
                 id: payment.id,
                 paymentDate: new Date(payment.paymentDate).toLocaleDateString("en-GB"),
                 paymentMode: payment.paymentMode,
-                amount: payment.amount,
+                amount: Number(payment.amount ?? 0),
               })),
               existingSupportingFiles: order.files.map((file) => ({
                 id: file.id,
@@ -144,7 +145,7 @@ export default async function AdminEditCustomOrderPage({
                 id: item.id,
                 description: item.description,
                 qty: item.qty,
-                unitPrice: item.unitPrice,
+                unitPrice: Number(item.unitPrice ?? 0),
                 uom: item.uom,
               })),
             }}

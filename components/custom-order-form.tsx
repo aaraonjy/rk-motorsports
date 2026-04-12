@@ -12,6 +12,7 @@ type PaymentHistoryItem = {
 type CustomOrderInitialData = {
   orderId: string;
   customTitle: string | null;
+  documentDate?: string | null;
   vehicleNo?: string | null;
   internalRemarks: string | null;
   customDiscount: number | null;
@@ -62,7 +63,7 @@ function createEmptyRow(): CustomLineItem {
     description: "",
     qty: "1",
     uom: "",
-    unitPrice: "0",
+    unitPrice: "0.00",
   };
 }
 
@@ -72,11 +73,22 @@ function parseWholeNumber(value: string) {
   return Math.floor(parsed);
 }
 
+function roundMoney(value: number) {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
+function parseMoneyAmount(value: string) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) return 0;
+  return roundMoney(parsed);
+}
+
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("en-MY", {
     style: "currency",
     currency: "MYR",
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(value);
 }
 
@@ -114,6 +126,9 @@ export function CustomOrderForm({
   const isEditMode = !!orderId;
   const existingTotalPaid = Number(initialData?.totalPaid ?? 0);
   const [title, setTitle] = useState(initialData?.customTitle || "");
+  const [documentDate, setDocumentDate] = useState(
+    initialData?.documentDate || new Date().toISOString().slice(0, 10)
+  );
   const [vehicleNo, setVehicleNo] = useState(initialData?.vehicleNo || "");
   const [vehicleNoError, setVehicleNoError] = useState("");
   const [internalRemarks, setInternalRemarks] = useState(initialData?.internalRemarks || "");
@@ -128,7 +143,7 @@ export function CustomOrderForm({
           description: item.description,
           qty: String(item.qty),
           uom: item.uom || "",
-          unitPrice: String(item.unitPrice),
+          unitPrice: String(Number(item.unitPrice).toFixed(2)),
         }))
       : [createEmptyRow()]
   );
@@ -140,8 +155,8 @@ export function CustomOrderForm({
     () =>
       rows.map((row) => {
         const qty = Math.max(1, parseWholeNumber(row.qty || "0"));
-        const unitPrice = Math.max(0, parseWholeNumber(row.unitPrice || "0"));
-        const lineTotal = qty * unitPrice;
+        const unitPrice = Math.max(0, parseMoneyAmount(row.unitPrice || "0"));
+        const lineTotal = roundMoney(qty * unitPrice);
 
         return {
           ...row,
@@ -154,24 +169,24 @@ export function CustomOrderForm({
   );
 
   const subtotal = useMemo(
-    () => normalizedRows.reduce((sum, row) => sum + row.lineTotal, 0),
+    () => roundMoney(normalizedRows.reduce((sum, row) => sum + row.lineTotal, 0)),
     [normalizedRows]
   );
 
   const discountAmount = useMemo(
-    () => Math.max(0, parseWholeNumber(discount || "0")),
+    () => Math.max(0, parseMoneyAmount(discount || "0")),
     [discount]
   );
 
-  const grandTotal = Math.max(subtotal - discountAmount, 0);
+  const grandTotal = roundMoney(Math.max(subtotal - discountAmount, 0));
   const normalizedPaymentAmount = useMemo(
-    () => Math.max(0, parseWholeNumber(paymentAmount || "0")),
+    () => Math.max(0, parseMoneyAmount(paymentAmount || "0")),
     [paymentAmount]
   );
-  const maxNewPayment = Math.max(grandTotal - existingTotalPaid, 0);
+  const maxNewPayment = roundMoney(Math.max(grandTotal - existingTotalPaid, 0));
   const projectedPaymentAmount = Math.min(normalizedPaymentAmount, maxNewPayment);
-  const projectedTotalPaid = existingTotalPaid + projectedPaymentAmount;
-  const projectedOutstandingBalance = Math.max(grandTotal - projectedTotalPaid, 0);
+  const projectedTotalPaid = roundMoney(existingTotalPaid + projectedPaymentAmount);
+  const projectedOutstandingBalance = roundMoney(Math.max(grandTotal - projectedTotalPaid, 0));
 
   const hasAtLeastOneValidRow = normalizedRows.some(
     (row) => row.description.trim() && row.qty > 0 && row.unitPrice >= 0
@@ -287,6 +302,7 @@ export function CustomOrderForm({
       formData.append("orderType", "CUSTOM_ORDER");
       formData.append("customerId", customerId);
       formData.append("customTitle", title.trim());
+      formData.append("documentDate", documentDate);
       formData.append("vehicleNo", vehicleNo.trim());
       formData.append("internalRemarks", internalRemarks.trim());
       formData.append("customSubtotal", String(subtotal));
@@ -356,6 +372,22 @@ export function CustomOrderForm({
               placeholder="e.g. Workshop labour + diagnostics + dyno session"
               required
             />
+          </div>
+
+          <div>
+            <label className="label-rk">Document Date</label>
+            <input
+              type="date"
+              className="input-rk"
+              value={documentDate}
+              onChange={(e) => setDocumentDate(e.target.value)}
+              disabled={isEditMode}
+            />
+            <p className="mt-2 text-xs text-white/45">
+              {isEditMode
+                ? "Document Date is locked after creation to preserve the assigned document number."
+                : "Defaults to today. You may choose an earlier date to record a backdated transaction."}
+            </p>
           </div>
 
           <div>
@@ -536,7 +568,7 @@ export function CustomOrderForm({
                     <input
                       type="number"
                       min="0"
-                      step="1"
+                      step="0.01"
                       className="input-rk"
                       value={row.unitPrice}
                       onChange={(e) => updateRow(row.id, "unitPrice", e.target.value)}
@@ -581,11 +613,11 @@ export function CustomOrderForm({
               <input
                 type="number"
                 min="0"
-                step="1"
+                step="0.01"
                 className="input-rk"
                 value={discount}
                 onChange={(e) => setDiscount(e.target.value)}
-                placeholder="0"
+                placeholder="0.00"
               />
             </div>
 
@@ -602,7 +634,7 @@ export function CustomOrderForm({
               Payment Details
             </p>
             <p className="mt-3 text-sm text-white/60">
-              Record payment on the same form before submitting the order. Leave amount as RM0 if no payment is received yet.
+              Record payment on the same form before submitting the order. Leave amount as RM0.00 if no payment is received yet.
             </p>
 
             <div className="mt-6 space-y-4">
@@ -638,12 +670,12 @@ export function CustomOrderForm({
                 <input
                   type="number"
                   min="0"
-                  step="1"
+                  step="0.01"
                   max={maxNewPayment}
                   className="input-rk"
                   value={paymentAmount}
                   onChange={(e) => setPaymentAmount(e.target.value)}
-                  placeholder="0"
+                  placeholder="0.00"
                 />
                 <p className="mt-2 text-xs text-white/45">
                   Maximum payable now: {formatCurrency(maxNewPayment)}
@@ -705,7 +737,7 @@ export function CustomOrderForm({
           </button>
 
           <p className="mt-4 text-xs leading-6 text-white/45">
-            Discount uses fixed RM amount only. Grand total will never go below RM0.
+            Discount supports up to 2 decimal places. Grand total will never go below RM0.00.
           </p>
         </div>
       </div>

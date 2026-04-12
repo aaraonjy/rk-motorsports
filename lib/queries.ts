@@ -67,7 +67,7 @@ type AllOrdersOptions = {
   orderType?: string;
   source?: string;
   paymentStatus?: string;
-  documentType?: string;
+  transactionView?: string;
   outstandingOnly?: boolean;
   dateFrom?: string;
   dateTo?: string;
@@ -232,13 +232,7 @@ export async function getAllOrders(filters?: AllOrdersOptions) {
     ...(filters?.source && filters.source !== "ALL"
       ? { source: filters.source as any }
       : {}),
-    ...(filters?.documentType === "CS"
-      ? { docType: "CS" as any }
-      : {}),
-    ...(filters?.documentType === "INV"
-      ? { docType: "INV" as any }
-      : {}),
-    ...(filters?.documentType === "CN"
+    ...(filters?.transactionView === "CN"
       ? { creditNote: { isNot: null } }
       : {}),
     ...(Object.keys(createdAt).length > 0 ? { createdAt } : {}),
@@ -466,7 +460,7 @@ export async function getCustomersReport(filters?: CustomersReportOptions) {
   return customers.map((customer) => {
     const totalOrders = customer.orders.length;
     const totalSpent = customer.orders.reduce((sum, order) => {
-      return sum + (order.orderType === "CUSTOM_ORDER" ? order.customGrandTotal || 0 : order.totalAmount || 0);
+      return sum + Number(order.orderType === "CUSTOM_ORDER" ? order.customGrandTotal || 0 : order.totalAmount || 0);
     }, 0);
 
     const lastOrderDate = totalOrders > 0 ? customer.orders[0].createdAt : null;

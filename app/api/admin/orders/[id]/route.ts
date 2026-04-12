@@ -12,11 +12,20 @@ type CustomOrderItemPayload = {
   uom?: string | null;
 };
 
-
 function sanitizeWholeNumber(value: unknown) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed < 0) return 0;
   return Math.floor(parsed);
+}
+
+function sanitizeMoneyAmount(value: unknown) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) return 0;
+  return Math.round((parsed + Number.EPSILON) * 100) / 100;
+}
+
+function nearlyEqual(a: number, b: number) {
+  return Math.abs(a - b) < 0.005;
 }
 
 function isAllowedPaymentMode(value: string) {
@@ -25,6 +34,10 @@ function isAllowedPaymentMode(value: string) {
 
 function isAllowedSupportingFile(file: File) {
   return file.type.startsWith("image/") || file.type.startsWith("video/");
+}
+
+function hasSpacing(value: string) {
+  return /\s/.test(value);
 }
 
 export async function PUT(
@@ -81,13 +94,14 @@ export async function PUT(
 
     const customerId = String(form.get("customerId") || "").trim();
     const customTitle = String(form.get("customTitle") || "").trim();
-    const submittedVehicleNo = String(form.get("vehicleNo") || "").trim().toUpperCase();
+    const rawVehicleNo = String(form.get("vehicleNo") || "");
+    const submittedVehicleNo = rawVehicleNo.trim().toUpperCase();
     const vehicleNo = submittedVehicleNo || order.vehicleNo || "";
     const internalRemarks = String(form.get("internalRemarks") || "").trim();
     const itemsRaw = String(form.get("items") || "[]");
     const items = JSON.parse(itemsRaw) as CustomOrderItemPayload[];
     const paymentMode = String(form.get("paymentMode") || "CASH").trim().toUpperCase();
-    const paymentAmount = sanitizeWholeNumber(form.get("paymentAmount"));
+    const paymentAmount = sanitizeMoneyAmount(form.get("paymentAmount"));
 
     if (!customerId || customerId !== order.userId) {
       return NextResponse.json(
@@ -103,12 +117,19 @@ export async function PUT(
       );
     }
 
+    if (hasSpacing(rawVehicleNo)) {
+      return NextResponse.json(
+        { ok: false, error: "No spacing is allowed in Vehicle No." },
+        { status: 400 }
+      );
+    }
+
     const normalizedItems = items
       .map((item) => {
         const description = String(item.description || "").trim();
         const qty = Math.max(1, sanitizeWholeNumber(item.qty));
-        const unitPrice = Math.max(0, sanitizeWholeNumber(item.unitPrice));
-        const lineTotal = qty * unitPrice;
+        const unitPrice = Math.max(0, sanitizeMoneyAmount(item.unitPrice));
+        const lineTotal = Math.round((qty * unitPrice + Number.EPSILON) * 100) / 100;
         const uom = String(item.uom || "").trim();
 
         return {
@@ -128,24 +149,24 @@ export async function PUT(
       );
     }
 
-    const calculatedSubtotal = normalizedItems.reduce(
+    const calculatedSubtotal = Math.round((normalizedItems.reduce(
       (sum, item) => sum + item.lineTotal,
       0
-    );
-    const customDiscount = Math.max(0, sanitizeWholeNumber(form.get("customDiscount")));
-    const calculatedGrandTotal = Math.max(calculatedSubtotal - customDiscount, 0);
+    ) + Number.EPSILON) * 100) / 100;
+    const customDiscount = Math.max(0, sanitizeMoneyAmount(form.get("customDiscount")));
+    const calculatedGrandTotal = Math.round((Math.max(calculatedSubtotal - customDiscount, 0) + Number.EPSILON) * 100) / 100;
 
-    const customSubtotal = sanitizeWholeNumber(form.get("customSubtotal"));
-    const customGrandTotal = sanitizeWholeNumber(form.get("customGrandTotal"));
+    const customSubtotal = sanitizeMoneyAmount(form.get("customSubtotal"));
+    const customGrandTotal = sanitizeMoneyAmount(form.get("customGrandTotal"));
 
-    if (customSubtotal !== calculatedSubtotal || customGrandTotal !== calculatedGrandTotal) {
+    if (!nearlyEqual(customSubtotal, calculatedSubtotal) || !nearlyEqual(customGrandTotal, calculatedGrandTotal)) {
       return NextResponse.json(
         { ok: false, error: "Order totals are invalid. Please refresh and try again." },
         { status: 400 }
       );
     }
 
-    const existingTotalPaid = order.payments.reduce((sum, payment) => sum + payment.amount, 0);
+    const existingTotalPaid = order.payments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
 
     if (calculatedGrandTotal < existingTotalPaid) {
       return NextResponse.json(
@@ -191,7 +212,7 @@ export async function PUT(
       );
     }
 
-    const currentOutstandingBalance = Math.max(calculatedGrandTotal - existingTotalPaid, 0);
+    const currentOutstandingBalance = Math.round((Math.max(calculatedGrandTotal - existingTotalPaid, 0) + Number.EPSILON) * 100) / 100;
 
     if (paymentAmount > currentOutstandingBalance) {
       return NextResponse.json(
@@ -213,20 +234,21 @@ export async function PUT(
     }
 
     const newPayments = [
-      ...order.payments.map((payment) => ({ amount: payment.amount })),
+      ...order.payments.map((payment) => ({ amount: Number(payment.amount || 0) })),
       ...(paymentAmount > 0 ? [{ amount: paymentAmount }] : []),
     ];
     const paymentSummary = calculatePaymentSummary(newPayments, calculatedGrandTotal);
 
     const requestDetailsLines = [
       `Order Type: Custom Order`,
+      `Document Date: ${new Date(order.documentDate || order.createdAt).toISOString().slice(0, 10)}`,
       `Title / Summary: ${customTitle}`,
       `Vehicle No: ${vehicleNo || "None"}`,
       `Internal Remarks: ${internalRemarks || "None"}`,
-      `Subtotal: RM${calculatedSubtotal}`,
-      `Discount: RM${customDiscount}`,
-      `Grand Total: RM${calculatedGrandTotal}`,
-      `New Payment Added: RM${paymentAmount}`,
+      `Subtotal: RM${calculatedSubtotal.toFixed(2)}`,
+      `Discount: RM${customDiscount.toFixed(2)}`,
+      `Grand Total: RM${calculatedGrandTotal.toFixed(2)}`,
+      `New Payment Added: RM${paymentAmount.toFixed(2)}`,
       `Items: ${normalizedItems.length}`,
     ];
 
@@ -262,8 +284,8 @@ export async function PUT(
           customDiscount,
           customGrandTotal: calculatedGrandTotal,
           totalAmount: calculatedGrandTotal,
-          totalPaid: paymentSummary.totalPaid,
-          outstandingBalance: paymentSummary.outstandingBalance,
+          totalPaid: Number(paymentSummary.totalPaid || 0),
+          outstandingBalance: Number(paymentSummary.outstandingBalance || 0),
           requestDetails: requestDetailsLines.join("\n"),
           customItems: {
             create: normalizedItems,

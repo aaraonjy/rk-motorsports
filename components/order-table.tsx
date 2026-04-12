@@ -169,7 +169,6 @@ function getPaymentModeLabel(value?: string | null) {
   }
 }
 
-
 function getCreditNoteReasonLabel(value?: string | null) {
   switch (value) {
     case "CUSTOMER_CANCEL_ORDER":
@@ -219,11 +218,11 @@ function getDisplayRows(orders: OrderWithRelations[], transactionView: Transacti
 }
 
 function getCustomOrderGrandTotal(order: OrderWithRelations) {
-  return order.customGrandTotal ?? order.totalAmount ?? 0;
+  return Number(order.customGrandTotal ?? order.totalAmount ?? 0);
 }
 
 function getOrderTotalPaid(order: OrderWithRelations) {
-  return order.totalPaid ?? 0;
+  return Number(order.totalPaid ?? 0);
 }
 
 function getOrderOutstandingBalance(order: OrderWithRelations) {
@@ -475,12 +474,12 @@ function CustomOrderDetails({ order }: { order: OrderWithRelations }) {
 
       <div>
         <span className="text-white/45">Subtotal:</span>{" "}
-        <span className="text-white/90">{formatCurrency(order.customSubtotal ?? order.totalAmount ?? 0)}</span>
+        <span className="text-white/90">{formatCurrency(Number(order.customSubtotal ?? order.totalAmount ?? 0))}</span>
       </div>
 
       <div>
         <span className="text-white/45">Discount:</span>{" "}
-        <span className="text-white/90">{formatCurrency(order.customDiscount ?? 0)}</span>
+        <span className="text-white/90">{formatCurrency(Number(order.customDiscount ?? 0))}</span>
       </div>
 
       <div>
@@ -1360,9 +1359,9 @@ export function OrderTable({
                 ? [
                     `Order Type: Custom Order`,
                     `Title / Summary: ${order.customTitle || "-"}`,
-                    `Subtotal: ${formatCurrency(order.customSubtotal ?? order.totalAmount ?? 0)}`,
-                    `Discount: ${formatCurrency(order.customDiscount ?? 0)}`,
-                    `Grand Total: ${formatCurrency(order.customGrandTotal ?? order.totalAmount ?? 0)}`,
+                    `Subtotal: ${formatCurrency(Number(order.customSubtotal ?? order.totalAmount ?? 0))}`,
+                    `Discount: ${formatCurrency(Number(order.customDiscount ?? 0))}`,
+                    `Grand Total: ${formatCurrency(Number(order.customGrandTotal ?? order.totalAmount ?? 0))}`,
                     "",
                     "Line Items:",
                     ...(order.customItems && order.customItems.length > 0
@@ -1537,7 +1536,7 @@ export function OrderTable({
                     </div>
                   </td>
 
-                  <td className="px-4 py-4 whitespace-nowrap align-top">{formatCurrency(order.totalAmount)}</td>
+                  <td className="px-4 py-4 whitespace-nowrap align-top">{formatCurrency(Number(order.totalAmount ?? 0))}</td>
 
                   <td className="px-4 py-4 align-top">
                     {customOrder ? (

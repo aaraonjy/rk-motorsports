@@ -174,15 +174,16 @@ model Order {
   tcuReadTool            String?
   customTitle            String?
   internalRemarks        String?
-  customSubtotal         Int               @default(0)
-  customDiscount         Int               @default(0)
-  customGrandTotal       Int               @default(0)
+  documentDate           DateTime          @default(now())
+  customSubtotal         Decimal           @default(0) @db.Decimal(12, 2)
+  customDiscount         Decimal           @default(0) @db.Decimal(12, 2)
+  customGrandTotal       Decimal           @default(0) @db.Decimal(12, 2)
   cancelledBy            CancelledBy?
   cancelReason           String?
   cancelledAt            DateTime?
-  totalAmount            Int               @default(0)
-  totalPaid              Int               @default(0)
-  outstandingBalance     Int               @default(0)
+  totalAmount            Decimal           @default(0) @db.Decimal(12, 2)
+  totalPaid              Decimal           @default(0) @db.Decimal(12, 2)
+  outstandingBalance     Decimal           @default(0) @db.Decimal(12, 2)
   createdAt              DateTime          @default(now())
   updatedAt              DateTime          @updatedAt
   userId                 String
@@ -219,8 +220,8 @@ model CustomOrderItem {
   description  String
   qty          Int      @default(1)
   uom          String?
-  unitPrice    Int
-  lineTotal    Int
+  unitPrice    Decimal  @db.Decimal(12, 2)
+  lineTotal    Decimal  @db.Decimal(12, 2)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   order        Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
@@ -234,7 +235,7 @@ model Payment {
   orderId     String
   paymentDate DateTime
   paymentMode String
-  amount      Int
+  amount      Decimal  @db.Decimal(12, 2)
   createdAt   DateTime @default(now())
 
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
@@ -302,8 +303,8 @@ model CreditNoteItem {
   description  String
   qty          Int        @default(1)
   uom          String?
-  unitPrice    Int
-  lineTotal    Int
+  unitPrice    Decimal  @db.Decimal(12, 2)
+  lineTotal    Decimal  @db.Decimal(12, 2)
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 

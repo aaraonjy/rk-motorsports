@@ -16,7 +16,7 @@ function formatDate(value: Date) {
   }).format(new Date(value));
 }
 
-function formatMoney(value: number | string | null | undefined) {
+function formatMoney(value: unknown) {
   return `RM ${Number(value || 0).toFixed(2)}`;
 }
 
@@ -224,12 +224,8 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     drawText(page, font, bold, "Total:", totalLabelX, y, 12, true);
     drawText(page, font, bold, `- ${formatMoney(creditNote.amount)}`, totalValueX, y, 12, true);
 
-    y -= 36;
-    drawText(page, font, bold, "This Credit Note is issued for the reference invoice above.", left, y, 10);
-    y -= 14;
-    drawText(page, font, bold, "Payment records remain unchanged unless separately handled.", left, y, 10);
-
     const pdfBytes = await pdfDoc.save();
+
     return new NextResponse(new Uint8Array(pdfBytes), {
       headers: {
         "Content-Type": "application/pdf",

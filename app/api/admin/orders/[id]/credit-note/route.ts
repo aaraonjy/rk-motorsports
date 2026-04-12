@@ -81,9 +81,9 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       return respondCreditNote(req, { ok: false, redirectTo: "/admin" }, 400);
     }
 
-    const amount = order.orderType === "CUSTOM_ORDER"
-      ? Math.max(order.customGrandTotal || order.totalAmount || 0, 0)
-      : Math.max(order.totalAmount || 0, 0);
+    const amount = Number(order.orderType === "CUSTOM_ORDER"
+      ? order.customGrandTotal || order.totalAmount || 0
+      : order.totalAmount || 0);
 
     if (amount <= 0) {
       return respondCreditNote(req, { ok: false, redirectTo: "/admin" }, 400);
@@ -94,8 +94,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
           description: item.description,
           qty: item.qty,
           uom: item.uom || null,
-          unitPrice: item.unitPrice,
-          lineTotal: item.lineTotal,
+          unitPrice: Number(item.unitPrice || 0),
+          lineTotal: Number(item.lineTotal || 0),
         }))
       : [{
           description: buildStandardCreditNoteDescription(order),
