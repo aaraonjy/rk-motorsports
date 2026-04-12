@@ -29,7 +29,7 @@ export function CleanupAuditLogsResult() {
     result.tone === "success"
       ? "border-emerald-500 bg-emerald-500/15 text-emerald-200"
       : result.tone === "neutral"
-        ? "border-gray-500 bg-gray-500/15 text-gray-200"
+        ? "border-gray-700 bg-gray-800/40 text-gray-300"
         : "border-red-500 bg-red-500/15 text-red-200";
 
   return (
