@@ -2,6 +2,7 @@ import { getSessionUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { redirect } from "next/navigation";
 import { AuditLogTableClient } from "./audit-log-table-client";
+import { CleanupAuditLogsButton } from "./cleanup-audit-logs-button";
 
 type AuditLogsPageProps = {
   searchParams?: Promise<{
@@ -42,26 +43,6 @@ function buildQuickFilterHref(period: number) {
   return `/admin/settings/audit-logs?period=${period}`;
 }
 
-function buildExportHref(params: {
-  period: number;
-  user: string;
-  module: string;
-  action: string;
-  status: string;
-  q: string;
-  doc: string;
-}) {
-  const search = new URLSearchParams();
-  search.set("period", String(params.period));
-  if (params.user !== "ALL") search.set("user", params.user);
-  if (params.module !== "ALL") search.set("module", params.module);
-  if (params.action !== "ALL") search.set("action", params.action);
-  if (params.status !== "ALL") search.set("status", params.status);
-  if (params.q) search.set("q", params.q);
-  if (params.doc) search.set("doc", params.doc);
-  return `/api/admin/audit-logs/export?${search.toString()}`;
-}
-
 export default async function AuditLogsPage({ searchParams }: AuditLogsPageProps) {
   const user = await getSessionUser();
   if (!user) redirect("/login");
@@ -76,7 +57,7 @@ export default async function AuditLogsPage({ searchParams }: AuditLogsPageProps
   const selectedAction = (params.action || "ALL").trim();
   const selectedStatus = (params.status || "ALL").trim();
   const searchKeyword = (params.q || "").trim();
-  const documentKeyword = (params.doc || "").trim();
+  const selectedDocument = (params.doc || "").trim();
   const currentPage = Math.max(1, Number(params.page || "1") || 1);
   const skip = (currentPage - 1) * PAGE_SIZE;
 
@@ -88,10 +69,10 @@ export default async function AuditLogsPage({ searchParams }: AuditLogsPageProps
     ...(selectedModule !== "ALL" ? { module: selectedModule } : {}),
     ...(selectedAction !== "ALL" ? { action: selectedAction } : {}),
     ...(selectedStatus !== "ALL" ? { status: selectedStatus } : {}),
-    ...(documentKeyword
+    ...(selectedDocument
       ? {
           entityCode: {
-            contains: documentKeyword,
+            contains: selectedDocument,
             mode: "insensitive" as const,
           },
         }
@@ -161,14 +142,16 @@ export default async function AuditLogsPage({ searchParams }: AuditLogsPageProps
             <p className="text-sm font-semibold uppercase tracking-[0.24em] text-red-400/80">Global Settings</p>
             <h1 className="mt-3 text-4xl font-bold">Audit Logs</h1>
             <p className="mt-4 max-w-3xl text-white/70">
-              Review admin activity history across authentication, orders, payments, credit notes, payment slip updates, and report exports.
+              Review admin activity history across authentication, orders, payments, credit notes, payment slip updates,
+              and report exports.
             </p>
           </div>
         </div>
 
         <div className="mt-8 card-rk p-6 text-white/75">
           <p>
-            Batch 3B adds audit log export, document reference filtering, and more readable action badges while preserving your existing audit logic.
+            Batch 3B adds audit log export, document reference filtering, and a 180-day retention cleanup option while
+            preserving your existing audit logic.
           </p>
         </div>
 
@@ -192,20 +175,22 @@ export default async function AuditLogsPage({ searchParams }: AuditLogsPageProps
             })}
           </div>
 
-          <a
-            href={buildExportHref({
-              period: selectedPeriod,
-              user: selectedUser,
-              module: selectedModule,
-              action: selectedAction,
-              status: selectedStatus,
-              q: searchKeyword,
-              doc: documentKeyword,
-            })}
-            className="rounded-2xl border border-white/15 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
-          >
-            Export Audit Logs CSV
-          </a>
+          <div className="flex flex-wrap items-center gap-3">
+            <a
+              href={`/api/admin/settings/audit-logs/export?period=${selectedPeriod}&user=${encodeURIComponent(
+                selectedUser
+              )}&module=${encodeURIComponent(selectedModule)}&action=${encodeURIComponent(
+                selectedAction
+              )}&status=${encodeURIComponent(selectedStatus)}&q=${encodeURIComponent(
+                searchKeyword
+              )}&doc=${encodeURIComponent(selectedDocument)}`}
+              className="rounded-2xl border border-white/15 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
+            >
+              Export Audit Logs CSV
+            </a>
+
+            <CleanupAuditLogsButton retentionDays={180} />
+          </div>
         </div>
 
         <form method="get" className="mt-4 card-rk grid gap-4 p-6 md:grid-cols-2 xl:grid-cols-3">
@@ -289,7 +274,7 @@ export default async function AuditLogsPage({ searchParams }: AuditLogsPageProps
 
           <div>
             <label className="mb-2 block text-sm text-white/65">Document / Reference</label>
-            <input type="text" name="doc" defaultValue={documentKeyword} placeholder="Search invoice, CN, or document no" className="w-full rounded-xl border border-white/15 bg-black/50 px-4 py-3 text-white outline-none placeholder:text-white/35" />
+            <input type="text" name="doc" defaultValue={selectedDocument} placeholder="Search invoice, CN, or document no" className="w-full rounded-xl border border-white/15 bg-black/50 px-4 py-3 text-white outline-none placeholder:text-white/35" />
           </div>
 
           <div className="flex items-end gap-3 xl:col-span-3 xl:justify-end">
@@ -309,7 +294,7 @@ export default async function AuditLogsPage({ searchParams }: AuditLogsPageProps
             action: selectedAction,
             status: selectedStatus,
             q: searchKeyword,
-            doc: documentKeyword,
+            doc: selectedDocument,
           }}
         />
       </div>
