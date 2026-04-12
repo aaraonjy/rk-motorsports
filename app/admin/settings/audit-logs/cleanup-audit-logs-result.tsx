@@ -27,13 +27,13 @@ export function CleanupAuditLogsResult() {
 
   const resultClassName =
     result.tone === "success"
-      ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200"
+      ? "border-emerald-500 bg-emerald-500/15 text-emerald-200"
       : result.tone === "neutral"
-        ? "border-white/15 bg-white/5 text-white/70"
-        : "border-red-500/30 bg-red-500/10 text-red-200";
+        ? "border-gray-500 bg-gray-500/15 text-gray-200"
+        : "border-red-500 bg-red-500/15 text-red-200";
 
   return (
-    <div className={`mt-4 max-w-xl rounded-2xl border px-4 py-3 text-sm ${resultClassName}`}>
+    <div className={`mt-4 w-full rounded-2xl border px-4 py-3 text-sm ${resultClassName}`}>
       {result.message}
     </div>
   );
