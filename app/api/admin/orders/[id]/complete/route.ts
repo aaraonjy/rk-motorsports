@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/auth";
+import { getSessionUser, requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { createAuditLogFromRequest } from "@/lib/audit";
 
 function needsEcu(tuningType: string | null | undefined) {
   return tuningType === "ECU" || tuningType === "ECU_TCU" || !tuningType;
@@ -16,6 +17,7 @@ export async function POST(
 ) {
   try {
     await requireAdmin();
+    const admin = await getSessionUser();
     const { id } = await ctx.params;
 
     const order = await db.order.findUnique({
@@ -51,6 +53,26 @@ export async function POST(
         data: { status: "COMPLETED" },
       });
 
+      try {
+        if (admin) {
+          await createAuditLogFromRequest({
+            req,
+            user: admin,
+            module: "Orders",
+            action: "COMPLETE",
+            entityType: "Order",
+            entityId: order.id,
+            entityCode: order.orderNumber,
+            description: `${admin.name} completed order ${order.orderNumber}.`,
+            oldValues: { status: order.status },
+            newValues: { status: "COMPLETED" },
+            status: "SUCCESS",
+          });
+        }
+      } catch (error) {
+        console.error("Audit log creation failed:", error);
+      }
+
       return NextResponse.redirect(
         new URL("/admin?success=order_completed", req.url),
         303
@@ -76,6 +98,26 @@ export async function POST(
         data: { status: "COMPLETED" },
       });
 
+      try {
+        if (admin) {
+          await createAuditLogFromRequest({
+            req,
+            user: admin,
+            module: "Orders",
+            action: "COMPLETE",
+            entityType: "Order",
+            entityId: order.id,
+            entityCode: order.orderNumber,
+            description: `${admin.name} completed order ${order.orderNumber}.`,
+            oldValues: { status: order.status },
+            newValues: { status: "COMPLETED" },
+            status: "SUCCESS",
+          });
+        }
+      } catch (error) {
+        console.error("Audit log creation failed:", error);
+      }
+
       return NextResponse.redirect(
         new URL("/admin?success=order_completed", req.url),
         303
@@ -86,6 +128,26 @@ export async function POST(
       where: { id },
       data: { status: "READY_FOR_DOWNLOAD" },
     });
+
+    try {
+      if (admin) {
+        await createAuditLogFromRequest({
+          req,
+          user: admin,
+          module: "Orders",
+          action: "RELEASE",
+          entityType: "Order",
+          entityId: order.id,
+          entityCode: order.orderNumber,
+          description: `${admin.name} released order ${order.orderNumber} for download.`,
+          oldValues: { status: order.status },
+          newValues: { status: "READY_FOR_DOWNLOAD" },
+          status: "SUCCESS",
+        });
+      }
+    } catch (error) {
+      console.error("Audit log creation failed:", error);
+    }
 
     try {
       await db.notification.create({

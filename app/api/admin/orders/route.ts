@@ -5,6 +5,7 @@ import { generateOrderDocumentNumber } from "@/lib/document-number";
 import { createAdminNotification } from "@/lib/notifications";
 import { calculatePaymentSummary } from "@/lib/payment-summary";
 import { saveFile } from "@/lib/storage";
+import { createAuditLogFromRequest } from "@/lib/audit";
 
 type CustomOrderItemPayload = {
   description: string;

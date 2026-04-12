@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
+import { createAuditLogFromRequest } from "@/lib/audit";
 
 export async function POST(
   req: Request,
@@ -50,6 +51,31 @@ export async function POST(
       cancelledAt: new Date(),
     },
   });
+
+  try {
+    await createAuditLogFromRequest({
+      req,
+      user,
+      module: "Orders",
+      action: "CANCEL",
+      entityType: "Order",
+      entityId: order.id,
+      entityCode: order.orderNumber,
+      description: `${user.name} cancelled order ${order.orderNumber}.`,
+      oldValues: {
+        status: order.status,
+        cancelReason: order.cancelReason,
+      },
+      newValues: {
+        status: "CANCELLED",
+        cancelledBy: "ADMIN",
+        cancelReason,
+      },
+      status: "SUCCESS",
+    });
+  } catch (error) {
+    console.error("Audit log creation failed:", error);
+  }
 
   return NextResponse.redirect(
     new URL(`/admin?success=admin_order_cancelled&t=${Date.now()}`, req.url),

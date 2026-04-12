@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createSession, verifyPassword } from "@/lib/auth";
 import { db } from "@/lib/db";
 import {
+import { createAuditLogFromRequest } from "@/lib/audit";
   buildRateLimitHeaders,
   checkRateLimits,
   createRateLimitErrorPayload,
@@ -57,6 +58,20 @@ export async function POST(req: NextRequest) {
     const user = await db.user.findUnique({ where: { email } });
 
     if (!user) {
+      try {
+        await createAuditLogFromRequest({
+          req,
+          module: "Authentication",
+          action: "FAILED_LOGIN",
+          entityType: "User",
+          description: `Failed login attempt for ${email}.`,
+          newValues: { email },
+          status: "FAILED",
+        });
+      } catch (error) {
+        console.error("Audit log creation failed:", error);
+      }
+
       return NextResponse.json(
         { ok: false, error: "Invalid email or password." },
         {
@@ -69,6 +84,22 @@ export async function POST(req: NextRequest) {
     const ok = await verifyPassword(password, user.passwordHash);
 
     if (!ok) {
+      try {
+        await createAuditLogFromRequest({
+          req,
+          user,
+          module: "Authentication",
+          action: "FAILED_LOGIN",
+          entityType: "User",
+          entityId: user.id,
+          entityCode: user.email,
+          description: `${user.name} failed to login.`,
+          status: "FAILED",
+        });
+      } catch (error) {
+        console.error("Audit log creation failed:", error);
+      }
+
       return NextResponse.json(
         { ok: false, error: "Invalid email or password." },
         {
@@ -79,6 +110,22 @@ export async function POST(req: NextRequest) {
     }
 
     await createSession(user.id);
+
+    try {
+      await createAuditLogFromRequest({
+        req,
+        user,
+        module: "Authentication",
+        action: "LOGIN",
+        entityType: "User",
+        entityId: user.id,
+        entityCode: user.email,
+        description: `${user.name} logged in successfully.`,
+        status: "SUCCESS",
+      });
+    } catch (error) {
+      console.error("Audit log creation failed:", error);
+    }
 
     return NextResponse.json(
       {

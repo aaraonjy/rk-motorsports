@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
 import { calculatePaymentSummary } from "@/lib/payment-summary";
 import { saveFile } from "@/lib/storage";
+import { createAuditLogFromRequest } from "@/lib/audit";
 
 type CustomOrderItemPayload = {
   description: string;
@@ -67,6 +68,13 @@ export async function PUT(
     const order = await db.order.findUnique({
       where: { id },
       include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
         customItems: true,
         payments: {
           orderBy: { paymentDate: "asc" },

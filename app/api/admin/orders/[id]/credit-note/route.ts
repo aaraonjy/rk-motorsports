@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { generateCreditNoteDocumentNumber } from "@/lib/document-number";
+import { createAuditLogFromRequest } from "@/lib/audit";
 
 type ApiResponse = {
   ok: boolean;
@@ -106,10 +107,11 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
         }];
 
     const cnDate = new Date();
+    const cnNo = await generateCreditNoteDocumentNumber(cnDate);
 
-    await db.creditNote.create({
+    const creditNote = await db.creditNote.create({
       data: {
-        cnNo: await generateCreditNoteDocumentNumber(cnDate),
+        cnNo,
         cnDate,
         orderId: order.id,
         customerId: order.userId,
@@ -123,6 +125,32 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
         },
       },
     });
+
+    try {
+      await createAuditLogFromRequest({
+        req,
+        user: admin,
+        module: "Credit Notes",
+        action: "CREATE",
+        entityType: "CreditNote",
+        entityId: creditNote.id,
+        entityCode: creditNote.cnNo,
+        description: `${admin.name} created credit note ${creditNote.cnNo} for order ${order.orderNumber}.`,
+        newValues: {
+          orderId: order.id,
+          orderNumber: order.orderNumber,
+          customerId: order.user.id,
+          customerName: order.user.name,
+          reasonType,
+          reasonRemarks,
+          amount,
+          itemCount: items.length,
+        },
+        status: "SUCCESS",
+      });
+    } catch (error) {
+      console.error("Audit log creation failed:", error);
+    }
 
     return respondCreditNote(req, { ok: true, redirectTo: "/admin?success=credit_note_created" });
   } catch (error) {

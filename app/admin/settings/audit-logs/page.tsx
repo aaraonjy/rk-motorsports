@@ -117,14 +117,14 @@ export default async function AuditLogsPage({ searchParams }: AuditLogsPageProps
             </p>
             <h1 className="mt-3 text-4xl font-bold">Audit Logs</h1>
             <p className="mt-4 max-w-3xl text-white/70">
-              Review admin activity history and prepare the system foundation for future detailed audit tracking.
+              Review admin activity history across authentication, orders, payments, and credit notes.
             </p>
           </div>
         </div>
 
         <div className="mt-8 card-rk p-6 text-white/75">
           <p>
-            Batch 1 includes the Audit Logs page structure, filters, and database foundation. Action-based log recording will be connected in the next batch.
+            Batch 2A now records core admin activity for login/logout, custom order creation and updates, order cancellation/completion, payment additions, and credit note creation.
           </p>
         </div>
 
@@ -277,7 +277,7 @@ export default async function AuditLogsPage({ searchParams }: AuditLogsPageProps
                 {logs.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="px-5 py-16 text-center text-white/55">
-                      No audit logs found yet. Batch 2 will begin recording actual activity into this table.
+                      No audit logs found for the selected filters.
                     </td>
                   </tr>
                 ) : (

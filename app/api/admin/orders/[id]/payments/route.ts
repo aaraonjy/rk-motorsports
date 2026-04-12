@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { calculatePaymentSummary } from "@/lib/payment-summary";
+import { createAuditLogFromRequest } from "@/lib/audit";
 
 type AddPaymentPayload = {
   paymentDate?: string;
@@ -46,6 +47,13 @@ export async function POST(
     const order = await db.order.findUnique({
       where: { id },
       include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
         payments: {
           orderBy: { paymentDate: "asc" },
           select: {
@@ -137,6 +145,35 @@ export async function POST(
         },
       });
     });
+
+    try {
+      await createAuditLogFromRequest({
+        req,
+        user,
+        module: "Payments",
+        action: "CREATE",
+        entityType: "Payment",
+        entityId: order.id,
+        entityCode: order.orderNumber,
+        description: `${user.name} added payment for order ${order.orderNumber}.`,
+        oldValues: {
+          totalPaid: Number(order.totalPaid || 0),
+          outstandingBalance: Number(order.outstandingBalance || 0),
+        },
+        newValues: {
+          customerId: order.user.id,
+          customerName: order.user.name,
+          paymentDate: paymentDate.toISOString(),
+          paymentMode,
+          amount,
+          totalPaid: Number(summary.totalPaid || 0),
+          outstandingBalance: Number(summary.outstandingBalance || 0),
+        },
+        status: "SUCCESS",
+      });
+    } catch (error) {
+      console.error("Audit log creation failed:", error);
+    }
 
     return NextResponse.json({ ok: true });
   } catch (error) {
