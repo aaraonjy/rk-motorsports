@@ -2,6 +2,11 @@ import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { getCustomersReport } from "@/lib/queries";
 
+function formatCsvMoney(value: unknown) {
+  const amount = Number(value ?? 0);
+  return Number.isFinite(amount) ? amount.toFixed(2) : "0.00";
+}
+
 function escapeCsvValue(value: unknown) {
   const normalized = String(value ?? "");
   const escaped = normalized.replace(/"/g, '""');
