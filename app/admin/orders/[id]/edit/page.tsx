@@ -19,31 +19,45 @@ export default async function AdminEditCustomOrderPage({
 
   const { id } = await params;
 
-  const order = await db.order.findUnique({
-    where: { id },
-    include: {
-      user: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          phone: true,
+  const [order, taxConfig, taxCodes] = await Promise.all([
+    db.order.findUnique({
+      where: { id },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+          },
+        },
+        customItems: {
+          orderBy: { createdAt: "asc" },
+        },
+        payments: {
+          orderBy: { paymentDate: "asc" },
+        },
+        files: {
+          where: {
+            kind: "SUPPORTING_DOC",
+          },
+          orderBy: { createdAt: "asc" },
         },
       },
-      customItems: {
-        orderBy: { createdAt: "asc" },
+    }),
+    db.taxConfiguration.findUnique({ where: { id: "default" } }),
+    db.taxCode.findMany({
+      where: { isActive: true },
+      orderBy: [{ code: "asc" }],
+      select: {
+        id: true,
+        code: true,
+        description: true,
+        rate: true,
+        calculationMethod: true,
       },
-      payments: {
-        orderBy: { paymentDate: "asc" },
-      },
-      files: {
-        where: {
-          kind: "SUPPORTING_DOC",
-        },
-        orderBy: { createdAt: "asc" },
-      },
-    },
-  });
+    }),
+  ]);
 
   if (!order || order.orderType !== "CUSTOM_ORDER") {
     redirect("/admin");
@@ -127,6 +141,15 @@ export default async function AdminEditCustomOrderPage({
               vehicleNo: order.vehicleNo,
               internalRemarks: order.internalRemarks,
               customDiscount: Number(order.customDiscount ?? 0),
+              taxCodeId: order.taxCodeId,
+              taxCode: order.taxCode,
+              taxDescription: order.taxDescription,
+              taxRate: order.taxRate != null ? Number(order.taxRate) : null,
+              taxCalculationMethod: order.taxCalculationMethod,
+              taxAmount: Number(order.taxAmount ?? 0),
+              taxableSubtotal: Number(order.taxableSubtotal ?? 0),
+              grandTotalAfterTax: Number(order.grandTotalAfterTax ?? 0),
+              isTaxEnabledSnapshot: order.isTaxEnabledSnapshot,
               totalPaid: Number(order.totalPaid ?? 0),
               outstandingBalance: Number(order.outstandingBalance ?? 0),
               payments: order.payments.map((payment) => ({
@@ -147,6 +170,14 @@ export default async function AdminEditCustomOrderPage({
                 qty: item.qty,
                 unitPrice: Number(item.unitPrice ?? 0),
                 uom: item.uom,
+              })),
+            }}
+            taxConfig={{
+              taxModuleEnabled: taxConfig?.taxModuleEnabled ?? false,
+              defaultAdminTaxCodeId: taxConfig?.defaultAdminTaxCodeId ?? "",
+              taxCodes: taxCodes.map((item) => ({
+                ...item,
+                rate: Number(item.rate),
               })),
             }}
           />

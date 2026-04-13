@@ -18,6 +18,7 @@ import {
   checkRateLimit,
   createRateLimitKey,
 } from "@/lib/rate-limit";
+import { calculateTaxBreakdown, getTaxDisplayLabel } from "@/tax";
 
 function normalizeTuningType(value: string) {
   if (value === "TCU") return "TCU";
@@ -238,7 +239,29 @@ export async function POST(req: Request) {
       : 0;
 
     const calculatedTotal = calculatedBaseTotal + calculatedAddOnTotal;
-    const finalTotal = estimatedTotalRaw > 0 ? estimatedTotalRaw : calculatedTotal;
+    const finalSubtotal = estimatedTotalRaw > 0 ? estimatedTotalRaw : calculatedTotal;
+
+    const taxConfig = await db.taxConfiguration.findUnique({
+      where: { id: "default" },
+      include: {
+        defaultPortalTaxCode: true,
+      },
+    });
+
+    const portalTaxCode =
+      taxConfig?.taxModuleEnabled && taxConfig.defaultPortalTaxCode?.isActive
+        ? taxConfig.defaultPortalTaxCode
+        : null;
+
+    const taxBreakdown = calculateTaxBreakdown({
+      subtotal: finalSubtotal,
+      discount: 0,
+      taxRate: portalTaxCode ? Number(portalTaxCode.rate) : null,
+      calculationMethod: portalTaxCode?.calculationMethod ?? null,
+      taxEnabled: Boolean(taxConfig?.taxModuleEnabled && portalTaxCode),
+    });
+
+    const finalTotal = taxBreakdown.grandTotalAfterTax;
     const docType = "INV";
 
     const requestDetailsLines = [
@@ -265,6 +288,9 @@ export async function POST(req: Request) {
         waterMethanolInjection || "Not selected"
       }`,
       `Remarks: ${remarks || "None"}`,
+      `Tax Code: ${portalTaxCode?.code || "No tax"}`,
+      `Tax Amount: RM${taxBreakdown.taxAmount.toFixed(2)}`,
+      `Grand Total After Tax: RM${taxBreakdown.grandTotalAfterTax.toFixed(2)}`,
     ];
 
     const requestDetails = requestDetailsLines.join("\n");
@@ -305,6 +331,22 @@ export async function POST(req: Request) {
         source: adminMode ? "ADMIN_PORTAL" : "ONLINE_PORTAL",
         docType,
         totalAmount: finalTotal,
+        taxCodeId: portalTaxCode?.id ?? null,
+        taxCode: portalTaxCode?.code ?? null,
+        taxDescription: portalTaxCode?.description ?? null,
+        taxDisplayLabel: portalTaxCode
+          ? getTaxDisplayLabel({
+              code: portalTaxCode.code,
+              description: portalTaxCode.description,
+              rate: Number(portalTaxCode.rate),
+            })
+          : null,
+        taxRate: portalTaxCode ? Number(portalTaxCode.rate) : null,
+        taxCalculationMethod: portalTaxCode?.calculationMethod ?? null,
+        taxAmount: taxBreakdown.taxAmount,
+        taxableSubtotal: taxBreakdown.taxableSubtotal,
+        grandTotalAfterTax: taxBreakdown.grandTotalAfterTax,
+        isTaxEnabledSnapshot: taxBreakdown.isTaxApplied,
         requestDetails,
         tuningType,
         selectedTuneId:

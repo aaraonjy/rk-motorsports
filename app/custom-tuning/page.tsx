@@ -2,10 +2,25 @@ import Link from "next/link";
 import { getProducts } from "@/lib/queries";
 import { getSessionUser } from "@/lib/auth";
 import { CustomTuningForm } from "@/components/custom-tuning-form";
+import { db } from "@/lib/db";
 
 export default async function CustomTuningPage() {
   const user = await getSessionUser();
-  const products = await getProducts();
+  const [products, taxConfig, taxCodes] = await Promise.all([
+    getProducts(),
+    db.taxConfiguration.findUnique({ where: { id: "default" } }),
+    db.taxCode.findMany({
+      where: { isActive: true },
+      orderBy: [{ code: "asc" }],
+      select: {
+        id: true,
+        code: true,
+        description: true,
+        rate: true,
+        calculationMethod: true,
+      },
+    }),
+  ]);
   const customProduct = products.find((p) => p.slug === "custom-file-service");
 
   return (
@@ -49,7 +64,17 @@ export default async function CustomTuningPage() {
           </div>
         ) : (
           <div className="mt-10">
-            <CustomTuningForm productId={customProduct.id} />
+            <CustomTuningForm
+              productId={customProduct.id}
+              taxConfig={{
+                taxModuleEnabled: taxConfig?.taxModuleEnabled ?? false,
+                defaultPortalTaxCodeId: taxConfig?.defaultPortalTaxCodeId ?? "",
+                taxCodes: taxCodes.map((item) => ({
+                  ...item,
+                  rate: Number(item.rate),
+                })),
+              }}
+            />
           </div>
         )}
       </div>

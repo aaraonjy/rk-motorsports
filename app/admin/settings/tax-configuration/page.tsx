@@ -17,7 +17,7 @@ export default async function TaxConfigurationPage() {
       },
     }),
     db.taxCode.findMany({
-      orderBy: [{ isActive: "desc" }, { sortOrder: "asc" }, { code: "asc" }],
+      orderBy: [{ isActive: "desc" }, { code: "asc" }],
     }),
   ]);
 
@@ -44,11 +44,9 @@ export default async function TaxConfigurationPage() {
             id: taxCode.id,
             code: taxCode.code,
             description: taxCode.description,
-            displayLabel: taxCode.displayLabel ?? "",
             rate: Number(taxCode.rate),
             calculationMethod: taxCode.calculationMethod,
             isActive: taxCode.isActive,
-            sortOrder: taxCode.sortOrder,
           }))}
         />
       </div>

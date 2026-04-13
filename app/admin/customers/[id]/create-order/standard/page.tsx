@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { getCustomerById, getProducts } from "@/lib/queries";
+import { db } from "@/lib/db";
 import { CustomTuningForm } from "@/components/custom-tuning-form";
 
 type CreateOrderPageProps = {
@@ -37,7 +38,21 @@ export default async function AdminCustomerStandardCreateOrderPage({
   const customer = await getCustomerById(id);
   if (!customer) redirect("/admin/customers");
 
-  const products = await getProducts();
+  const [products, taxConfig, taxCodes] = await Promise.all([
+    getProducts(),
+    db.taxConfiguration.findUnique({ where: { id: "default" } }),
+    db.taxCode.findMany({
+      where: { isActive: true },
+      orderBy: [{ code: "asc" }],
+      select: {
+        id: true,
+        code: true,
+        description: true,
+        rate: true,
+        calculationMethod: true,
+      },
+    }),
+  ]);
   const customProduct = products.find((p) => p.slug === "custom-file-service");
 
   return (
@@ -134,6 +149,14 @@ export default async function AdminCustomerStandardCreateOrderPage({
               productId={customProduct.id}
               adminMode
               customerId={customer.id}
+              taxConfig={{
+                taxModuleEnabled: taxConfig?.taxModuleEnabled ?? false,
+                defaultPortalTaxCodeId: taxConfig?.defaultPortalTaxCodeId ?? "",
+                taxCodes: taxCodes.map((item) => ({
+                  ...item,
+                  rate: Number(item.rate),
+                })),
+              }}
             />
           </div>
         )}

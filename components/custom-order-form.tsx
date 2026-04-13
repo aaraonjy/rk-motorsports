@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { calculateTaxBreakdown, getTaxDisplayLabel, type TaxCalculationMethodValue } from "@/tax";
 
 type PaymentHistoryItem = {
   id: string;
@@ -16,6 +17,15 @@ type CustomOrderInitialData = {
   vehicleNo?: string | null;
   internalRemarks: string | null;
   customDiscount: number | null;
+  taxCodeId?: string | null;
+  taxCode?: string | null;
+  taxDescription?: string | null;
+  taxRate?: number | null;
+  taxCalculationMethod?: TaxCalculationMethodValue | null;
+  taxAmount?: number | null;
+  taxableSubtotal?: number | null;
+  grandTotalAfterTax?: number | null;
+  isTaxEnabledSnapshot?: boolean | null;
   totalPaid?: number | null;
   outstandingBalance?: number | null;
   payments?: PaymentHistoryItem[];
@@ -34,6 +44,14 @@ type CustomOrderInitialData = {
   }>;
 };
 
+type TaxCodeOption = {
+  id: string;
+  code: string;
+  description: string;
+  rate: number;
+  calculationMethod: TaxCalculationMethodValue;
+};
+
 type CustomOrderFormProps = {
   customerId: string;
   orderId?: string;
@@ -41,6 +59,11 @@ type CustomOrderFormProps = {
   submitLabel?: string;
   submittingLabel?: string;
   errorTitle?: string;
+  taxConfig?: {
+    taxModuleEnabled: boolean;
+    defaultAdminTaxCodeId?: string | null;
+    taxCodes: TaxCodeOption[];
+  };
 };
 
 type CustomLineItem = {
@@ -115,6 +138,15 @@ function removeSpacing(value: string) {
   return value.replace(/\s+/g, "");
 }
 
+
+function formatTaxOptionLabel(taxCode: TaxCodeOption) {
+  return getTaxDisplayLabel({
+    code: taxCode.code,
+    description: taxCode.description,
+    rate: taxCode.rate,
+  });
+}
+
 export function CustomOrderForm({
   customerId,
   orderId,
@@ -122,6 +154,7 @@ export function CustomOrderForm({
   submitLabel = "Create Custom Order",
   submittingLabel,
   errorTitle = "Create Order Failed",
+  taxConfig,
 }: CustomOrderFormProps) {
   const isEditMode = !!orderId;
   const existingTotalPaid = Number(initialData?.totalPaid ?? 0);
@@ -178,7 +211,55 @@ export function CustomOrderForm({
     [discount]
   );
 
-  const grandTotal = roundMoney(Math.max(subtotal - discountAmount, 0));
+  const availableTaxCodes = useMemo(() => {
+    const current = taxConfig?.taxCodes || [];
+
+    if (
+      initialData?.taxCodeId &&
+      !current.some((item) => item.id === initialData.taxCodeId) &&
+      initialData.taxCode &&
+      initialData.taxRate != null &&
+      initialData.taxCalculationMethod
+    ) {
+      return [
+        ...current,
+        {
+          id: initialData.taxCodeId,
+          code: initialData.taxCode,
+          description: initialData.taxDescription || initialData.taxCode,
+          rate: Number(initialData.taxRate || 0),
+          calculationMethod: initialData.taxCalculationMethod,
+        },
+      ];
+    }
+
+    return current;
+  }, [initialData, taxConfig?.taxCodes]);
+
+  const [selectedTaxCodeId, setSelectedTaxCodeId] = useState(() => {
+    if (initialData?.taxCodeId) return initialData.taxCodeId;
+    if (!taxConfig?.taxModuleEnabled) return "";
+    return taxConfig?.defaultAdminTaxCodeId || "";
+  });
+
+  const selectedTaxCode = useMemo(
+    () => availableTaxCodes.find((item) => item.id === selectedTaxCodeId) || null,
+    [availableTaxCodes, selectedTaxCodeId]
+  );
+
+  const taxBreakdown = useMemo(
+    () =>
+      calculateTaxBreakdown({
+        subtotal,
+        discount: discountAmount,
+        taxRate: selectedTaxCode?.rate ?? null,
+        calculationMethod: selectedTaxCode?.calculationMethod ?? null,
+        taxEnabled: Boolean(taxConfig?.taxModuleEnabled && selectedTaxCode),
+      }),
+    [discountAmount, selectedTaxCode, subtotal, taxConfig?.taxModuleEnabled]
+  );
+
+  const grandTotal = taxBreakdown.grandTotalAfterTax;
   const normalizedPaymentAmount = useMemo(
     () => Math.max(0, parseMoneyAmount(paymentAmount || "0")),
     [paymentAmount]
@@ -308,6 +389,7 @@ export function CustomOrderForm({
       formData.append("customSubtotal", String(subtotal));
       formData.append("customDiscount", String(discountAmount));
       formData.append("customGrandTotal", String(grandTotal));
+      formData.append("taxCodeId", selectedTaxCodeId || "");
       formData.append("paymentDate", paymentDate);
       formData.append("paymentMode", paymentMode);
       formData.append("paymentAmount", String(projectedPaymentAmount));
@@ -621,6 +703,37 @@ export function CustomOrderForm({
               />
             </div>
 
+            {taxConfig?.taxModuleEnabled ? (
+              <div>
+                <label className="label-rk">Tax Code</label>
+                <div className="relative">
+                  <select
+                    value={selectedTaxCodeId}
+                    onChange={(e) => setSelectedTaxCodeId(e.target.value)}
+                    className="input-rk appearance-none pr-12"
+                  >
+                    <option value="">No Tax</option>
+                    {availableTaxCodes.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {formatTaxOptionLabel(item)}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/60">▾</div>
+                </div>
+                <p className="mt-2 text-xs text-white/45">
+                  Default admin tax code is pre-selected, but you may change or remove it for this order.
+                </p>
+              </div>
+            ) : null}
+
+            {taxConfig?.taxModuleEnabled ? (
+              <div className="flex items-center justify-between gap-4 border-t border-white/10 pt-4 text-white/75">
+                <span>Tax Amount</span>
+                <span className="font-semibold text-white">{formatCurrency(taxBreakdown.taxAmount)}</span>
+              </div>
+            ) : null}
+
             <div className="flex items-center justify-between gap-4 border-t border-white/10 pt-4 text-base">
               <span className="font-semibold text-white">Grand Total</span>
               <span className="text-xl font-bold text-amber-200">
@@ -738,6 +851,7 @@ export function CustomOrderForm({
 
           <p className="mt-4 text-xs leading-6 text-white/45">
             Discount supports up to 2 decimal places. Grand total will never go below RM0.00.
+            {taxConfig?.taxModuleEnabled ? " When a tax code is selected, payment and outstanding balance use the total after tax." : ""}
           </p>
         </div>
       </div>

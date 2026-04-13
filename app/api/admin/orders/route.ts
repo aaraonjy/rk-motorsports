@@ -6,6 +6,7 @@ import { createAdminNotification } from "@/lib/notifications";
 import { calculatePaymentSummary } from "@/lib/payment-summary";
 import { saveFile } from "@/lib/storage";
 import { createAuditLogFromRequest } from "@/lib/audit";
+import { calculateTaxBreakdown, getTaxDisplayLabel } from "@/tax";
 
 type CustomOrderItemPayload = {
   description: string;
@@ -150,12 +151,39 @@ export async function POST(req: Request) {
       0
     ) + Number.EPSILON) * 100) / 100;
     const customDiscount = Math.max(0, sanitizeMoneyAmount(form.get("customDiscount")));
-    const calculatedGrandTotal = Math.round((Math.max(calculatedSubtotal - customDiscount, 0) + Number.EPSILON) * 100) / 100;
+    const taxableSubtotal = Math.round((Math.max(calculatedSubtotal - customDiscount, 0) + Number.EPSILON) * 100) / 100;
 
     const customSubtotal = sanitizeMoneyAmount(form.get("customSubtotal"));
-    const customGrandTotal = sanitizeMoneyAmount(form.get("customGrandTotal"));
+    const submittedGrandTotal = sanitizeMoneyAmount(form.get("customGrandTotal"));
+    const submittedTaxCodeId = String(form.get("taxCodeId") || "").trim();
 
-    if (!nearlyEqual(customSubtotal, calculatedSubtotal) || !nearlyEqual(customGrandTotal, calculatedGrandTotal)) {
+    const taxConfig = await db.taxConfiguration.findUnique({ where: { id: "default" } });
+    let selectedTaxCode = null;
+    if (taxConfig?.taxModuleEnabled && submittedTaxCodeId) {
+      selectedTaxCode = await db.taxCode.findFirst({
+        where: {
+          id: submittedTaxCodeId,
+          isActive: true,
+        },
+      });
+
+      if (!selectedTaxCode) {
+        return NextResponse.json(
+          { ok: false, error: "Selected tax code is invalid or inactive." },
+          { status: 400 }
+        );
+      }
+    }
+
+    const taxBreakdown = calculateTaxBreakdown({
+      subtotal: calculatedSubtotal,
+      discount: customDiscount,
+      taxRate: selectedTaxCode ? Number(selectedTaxCode.rate) : null,
+      calculationMethod: selectedTaxCode?.calculationMethod ?? null,
+      taxEnabled: Boolean(taxConfig?.taxModuleEnabled && selectedTaxCode),
+    });
+
+    if (!nearlyEqual(customSubtotal, calculatedSubtotal) || !nearlyEqual(submittedGrandTotal, taxBreakdown.grandTotalAfterTax)) {
       return NextResponse.json(
         { ok: false, error: "Order totals are invalid. Please refresh and try again." },
         { status: 400 }
@@ -199,7 +227,7 @@ export async function POST(req: Request) {
       );
     }
 
-    if (paymentAmount > calculatedGrandTotal) {
+    if (paymentAmount > taxBreakdown.grandTotalAfterTax) {
       return NextResponse.json(
         { ok: false, error: "Payment amount cannot exceed the grand total." },
         { status: 400 }
@@ -230,7 +258,7 @@ export async function POST(req: Request) {
 
     const paymentSummary = calculatePaymentSummary(
       paymentAmount > 0 ? [{ amount: paymentAmount }] : [],
-      calculatedGrandTotal
+      taxBreakdown.grandTotalAfterTax
     );
 
     const supportingFilesToCreate: Array<{
@@ -261,7 +289,9 @@ export async function POST(req: Request) {
       `Internal Remarks: ${internalRemarks || "None"}`,
       `Subtotal: RM${calculatedSubtotal.toFixed(2)}`,
       `Discount: RM${customDiscount.toFixed(2)}`,
-      `Grand Total: RM${calculatedGrandTotal.toFixed(2)}`,
+      `Tax Code: ${selectedTaxCode?.code || "No tax"}`,
+      `Tax Amount: RM${taxBreakdown.taxAmount.toFixed(2)}`,
+      `Grand Total: RM${taxBreakdown.grandTotalAfterTax.toFixed(2)}`,
       `Initial Payment: RM${paymentAmount.toFixed(2)}`,
       `Items: ${normalizedItems.length}`,
     ];
@@ -281,8 +311,24 @@ export async function POST(req: Request) {
         internalRemarks: internalRemarks || null,
         customSubtotal: calculatedSubtotal,
         customDiscount,
-        customGrandTotal: calculatedGrandTotal,
-        totalAmount: calculatedGrandTotal,
+        customGrandTotal: taxableSubtotal,
+        taxCodeId: selectedTaxCode?.id ?? null,
+        taxCode: selectedTaxCode?.code ?? null,
+        taxDescription: selectedTaxCode?.description ?? null,
+        taxDisplayLabel: selectedTaxCode
+          ? getTaxDisplayLabel({
+              code: selectedTaxCode.code,
+              description: selectedTaxCode.description,
+              rate: Number(selectedTaxCode.rate),
+            })
+          : null,
+        taxRate: selectedTaxCode ? Number(selectedTaxCode.rate) : null,
+        taxCalculationMethod: selectedTaxCode?.calculationMethod ?? null,
+        taxAmount: taxBreakdown.taxAmount,
+        taxableSubtotal: taxBreakdown.taxableSubtotal,
+        grandTotalAfterTax: taxBreakdown.grandTotalAfterTax,
+        isTaxEnabledSnapshot: taxBreakdown.isTaxApplied,
+        totalAmount: taxBreakdown.grandTotalAfterTax,
         totalPaid: Number(paymentSummary.totalPaid || 0),
         outstandingBalance: Number(paymentSummary.outstandingBalance || 0),
         requestDetails: requestDetailsLines.join("\n"),

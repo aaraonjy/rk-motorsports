@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { calculateTaxBreakdown, getTaxDisplayLabel, type TaxCalculationMethodValue } from "@/tax";
 import carLibrary from "@/lib/car-library.json";
 import ecuTypesData from "@/lib/ecu-types.json";
 import ecuReadToolsData from "@/lib/ecu-read-tools.json";
@@ -61,10 +62,23 @@ type TcuTypeEntry = {
 type EcuTypesFile = Record<string, EcuTypeEntry[]>;
 type TcuTypesFile = Record<string, TcuTypeEntry[]>;
 
+type TaxCodeOption = {
+  id: string;
+  code: string;
+  description: string;
+  rate: number;
+  calculationMethod: TaxCalculationMethodValue;
+};
+
 type CustomTuningFormProps = {
   productId: string;
   adminMode?: boolean;
   customerId?: string;
+  taxConfig?: {
+    taxModuleEnabled: boolean;
+    defaultPortalTaxCodeId?: string | null;
+    taxCodes: TaxCodeOption[];
+  };
 };
 
 
@@ -409,6 +423,7 @@ export function CustomTuningForm({
   productId,
   adminMode = false,
   customerId,
+  taxConfig,
 }: CustomTuningFormProps) {
   const [tuningType, setTuningType] = useState<TuningTypeOption>("ECU");
   const [selectedAddOns, setSelectedAddOns] = useState<string[]>([]);
@@ -922,6 +937,29 @@ export function CustomTuningForm({
 
   const estimatedTotal = baseTuneTotal + addOnTotal;
 
+  const portalTaxCode = useMemo(() => {
+    if (!taxConfig?.taxModuleEnabled || !taxConfig?.defaultPortalTaxCodeId) {
+      return null;
+    }
+
+    return (
+      taxConfig.taxCodes.find((item) => item.id === taxConfig.defaultPortalTaxCodeId) ||
+      null
+    );
+  }, [taxConfig]);
+
+  const estimatedTaxBreakdown = useMemo(
+    () =>
+      calculateTaxBreakdown({
+        subtotal: estimatedTotal,
+        discount: 0,
+        taxRate: portalTaxCode?.rate ?? null,
+        calculationMethod: portalTaxCode?.calculationMethod ?? null,
+        taxEnabled: Boolean(taxConfig?.taxModuleEnabled && portalTaxCode),
+      }),
+    [estimatedTotal, portalTaxCode, taxConfig?.taxModuleEnabled]
+  );
+
   const selectedEcuTune = useMemo(
     () => ecuTunes.find((item) => item.id === ecuStage) || null,
     [ecuStage]
@@ -1078,6 +1116,7 @@ async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
       <input type="hidden" name="engineModsOther" value={engineModsOther.trim()} />
       <input type="hidden" name="selectedTuneLabel" value={selectedTuneLabel} />
       <input type="hidden" name="estimatedTotal" value={estimatedTotal || ""} />
+      <input type="hidden" name="portalTaxCodeId" value={portalTaxCode?.id || ""} />
       <input type="hidden" name="vehicleBrand" value={selectedBrand} />
       <input
         type="hidden"
@@ -2319,15 +2358,36 @@ async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
           >
             Total estimated price
           </p>
-          <p className="mt-3 text-4xl font-bold text-white">
-            {selectedTuneLabel ? (
-              `RM ${estimatedTotal.toLocaleString()}`
-            ) : (
+          {selectedTuneLabel ? (
+            <div className="mt-3 space-y-3 text-sm text-white/75">
+              <div className="flex items-center justify-between gap-4">
+                <span>Estimated Subtotal</span>
+                <span className="font-semibold text-white">RM {estimatedTotal.toLocaleString()}</span>
+              </div>
+              {estimatedTaxBreakdown.isTaxApplied && portalTaxCode ? (
+                <>
+                  <div className="flex items-center justify-between gap-4">
+                    <span>{getTaxDisplayLabel({ code: portalTaxCode.code, description: portalTaxCode.description, rate: portalTaxCode.rate })}</span>
+                    <span className="font-semibold text-white">RM {estimatedTaxBreakdown.taxAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="border-t border-white/10 pt-3">
+                    <div className="flex items-center justify-between gap-4 text-lg">
+                      <span className="font-semibold text-white">Estimated Total</span>
+                      <span className="text-2xl font-bold text-white">RM {estimatedTaxBreakdown.grandTotalAfterTax.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="text-4xl font-bold text-white">RM {estimatedTotal.toLocaleString()}</div>
+              )}
+            </div>
+          ) : (
+            <p className="mt-3 text-4xl font-bold text-white">
               <span className="text-2xl font-semibold text-white/50">
                 {getEmptyTotalText(tuningType)}
               </span>
-            )}
-          </p>
+            </p>
+          )}
         </div>
 
         <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03] p-6">

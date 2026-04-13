@@ -7,11 +7,9 @@ type TaxCodeItem = {
   id: string;
   code: string;
   description: string;
-  displayLabel: string;
   rate: number;
   calculationMethod: "EXCLUSIVE" | "INCLUSIVE";
   isActive: boolean;
-  sortOrder: number;
 };
 
 type TaxConfigurationClientProps = {
@@ -35,11 +33,9 @@ function createEmptyTaxCodeDraft(): Omit<TaxCodeDraft, "id"> {
   return {
     code: "",
     description: "",
-    displayLabel: "",
     rate: 0,
     calculationMethod: "EXCLUSIVE",
     isActive: true,
-    sortOrder: 0,
   };
 }
 
@@ -61,14 +57,12 @@ export function AdminTaxConfigurationClient({
   const [drafts, setDrafts] = useState<TaxCodeDraft[]>(taxCodes);
 
   const activeTaxCodes = useMemo(
-    () => drafts.filter((item) => item.isActive).sort((a, b) => a.sortOrder - b.sortOrder || a.code.localeCompare(b.code)),
+    () => drafts.filter((item) => item.isActive).sort((a, b) => a.code.localeCompare(b.code)),
     [drafts]
   );
 
   function updateDraft(id: string, field: keyof TaxCodeDraft, value: string | number | boolean) {
-    setDrafts((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, [field]: value } : item))
-    );
+    setDrafts((prev) => prev.map((item) => (item.id === id ? { ...item, [field]: value } : item)));
   }
 
   async function handleSaveConfig() {
@@ -143,11 +137,9 @@ export function AdminTaxConfigurationClient({
         body: JSON.stringify({
           code: draft.code,
           description: draft.description,
-          displayLabel: draft.displayLabel,
           rate: draft.rate,
           calculationMethod: draft.calculationMethod,
           isActive: draft.isActive,
-          sortOrder: draft.sortOrder,
         }),
       });
 
@@ -253,69 +245,54 @@ export function AdminTaxConfigurationClient({
               Create active/inactive tax codes and define their calculation method. Historical transaction snapshots will rely on these values in later batches.
             </p>
           </div>
-          <span className="text-sm text-white/55">{drafts.length} tax code(s)</span>
+          <div className="text-sm text-white/55">{drafts.length} tax code(s)</div>
         </div>
 
-        <div className="mt-6 grid gap-4 xl:grid-cols-6">
-          <input
-            value={newTaxCode.code}
-            onChange={(event) => setNewTaxCode((prev) => ({ ...prev, code: event.target.value.toUpperCase() }))}
-            placeholder="Tax Code"
-            className="rounded-xl border border-white/15 bg-black/40 px-4 py-3 text-sm text-white outline-none"
-          />
-          <input
-            value={newTaxCode.description}
-            onChange={(event) => setNewTaxCode((prev) => ({ ...prev, description: event.target.value }))}
-            placeholder="Description"
-            className="rounded-xl border border-white/15 bg-black/40 px-4 py-3 text-sm text-white outline-none xl:col-span-2"
-          />
-          <input
-            value={newTaxCode.displayLabel}
-            onChange={(event) => setNewTaxCode((prev) => ({ ...prev, displayLabel: event.target.value }))}
-            placeholder="Display Label (Optional)"
-            className="rounded-xl border border-white/15 bg-black/40 px-4 py-3 text-sm text-white outline-none xl:col-span-2"
-          />
-          <input
-            type="number"
-            step="0.01"
-            min="0"
-            max="100"
-            value={newTaxCode.rate}
-            onChange={(event) => setNewTaxCode((prev) => ({ ...prev, rate: Number(event.target.value || 0) }))}
-            placeholder="Rate"
-            className="rounded-xl border border-white/15 bg-black/40 px-4 py-3 text-sm text-white outline-none"
-          />
-          <select
-            value={newTaxCode.calculationMethod}
-            onChange={(event) => setNewTaxCode((prev) => ({ ...prev, calculationMethod: event.target.value as "EXCLUSIVE" | "INCLUSIVE" }))}
-            className="rounded-xl border border-white/15 bg-black/40 px-4 py-3 text-sm text-white outline-none"
-          >
-            <option value="EXCLUSIVE">Exclusive</option>
-            <option value="INCLUSIVE">Inclusive</option>
-          </select>
-          <input
-            type="number"
-            min="0"
-            value={newTaxCode.sortOrder}
-            onChange={(event) => setNewTaxCode((prev) => ({ ...prev, sortOrder: Number(event.target.value || 0) }))}
-            placeholder="Sort Order"
-            className="rounded-xl border border-white/15 bg-black/40 px-4 py-3 text-sm text-white outline-none"
-          />
-          <label className="flex items-center gap-3 rounded-xl border border-white/15 bg-black/30 px-4 py-3 text-sm text-white/75 xl:col-span-2">
+        <div className="mt-6 rounded-2xl border border-white/10 bg-black/20 p-4">
+          <div className="grid gap-4 xl:grid-cols-[0.9fr_1.4fr_0.8fr_0.9fr_1fr_auto]">
             <input
-              type="checkbox"
-              checked={newTaxCode.isActive}
-              onChange={(event) => setNewTaxCode((prev) => ({ ...prev, isActive: event.target.checked }))}
-              className="h-4 w-4 rounded border-white/20 bg-transparent"
+              className="input-rk"
+              placeholder="Tax Code"
+              value={newTaxCode.code}
+              onChange={(event) => setNewTaxCode((prev) => ({ ...prev, code: event.target.value.toUpperCase() }))}
             />
-            Active tax code
-          </label>
-          <div className="xl:col-span-2 xl:flex xl:justify-end">
+            <input
+              className="input-rk"
+              placeholder="Description"
+              value={newTaxCode.description}
+              onChange={(event) => setNewTaxCode((prev) => ({ ...prev, description: event.target.value }))}
+            />
+            <input
+              type="number"
+              min="0"
+              max="100"
+              step="0.01"
+              className="input-rk"
+              placeholder="Rate"
+              value={newTaxCode.rate}
+              onChange={(event) => setNewTaxCode((prev) => ({ ...prev, rate: Number(event.target.value || 0) }))}
+            />
+            <select
+              className="input-rk"
+              value={newTaxCode.calculationMethod}
+              onChange={(event) => setNewTaxCode((prev) => ({ ...prev, calculationMethod: event.target.value as TaxCodeItem["calculationMethod"] }))}
+            >
+              <option value="EXCLUSIVE">Exclusive</option>
+              <option value="INCLUSIVE">Inclusive</option>
+            </select>
+            <label className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white/80">
+              <input
+                type="checkbox"
+                checked={newTaxCode.isActive}
+                onChange={(event) => setNewTaxCode((prev) => ({ ...prev, isActive: event.target.checked }))}
+              />
+              Active tax code
+            </label>
             <button
               type="button"
               onClick={handleCreateTaxCode}
               disabled={isCreating}
-              className="w-full rounded-2xl border border-white/15 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60 xl:w-auto"
+              className="rounded-2xl border border-white/15 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isCreating ? "Creating..." : "Create Tax Code"}
             </button>
@@ -330,87 +307,65 @@ export function AdminTaxConfigurationClient({
 
         <div className="mt-6 space-y-4">
           {drafts.length === 0 ? (
-            <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-5 text-sm text-white/60">
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-6 text-white/55">
               No tax codes have been created yet.
             </div>
-          ) : (
-            drafts.map((item) => (
-              <div key={item.id} className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                <div className="grid gap-4 xl:grid-cols-7">
-                  <input
-                    value={item.code}
-                    onChange={(event) => updateDraft(item.id, "code", event.target.value.toUpperCase())}
-                    className="rounded-xl border border-white/15 bg-black/40 px-4 py-3 text-sm text-white outline-none"
-                  />
-                  <input
-                    value={item.description}
-                    onChange={(event) => updateDraft(item.id, "description", event.target.value)}
-                    className="rounded-xl border border-white/15 bg-black/40 px-4 py-3 text-sm text-white outline-none xl:col-span-2"
-                  />
-                  <input
-                    value={item.displayLabel}
-                    onChange={(event) => updateDraft(item.id, "displayLabel", event.target.value)}
-                    placeholder="Display Label"
-                    className="rounded-xl border border-white/15 bg-black/40 px-4 py-3 text-sm text-white outline-none xl:col-span-2"
-                  />
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    max="100"
-                    value={item.rate}
-                    onChange={(event) => updateDraft(item.id, "rate", Number(event.target.value || 0))}
-                    className="rounded-xl border border-white/15 bg-black/40 px-4 py-3 text-sm text-white outline-none"
-                  />
-                  <select
-                    value={item.calculationMethod}
-                    onChange={(event) => updateDraft(item.id, "calculationMethod", event.target.value as "EXCLUSIVE" | "INCLUSIVE")}
-                    className="rounded-xl border border-white/15 bg-black/40 px-4 py-3 text-sm text-white outline-none"
-                  >
-                    <option value="EXCLUSIVE">Exclusive</option>
-                    <option value="INCLUSIVE">Inclusive</option>
-                  </select>
+          ) : null}
 
-                  <div className="flex flex-wrap items-center gap-3 xl:col-span-3">
-                    <label className="flex items-center gap-2 rounded-xl border border-white/15 bg-black/30 px-4 py-3 text-sm text-white/75">
-                      <input
-                        type="checkbox"
-                        checked={item.isActive}
-                        onChange={(event) => updateDraft(item.id, "isActive", event.target.checked)}
-                        className="h-4 w-4 rounded border-white/20 bg-transparent"
-                      />
-                      Active
-                    </label>
-                    <label className="flex items-center gap-2 rounded-xl border border-white/15 bg-black/30 px-4 py-3 text-sm text-white/75">
-                      <span>Sort</span>
-                      <input
-                        type="number"
-                        min="0"
-                        value={item.sortOrder}
-                        onChange={(event) => updateDraft(item.id, "sortOrder", Number(event.target.value || 0))}
-                        className="w-24 bg-transparent text-white outline-none"
-                      />
-                    </label>
-                    <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${item.isActive ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200" : "border-white/15 bg-white/5 text-white/65"}`}>
-                      {item.isActive ? "Active" : "Inactive"}
-                    </span>
-                    <span className="text-xs text-white/45">{formatPercent(item.rate)}</span>
-                  </div>
-
-                  <div className="xl:col-span-4 xl:flex xl:items-center xl:justify-end">
-                    <button
-                      type="button"
-                      onClick={() => handleSaveTaxCode(item.id)}
-                      disabled={Boolean(item.isSaving)}
-                      className="rounded-2xl border border-white/15 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {item.isSaving ? "Saving..." : `Save ${item.code || "Tax Code"}`}
-                    </button>
-                  </div>
+          {drafts.map((draft) => (
+            <div key={draft.id} className="rounded-2xl border border-white/10 bg-black/20 p-4">
+              <div className="grid gap-4 xl:grid-cols-[0.9fr_1.4fr_0.8fr_0.9fr_1fr_auto]">
+                <input
+                  className="input-rk"
+                  value={draft.code}
+                  onChange={(event) => updateDraft(draft.id, "code", event.target.value.toUpperCase())}
+                />
+                <input
+                  className="input-rk"
+                  value={draft.description}
+                  onChange={(event) => updateDraft(draft.id, "description", event.target.value)}
+                />
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  className="input-rk"
+                  value={draft.rate}
+                  onChange={(event) => updateDraft(draft.id, "rate", Number(event.target.value || 0))}
+                />
+                <select
+                  className="input-rk"
+                  value={draft.calculationMethod}
+                  onChange={(event) => updateDraft(draft.id, "calculationMethod", event.target.value as TaxCodeItem["calculationMethod"])}
+                >
+                  <option value="EXCLUSIVE">Exclusive</option>
+                  <option value="INCLUSIVE">Inclusive</option>
+                </select>
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white/80">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={draft.isActive}
+                      onChange={(event) => updateDraft(draft.id, "isActive", event.target.checked)}
+                    />
+                    Active
+                  </label>
+                  <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${draft.isActive ? "border border-emerald-500/30 bg-emerald-500/10 text-emerald-200" : "border border-white/15 bg-white/5 text-white/60"}`}>
+                    {draft.isActive ? formatPercent(draft.rate) : "Inactive"}
+                  </span>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => handleSaveTaxCode(draft.id)}
+                  disabled={draft.isSaving}
+                  className="rounded-2xl border border-white/15 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {draft.isSaving ? "Saving..." : "Save"}
+                </button>
               </div>
-            ))
-          )}
+            </div>
+          ))}
         </div>
       </div>
     </div>

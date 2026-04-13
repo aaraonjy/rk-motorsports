@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { getCustomerById } from "@/lib/queries";
+import { db } from "@/lib/db";
 import { CustomOrderForm } from "@/components/custom-order-form";
 
 type CreateOrderPageProps = {
@@ -34,7 +35,21 @@ export default async function AdminCustomerCustomOrderPage({
   if (user.role !== "ADMIN") redirect("/dashboard");
 
   const { id } = await params;
-  const customer = await getCustomerById(id);
+  const [customer, taxConfig, taxCodes] = await Promise.all([
+    getCustomerById(id),
+    db.taxConfiguration.findUnique({ where: { id: "default" } }),
+    db.taxCode.findMany({
+      where: { isActive: true },
+      orderBy: [{ code: "asc" }],
+      select: {
+        id: true,
+        code: true,
+        description: true,
+        rate: true,
+        calculationMethod: true,
+      },
+    }),
+  ]);
   if (!customer) redirect("/admin/customers");
 
   return (
@@ -106,7 +121,17 @@ export default async function AdminCustomerCustomOrderPage({
         </div>
 
         <div className="mt-10">
-          <CustomOrderForm customerId={customer.id} />
+          <CustomOrderForm
+            customerId={customer.id}
+            taxConfig={{
+              taxModuleEnabled: taxConfig?.taxModuleEnabled ?? false,
+              defaultAdminTaxCodeId: taxConfig?.defaultAdminTaxCodeId ?? "",
+              taxCodes: taxCodes.map((item) => ({
+                ...item,
+                rate: Number(item.rate),
+              })),
+            }}
+          />
         </div>
       </div>
     </section>

@@ -4,6 +4,7 @@ import { getSessionUser } from "@/lib/auth";
 import { calculatePaymentSummary } from "@/lib/payment-summary";
 import { saveFile } from "@/lib/storage";
 import { createAuditLogFromRequest } from "@/lib/audit";
+import { calculateTaxBreakdown, getTaxDisplayLabel } from "@/tax";
 
 type CustomOrderItemPayload = {
   description: string;
@@ -161,14 +162,41 @@ export async function PUT(
       (normalizedItems.reduce((sum, item) => sum + item.lineTotal, 0) + Number.EPSILON) * 100
     ) / 100;
     const customDiscount = Math.max(0, sanitizeMoneyAmount(form.get("customDiscount")));
-    const calculatedGrandTotal = Math.round(
+    const taxableSubtotal = Math.round(
       (Math.max(calculatedSubtotal - customDiscount, 0) + Number.EPSILON) * 100
     ) / 100;
 
     const customSubtotal = sanitizeMoneyAmount(form.get("customSubtotal"));
-    const customGrandTotal = sanitizeMoneyAmount(form.get("customGrandTotal"));
+    const submittedGrandTotal = sanitizeMoneyAmount(form.get("customGrandTotal"));
+    const submittedTaxCodeId = String(form.get("taxCodeId") || "").trim();
 
-    if (!nearlyEqual(customSubtotal, calculatedSubtotal) || !nearlyEqual(customGrandTotal, calculatedGrandTotal)) {
+    const taxConfig = await db.taxConfiguration.findUnique({ where: { id: "default" } });
+    let selectedTaxCode = null;
+    if (taxConfig?.taxModuleEnabled && submittedTaxCodeId) {
+      selectedTaxCode = await db.taxCode.findFirst({
+        where: {
+          id: submittedTaxCodeId,
+          OR: [{ isActive: true }, { id: order.taxCodeId ?? "" }],
+        },
+      });
+
+      if (!selectedTaxCode) {
+        return NextResponse.json(
+          { ok: false, error: "Selected tax code is invalid or inactive." },
+          { status: 400 }
+        );
+      }
+    }
+
+    const taxBreakdown = calculateTaxBreakdown({
+      subtotal: calculatedSubtotal,
+      discount: customDiscount,
+      taxRate: selectedTaxCode ? Number(selectedTaxCode.rate) : null,
+      calculationMethod: selectedTaxCode?.calculationMethod ?? null,
+      taxEnabled: Boolean(taxConfig?.taxModuleEnabled && selectedTaxCode),
+    });
+
+    if (!nearlyEqual(customSubtotal, calculatedSubtotal) || !nearlyEqual(submittedGrandTotal, taxBreakdown.grandTotalAfterTax)) {
       return NextResponse.json(
         { ok: false, error: "Order totals are invalid. Please refresh and try again." },
         { status: 400 }
@@ -180,7 +208,7 @@ export async function PUT(
       0
     );
 
-    if (calculatedGrandTotal < existingTotalPaid) {
+    if (taxBreakdown.grandTotalAfterTax < existingTotalPaid) {
       return NextResponse.json(
         { ok: false, error: "Grand total cannot be lower than the total paid amount." },
         { status: 400 }
@@ -224,7 +252,7 @@ export async function PUT(
       );
     }
 
-    const currentOutstandingBalance = Math.max(calculatedGrandTotal - existingTotalPaid, 0);
+    const currentOutstandingBalance = Math.max(taxBreakdown.grandTotalAfterTax - existingTotalPaid, 0);
 
     if (paymentAmount > currentOutstandingBalance) {
       return NextResponse.json(
@@ -249,7 +277,7 @@ export async function PUT(
       ...order.payments.map((payment) => ({ amount: Number(payment.amount || 0) })),
       ...(paymentAmount > 0 ? [{ amount: paymentAmount }] : []),
     ];
-    const paymentSummary = calculatePaymentSummary(newPayments, calculatedGrandTotal);
+    const paymentSummary = calculatePaymentSummary(newPayments, taxBreakdown.grandTotalAfterTax);
 
     const requestDetailsLines = [
       `Order Type: Custom Order`,
@@ -258,7 +286,9 @@ export async function PUT(
       `Internal Remarks: ${internalRemarks || "None"}`,
       `Subtotal: RM${calculatedSubtotal.toFixed(2)}`,
       `Discount: RM${customDiscount.toFixed(2)}`,
-      `Grand Total: RM${calculatedGrandTotal.toFixed(2)}`,
+      `Tax Code: ${selectedTaxCode?.code || "No tax"}`,
+      `Tax Amount: RM${taxBreakdown.taxAmount.toFixed(2)}`,
+      `Grand Total: RM${taxBreakdown.grandTotalAfterTax.toFixed(2)}`,
       `New Payment Added: RM${paymentAmount.toFixed(2)}`,
       `Items: ${normalizedItems.length}`,
     ];
@@ -293,8 +323,24 @@ export async function PUT(
           internalRemarks: internalRemarks || null,
           customSubtotal: calculatedSubtotal,
           customDiscount,
-          customGrandTotal: calculatedGrandTotal,
-          totalAmount: calculatedGrandTotal,
+          customGrandTotal: taxableSubtotal,
+          taxCodeId: selectedTaxCode?.id ?? null,
+          taxCode: selectedTaxCode?.code ?? null,
+          taxDescription: selectedTaxCode?.description ?? null,
+          taxDisplayLabel: selectedTaxCode
+            ? getTaxDisplayLabel({
+                code: selectedTaxCode.code,
+                description: selectedTaxCode.description,
+                rate: Number(selectedTaxCode.rate),
+              })
+            : null,
+          taxRate: selectedTaxCode ? Number(selectedTaxCode.rate) : null,
+          taxCalculationMethod: selectedTaxCode?.calculationMethod ?? null,
+          taxAmount: taxBreakdown.taxAmount,
+          taxableSubtotal: taxBreakdown.taxableSubtotal,
+          grandTotalAfterTax: taxBreakdown.grandTotalAfterTax,
+          isTaxEnabledSnapshot: taxBreakdown.isTaxApplied,
+          totalAmount: taxBreakdown.grandTotalAfterTax,
           totalPaid: Number(paymentSummary.totalPaid || 0),
           outstandingBalance: Number(paymentSummary.outstandingBalance || 0),
           requestDetails: requestDetailsLines.join("\n"),
