@@ -218,7 +218,15 @@ function getDisplayRows(orders: OrderWithRelations[], transactionView: Transacti
 }
 
 function getCustomOrderGrandTotal(order: OrderWithRelations) {
-  return Number(order.customGrandTotal ?? order.totalAmount ?? 0);
+  return Number(order.grandTotalAfterTax ?? order.totalAmount ?? order.customGrandTotal ?? 0);
+}
+
+function getOrderTaxAmount(order: OrderWithRelations) {
+  return Number(order.taxAmount ?? 0);
+}
+
+function hasOrderTax(order: OrderWithRelations) {
+  return Boolean(order.isTaxEnabledSnapshot && getOrderTaxAmount(order) > 0);
 }
 
 function getOrderTotalPaid(order: OrderWithRelations) {
@@ -486,6 +494,19 @@ function CustomOrderDetails({ order }: { order: OrderWithRelations }) {
         <span className="text-white/45">Grand Total:</span>{" "}
         <span className="text-white/90">{formatCurrency(grandTotal)}</span>
       </div>
+
+      {hasOrderTax(order) ? (
+        <>
+          <div>
+            <span className="text-white/45">Tax Code:</span>{" "}
+            <span className="text-white/90">{order.taxCode || order.taxDisplayLabel || "-"}</span>
+          </div>
+          <div>
+            <span className="text-white/45">Tax Amount:</span>{" "}
+            <span className="text-emerald-200">{formatCurrency(getOrderTaxAmount(order))}</span>
+          </div>
+        </>
+      ) : null}
 
       <div>
         <span className="text-white/45">Total Paid:</span>{" "}
@@ -1361,7 +1382,7 @@ export function OrderTable({
                     `Title / Summary: ${order.customTitle || "-"}`,
                     `Subtotal: ${formatCurrency(Number(order.customSubtotal ?? order.totalAmount ?? 0))}`,
                     `Discount: ${formatCurrency(Number(order.customDiscount ?? 0))}`,
-                    `Grand Total: ${formatCurrency(Number(order.customGrandTotal ?? order.totalAmount ?? 0))}`,
+                    `Grand Total: ${formatCurrency(Number(order.grandTotalAfterTax ?? order.totalAmount ?? order.customGrandTotal ?? 0))}`,
                     "",
                     "Line Items:",
                     ...(order.customItems && order.customItems.length > 0
@@ -1402,6 +1423,20 @@ export function OrderTable({
                         <div>
                           <span className="text-white/45">Order Type:</span>{" "}
                           <span className="text-white/90">{customOrder ? "Custom Order" : "Standard Tuning"}</span>
+                        </div>
+                        <div>
+                          <span className="text-white/45">CN Subtotal Reversal:</span>{" "}
+                          <span className="text-white/90">{formatCurrency(Number(order.taxableSubtotal ?? order.customSubtotal ?? order.totalAmount ?? 0))}</span>
+                        </div>
+                        {hasOrderTax(order) ? (
+                          <div>
+                            <span className="text-white/45">CN Tax Reversal:</span>{" "}
+                            <span className="text-red-200">{formatCurrency(getOrderTaxAmount(order))}</span>
+                          </div>
+                        ) : null}
+                        <div>
+                          <span className="text-white/45">CN Grand Total:</span>{" "}
+                          <span className="text-red-200">{formatCurrency(Number(creditNote.amount ?? 0))}</span>
                         </div>
                         <div>
                           <span className="text-white/45">Reason:</span>{" "}

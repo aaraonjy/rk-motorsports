@@ -90,6 +90,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       return respondCreditNote(req, { ok: false, redirectTo: "/admin" }, 400);
     }
 
+    const subtotalBeforeTax = Number(order.taxableSubtotal ?? order.customSubtotal ?? order.totalAmount ?? 0);
+
     const items = order.orderType === "CUSTOM_ORDER" && order.customItems.length > 0
       ? order.customItems.map((item) => ({
           description: item.description,
@@ -102,8 +104,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
           description: buildStandardCreditNoteDescription(order),
           qty: 1,
           uom: null,
-          unitPrice: amount,
-          lineTotal: amount,
+          unitPrice: subtotalBeforeTax,
+          lineTotal: subtotalBeforeTax,
         }];
 
     const cnDate = new Date();

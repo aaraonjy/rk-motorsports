@@ -323,7 +323,7 @@ export async function PUT(
           internalRemarks: internalRemarks || null,
           customSubtotal: calculatedSubtotal,
           customDiscount,
-          customGrandTotal: taxableSubtotal,
+          customGrandTotal: taxBreakdown.grandTotalAfterTax,
           taxCodeId: selectedTaxCode?.id ?? null,
           taxCode: selectedTaxCode?.code ?? null,
           taxDescription: selectedTaxCode?.description ?? null,

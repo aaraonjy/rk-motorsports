@@ -466,9 +466,18 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
       drawText(page, font, bold, "Discount:", rightColumnX - 110, y, 10, true);
       drawText(page, font, bold, formatMoney(order.customDiscount ?? 0), rightColumnX, y, 10);
 
+      const taxAmount = Number(order.taxAmount ?? 0);
+      const taxHasAmount = Boolean(order.isTaxEnabledSnapshot && taxAmount > 0);
+
+      if (taxHasAmount) {
+        y -= 18;
+        drawText(page, font, bold, `Tax${order.taxCode ? ` (${order.taxCode})` : ""}:`, rightColumnX - 110, y, 10, true);
+        drawText(page, font, bold, formatMoney(taxAmount), rightColumnX, y, 10);
+      }
+
       y -= 24;
       drawText(page, font, bold, "Grand Total:", rightColumnX - 110, y, 12, true);
-      drawText(page, font, bold, formatMoney(order.customGrandTotal ?? order.totalAmount), rightColumnX, y, 12, true);
+      drawText(page, font, bold, formatMoney(order.grandTotalAfterTax ?? order.customGrandTotal ?? order.totalAmount), rightColumnX, y, 12, true);
 
       y -= 28;
       y = drawPaymentSummary({
