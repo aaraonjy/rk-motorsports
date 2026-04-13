@@ -58,6 +58,7 @@ function formatPaymentModeLabel(paymentMode?: string | null) {
 }
 
 function getTaxSummary(order: {
+  orderType?: string | null;
   taxableSubtotal?: unknown;
   customSubtotal?: unknown;
   customDiscount?: unknown;
@@ -68,17 +69,30 @@ function getTaxSummary(order: {
   grandTotalAfterTax?: unknown;
   customGrandTotal?: unknown;
   isTaxEnabledSnapshot?: boolean | null;
+  customItems?: Array<{
+    taxCodeId?: string | null;
+    taxCode?: string | null;
+    taxAmount?: unknown;
+  }>;
 }) {
   const taxAmount = Number(order.taxAmount ?? 0);
   const hasTax = Boolean(order.isTaxEnabledSnapshot && taxAmount > 0);
-  const subtotal = Number(order.taxableSubtotal ?? order.customSubtotal ?? order.totalAmount ?? 0);
+  const subtotal = Number(order.customSubtotal ?? order.taxableSubtotal ?? order.totalAmount ?? 0);
   const discount = Number(order.customDiscount ?? 0);
   const grandTotal = Number(order.grandTotalAfterTax ?? order.customGrandTotal ?? order.totalAmount ?? 0);
   const method = String(order.taxCalculationMethod || "").toUpperCase();
+  const isLineItemMode = Boolean(
+    order.orderType === "CUSTOM_ORDER" &&
+      (order.customItems || []).some(
+        (item) => Boolean(item.taxCodeId || item.taxCode) || Number(item.taxAmount ?? 0) > 0
+      )
+  );
   const taxLabel = hasTax
-    ? `${method === "INCLUSIVE" ? "Tax Included" : "Tax"}${order.taxCode ? ` (${order.taxCode})` : ""}:`
+    ? isLineItemMode
+      ? `${method === "INCLUSIVE" ? "Tax Included Total" : "Tax Total"}:`
+      : `${method === "INCLUSIVE" ? "Tax Included" : "Tax"}${order.taxCode ? ` (${order.taxCode})` : ""}:`
     : "Tax:";
-  return { subtotal, discount, taxAmount, hasTax, grandTotal, method, taxLabel };
+  return { subtotal, discount, taxAmount, hasTax, grandTotal, method, taxLabel, isLineItemMode };
 }
 
 function groupPaymentsByMode(payments: Array<{ paymentMode: string; amount: unknown }>) {
