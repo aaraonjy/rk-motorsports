@@ -4,7 +4,7 @@ import { getSessionUser } from "@/lib/auth";
 import { calculatePaymentSummary } from "@/lib/payment-summary";
 import { saveFile } from "@/lib/storage";
 import { createAuditLogFromRequest } from "@/lib/audit";
-import { calculateTaxBreakdown, getTaxDisplayLabel } from "@/tax";
+import { calculateTaxBreakdown, getTaxDisplayLabel } from "@/lib/tax";
 
 type CustomOrderItemPayload = {
   description: string;

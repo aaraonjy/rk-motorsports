@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { calculateTaxBreakdown, getTaxDisplayLabel, type TaxCalculationMethodValue } from "@/tax";
+import { calculateTaxBreakdown, getTaxDisplayLabel, type TaxCalculationMethodValue } from "@/lib/tax";
 
 type PaymentHistoryItem = {
   id: string;

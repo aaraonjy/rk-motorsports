@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { calculateTaxBreakdown, getTaxDisplayLabel, type TaxCalculationMethodValue } from "@/tax";
+import { calculateTaxBreakdown, getTaxDisplayLabel, type TaxCalculationMethodValue } from "@/lib/tax";
 import carLibrary from "@/lib/car-library.json";
 import ecuTypesData from "@/lib/ecu-types.json";
 import ecuReadToolsData from "@/lib/ecu-read-tools.json";

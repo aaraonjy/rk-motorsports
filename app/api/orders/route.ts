@@ -18,7 +18,7 @@ import {
   checkRateLimit,
   createRateLimitKey,
 } from "@/lib/rate-limit";
-import { calculateTaxBreakdown, getTaxDisplayLabel } from "@/tax";
+import { calculateTaxBreakdown, getTaxDisplayLabel } from "@/lib/tax";
 
 function normalizeTuningType(value: string) {
   if (value === "TCU") return "TCU";
