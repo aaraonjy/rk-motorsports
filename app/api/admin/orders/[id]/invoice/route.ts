@@ -125,21 +125,6 @@ function drawText(
   });
 }
 
-function drawTextRight(
-  page: PDFPage,
-  font: PDFFont,
-  bold: PDFFont,
-  text: string,
-  rightX: number,
-  y: number,
-  size = 10,
-  isBold = false
-) {
-  const activeFont = isBold ? bold : font;
-  const width = activeFont.widthOfTextAtSize(text, size);
-  drawText(page, font, bold, text, rightX - width, y, size, isBold);
-}
-
 function wrapText(text: string, maxChars = 62) {
   const normalized = String(text || "").trim();
   if (!normalized) return ["-"];
@@ -455,43 +440,35 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
         y -= 16;
 
         if (taxSummary.isLineItemMode) {
-          const lineHeaderSize = 8;
-          const lineValueSize = 8.5;
-          const qtyRightX = 300;
-          const uomRightX = 340;
-          const unitRightX = 405;
-          const subtotalRightX = 465;
-          const taxRightX = 510;
-          const grandRightX = 545;
+          const itemQtyX = 330;
+          const itemUomX = 370;
+          const itemUnitX = 420;
+          const itemTotalX = 500;
+          const itemTaxCodeX = 540;
+          const itemTaxAmountX = 580;
 
-          drawText(page, font, bold, "Description", descX + 8, y, lineHeaderSize, true);
-          drawTextRight(page, font, bold, "Qty", qtyRightX, y, lineHeaderSize, true);
-          drawTextRight(page, font, bold, "UOM", uomRightX, y, lineHeaderSize, true);
-          drawTextRight(page, font, bold, "Unit Price", unitRightX, y, lineHeaderSize, true);
-          drawTextRight(page, font, bold, "Subtotal", subtotalRightX, y, lineHeaderSize, true);
-          drawTextRight(page, font, bold, "Tax Amt", taxRightX, y, lineHeaderSize, true);
-          drawTextRight(page, font, bold, "Grand Total", grandRightX, y, lineHeaderSize, true);
-          y -= 14;
+          drawText(page, font, bold, "Description", descX + 8, y, 8.5, true);
+          drawText(page, font, bold, "Qty", itemQtyX, y, 8.5, true);
+          drawText(page, font, bold, "UOM", itemUomX, y, 8.5, true);
+          drawText(page, font, bold, "Unit Price", itemUnitX, y, 8.5, true);
+          drawText(page, font, bold, "Total", itemTotalX, y, 8.5, true);
+          drawText(page, font, bold, "Tax Code", itemTaxCodeX, y, 8.5, true);
+          drawText(page, font, bold, "Tax Amt", itemTaxAmountX, y, 8.5, true);
+          y -= 12;
 
           for (const item of order.customItems) {
             if (y < 180) break;
-
-            const itemLines = wrapText(item.description, 36);
-            const itemTaxAmount = Number(item.taxAmount || 0);
-            const itemGrandTotal = Number(item.lineTotal || 0) + itemTaxAmount;
-
-            drawText(page, font, bold, itemLines[0], descX + 8, y, lineValueSize);
+            const itemLines = wrapText(item.description, 34);
+            drawText(page, font, bold, itemLines[0], descX + 8, y, 8.5);
             if (itemLines[1]) {
-              drawText(page, font, bold, itemLines[1], descX + 8, y - 10, lineValueSize);
+              drawText(page, font, bold, itemLines[1], descX + 8, y - 10, 8.5);
             }
-
-            drawTextRight(page, font, bold, String(item.qty), qtyRightX, y, lineValueSize);
-            drawTextRight(page, font, bold, item.uom || "-", uomRightX, y, lineValueSize);
-            drawTextRight(page, font, bold, formatMoney(item.unitPrice), unitRightX, y, lineValueSize);
-            drawTextRight(page, font, bold, formatMoney(item.lineTotal), subtotalRightX, y, lineValueSize);
-            drawTextRight(page, font, bold, formatMoney(itemTaxAmount), taxRightX, y, lineValueSize);
-            drawTextRight(page, font, bold, formatMoney(itemGrandTotal), grandRightX, y, lineValueSize);
-
+            drawText(page, font, bold, String(item.qty), itemQtyX, y, 8.5);
+            drawText(page, font, bold, item.uom || "-", itemUomX, y, 8.5);
+            drawText(page, font, bold, formatMoney(item.unitPrice), itemUnitX, y, 8.5);
+            drawText(page, font, bold, formatMoney(item.lineTotal), itemTotalX, y, 8.5);
+            drawText(page, font, bold, item.taxCode || "No Tax", itemTaxCodeX, y, 8.5);
+            drawText(page, font, bold, formatMoney(item.taxAmount), itemTaxAmountX, y, 8.5);
             y -= itemLines.length > 1 ? rowHeight + 10 : rowHeight;
           }
         } else {
