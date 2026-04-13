@@ -125,7 +125,7 @@ function drawText(
   });
 }
 
-function drawRightAlignedText(
+function drawTextRight(
   page: PDFPage,
   font: PDFFont,
   bold: PDFFont,
@@ -136,8 +136,8 @@ function drawRightAlignedText(
   isBold = false
 ) {
   const activeFont = isBold ? bold : font;
-  const textWidth = activeFont.widthOfTextAtSize(text, size);
-  drawText(page, font, bold, text, rightX - textWidth, y, size, isBold);
+  const width = activeFont.widthOfTextAtSize(text, size);
+  drawText(page, font, bold, text, rightX - width, y, size, isBold);
 }
 
 function wrapText(text: string, maxChars = 62) {
@@ -455,40 +455,42 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
         y -= 16;
 
         if (taxSummary.isLineItemMode) {
-          const qtyRightX = 326;
-          const uomRightX = 366;
-          const unitPriceRightX = 430;
-          const subtotalRightX = 488;
-          const taxAmountRightX = 530;
-          const grandTotalRightX = right - 4;
+          const lineHeaderSize = 8;
+          const lineValueSize = 8.5;
+          const qtyRightX = 300;
+          const uomRightX = 340;
+          const unitRightX = 405;
+          const subtotalRightX = 465;
+          const taxRightX = 510;
+          const grandRightX = 545;
 
-          drawText(page, font, bold, "Description", descX + 8, y, 8, true);
-          drawText(page, font, bold, "Qty", 296, y, 8, true);
-          drawText(page, font, bold, "UOM", 336, y, 8, true);
-          drawText(page, font, bold, "Unit Price", 378, y, 8, true);
-          drawText(page, font, bold, "Subtotal", 438, y, 8, true);
-          drawText(page, font, bold, "Tax Amt", 485, y, 8, true);
-          drawText(page, font, bold, "Grand Total", 502, y, 8, true);
-          y -= 12;
+          drawText(page, font, bold, "Description", descX + 8, y, lineHeaderSize, true);
+          drawTextRight(page, font, bold, "Qty", qtyRightX, y, lineHeaderSize, true);
+          drawTextRight(page, font, bold, "UOM", uomRightX, y, lineHeaderSize, true);
+          drawTextRight(page, font, bold, "Unit Price", unitRightX, y, lineHeaderSize, true);
+          drawTextRight(page, font, bold, "Subtotal", subtotalRightX, y, lineHeaderSize, true);
+          drawTextRight(page, font, bold, "Tax Amt", taxRightX, y, lineHeaderSize, true);
+          drawTextRight(page, font, bold, "Grand Total", grandRightX, y, lineHeaderSize, true);
+          y -= 14;
 
           for (const item of order.customItems) {
             if (y < 180) break;
-            const itemLines = wrapText(item.description, 32);
-            const lineSubtotal = Number(item.lineTotal ?? 0);
-            const lineTaxAmount = Number(item.taxAmount ?? 0);
-            const lineGrandTotal = lineSubtotal + lineTaxAmount;
 
-            drawText(page, font, bold, itemLines[0], descX + 8, y, 8);
+            const itemLines = wrapText(item.description, 36);
+            const itemTaxAmount = Number(item.taxAmount || 0);
+            const itemGrandTotal = Number(item.lineTotal || 0) + itemTaxAmount;
+
+            drawText(page, font, bold, itemLines[0], descX + 8, y, lineValueSize);
             if (itemLines[1]) {
-              drawText(page, font, bold, itemLines[1], descX + 8, y - 10, 8);
+              drawText(page, font, bold, itemLines[1], descX + 8, y - 10, lineValueSize);
             }
 
-            drawRightAlignedText(page, font, bold, String(item.qty), qtyRightX, y, 8);
-            drawRightAlignedText(page, font, bold, item.uom || "-", uomRightX, y, 8);
-            drawRightAlignedText(page, font, bold, formatMoney(item.unitPrice), unitPriceRightX, y, 8);
-            drawRightAlignedText(page, font, bold, formatMoney(lineSubtotal), subtotalRightX, y, 8);
-            drawRightAlignedText(page, font, bold, formatMoney(lineTaxAmount), taxAmountRightX, y, 8);
-            drawRightAlignedText(page, font, bold, formatMoney(lineGrandTotal), grandTotalRightX, y, 8);
+            drawTextRight(page, font, bold, String(item.qty), qtyRightX, y, lineValueSize);
+            drawTextRight(page, font, bold, item.uom || "-", uomRightX, y, lineValueSize);
+            drawTextRight(page, font, bold, formatMoney(item.unitPrice), unitRightX, y, lineValueSize);
+            drawTextRight(page, font, bold, formatMoney(item.lineTotal), subtotalRightX, y, lineValueSize);
+            drawTextRight(page, font, bold, formatMoney(itemTaxAmount), taxRightX, y, lineValueSize);
+            drawTextRight(page, font, bold, formatMoney(itemGrandTotal), grandRightX, y, lineValueSize);
 
             y -= itemLines.length > 1 ? rowHeight + 10 : rowHeight;
           }
