@@ -4,8 +4,16 @@ import { createAuditLogFromRequest } from "@/lib/audit";
 import { getAllOrders } from "@/lib/queries";
 import { type OrderWithRelations } from "@/components/order-table";
 
+function getOrderSubtotal(order: OrderWithRelations) {
+  return Number(order.customSubtotal ?? order.taxableSubtotal ?? order.totalAmount ?? 0);
+}
+
+function getOrderTaxAmount(order: OrderWithRelations) {
+  return Number(order.taxAmount ?? 0);
+}
+
 function getOrderAmount(order: OrderWithRelations) {
-  return Number(order.customGrandTotal ?? order.totalAmount ?? 0);
+  return Number(order.grandTotalAfterTax ?? order.customGrandTotal ?? order.totalAmount ?? 0);
 }
 
 function getOrderOutstandingBalance(order: OrderWithRelations) {
@@ -147,6 +155,8 @@ export async function GET(req: Request) {
       "Customer Phone",
       "Vehicle No.",
       "Order Status",
+      "Subtotal",
+      "Tax Amount",
       "Grand Total",
       "Total Paid",
       "Outstanding Balance",
@@ -161,6 +171,8 @@ export async function GET(req: Request) {
       order.user?.phone || "",
       order.vehicleNo || "",
       getReportDisplayStatusLabel(order),
+      formatCsvMoney(getOrderSubtotal(order)),
+      formatCsvMoney(getOrderTaxAmount(order)),
       formatCsvMoney(getOrderAmount(order)),
       formatCsvMoney(Number(order.totalPaid ?? 0)),
       formatCsvMoney(getOrderOutstandingBalance(order)),

@@ -17,7 +17,11 @@ type CsvTransactionRow = {
   vehicleNo: string;
   status: string;
   referenceInvoiceNo: string;
-  amount: number;
+  subtotal: number;
+  discount: number;
+  taxCode: string;
+  taxAmount: number;
+  grandTotal: number;
 };
 
 function getOrderTypeLabel(value?: string | null) {
@@ -39,12 +43,32 @@ function getOrderTitle(order: OrderWithRelations) {
   return order.selectedTuneLabel || `${getTuningTypeLabel(order)} Tune`;
 }
 
-function getOrderAmount(order: OrderWithRelations) {
+function getOrderSubtotal(order: OrderWithRelations) {
   if (order.orderType === "CUSTOM_ORDER") {
-    return Number(order.customGrandTotal ?? order.totalAmount ?? 0);
+    return Number(order.customSubtotal ?? order.taxableSubtotal ?? order.totalAmount ?? 0);
   }
 
   return Number(order.totalAmount ?? 0);
+}
+
+function getOrderDiscount(order: OrderWithRelations) {
+  return Number(order.customDiscount ?? 0);
+}
+
+function getOrderTaxCode(order: OrderWithRelations) {
+  return String(order.taxCode ?? order.taxDisplayLabel ?? "");
+}
+
+function getOrderTaxAmount(order: OrderWithRelations) {
+  return Number(order.taxAmount ?? 0);
+}
+
+function getOrderGrandTotal(order: OrderWithRelations) {
+  if (order.orderType === "CUSTOM_ORDER") {
+    return Number(order.grandTotalAfterTax ?? order.customGrandTotal ?? order.totalAmount ?? 0);
+  }
+
+  return Number(order.grandTotalAfterTax ?? order.totalAmount ?? 0);
 }
 
 function getReportDisplayStatus(order: OrderWithRelations) {
@@ -136,7 +160,11 @@ function buildRows(
         vehicleNo: order.vehicleNo || "",
         status: getReportDisplayStatusLabel(order),
         referenceInvoiceNo: "",
-        amount: getOrderAmount(order),
+        subtotal: getOrderSubtotal(order),
+        discount: getOrderDiscount(order),
+        taxCode: getOrderTaxCode(order),
+        taxAmount: getOrderTaxAmount(order),
+        grandTotal: getOrderGrandTotal(order),
       });
     }
 
@@ -156,7 +184,11 @@ function buildRows(
           vehicleNo: order.vehicleNo || "",
           status: "Credit Note",
           referenceInvoiceNo: order.orderNumber,
-          amount: -Math.abs(Number(order.creditNote.amount || 0)),
+          subtotal: -Math.abs(getOrderSubtotal(order)),
+          discount: -Math.abs(getOrderDiscount(order)),
+          taxCode: getOrderTaxCode(order),
+          taxAmount: -Math.abs(getOrderTaxAmount(order)),
+          grandTotal: -Math.abs(Number(order.creditNote.amount || getOrderGrandTotal(order))),
         });
       }
     }
@@ -218,7 +250,11 @@ export async function GET(req: Request) {
       "Vehicle No.",
       "Status",
       "Reference Invoice No.",
-      "Amount",
+      "Subtotal",
+      "Discount",
+      "Tax Code",
+      "Tax Amount",
+      "Grand Total",
     ],
     ...rows.map((row) => [
       new Intl.DateTimeFormat("en-GB").format(row.date),
@@ -233,7 +269,11 @@ export async function GET(req: Request) {
       row.vehicleNo,
       row.status,
       row.referenceInvoiceNo,
-      formatCsvMoney(row.amount),
+      formatCsvMoney(row.subtotal),
+      formatCsvMoney(row.discount),
+      row.taxCode,
+      formatCsvMoney(row.taxAmount),
+      formatCsvMoney(row.grandTotal),
     ]),
   ];
 

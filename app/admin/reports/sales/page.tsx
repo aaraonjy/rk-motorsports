@@ -30,7 +30,11 @@ type SalesTransactionRow = {
   vehicleNo: string;
   statusLabel: string;
   referenceInvoiceNo: string;
-  amount: number;
+  subtotal: number;
+  discount: number;
+  taxCode: string;
+  taxAmount: number;
+  grandTotal: number;
 };
 
 function formatCurrency(value: number) {
@@ -69,12 +73,32 @@ function getOrderTitle(order: OrderWithRelations) {
   return order.selectedTuneLabel || `${getTuningTypeLabel(order)} Tune`;
 }
 
-function getOrderAmount(order: OrderWithRelations) {
+function getOrderSubtotal(order: OrderWithRelations) {
   if (order.orderType === "CUSTOM_ORDER") {
-    return Number(order.customGrandTotal ?? order.totalAmount ?? 0);
+    return Number(order.customSubtotal ?? order.taxableSubtotal ?? order.totalAmount ?? 0);
   }
 
   return Number(order.totalAmount ?? 0);
+}
+
+function getOrderDiscount(order: OrderWithRelations) {
+  return Number(order.customDiscount ?? 0);
+}
+
+function getOrderTaxCode(order: OrderWithRelations) {
+  return String(order.taxCode ?? order.taxDisplayLabel ?? "-");
+}
+
+function getOrderTaxAmount(order: OrderWithRelations) {
+  return Number(order.taxAmount ?? 0);
+}
+
+function getOrderAmount(order: OrderWithRelations) {
+  if (order.orderType === "CUSTOM_ORDER") {
+    return Number(order.grandTotalAfterTax ?? order.customGrandTotal ?? order.totalAmount ?? 0);
+  }
+
+  return Number(order.grandTotalAfterTax ?? order.totalAmount ?? 0);
 }
 
 function getReportDisplayStatus(order: OrderWithRelations) {
@@ -196,7 +220,11 @@ function buildSalesTransactionRows(
         vehicleNo: order.vehicleNo || "-",
         statusLabel: getReportDisplayStatusLabel(order),
         referenceInvoiceNo: "-",
-        amount: getOrderAmount(order),
+        subtotal: getOrderSubtotal(order),
+        discount: getOrderDiscount(order),
+        taxCode: getOrderTaxCode(order),
+        taxAmount: getOrderTaxAmount(order),
+        grandTotal: getOrderAmount(order),
       });
     }
 
@@ -217,7 +245,11 @@ function buildSalesTransactionRows(
           vehicleNo: order.vehicleNo || "-",
           statusLabel: `Credit Note`,
           referenceInvoiceNo: order.orderNumber,
-          amount: -Math.abs(Number(order.creditNote.amount || 0)),
+          subtotal: -Math.abs(getOrderSubtotal(order)),
+          discount: -Math.abs(getOrderDiscount(order)),
+          taxCode: getOrderTaxCode(order),
+          taxAmount: -Math.abs(getOrderTaxAmount(order)),
+          grandTotal: -Math.abs(Number(order.creditNote.amount || getOrderAmount(order))),
         });
       }
     }
@@ -513,7 +545,11 @@ export default async function SalesReportPage({
                       <th className="px-6 py-4 font-medium">Vehicle No.</th>
                       <th className="px-6 py-4 font-medium">Status</th>
                       <th className="px-6 py-4 font-medium">Reference Invoice</th>
-                      <th className="px-6 py-4 font-medium text-right">Amount</th>
+                      <th className="px-6 py-4 font-medium text-right">Subtotal</th>
+                      <th className="px-6 py-4 font-medium text-right">Discount</th>
+                      <th className="px-6 py-4 font-medium">Tax Code</th>
+                      <th className="px-6 py-4 font-medium text-right">Tax Amount</th>
+                      <th className="px-6 py-4 font-medium text-right">Grand Total</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -550,7 +586,17 @@ export default async function SalesReportPage({
                         </td>
                         <td className="px-6 py-5 text-white/90">{row.referenceInvoiceNo}</td>
                         <td className={`px-6 py-5 text-right font-medium ${row.transactionType === "CN" ? "text-red-200" : "text-white"}`}>
-                          {formatCurrency(row.amount)}
+                          {formatCurrency(row.subtotal)}
+                        </td>
+                        <td className={`px-6 py-5 text-right font-medium ${row.transactionType === "CN" ? "text-red-200" : "text-white"}`}>
+                          {formatCurrency(row.discount)}
+                        </td>
+                        <td className="px-6 py-5 text-white/90">{row.taxCode}</td>
+                        <td className={`px-6 py-5 text-right font-medium ${row.transactionType === "CN" ? "text-red-200" : "text-white"}`}>
+                          {formatCurrency(row.taxAmount)}
+                        </td>
+                        <td className={`px-6 py-5 text-right font-medium ${row.transactionType === "CN" ? "text-red-200" : "text-white"}`}>
+                          {formatCurrency(row.grandTotal)}
                         </td>
                       </tr>
                     ))}

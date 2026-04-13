@@ -34,8 +34,16 @@ function formatDate(value: Date) {
   }).format(value);
 }
 
+function getOrderSubtotal(order: OrderWithRelations) {
+  return Number(order.customSubtotal ?? order.taxableSubtotal ?? order.totalAmount ?? 0);
+}
+
+function getOrderTaxAmount(order: OrderWithRelations) {
+  return Number(order.taxAmount ?? 0);
+}
+
 function getOrderAmount(order: OrderWithRelations) {
-  return Number(order.customGrandTotal ?? order.totalAmount ?? 0);
+  return Number(order.grandTotalAfterTax ?? order.customGrandTotal ?? order.totalAmount ?? 0);
 }
 
 function getOrderOutstandingBalance(order: OrderWithRelations) {
@@ -210,6 +218,8 @@ export default async function CustomerPaymentBalanceReportPage({
     vehicleNo: order.vehicleNo || "-",
     orderStatusLabel: getReportDisplayStatusLabel(order),
     orderStatusBadgeClass: getReportStatusBadgeClass(order),
+    subtotal: formatCurrency(getOrderSubtotal(order)),
+    taxAmount: formatCurrency(getOrderTaxAmount(order)),
     grandTotal: formatCurrency(getOrderAmount(order)),
     totalPaid: formatCurrency(order.totalPaid ?? 0),
     outstandingBalance: formatCurrency(getOrderOutstandingBalance(order)),
