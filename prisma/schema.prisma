@@ -67,6 +67,11 @@ enum DocType {
   INV
 }
 
+enum TaxCalculationMethod {
+  EXCLUSIVE
+  INCLUSIVE
+}
+
 model User {
   id                 String         @id @default(cuid())
   name               String
@@ -137,6 +142,37 @@ model Product {
   orderItems  OrderItem[]
 }
 
+model TaxCode {
+  id                       String               @id @default(cuid())
+  code                     String               @unique
+  description              String
+  displayLabel             String?
+  rate                     Decimal              @db.Decimal(5, 2)
+  calculationMethod        TaxCalculationMethod
+  isActive                 Boolean              @default(true)
+  sortOrder                Int                  @default(0)
+  createdAt                DateTime             @default(now())
+  updatedAt                DateTime             @updatedAt
+  defaultPortalForConfigs  TaxConfiguration[]   @relation("DefaultPortalTaxCode")
+  defaultAdminForConfigs   TaxConfiguration[]   @relation("DefaultAdminTaxCode")
+
+  @@index([isActive, sortOrder, code])
+}
+
+model TaxConfiguration {
+  id                     String    @id
+  taxModuleEnabled       Boolean   @default(false)
+  defaultPortalTaxCodeId String?
+  defaultAdminTaxCodeId  String?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+  defaultPortalTaxCode   TaxCode?  @relation("DefaultPortalTaxCode", fields: [defaultPortalTaxCodeId], references: [id], onDelete: SetNull)
+  defaultAdminTaxCode    TaxCode?  @relation("DefaultAdminTaxCode", fields: [defaultAdminTaxCodeId], references: [id], onDelete: SetNull)
+
+  @@index([defaultPortalTaxCodeId])
+  @@index([defaultAdminTaxCodeId])
+}
+
 model Order {
   id                     String            @id @default(cuid())
   orderNumber            String            @unique
@@ -178,6 +214,16 @@ model Order {
   customSubtotal         Decimal           @default(0) @db.Decimal(12, 2)
   customDiscount         Decimal           @default(0) @db.Decimal(12, 2)
   customGrandTotal       Decimal           @default(0) @db.Decimal(12, 2)
+  taxCodeId              String?
+  taxCode                String?
+  taxDescription         String?
+  taxDisplayLabel        String?
+  taxRate                Decimal?          @db.Decimal(5, 2)
+  taxCalculationMethod   TaxCalculationMethod?
+  taxAmount              Decimal           @default(0) @db.Decimal(12, 2)
+  taxableSubtotal        Decimal           @default(0) @db.Decimal(12, 2)
+  grandTotalAfterTax     Decimal           @default(0) @db.Decimal(12, 2)
+  isTaxEnabledSnapshot   Boolean           @default(false)
   cancelledBy            CancelledBy?
   cancelReason           String?
   cancelledAt            DateTime?
@@ -202,6 +248,7 @@ model Order {
   @@index([orderType])
   @@index([source])
   @@index([docType])
+  @@index([taxCode])
 }
 
 model OrderItem {

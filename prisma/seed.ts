@@ -26,6 +26,15 @@ async function main() {
     },
   });
 
+  await prisma.taxConfiguration.upsert({
+    where: { id: "default" },
+    update: {},
+    create: {
+      id: "default",
+      taxModuleEnabled: false,
+    },
+  });
+
   console.log("Seed completed successfully.");
 }
 

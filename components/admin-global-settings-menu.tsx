@@ -9,6 +9,10 @@ const settingsItems = [
     label: "Audit Logs",
     href: "/admin/settings/audit-logs",
   },
+  {
+    label: "Tax Configuration",
+    href: "/admin/settings/tax-configuration",
+  },
 ] as const;
 
 export function AdminGlobalSettingsMenu() {
