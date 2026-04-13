@@ -106,7 +106,7 @@ function PaymentBreakdownModal({
             <div className="mt-2 text-lg font-semibold text-white">{row.taxAmount}</div>
           </div>
 
-          <div className="rounded-xl border border-white/10 bg-black/40 p-4">
+          <div className="rounded-xl border border-white/10 bg-black/40 p-4 text-center">
             <div className="h-[32px] text-xs uppercase tracking-[0.18em] text-white/45">
               Grand Total
             </div>
