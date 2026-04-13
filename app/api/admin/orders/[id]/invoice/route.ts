@@ -457,11 +457,11 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
         if (taxSummary.isLineItemMode) {
           const lineHeaderSize = 8;
           const lineValueSize = 8.5;
-          const qtyRightX = 300;
-          const uomRightX = 340;
-          const unitRightX = 405;
-          const subtotalRightX = 465;
-          const taxRightX = 510;
+          const qtyRightX = 280;
+          const uomRightX = 320;
+          const unitRightX = 385;
+          const subtotalRightX = 445;
+          const taxRightX = 490;
           const grandRightX = 545;
 
           drawText(page, font, bold, "Description", descX + 8, y, lineHeaderSize, true);
