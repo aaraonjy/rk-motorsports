@@ -44,6 +44,7 @@ export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) 
   });
   const [isCreatingCode, setIsCreatingCode] = useState(false);
   const [pendingModuleToggle, setPendingModuleToggle] = useState<boolean | null>(null);
+  const [isCreateRowOpen, setIsCreateRowOpen] = useState(false);
 
   const selectStyle = {
     backgroundImage:
@@ -127,6 +128,7 @@ export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) 
       ]);
       setNewTaxCode({ code: "", description: "", rate: "0", calculationMethod: "EXCLUSIVE", isActive: true });
       setTaxCodeMessage({ type: "success", text: "Tax code created successfully." });
+      setIsCreateRowOpen(false);
     } catch (error) {
       setTaxCodeMessage({ type: "error", text: error instanceof Error ? error.message : "Unable to create tax code." });
     } finally {
@@ -172,26 +174,25 @@ export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) 
           <div className="flex items-start justify-between gap-4">
             <div>
               <h2 className="text-2xl font-semibold">Module Configuration</h2>
-              <p className="mt-2 max-w-3xl text-white/70">
-                Batch 1 only stores the tax foundation and default tax code selections. Order, invoice, and report tax usage will be integrated in the next batches.
-              </p>
             </div>
             <div className={`rounded-full border px-4 py-2 text-sm font-semibold ${config.taxModuleEnabled ? "border-emerald-500/30 bg-emerald-500/15 text-emerald-200" : "border-white/12 bg-white/5 text-white/75"}`}>
               {config.taxModuleEnabled ? "Tax Module Enabled" : "Tax Module Disabled"}
             </div>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-3">
+          <div className="grid gap-4 lg:grid-cols-3 lg:items-stretch">
             <div className="rounded-3xl border border-white/10 bg-black/25 p-4">
               <div className="text-lg font-semibold">Enable Tax Module</div>
               <p className="mt-2 text-sm text-white/65">Toggle tax usage for configured order flows. Historical taxed orders remain unchanged.</p>
-              <button
-                type="button"
-                onClick={handleModuleToggle}
-                className={`mt-5 inline-flex min-h-[50px] w-full items-center justify-center rounded-2xl border px-4 py-3 text-sm font-semibold transition ${config.taxModuleEnabled ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-200 hover:bg-emerald-500/20" : "border-white/12 bg-white/[0.04] text-white/85 hover:bg-white/[0.08]"}`}
-              >
-                {config.taxModuleEnabled ? "ON" : "OFF"}
-              </button>
+              <div className="mt-5 flex min-h-[56px] items-end">
+                <button
+                  type="button"
+                  onClick={handleModuleToggle}
+                  className={`inline-flex min-h-[48px] w-full items-center justify-center rounded-2xl border px-4 py-3 text-sm font-semibold transition ${config.taxModuleEnabled ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-200 hover:bg-emerald-500/20" : "border-white/12 bg-white/[0.04] text-white/85 hover:bg-white/[0.08]"}`}
+                >
+                  {config.taxModuleEnabled ? "ON" : "OFF"}
+                </button>
+              </div>
             </div>
 
             <div className="rounded-3xl border border-white/10 bg-black/25 p-4">
@@ -256,27 +257,38 @@ export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) 
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 className="text-2xl font-semibold">Tax Code Master</h2>
-            <p className="mt-2 max-w-3xl text-white/70">Create active/inactive tax codes and define their calculation method. Historical transaction snapshots will rely on these values in later batches.</p>
           </div>
-          <div className="text-sm text-white/65">{taxCodeRows.length} tax code(s)</div>
+          <div className="text-sm text-white/65">{activeTaxCodes.length} tax code(s)</div>
         </div>
 
-        <div className="mt-6 grid gap-3 md:grid-cols-[1.1fr_1.6fr_0.8fr_1fr_1fr_auto]">
-          <input className={inputClassName} placeholder="Tax Code" value={newTaxCode.code} onChange={(e) => setNewTaxCode((prev) => ({ ...prev, code: e.target.value }))} />
-          <input className={inputClassName} placeholder="Description" value={newTaxCode.description} onChange={(e) => setNewTaxCode((prev) => ({ ...prev, description: e.target.value }))} />
-          <input className={inputClassName} placeholder="0" type="number" min="0" max="100" step="0.01" value={newTaxCode.rate} onChange={(e) => setNewTaxCode((prev) => ({ ...prev, rate: e.target.value }))} />
-          <select className={selectClassName} style={selectStyle} value={newTaxCode.calculationMethod} onChange={(e) => setNewTaxCode((prev) => ({ ...prev, calculationMethod: e.target.value as "EXCLUSIVE" | "INCLUSIVE" }))}>
-            <option value="EXCLUSIVE">Exclusive</option>
-            <option value="INCLUSIVE">Inclusive</option>
-          </select>
-          <label className="flex min-h-[50px] items-center gap-3 rounded-2xl border border-white/12 bg-black/35 px-4 py-3 text-sm text-white/85">
-            <input type="checkbox" checked={newTaxCode.isActive} onChange={(e) => setNewTaxCode((prev) => ({ ...prev, isActive: e.target.checked }))} className="h-4 w-4 rounded border-white/15 bg-black/40" />
-            Active tax code
-          </label>
-          <button type="button" onClick={createTaxCode} disabled={isCreatingCode} className="inline-flex min-h-[50px] items-center justify-center rounded-2xl border border-white/12 bg-black/30 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-70">
-            {isCreatingCode ? "Creating..." : "Create Tax Code"}
+        <div className="mt-6 flex justify-end">
+          <button
+            type="button"
+            onClick={() => setIsCreateRowOpen((prev) => !prev)}
+            className="inline-flex min-h-[48px] items-center justify-center rounded-2xl border border-white/12 bg-black/30 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
+          >
+            {isCreateRowOpen ? "Close Create Tax Code" : "Create Tax Code"}
           </button>
         </div>
+
+        {isCreateRowOpen ? (
+          <div className="mt-6 grid gap-3 md:grid-cols-[1.1fr_1.6fr_0.8fr_1fr_1fr_auto]">
+            <input className={inputClassName} placeholder="Tax Code" value={newTaxCode.code} onChange={(e) => setNewTaxCode((prev) => ({ ...prev, code: e.target.value }))} />
+            <input className={inputClassName} placeholder="Description" value={newTaxCode.description} onChange={(e) => setNewTaxCode((prev) => ({ ...prev, description: e.target.value }))} />
+            <input className={inputClassName} placeholder="0" type="number" min="0" max="100" step="0.01" value={newTaxCode.rate} onChange={(e) => setNewTaxCode((prev) => ({ ...prev, rate: e.target.value }))} />
+            <select className={selectClassName} style={selectStyle} value={newTaxCode.calculationMethod} onChange={(e) => setNewTaxCode((prev) => ({ ...prev, calculationMethod: e.target.value as "EXCLUSIVE" | "INCLUSIVE" }))}>
+              <option value="EXCLUSIVE">Exclusive</option>
+              <option value="INCLUSIVE">Inclusive</option>
+            </select>
+            <label className="flex min-h-[50px] items-center gap-3 rounded-2xl border border-white/12 bg-black/35 px-4 py-3 text-sm text-white/85">
+              <input type="checkbox" checked={newTaxCode.isActive} onChange={(e) => setNewTaxCode((prev) => ({ ...prev, isActive: e.target.checked }))} className="h-4 w-4 rounded border-white/15 bg-black/40" />
+              Active tax code
+            </label>
+            <button type="button" onClick={createTaxCode} disabled={isCreatingCode} className="inline-flex min-h-[50px] items-center justify-center rounded-2xl border border-white/12 bg-black/30 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-70">
+              {isCreatingCode ? "Creating..." : "Save New Tax Code"}
+            </button>
+          </div>
+        ) : null}
 
         {taxCodeMessage ? (
           <div className={`mt-5 rounded-2xl border px-4 py-3 text-sm ${taxCodeMessage.type === "success" ? "border-emerald-500/30 bg-emerald-500/15 text-emerald-100" : "border-red-500/30 bg-red-500/15 text-red-100"}`}>
@@ -285,10 +297,10 @@ export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) 
         ) : null}
 
         <div className="mt-6 space-y-4">
-          {taxCodeRows.length === 0 ? (
-            <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-5 text-sm text-white/65">No tax codes have been created yet.</div>
+          {activeTaxCodes.length === 0 ? (
+            <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-5 text-sm text-white/65">No active tax codes have been created yet.</div>
           ) : (
-            taxCodeRows.map((row) => (
+            activeTaxCodes.map((row) => (
               <div key={row.id} className="rounded-3xl border border-white/10 bg-black/20 p-4">
                 <div className="grid gap-3 md:grid-cols-[1.1fr_1.6fr_0.8fr_1fr_1fr_auto] md:items-center">
                   <input className={inputClassName} value={row.code} onChange={(e) => updateRow(row.id, { code: e.target.value.toUpperCase() })} />
