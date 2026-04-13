@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { TaxCalculationModeValue } from "@/tax";
+import type { TaxCalculationModeValue } from "@/lib/tax";
 
 type TaxCodeItem = {
   id: string;

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { createAuditLogFromRequest } from "@/lib/audit";
-import { normalizeTaxCalculationMode } from "@/tax";
+import { normalizeTaxCalculationMode } from "@/lib/tax";
 
 export async function POST(req: Request) {
   try {
