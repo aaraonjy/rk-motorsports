@@ -53,6 +53,10 @@ export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) 
 
   const activeTaxCodes = useMemo(() => taxCodeRows.filter((item) => item.isActive), [taxCodeRows]);
 
+  const hasConfigChanges =
+    config.defaultPortalTaxCodeId !== initialConfig.defaultPortalTaxCodeId ||
+    config.defaultAdminTaxCodeId !== initialConfig.defaultAdminTaxCodeId;
+
   async function saveConfiguration(nextConfig = config) {
     setIsSavingConfig(true);
     setConfigMessage(null);
@@ -233,16 +237,18 @@ export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) 
             </div>
           ) : null}
 
-          <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={() => saveConfiguration()}
-              disabled={isSavingConfig}
-              className="inline-flex min-h-[48px] items-center justify-center rounded-2xl border border-white/12 bg-black/30 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-70"
-            >
-              {isSavingConfig ? "Saving..." : "Save Tax Configuration"}
-            </button>
-          </div>
+          {hasConfigChanges ? (
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => saveConfiguration()}
+                disabled={isSavingConfig}
+                className="inline-flex min-h-[48px] items-center justify-center rounded-2xl border border-white/12 bg-black/30 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {isSavingConfig ? "Saving..." : "Save Tax Configuration"}
+              </button>
+            </div>
+          ) : null}
         </div>
       </div>
 
