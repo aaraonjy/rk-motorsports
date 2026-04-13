@@ -591,7 +591,7 @@ export default async function SalesReportPage({
                         <td className={`whitespace-nowrap px-6 py-5 text-right font-medium ${row.transactionType === "CN" ? "text-red-200" : "text-white"}`}>
                           {formatCurrency(row.discount)}
                         </td>
-                        <td className="px-6 py-5 text-white/90">{row.taxCode}</td>
+                        <td className="px-6 py-5 text-white/90 whitespace-nowrap">{row.taxCode}</td>
                         <td className={`whitespace-nowrap px-6 py-5 text-right font-medium ${row.transactionType === "CN" ? "text-red-200" : "text-white"}`}>
                           {formatCurrency(row.taxAmount)}
                         </td>

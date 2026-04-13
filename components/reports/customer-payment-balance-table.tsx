@@ -93,27 +93,37 @@ function PaymentBreakdownModal({
 
         <div className="mt-5 grid gap-3 md:grid-cols-5">
           <div className="rounded-xl border border-white/10 bg-black/40 p-4">
-            <div className="text-xs uppercase tracking-[0.18em] text-white/45">Subtotal</div>
+              <div className="h-[32px] text-xs uppercase tracking-[0.18em] text-white/45">
+              Subtotal
+            </div>
             <div className="mt-2 text-lg font-semibold text-white">{row.subtotal}</div>
           </div>
 
           <div className="rounded-xl border border-white/10 bg-black/40 p-4">
-            <div className="text-xs uppercase tracking-[0.18em] text-white/45">Tax Amount</div>
+            <div className="h-[32px] text-xs uppercase tracking-[0.18em] text-white/45">
+              Tax Amount
+            </div>
             <div className="mt-2 text-lg font-semibold text-white">{row.taxAmount}</div>
           </div>
 
           <div className="rounded-xl border border-white/10 bg-black/40 p-4">
-            <div className="text-xs uppercase tracking-[0.18em] text-white/45">Grand Total</div>
+            <div className="h-[32px] text-xs uppercase tracking-[0.18em] text-white/45">
+              Grand Total
+            </div>
             <div className="mt-2 text-lg font-semibold text-white">{row.grandTotal}</div>
           </div>
 
           <div className="rounded-xl border border-white/10 bg-black/40 p-4">
-            <div className="text-xs uppercase tracking-[0.18em] text-white/45">Total Paid</div>
+            <div className="h-[32px] text-xs uppercase tracking-[0.18em] text-white/45">
+              Total Paid
+            </div>
             <div className="mt-2 text-lg font-semibold text-white">{row.totalPaid}</div>
           </div>
 
           <div className="rounded-xl border border-white/10 bg-black/40 p-4">
-            <div className="text-xs uppercase tracking-[0.18em] text-white/45">Outstanding</div>
+            <div className="h-[32px] text-xs uppercase tracking-[0.18em] text-white/45">
+              Outstanding
+            </div>
             <div className="mt-2 text-lg font-semibold text-white">{row.outstandingBalance}</div>
           </div>
         </div>
