@@ -401,6 +401,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     });
 
     const isCustomOrder = order.orderType === "CUSTOM_ORDER";
+    const taxSummary = getTaxSummary(order);
     const headerY = headerStartY - 62;
 
     page.drawRectangle({
@@ -415,10 +416,6 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
 
     if (isCustomOrder) {
       const descX = left + 10;
-      const itemQtyX = right - 245;
-      const itemUomX = right - 200;
-      const itemUnitX = right - 145;
-      const itemTotalX = right - 80;
 
       drawText(page, font, bold, "Description", descX, headerY + 9, 10, true);
 
@@ -442,25 +439,64 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
         drawText(page, font, bold, "Item Breakdown", descX, y, 10, true);
         y -= 16;
 
-        drawText(page, font, bold, "Description", descX + 8, y, 9, true);
-        drawText(page, font, bold, "Qty", itemQtyX, y, 9, true);
-        drawText(page, font, bold, "UOM", itemUomX, y, 9, true);
-        drawText(page, font, bold, "Unit Price", itemUnitX, y, 9, true);
-        drawText(page, font, bold, "Total", itemTotalX, y, 9, true);
-        y -= 12;
+        if (taxSummary.isLineItemMode) {
+          const itemQtyX = 318;
+          const itemUomX = 358;
+          const itemUnitX = 402;
+          const itemTotalX = 468;
+          const itemTaxCodeX = 518;
+          const itemTaxAmountX = 548;
 
-        for (const item of order.customItems) {
-          if (y < 180) break;
-          const itemLines = wrapText(item.description, 40);
-          drawText(page, font, bold, itemLines[0], descX + 8, y, 9);
-          if (itemLines[1]) {
-            drawText(page, font, bold, itemLines[1], descX + 8, y - 10, 9);
+          drawText(page, font, bold, "Description", descX + 8, y, 8.5, true);
+          drawText(page, font, bold, "Qty", itemQtyX, y, 8.5, true);
+          drawText(page, font, bold, "UOM", itemUomX, y, 8.5, true);
+          drawText(page, font, bold, "Unit Price", itemUnitX, y, 8.5, true);
+          drawText(page, font, bold, "Total", itemTotalX, y, 8.5, true);
+          drawText(page, font, bold, "Tax Code", itemTaxCodeX, y, 8.5, true);
+          drawText(page, font, bold, "Tax Amt", itemTaxAmountX, y, 8.5, true);
+          y -= 12;
+
+          for (const item of order.customItems) {
+            if (y < 180) break;
+            const itemLines = wrapText(item.description, 34);
+            drawText(page, font, bold, itemLines[0], descX + 8, y, 8.5);
+            if (itemLines[1]) {
+              drawText(page, font, bold, itemLines[1], descX + 8, y - 10, 8.5);
+            }
+            drawText(page, font, bold, String(item.qty), itemQtyX, y, 8.5);
+            drawText(page, font, bold, item.uom || "-", itemUomX, y, 8.5);
+            drawText(page, font, bold, formatMoney(item.unitPrice), itemUnitX, y, 8.5);
+            drawText(page, font, bold, formatMoney(item.lineTotal), itemTotalX, y, 8.5);
+            drawText(page, font, bold, item.taxCode || "No Tax", itemTaxCodeX, y, 8.5);
+            drawText(page, font, bold, formatMoney(item.taxAmount), itemTaxAmountX, y, 8.5);
+            y -= itemLines.length > 1 ? rowHeight + 10 : rowHeight;
           }
-          drawText(page, font, bold, String(item.qty), itemQtyX, y, 9);
-          drawText(page, font, bold, item.uom || "-", itemUomX, y, 9);
-          drawText(page, font, bold, formatMoney(item.unitPrice), itemUnitX, y, 9);
-          drawText(page, font, bold, formatMoney(item.lineTotal), itemTotalX, y, 9);
-          y -= itemLines.length > 1 ? rowHeight + 10 : rowHeight;
+        } else {
+          const itemQtyX = right - 245;
+          const itemUomX = right - 200;
+          const itemUnitX = right - 145;
+          const itemTotalX = right - 80;
+
+          drawText(page, font, bold, "Description", descX + 8, y, 9, true);
+          drawText(page, font, bold, "Qty", itemQtyX, y, 9, true);
+          drawText(page, font, bold, "UOM", itemUomX, y, 9, true);
+          drawText(page, font, bold, "Unit Price", itemUnitX, y, 9, true);
+          drawText(page, font, bold, "Total", itemTotalX, y, 9, true);
+          y -= 12;
+
+          for (const item of order.customItems) {
+            if (y < 180) break;
+            const itemLines = wrapText(item.description, 40);
+            drawText(page, font, bold, itemLines[0], descX + 8, y, 9);
+            if (itemLines[1]) {
+              drawText(page, font, bold, itemLines[1], descX + 8, y - 10, 9);
+            }
+            drawText(page, font, bold, String(item.qty), itemQtyX, y, 9);
+            drawText(page, font, bold, item.uom || "-", itemUomX, y, 9);
+            drawText(page, font, bold, formatMoney(item.unitPrice), itemUnitX, y, 9);
+            drawText(page, font, bold, formatMoney(item.lineTotal), itemTotalX, y, 9);
+            y -= itemLines.length > 1 ? rowHeight + 10 : rowHeight;
+          }
         }
       }
 
@@ -471,8 +507,6 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
         thickness: 1,
         color: rgb(0.85, 0.85, 0.85),
       });
-
-      const taxSummary = getTaxSummary(order);
 
       y -= 22;
       drawText(page, font, bold, "Subtotal:", rightColumnX - 110, y, 10, true);
@@ -515,7 +549,6 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
 
       let y = headerY - 26;
       const lines = buildStandardLines(order);
-      const taxSummary = getTaxSummary(order);
 
       for (const line of lines) {
         drawText(page, font, bold, line, left + 10, y, 9);

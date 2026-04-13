@@ -100,6 +100,10 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
           uom: item.uom || null,
           unitPrice: Number(item.unitPrice || 0),
           lineTotal: Number(item.lineTotal || 0),
+          taxCodeId: item.taxCodeId || null,
+          taxCode: item.taxCode || null,
+          taxRate: item.taxRate != null ? Number(item.taxRate || 0) : null,
+          taxAmount: Number(item.taxAmount || 0),
         }))
       : [{
           description: buildStandardCreditNoteDescription(order),
@@ -107,6 +111,10 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
           uom: null,
           unitPrice: subtotalBeforeTax,
           lineTotal: subtotalBeforeTax,
+          taxCodeId: null,
+          taxCode: null,
+          taxRate: null,
+          taxAmount: 0,
         }];
 
     const cnDate = new Date();

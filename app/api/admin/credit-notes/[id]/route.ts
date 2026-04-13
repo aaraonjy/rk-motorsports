@@ -198,21 +198,45 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
       }
     }
 
+    const isLineItemMode =
+      creditNote.items.some((item) => Boolean(item.taxCodeId || item.taxCode) || Number(item.taxAmount || 0) > 0) ||
+      creditNote.order.taxCode === "MULTIPLE";
+
     y -= 24;
     page.drawRectangle({ x: left, y, width: width - 100, height: 28, color: rgb(0.95, 0.95, 0.95), borderWidth: 0.5, borderColor: rgb(0.8, 0.8, 0.8) });
-    drawText(page, font, bold, "Description", left + 10, y + 9, 10, true);
-    drawText(page, font, bold, "Qty", right - 215, y + 9, 10, true);
-    drawText(page, font, bold, "Unit Price", right - 155, y + 9, 10, true);
-    drawText(page, font, bold, "Total", right - 80, y + 9, 10, true);
+
+    if (isLineItemMode) {
+      drawText(page, font, bold, "Description", left + 10, y + 9, 9, true);
+      drawText(page, font, bold, "Qty", 325, y + 9, 9, true);
+      drawText(page, font, bold, "Unit Price", 385, y + 9, 9, true);
+      drawText(page, font, bold, "Total", 450, y + 9, 9, true);
+      drawText(page, font, bold, "Tax Code", 498, y + 9, 9, true);
+      drawText(page, font, bold, "Tax Amt", 545, y + 9, 9, true);
+    } else {
+      drawText(page, font, bold, "Description", left + 10, y + 9, 10, true);
+      drawText(page, font, bold, "Qty", right - 215, y + 9, 10, true);
+      drawText(page, font, bold, "Unit Price", right - 155, y + 9, 10, true);
+      drawText(page, font, bold, "Total", right - 80, y + 9, 10, true);
+    }
 
     y -= 24;
     for (const item of creditNote.items) {
-      const lines = wrapText(item.description, 42);
-      drawText(page, font, bold, lines[0], left + 10, y, 9);
-      if (lines[1]) drawText(page, font, bold, lines[1], left + 10, y - 10, 9);
-      drawText(page, font, bold, String(item.qty), right - 215, y, 9);
-      drawText(page, font, bold, formatMoney(item.unitPrice), right - 155, y, 9);
-      drawText(page, font, bold, formatMoney(item.lineTotal), right - 80, y, 9);
+      const lines = wrapText(item.description, isLineItemMode ? 32 : 42);
+      drawText(page, font, bold, lines[0], left + 10, y, isLineItemMode ? 8.5 : 9);
+      if (lines[1]) drawText(page, font, bold, lines[1], left + 10, y - 10, isLineItemMode ? 8.5 : 9);
+
+      if (isLineItemMode) {
+        drawText(page, font, bold, String(item.qty), 325, y, 8.5);
+        drawText(page, font, bold, formatMoney(item.unitPrice), 385, y, 8.5);
+        drawText(page, font, bold, formatMoney(item.lineTotal), 450, y, 8.5);
+        drawText(page, font, bold, item.taxCode || "No Tax", 498, y, 8.5);
+        drawText(page, font, bold, formatMoney(item.taxAmount), 545, y, 8.5);
+      } else {
+        drawText(page, font, bold, String(item.qty), right - 215, y, 9);
+        drawText(page, font, bold, formatMoney(item.unitPrice), right - 155, y, 9);
+        drawText(page, font, bold, formatMoney(item.lineTotal), right - 80, y, 9);
+      }
+
       y -= lines[1] ? 32 : 22;
     }
 
@@ -232,10 +256,6 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
         0
     );
     const taxMethod = String(creditNote.order.taxCalculationMethod || "").toUpperCase();
-    const isLineItemMode = creditNote.items.some((item) => {
-      const itemTaxCode = (item as typeof item & { taxCode?: string | null }).taxCode;
-      return Boolean(itemTaxCode) || false;
-    }) || creditNote.order.taxCode === "MULTIPLE";
     const taxLabel = isLineItemMode
       ? `${taxMethod === "INCLUSIVE" ? "Tax Included Reversal" : "Tax Reversal"}:`
       : `${taxMethod === "INCLUSIVE" ? "Tax Included Reversal" : "Tax Reversal"}${
