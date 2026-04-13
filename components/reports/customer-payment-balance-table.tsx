@@ -18,6 +18,8 @@ type TableRow = {
   vehicleNo: string;
   orderStatusLabel: string;
   orderStatusBadgeClass: string;
+  subtotal: string;
+  taxAmount: string;
   grandTotal: string;
   totalPaid: string;
   outstandingBalance: string;
@@ -69,7 +71,7 @@ function PaymentBreakdownModal({
       onClick={onClose}
     >
       <div
-        className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-white/10 bg-zinc-950 p-6 shadow-2xl"
+        className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-white/10 bg-zinc-950 p-6 shadow-2xl"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-4">
@@ -89,7 +91,17 @@ function PaymentBreakdownModal({
           </button>
         </div>
 
-        <div className="mt-5 grid gap-3 md:grid-cols-3">
+        <div className="mt-5 grid gap-3 md:grid-cols-5">
+          <div className="rounded-xl border border-white/10 bg-black/40 p-4">
+            <div className="text-xs uppercase tracking-[0.18em] text-white/45">Subtotal</div>
+            <div className="mt-2 text-lg font-semibold text-white">{row.subtotal}</div>
+          </div>
+
+          <div className="rounded-xl border border-white/10 bg-black/40 p-4">
+            <div className="text-xs uppercase tracking-[0.18em] text-white/45">Tax Amount</div>
+            <div className="mt-2 text-lg font-semibold text-white">{row.taxAmount}</div>
+          </div>
+
           <div className="rounded-xl border border-white/10 bg-black/40 p-4">
             <div className="text-xs uppercase tracking-[0.18em] text-white/45">Grand Total</div>
             <div className="mt-2 text-lg font-semibold text-white">{row.grandTotal}</div>
@@ -165,6 +177,8 @@ export function CustomerPaymentBalanceTable({ rows }: { rows: TableRow[] }) {
               <th className="px-6 py-4 font-medium">Customer</th>
               <th className="px-6 py-4 font-medium">Vehicle No.</th>
               <th className="px-6 py-4 font-medium">Order Status</th>
+              <th className="px-6 py-4 font-medium text-right">Subtotal</th>
+              <th className="px-6 py-4 font-medium text-right">Tax Amount</th>
               <th className="px-6 py-4 font-medium text-right">Grand Total</th>
               <th className="px-6 py-4 font-medium text-right">Total Paid</th>
               <th className="px-6 py-4 font-medium text-right">Outstanding Balance</th>
@@ -185,6 +199,8 @@ export function CustomerPaymentBalanceTable({ rows }: { rows: TableRow[] }) {
                 <td className="px-6 py-5 text-white/65">
                   <span className={row.orderStatusBadgeClass}>{row.orderStatusLabel}</span>
                 </td>
+                <td className="px-6 py-5 text-right font-medium text-white">{row.subtotal}</td>
+                <td className="px-6 py-5 text-right font-medium text-white">{row.taxAmount}</td>
                 <td className="px-6 py-5 text-right font-medium text-white">{row.grandTotal}</td>
                 <td className="px-6 py-5 text-right font-medium text-white">{row.totalPaid}</td>
                 <td className="px-6 py-5 text-right font-medium text-white">{row.outstandingBalance}</td>
