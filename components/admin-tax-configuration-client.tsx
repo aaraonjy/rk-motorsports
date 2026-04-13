@@ -183,51 +183,57 @@ export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) 
 
           <div className="grid gap-4 lg:grid-cols-3">
             <div className="rounded-3xl border border-white/10 bg-black/25 p-4">
-              <div className="text-lg font-semibold">Enable Tax Module</div>
-              <p className="mt-2 text-sm text-white/65">Toggle tax usage for configured order flows. Historical taxed orders remain unchanged.</p>
-              <button
-                type="button"
-                onClick={handleModuleToggle}
-                className={`mt-5 inline-flex min-h-[50px] w-full items-center justify-center rounded-2xl border px-4 py-3 text-sm font-semibold transition ${config.taxModuleEnabled ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-200 hover:bg-emerald-500/20" : "border-white/12 bg-white/[0.04] text-white/85 hover:bg-white/[0.08]"}`}
-              >
-                {config.taxModuleEnabled ? "ON" : "OFF"}
-              </button>
+              <div className="flex min-h-[156px] flex-col">
+                <div className="text-lg font-semibold">Enable Tax Module</div>
+                <p className="mt-2 text-sm text-white/65">Toggle tax usage for configured order flows.</p>
+                <button
+                  type="button"
+                  onClick={handleModuleToggle}
+                  className={`mt-auto inline-flex min-h-[50px] w-full items-center justify-center rounded-2xl border px-4 py-3 text-sm font-semibold transition ${config.taxModuleEnabled ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-200 hover:bg-emerald-500/20" : "border-white/12 bg-white/[0.04] text-white/85 hover:bg-white/[0.08]"}`}
+                >
+                  {config.taxModuleEnabled ? "ON" : "OFF"}
+                </button>
+              </div>
             </div>
 
             <div className="rounded-3xl border border-white/10 bg-black/25 p-4">
-              <label className="text-lg font-semibold">Default Portal Tax Code</label>
-              <p className="mt-2 text-sm text-white/65">Used later for Custom Tuning Form auto-applied tax.</p>
-              <select
-                value={config.defaultPortalTaxCodeId}
-                onChange={(event) => setConfig((prev) => ({ ...prev, defaultPortalTaxCodeId: event.target.value }))}
-                className={`${selectClassName} mt-8`}
-                style={selectStyle}
-              >
-                <option value="">No default tax code</option>
-                {activeTaxCodes.map((taxCode) => (
-                  <option key={taxCode.id} value={taxCode.id}>
-                    {taxCode.code} - {taxCode.description}
-                  </option>
-                ))}
-              </select>
+              <div className="flex min-h-[156px] flex-col">
+                <label className="text-lg font-semibold">Default Portal Tax Code</label>
+                <p className="mt-2 text-sm text-white/65">Used later for Custom Tuning Form auto-applied tax.</p>
+                <select
+                  value={config.defaultPortalTaxCodeId}
+                  onChange={(event) => setConfig((prev) => ({ ...prev, defaultPortalTaxCodeId: event.target.value }))}
+                  className={`${selectClassName} mt-auto`}
+                  style={selectStyle}
+                >
+                  <option value="">No default tax code</option>
+                  {activeTaxCodes.map((taxCode) => (
+                    <option key={taxCode.id} value={taxCode.id}>
+                      {taxCode.code} - {taxCode.description}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             <div className="rounded-3xl border border-white/10 bg-black/25 p-4">
-              <label className="text-lg font-semibold">Default Admin Tax Code</label>
-              <p className="mt-2 text-sm text-white/65">Used later for Custom Order Form default tax selection.</p>
-              <select
-                value={config.defaultAdminTaxCodeId}
-                onChange={(event) => setConfig((prev) => ({ ...prev, defaultAdminTaxCodeId: event.target.value }))}
-                className={`${selectClassName} mt-8`}
-                style={selectStyle}
-              >
-                <option value="">No default tax code</option>
-                {activeTaxCodes.map((taxCode) => (
-                  <option key={taxCode.id} value={taxCode.id}>
-                    {taxCode.code} - {taxCode.description}
-                  </option>
-                ))}
-              </select>
+              <div className="flex min-h-[156px] flex-col">
+                <label className="text-lg font-semibold">Default Admin Tax Code</label>
+                <p className="mt-2 text-sm text-white/65">Used later for Custom Order Form default tax selection.</p>
+                <select
+                  value={config.defaultAdminTaxCodeId}
+                  onChange={(event) => setConfig((prev) => ({ ...prev, defaultAdminTaxCodeId: event.target.value }))}
+                  className={`${selectClassName} mt-auto`}
+                  style={selectStyle}
+                >
+                  <option value="">No default tax code</option>
+                  {activeTaxCodes.map((taxCode) => (
+                    <option key={taxCode.id} value={taxCode.id}>
+                      {taxCode.code} - {taxCode.description}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
 
