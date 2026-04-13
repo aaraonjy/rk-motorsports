@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { normalizeTaxCalculationMode } from "@/lib/tax";
 import { CustomOrderForm } from "@/components/custom-order-form";
 
 type EditOrderPageProps = {
@@ -174,6 +175,7 @@ export default async function AdminEditCustomOrderPage({
             }}
             taxConfig={{
               taxModuleEnabled: taxConfig?.taxModuleEnabled ?? false,
+              taxCalculationMode: normalizeTaxCalculationMode(taxConfig?.taxCalculationMode),
               defaultAdminTaxCodeId: taxConfig?.defaultAdminTaxCodeId ?? "",
               taxCodes: taxCodes.map((item) => ({
                 ...item,

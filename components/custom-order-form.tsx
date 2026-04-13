@@ -1,7 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { calculateTaxBreakdown, getTaxDisplayLabel, type TaxCalculationMethodValue } from "@/lib/tax";
+import {
+  calculateLineItemTaxBreakdown,
+  calculateTaxBreakdown,
+  getTaxDisplayLabel,
+  normalizeTaxCalculationMode,
+  type TaxCalculationMethodValue,
+  type TaxCalculationModeValue,
+} from "@/lib/tax";
 
 type PaymentHistoryItem = {
   id: string;
@@ -61,6 +68,7 @@ type CustomOrderFormProps = {
   errorTitle?: string;
   taxConfig?: {
     taxModuleEnabled: boolean;
+    taxCalculationMode: TaxCalculationModeValue;
     defaultAdminTaxCodeId?: string | null;
     taxCodes: TaxCodeOption[];
   };
@@ -72,6 +80,7 @@ type CustomLineItem = {
   qty: string;
   uom: string;
   unitPrice: string;
+  taxCodeId: string;
 };
 
 type ApiResponse = {
@@ -80,13 +89,14 @@ type ApiResponse = {
   redirectTo?: string;
 };
 
-function createEmptyRow(): CustomLineItem {
+function createEmptyRow(defaultTaxCodeId = ""): CustomLineItem {
   return {
     id: crypto.randomUUID(),
     description: "",
     qty: "1",
     uom: "",
     unitPrice: "0.00",
+    taxCodeId: defaultTaxCodeId,
   };
 }
 
@@ -138,7 +148,6 @@ function removeSpacing(value: string) {
   return value.replace(/\s+/g, "");
 }
 
-
 function formatTaxOptionLabel(taxCode: TaxCodeOption) {
   return getTaxDisplayLabel({
     code: taxCode.code,
@@ -169,47 +178,27 @@ export function CustomOrderForm({
   const [paymentDate, setPaymentDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [paymentMode, setPaymentMode] = useState("CASH");
   const [paymentAmount, setPaymentAmount] = useState("0");
-  const [rows, setRows] = useState<CustomLineItem[]>(
-    initialData?.items?.length
-      ? initialData.items.map((item) => ({
-          id: item.id || crypto.randomUUID(),
-          description: item.description,
-          qty: String(item.qty),
-          uom: item.uom || "",
-          unitPrice: String(Number(item.unitPrice).toFixed(2)),
-        }))
-      : [createEmptyRow()]
-  );
+  const taxCalculationMode = normalizeTaxCalculationMode(taxConfig?.taxCalculationMode);
+  const isLineItemTaxMode = Boolean(taxConfig?.taxModuleEnabled && taxCalculationMode === "LINE_ITEM");
+  const [rows, setRows] = useState<CustomLineItem[]>(() => {
+    const defaultLineItemTaxCodeId = initialData?.taxCodeId || taxConfig?.defaultAdminTaxCodeId || "";
+
+    if (initialData?.items?.length) {
+      return initialData.items.map((item) => ({
+        id: item.id || crypto.randomUUID(),
+        description: item.description,
+        qty: String(item.qty),
+        uom: item.uom || "",
+        unitPrice: String(Number(item.unitPrice).toFixed(2)),
+        taxCodeId: defaultLineItemTaxCodeId,
+      }));
+    }
+
+    return [createEmptyRow(defaultLineItemTaxCodeId)];
+  });
   const [submitError, setSubmitError] = useState("");
   const [supportingFiles, setSupportingFiles] = useState<File[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const normalizedRows = useMemo(
-    () =>
-      rows.map((row) => {
-        const qty = Math.max(1, parseWholeNumber(row.qty || "0"));
-        const unitPrice = Math.max(0, parseMoneyAmount(row.unitPrice || "0"));
-        const lineTotal = roundMoney(qty * unitPrice);
-
-        return {
-          ...row,
-          qty,
-          unitPrice,
-          lineTotal,
-        };
-      }),
-    [rows]
-  );
-
-  const subtotal = useMemo(
-    () => roundMoney(normalizedRows.reduce((sum, row) => sum + row.lineTotal, 0)),
-    [normalizedRows]
-  );
-
-  const discountAmount = useMemo(
-    () => Math.max(0, parseMoneyAmount(discount || "0")),
-    [discount]
-  );
 
   const availableTaxCodes = useMemo(() => {
     const current = taxConfig?.taxCodes || [];
@@ -242,24 +231,74 @@ export function CustomOrderForm({
     return taxConfig?.defaultAdminTaxCodeId || "";
   });
 
+  const normalizedRows = useMemo(
+    () =>
+      rows.map((row) => {
+        const qty = Math.max(1, parseWholeNumber(row.qty || "0"));
+        const unitPrice = Math.max(0, parseMoneyAmount(row.unitPrice || "0"));
+        const lineTotal = roundMoney(qty * unitPrice);
+        const lineTaxCode = availableTaxCodes.find((item) => item.id === row.taxCodeId) || null;
+        const lineTaxBreakdown = calculateLineItemTaxBreakdown({
+          lineTotal,
+          taxRate: lineTaxCode?.rate ?? null,
+          calculationMethod: lineTaxCode?.calculationMethod ?? null,
+          taxEnabled: Boolean(isLineItemTaxMode && lineTaxCode),
+        });
+
+        return {
+          ...row,
+          qty,
+          unitPrice,
+          lineTotal,
+          lineTaxCode,
+          lineTaxAmount: lineTaxBreakdown.taxAmount,
+          lineGrandTotalAfterTax: lineTaxBreakdown.lineGrandTotalAfterTax,
+        };
+      }),
+    [rows, availableTaxCodes, isLineItemTaxMode]
+  );
+
+  const subtotal = useMemo(
+    () => roundMoney(normalizedRows.reduce((sum, row) => sum + row.lineTotal, 0)),
+    [normalizedRows]
+  );
+
+  const discountAmount = useMemo(
+    () => Math.max(0, parseMoneyAmount(discount || "0")),
+    [discount]
+  );
+
   const selectedTaxCode = useMemo(
     () => availableTaxCodes.find((item) => item.id === selectedTaxCodeId) || null,
     [availableTaxCodes, selectedTaxCodeId]
   );
 
-  const taxBreakdown = useMemo(
+  const transactionTaxBreakdown = useMemo(
     () =>
       calculateTaxBreakdown({
         subtotal,
         discount: discountAmount,
         taxRate: selectedTaxCode?.rate ?? null,
         calculationMethod: selectedTaxCode?.calculationMethod ?? null,
-        taxEnabled: Boolean(taxConfig?.taxModuleEnabled && selectedTaxCode),
+        taxEnabled: Boolean(taxConfig?.taxModuleEnabled && !isLineItemTaxMode && selectedTaxCode),
       }),
-    [discountAmount, selectedTaxCode, subtotal, taxConfig?.taxModuleEnabled]
+    [discountAmount, selectedTaxCode, subtotal, taxConfig?.taxModuleEnabled, isLineItemTaxMode]
   );
 
-  const grandTotal = taxBreakdown.grandTotalAfterTax;
+  const lineItemTaxAmount = useMemo(
+    () => roundMoney(normalizedRows.reduce((sum, row) => sum + row.lineTaxAmount, 0)),
+    [normalizedRows]
+  );
+
+  const discountedSubtotal = useMemo(
+    () => Math.max(0, roundMoney(subtotal - discountAmount)),
+    [subtotal, discountAmount]
+  );
+
+  const taxAmount = isLineItemTaxMode ? lineItemTaxAmount : transactionTaxBreakdown.taxAmount;
+  const grandTotal = isLineItemTaxMode
+    ? roundMoney(discountedSubtotal + lineItemTaxAmount)
+    : transactionTaxBreakdown.grandTotalAfterTax;
   const normalizedPaymentAmount = useMemo(
     () => Math.max(0, parseMoneyAmount(paymentAmount || "0")),
     [paymentAmount]
@@ -278,7 +317,7 @@ export function CustomOrderForm({
 
   function updateRow(
     rowId: string,
-    field: keyof Pick<CustomLineItem, "description" | "qty" | "uom" | "unitPrice">,
+    field: keyof Pick<CustomLineItem, "description" | "qty" | "uom" | "unitPrice" | "taxCodeId">,
     value: string
   ) {
     setRows((prev) =>
@@ -287,13 +326,13 @@ export function CustomOrderForm({
   }
 
   function addRow() {
-    setRows((prev) => [...prev, createEmptyRow()]);
+    setRows((prev) => [...prev, createEmptyRow(isLineItemTaxMode ? taxConfig?.defaultAdminTaxCodeId || "" : "")]);
   }
 
   function removeRow(rowId: string) {
     setRows((prev) => {
       if (prev.length === 1) {
-        return [createEmptyRow()];
+        return [createEmptyRow(isLineItemTaxMode ? taxConfig?.defaultAdminTaxCodeId || "" : "")];
       }
       return prev.filter((row) => row.id !== rowId);
     });
@@ -389,7 +428,7 @@ export function CustomOrderForm({
       formData.append("customSubtotal", String(subtotal));
       formData.append("customDiscount", String(discountAmount));
       formData.append("customGrandTotal", String(grandTotal));
-      formData.append("taxCodeId", selectedTaxCodeId || "");
+      formData.append("taxCodeId", isLineItemTaxMode ? "" : selectedTaxCodeId || "");
       formData.append("paymentDate", paymentDate);
       formData.append("paymentMode", paymentMode);
       formData.append("paymentAmount", String(projectedPaymentAmount));
@@ -593,6 +632,7 @@ export function CustomOrderForm({
           {rows.map((row, index) => {
             const normalizedRow = normalizedRows.find((item) => item.id === row.id);
             const lineTotal = normalizedRow?.lineTotal || 0;
+            const lineTaxAmount = normalizedRow?.lineTaxAmount || 0;
 
             return (
               <div
@@ -664,6 +704,41 @@ export function CustomOrderForm({
                     </div>
                   </div>
                 </div>
+
+                {isLineItemTaxMode ? (
+                  <div className="mt-4 border-t border-white/10 pt-4">
+                    <div className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-white/45">
+                      Tax Details
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-[1.4fr_0.8fr]">
+                      <div>
+                        <label className="label-rk">Tax Code</label>
+                        <div className="relative">
+                          <select
+                            value={row.taxCodeId}
+                            onChange={(e) => updateRow(row.id, "taxCodeId", e.target.value)}
+                            className="input-rk appearance-none pr-12"
+                          >
+                            <option value="">No Tax</option>
+                            {availableTaxCodes.map((item) => (
+                              <option key={item.id} value={item.id}>
+                                {formatTaxOptionLabel(item)}
+                              </option>
+                            ))}
+                          </select>
+                          <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/60">▾</div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="label-rk">Tax Amount</label>
+                        <div className="input-rk flex items-center text-white/85">
+                          {formatCurrency(lineTaxAmount)}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
               </div>
             );
           })}
@@ -703,7 +778,7 @@ export function CustomOrderForm({
               />
             </div>
 
-            {taxConfig?.taxModuleEnabled ? (
+            {taxConfig?.taxModuleEnabled && !isLineItemTaxMode ? (
               <div>
                 <label className="label-rk">Tax Code</label>
                 <div className="relative">
@@ -727,10 +802,16 @@ export function CustomOrderForm({
               </div>
             ) : null}
 
+            {taxConfig?.taxModuleEnabled && isLineItemTaxMode ? (
+              <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-xs leading-6 text-white/60">
+                Tax Code is now controlled inside each line item. Order Summary shows the combined tax amount from all rows.
+              </div>
+            ) : null}
+
             {taxConfig?.taxModuleEnabled ? (
               <div className="flex items-center justify-between gap-4 border-t border-white/10 pt-4 text-white/75">
                 <span>Tax Amount</span>
-                <span className="font-semibold text-white">{formatCurrency(taxBreakdown.taxAmount)}</span>
+                <span className="font-semibold text-white">{formatCurrency(taxAmount)}</span>
               </div>
             ) : null}
 
@@ -851,7 +932,11 @@ export function CustomOrderForm({
 
           <p className="mt-4 text-xs leading-6 text-white/45">
             Discount supports up to 2 decimal places. Grand total will never go below RM0.00.
-            {taxConfig?.taxModuleEnabled ? " When a tax code is selected, payment and outstanding balance use the total after tax." : ""}
+            {taxConfig?.taxModuleEnabled
+              ? isLineItemTaxMode
+                ? " In Line Item mode, each row controls its own tax code and the summary shows the combined tax total."
+                : " When a tax code is selected, payment and outstanding balance use the total after tax."
+              : ""}
           </p>
         </div>
       </div>

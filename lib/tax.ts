@@ -20,6 +20,22 @@ export type TaxBreakdownResult = {
   isTaxApplied: boolean;
 };
 
+export type LineItemTaxBreakdownInput = {
+  lineTotal: number;
+  taxRate?: number | null;
+  calculationMethod?: TaxCalculationMethodValue | null;
+  taxEnabled?: boolean;
+};
+
+export type LineItemTaxBreakdownResult = {
+  lineTotal: number;
+  taxRate: number;
+  taxAmount: number;
+  lineGrandTotalAfterTax: number;
+  calculationMethod: TaxCalculationMethodValue | null;
+  isTaxApplied: boolean;
+};
+
 export function roundMoney(value: number) {
   if (!Number.isFinite(value)) return 0;
   return Math.round((value + Number.EPSILON) * 100) / 100;
@@ -72,6 +88,43 @@ export function calculateTaxBreakdown(input: TaxBreakdownInput): TaxBreakdownRes
     taxRate,
     taxAmount,
     grandTotalAfterTax,
+    calculationMethod,
+    isTaxApplied: true,
+  };
+}
+
+export function calculateLineItemTaxBreakdown(input: LineItemTaxBreakdownInput): LineItemTaxBreakdownResult {
+  const lineTotal = Math.max(0, roundMoney(Number(input.lineTotal) || 0));
+  const taxRate = normalizeTaxRate(input.taxRate);
+  const calculationMethod = input.calculationMethod ?? null;
+  const shouldApplyTax = Boolean(input.taxEnabled && taxRate > 0 && calculationMethod);
+
+  if (!shouldApplyTax || !calculationMethod) {
+    return {
+      lineTotal,
+      taxRate,
+      taxAmount: 0,
+      lineGrandTotalAfterTax: lineTotal,
+      calculationMethod: null,
+      isTaxApplied: false,
+    };
+  }
+
+  const taxAmount =
+    calculationMethod === "INCLUSIVE"
+      ? roundMoney(lineTotal * (taxRate / (100 + taxRate)))
+      : roundMoney(lineTotal * (taxRate / 100));
+
+  const lineGrandTotalAfterTax =
+    calculationMethod === "INCLUSIVE"
+      ? lineTotal
+      : roundMoney(lineTotal + taxAmount);
+
+  return {
+    lineTotal,
+    taxRate,
+    taxAmount,
+    lineGrandTotalAfterTax,
     calculationMethod,
     isTaxApplied: true,
   };

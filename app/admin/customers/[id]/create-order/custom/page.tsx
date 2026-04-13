@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { getCustomerById } from "@/lib/queries";
 import { db } from "@/lib/db";
+import { normalizeTaxCalculationMode } from "@/lib/tax";
 import { CustomOrderForm } from "@/components/custom-order-form";
 
 type CreateOrderPageProps = {
@@ -125,6 +126,7 @@ export default async function AdminCustomerCustomOrderPage({
             customerId={customer.id}
             taxConfig={{
               taxModuleEnabled: taxConfig?.taxModuleEnabled ?? false,
+              taxCalculationMode: normalizeTaxCalculationMode(taxConfig?.taxCalculationMode),
               defaultAdminTaxCodeId: taxConfig?.defaultAdminTaxCodeId ?? "",
               taxCodes: taxCodes.map((item) => ({
                 ...item,
