@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import type { TaxCalculationModeValue } from "@/tax";
 
 type TaxCodeItem = {
   id: string;
@@ -14,6 +15,7 @@ type TaxCodeItem = {
 type Props = {
   initialConfig: {
     taxModuleEnabled: boolean;
+    taxCalculationMode: TaxCalculationModeValue;
     defaultPortalTaxCodeId: string;
     defaultAdminTaxCodeId: string;
   };
@@ -56,6 +58,8 @@ export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) 
   const visibleTaxCodeRows = useMemo(() => taxCodeRows.filter((item) => item.isActive), [taxCodeRows]);
 
   const hasConfigChanges =
+    config.taxModuleEnabled !== initialConfig.taxModuleEnabled ||
+    config.taxCalculationMode !== initialConfig.taxCalculationMode ||
     config.defaultPortalTaxCodeId !== initialConfig.defaultPortalTaxCodeId ||
     config.defaultAdminTaxCodeId !== initialConfig.defaultAdminTaxCodeId;
 
@@ -181,7 +185,7 @@ export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) 
             </div>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-3">
+          <div className="grid gap-4 xl:grid-cols-4">
             <div className="rounded-3xl border border-white/10 bg-black/25 p-4">
               <div className="flex min-h-[156px] flex-col">
                 <div className="text-lg font-semibold">Enable Tax Module</div>
@@ -193,6 +197,27 @@ export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) 
                 >
                   {config.taxModuleEnabled ? "ON" : "OFF"}
                 </button>
+              </div>
+            </div>
+
+            <div className="rounded-3xl border border-white/10 bg-black/25 p-4">
+              <div className="flex min-h-[156px] flex-col">
+                <label className="text-lg font-semibold">Tax Calculation Mode</label>
+                <p className="mt-2 text-sm text-white/65">Prepare the system for transaction-level or line-item tax handling in later batches.</p>
+                <select
+                  value={config.taxCalculationMode}
+                  onChange={(event) =>
+                    setConfig((prev) => ({
+                      ...prev,
+                      taxCalculationMode: event.target.value as TaxCalculationModeValue,
+                    }))
+                  }
+                  className={`${selectClassName} mt-auto`}
+                  style={selectStyle}
+                >
+                  <option value="TRANSACTION">Per Transaction</option>
+                  <option value="LINE_ITEM">Per Line Item</option>
+                </select>
               </div>
             </div>
 

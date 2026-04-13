@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { createAuditLogFromRequest } from "@/lib/audit";
+import { normalizeTaxCalculationMode } from "@/tax";
 
 export async function POST(req: Request) {
   try {
@@ -9,6 +10,7 @@ export async function POST(req: Request) {
     const body = await req.json().catch(() => ({}));
 
     const taxModuleEnabled = Boolean(body.taxModuleEnabled);
+    const taxCalculationMode = normalizeTaxCalculationMode(body.taxCalculationMode);
     const defaultPortalTaxCodeId = typeof body.defaultPortalTaxCodeId === "string" && body.defaultPortalTaxCodeId.trim()
       ? body.defaultPortalTaxCodeId.trim()
       : null;
@@ -51,12 +53,14 @@ export async function POST(req: Request) {
       where: { id: "default" },
       update: {
         taxModuleEnabled,
+        taxCalculationMode,
         defaultPortalTaxCodeId,
         defaultAdminTaxCodeId,
       },
       create: {
         id: "default",
         taxModuleEnabled,
+        taxCalculationMode,
         defaultPortalTaxCodeId,
         defaultAdminTaxCodeId,
       },
@@ -74,12 +78,14 @@ export async function POST(req: Request) {
       oldValues: existing
         ? {
             taxModuleEnabled: existing.taxModuleEnabled,
+            taxCalculationMode: existing.taxCalculationMode,
             defaultPortalTaxCodeId: existing.defaultPortalTaxCodeId,
             defaultAdminTaxCodeId: existing.defaultAdminTaxCodeId,
           }
         : null,
       newValues: {
         taxModuleEnabled: saved.taxModuleEnabled,
+        taxCalculationMode: saved.taxCalculationMode,
         defaultPortalTaxCodeId: saved.defaultPortalTaxCodeId,
         defaultAdminTaxCodeId: saved.defaultAdminTaxCodeId,
       },

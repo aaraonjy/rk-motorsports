@@ -72,6 +72,11 @@ enum TaxCalculationMethod {
   INCLUSIVE
 }
 
+enum TaxCalculationMode {
+  TRANSACTION
+  LINE_ITEM
+}
+
 model User {
   id                 String         @id @default(cuid())
   name               String
@@ -160,14 +165,15 @@ model TaxCode {
 }
 
 model TaxConfiguration {
-  id                     String    @id
-  taxModuleEnabled       Boolean   @default(false)
+  id                     String             @id
+  taxModuleEnabled       Boolean            @default(false)
+  taxCalculationMode     TaxCalculationMode @default(TRANSACTION)
   defaultPortalTaxCodeId String?
   defaultAdminTaxCodeId  String?
-  createdAt              DateTime  @default(now())
-  updatedAt              DateTime  @updatedAt
-  defaultPortalTaxCode   TaxCode?  @relation("DefaultPortalTaxCode", fields: [defaultPortalTaxCodeId], references: [id], onDelete: SetNull)
-  defaultAdminTaxCode    TaxCode?  @relation("DefaultAdminTaxCode", fields: [defaultAdminTaxCodeId], references: [id], onDelete: SetNull)
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+  defaultPortalTaxCode   TaxCode?           @relation("DefaultPortalTaxCode", fields: [defaultPortalTaxCodeId], references: [id], onDelete: SetNull)
+  defaultAdminTaxCode    TaxCode?           @relation("DefaultAdminTaxCode", fields: [defaultAdminTaxCodeId], references: [id], onDelete: SetNull)
 
   @@index([defaultPortalTaxCodeId])
   @@index([defaultAdminTaxCodeId])

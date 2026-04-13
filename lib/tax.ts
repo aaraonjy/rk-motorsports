@@ -1,4 +1,5 @@
 export type TaxCalculationMethodValue = "EXCLUSIVE" | "INCLUSIVE";
+export type TaxCalculationModeValue = "TRANSACTION" | "LINE_ITEM";
 
 export type TaxBreakdownInput = {
   subtotal: number;
@@ -27,6 +28,10 @@ export function roundMoney(value: number) {
 export function normalizeTaxRate(value?: number | null) {
   if (!Number.isFinite(Number(value))) return 0;
   return Math.max(0, roundMoney(Number(value)));
+}
+
+export function normalizeTaxCalculationMode(value?: string | null): TaxCalculationModeValue {
+  return value === "LINE_ITEM" ? "LINE_ITEM" : "TRANSACTION";
 }
 
 export function calculateTaxBreakdown(input: TaxBreakdownInput): TaxBreakdownResult {

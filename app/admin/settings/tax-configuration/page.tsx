@@ -37,6 +37,7 @@ export default async function TaxConfigurationPage() {
         <AdminTaxConfigurationClient
           initialConfig={{
             taxModuleEnabled: config?.taxModuleEnabled ?? false,
+            taxCalculationMode: config?.taxCalculationMode ?? "TRANSACTION",
             defaultPortalTaxCodeId: config?.defaultPortalTaxCodeId ?? "",
             defaultAdminTaxCodeId: config?.defaultAdminTaxCodeId ?? "",
           }}
