@@ -48,6 +48,10 @@ type CustomOrderInitialData = {
     qty: number;
     unitPrice: number;
     uom?: string | null;
+    taxCodeId?: string | null;
+    taxCode?: string | null;
+    taxRate?: number | null;
+    taxAmount?: number | null;
   }>;
 };
 
@@ -190,7 +194,7 @@ export function CustomOrderForm({
         qty: String(item.qty),
         uom: item.uom || "",
         unitPrice: String(Number(item.unitPrice).toFixed(2)),
-        taxCodeId: defaultLineItemTaxCodeId,
+        taxCodeId: item.taxCodeId || defaultLineItemTaxCodeId,
       }));
     }
 
@@ -387,6 +391,10 @@ export function CustomOrderForm({
         uom: row.uom.trim() || null,
         unitPrice: row.unitPrice,
         lineTotal: row.lineTotal,
+        taxCodeId: isLineItemTaxMode ? row.lineTaxCode?.id || null : null,
+        taxCode: isLineItemTaxMode ? row.lineTaxCode?.code || null : null,
+        taxRate: isLineItemTaxMode ? row.lineTaxCode?.rate ?? 0 : 0,
+        taxAmount: isLineItemTaxMode ? row.lineTaxAmount : 0,
       }));
 
     if (items.length === 0) {

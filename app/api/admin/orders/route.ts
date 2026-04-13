@@ -6,7 +6,12 @@ import { createAdminNotification } from "@/lib/notifications";
 import { calculatePaymentSummary } from "@/lib/payment-summary";
 import { saveFile } from "@/lib/storage";
 import { createAuditLogFromRequest } from "@/lib/audit";
-import { calculateTaxBreakdown, getTaxDisplayLabel } from "@/lib/tax";
+import {
+  calculateLineItemTaxBreakdown,
+  calculateTaxBreakdown,
+  getTaxDisplayLabel,
+  normalizeTaxCalculationMode,
+} from "@/lib/tax";
 
 type CustomOrderItemPayload = {
   description: string;
@@ -14,6 +19,10 @@ type CustomOrderItemPayload = {
   unitPrice: number;
   lineTotal: number;
   uom?: string | null;
+  taxCodeId?: string | null;
+  taxCode?: string | null;
+  taxRate?: number | null;
+  taxAmount?: number | null;
 };
 
 function sanitizeWholeNumber(value: unknown) {
@@ -121,13 +130,20 @@ export async function POST(req: Request) {
       );
     }
 
-    const normalizedItems = items
+    const taxConfig = await db.taxConfiguration.findUnique({ where: { id: "default" } });
+    const taxCalculationMode = normalizeTaxCalculationMode(taxConfig?.taxCalculationMode);
+    const isLineItemTaxMode = Boolean(taxConfig?.taxModuleEnabled && taxCalculationMode === "LINE_ITEM");
+
+    const normalizedItemsBase = items
       .map((item) => {
         const description = String(item.description || "").trim();
         const qty = Math.max(1, sanitizeWholeNumber(item.qty));
         const unitPrice = Math.max(0, sanitizeMoneyAmount(item.unitPrice));
         const lineTotal = Math.round((qty * unitPrice + Number.EPSILON) * 100) / 100;
         const uom = String(item.uom || "").trim();
+        const submittedTaxCodeId = String(item.taxCodeId || "").trim();
+        const submittedTaxRate = sanitizeMoneyAmount(item.taxRate);
+        const submittedTaxAmount = Math.max(0, sanitizeMoneyAmount(item.taxAmount));
 
         return {
           description,
@@ -135,55 +151,189 @@ export async function POST(req: Request) {
           unitPrice,
           lineTotal,
           uom: uom || null,
+          submittedTaxCodeId,
+          submittedTaxRate,
+          submittedTaxAmount,
         };
       })
       .filter((item) => item.description.length > 0);
 
-    if (normalizedItems.length === 0) {
+    if (normalizedItemsBase.length === 0) {
       return NextResponse.json(
         { ok: false, error: "Please provide at least one valid line item." },
         { status: 400 }
       );
     }
 
-    const calculatedSubtotal = Math.round((normalizedItems.reduce(
+    const calculatedSubtotal = Math.round((normalizedItemsBase.reduce(
       (sum, item) => sum + item.lineTotal,
       0
     ) + Number.EPSILON) * 100) / 100;
     const customDiscount = Math.max(0, sanitizeMoneyAmount(form.get("customDiscount")));
-    const taxableSubtotal = Math.round((Math.max(calculatedSubtotal - customDiscount, 0) + Number.EPSILON) * 100) / 100;
 
     const customSubtotal = sanitizeMoneyAmount(form.get("customSubtotal"));
     const submittedGrandTotal = sanitizeMoneyAmount(form.get("customGrandTotal"));
     const submittedTaxCodeId = String(form.get("taxCodeId") || "").trim();
 
-    const taxConfig = await db.taxConfiguration.findUnique({ where: { id: "default" } });
-    let selectedTaxCode = null;
-    if (taxConfig?.taxModuleEnabled && submittedTaxCodeId) {
-      selectedTaxCode = await db.taxCode.findFirst({
-        where: {
-          id: submittedTaxCodeId,
-          isActive: true,
-        },
+    let normalizedItems = normalizedItemsBase.map((item) => ({
+      description: item.description,
+      qty: item.qty,
+      unitPrice: item.unitPrice,
+      lineTotal: item.lineTotal,
+      uom: item.uom,
+      taxCodeId: null as string | null,
+      taxCode: null as string | null,
+      taxRate: null as number | null,
+      taxAmount: 0,
+    }));
+
+    let orderTaxCodeId: string | null = null;
+    let orderTaxCode: string | null = null;
+    let orderTaxDescription: string | null = null;
+    let orderTaxDisplayLabel: string | null = null;
+    let orderTaxRate: number | null = null;
+    let orderTaxCalculationMethod: "EXCLUSIVE" | "INCLUSIVE" | null = null;
+    let orderTaxAmount = 0;
+    let orderTaxableSubtotal = 0;
+    let orderGrandTotalAfterTax = Math.max(calculatedSubtotal - customDiscount, 0);
+    let orderIsTaxEnabledSnapshot = false;
+    let taxCodeLabelForRequest = "No tax";
+
+    if (isLineItemTaxMode) {
+      const submittedTaxCodeIds = Array.from(
+        new Set(
+          normalizedItemsBase
+            .map((item) => item.submittedTaxCodeId)
+            .filter(Boolean)
+        )
+      );
+
+      const availableTaxCodes = submittedTaxCodeIds.length
+        ? await db.taxCode.findMany({
+            where: {
+              id: { in: submittedTaxCodeIds },
+              isActive: true,
+            },
+          })
+        : [];
+
+      const taxCodeMap = new Map(availableTaxCodes.map((item) => [item.id, item]));
+
+      normalizedItems = normalizedItemsBase.map((item) => {
+        const selectedTaxCode = item.submittedTaxCodeId
+          ? taxCodeMap.get(item.submittedTaxCodeId) || null
+          : null;
+
+        if (item.submittedTaxCodeId && !selectedTaxCode) {
+          throw new Error("Selected tax code is invalid or inactive.");
+        }
+
+        const lineTaxBreakdown = calculateLineItemTaxBreakdown({
+          lineTotal: item.lineTotal,
+          taxRate: selectedTaxCode ? Number(selectedTaxCode.rate) : null,
+          calculationMethod: selectedTaxCode?.calculationMethod ?? null,
+          taxEnabled: Boolean(taxConfig?.taxModuleEnabled && selectedTaxCode),
+        });
+
+        if (selectedTaxCode) {
+          if (
+            !nearlyEqual(item.submittedTaxRate, Number(selectedTaxCode.rate)) ||
+            !nearlyEqual(item.submittedTaxAmount, lineTaxBreakdown.taxAmount)
+          ) {
+            throw new Error("Order totals are invalid. Please refresh and try again.");
+          }
+        } else if (!nearlyEqual(item.submittedTaxAmount, 0)) {
+          throw new Error("Order totals are invalid. Please refresh and try again.");
+        }
+
+        return {
+          description: item.description,
+          qty: item.qty,
+          unitPrice: item.unitPrice,
+          lineTotal: item.lineTotal,
+          uom: item.uom,
+          taxCodeId: selectedTaxCode?.id ?? null,
+          taxCode: selectedTaxCode?.code ?? null,
+          taxRate: selectedTaxCode ? Number(selectedTaxCode.rate) : null,
+          taxAmount: lineTaxBreakdown.taxAmount,
+        };
       });
 
-      if (!selectedTaxCode) {
-        return NextResponse.json(
-          { ok: false, error: "Selected tax code is invalid or inactive." },
-          { status: 400 }
-        );
+      const taxableRows = normalizedItems.filter((item) => item.taxCodeId && item.taxAmount > 0);
+      const distinctTaxCodes = Array.from(new Set(taxableRows.map((item) => item.taxCode).filter(Boolean)));
+      orderTaxAmount = Math.round((normalizedItems.reduce((sum, item) => sum + item.taxAmount, 0) + Number.EPSILON) * 100) / 100;
+      orderTaxableSubtotal = Math.round((taxableRows.reduce((sum, item) => sum + item.lineTotal, 0) + Number.EPSILON) * 100) / 100;
+      orderGrandTotalAfterTax = Math.round((Math.max(calculatedSubtotal - customDiscount, 0) + orderTaxAmount + Number.EPSILON) * 100) / 100;
+      orderIsTaxEnabledSnapshot = orderTaxAmount > 0;
+
+      if (distinctTaxCodes.length === 1) {
+        const onlyTaxedRow = taxableRows.find((item) => item.taxCode === distinctTaxCodes[0]) || null;
+        orderTaxCodeId = onlyTaxedRow?.taxCodeId ?? null;
+        orderTaxCode = onlyTaxedRow?.taxCode ?? null;
+        orderTaxRate = onlyTaxedRow?.taxRate ?? null;
+        const matchedTaxCode = onlyTaxedRow?.taxCodeId ? taxCodeMap.get(onlyTaxedRow.taxCodeId) || null : null;
+        orderTaxDescription = matchedTaxCode?.description ?? null;
+        orderTaxCalculationMethod = matchedTaxCode?.calculationMethod ?? null;
+        orderTaxDisplayLabel = matchedTaxCode
+          ? getTaxDisplayLabel({
+              code: matchedTaxCode.code,
+              description: matchedTaxCode.description,
+              rate: Number(matchedTaxCode.rate),
+            })
+          : null;
+        taxCodeLabelForRequest = orderTaxCode || "No tax";
+      } else if (distinctTaxCodes.length > 1) {
+        orderTaxCode = "MULTIPLE";
+        orderTaxDescription = "Multiple tax codes";
+        orderTaxDisplayLabel = `Multiple tax codes (${distinctTaxCodes.join(", ")})`;
+        taxCodeLabelForRequest = `Multiple tax codes (${distinctTaxCodes.join(", ")})`;
       }
+    } else {
+      let selectedTaxCode = null;
+      if (taxConfig?.taxModuleEnabled && submittedTaxCodeId) {
+        selectedTaxCode = await db.taxCode.findFirst({
+          where: {
+            id: submittedTaxCodeId,
+            isActive: true,
+          },
+        });
+
+        if (!selectedTaxCode) {
+          return NextResponse.json(
+            { ok: false, error: "Selected tax code is invalid or inactive." },
+            { status: 400 }
+          );
+        }
+      }
+
+      const taxBreakdown = calculateTaxBreakdown({
+        subtotal: calculatedSubtotal,
+        discount: customDiscount,
+        taxRate: selectedTaxCode ? Number(selectedTaxCode.rate) : null,
+        calculationMethod: selectedTaxCode?.calculationMethod ?? null,
+        taxEnabled: Boolean(taxConfig?.taxModuleEnabled && selectedTaxCode),
+      });
+
+      orderTaxCodeId = selectedTaxCode?.id ?? null;
+      orderTaxCode = selectedTaxCode?.code ?? null;
+      orderTaxDescription = selectedTaxCode?.description ?? null;
+      orderTaxDisplayLabel = selectedTaxCode
+        ? getTaxDisplayLabel({
+            code: selectedTaxCode.code,
+            description: selectedTaxCode.description,
+            rate: Number(selectedTaxCode.rate),
+          })
+        : null;
+      orderTaxRate = selectedTaxCode ? Number(selectedTaxCode.rate) : null;
+      orderTaxCalculationMethod = selectedTaxCode?.calculationMethod ?? null;
+      orderTaxAmount = taxBreakdown.taxAmount;
+      orderTaxableSubtotal = taxBreakdown.taxableSubtotal;
+      orderGrandTotalAfterTax = taxBreakdown.grandTotalAfterTax;
+      orderIsTaxEnabledSnapshot = taxBreakdown.isTaxApplied;
+      taxCodeLabelForRequest = selectedTaxCode?.code || "No tax";
     }
 
-    const taxBreakdown = calculateTaxBreakdown({
-      subtotal: calculatedSubtotal,
-      discount: customDiscount,
-      taxRate: selectedTaxCode ? Number(selectedTaxCode.rate) : null,
-      calculationMethod: selectedTaxCode?.calculationMethod ?? null,
-      taxEnabled: Boolean(taxConfig?.taxModuleEnabled && selectedTaxCode),
-    });
-
-    if (!nearlyEqual(customSubtotal, calculatedSubtotal) || !nearlyEqual(submittedGrandTotal, taxBreakdown.grandTotalAfterTax)) {
+    if (!nearlyEqual(customSubtotal, calculatedSubtotal) || !nearlyEqual(submittedGrandTotal, orderGrandTotalAfterTax)) {
       return NextResponse.json(
         { ok: false, error: "Order totals are invalid. Please refresh and try again." },
         { status: 400 }
@@ -227,7 +377,7 @@ export async function POST(req: Request) {
       );
     }
 
-    if (paymentAmount > taxBreakdown.grandTotalAfterTax) {
+    if (paymentAmount > orderGrandTotalAfterTax) {
       return NextResponse.json(
         { ok: false, error: "Payment amount cannot exceed the grand total." },
         { status: 400 }
@@ -258,7 +408,7 @@ export async function POST(req: Request) {
 
     const paymentSummary = calculatePaymentSummary(
       paymentAmount > 0 ? [{ amount: paymentAmount }] : [],
-      taxBreakdown.grandTotalAfterTax
+      orderGrandTotalAfterTax
     );
 
     const supportingFilesToCreate: Array<{
@@ -289,9 +439,9 @@ export async function POST(req: Request) {
       `Internal Remarks: ${internalRemarks || "None"}`,
       `Subtotal: RM${calculatedSubtotal.toFixed(2)}`,
       `Discount: RM${customDiscount.toFixed(2)}`,
-      `Tax Code: ${selectedTaxCode?.code || "No tax"}`,
-      `Tax Amount: RM${taxBreakdown.taxAmount.toFixed(2)}`,
-      `Grand Total: RM${taxBreakdown.grandTotalAfterTax.toFixed(2)}`,
+      `Tax Code: ${taxCodeLabelForRequest}`,
+      `Tax Amount: RM${orderTaxAmount.toFixed(2)}`,
+      `Grand Total: RM${orderGrandTotalAfterTax.toFixed(2)}`,
       `Initial Payment: RM${paymentAmount.toFixed(2)}`,
       `Items: ${normalizedItems.length}`,
     ];
@@ -311,24 +461,18 @@ export async function POST(req: Request) {
         internalRemarks: internalRemarks || null,
         customSubtotal: calculatedSubtotal,
         customDiscount,
-        customGrandTotal: taxBreakdown.grandTotalAfterTax,
-        taxCodeId: selectedTaxCode?.id ?? null,
-        taxCode: selectedTaxCode?.code ?? null,
-        taxDescription: selectedTaxCode?.description ?? null,
-        taxDisplayLabel: selectedTaxCode
-          ? getTaxDisplayLabel({
-              code: selectedTaxCode.code,
-              description: selectedTaxCode.description,
-              rate: Number(selectedTaxCode.rate),
-            })
-          : null,
-        taxRate: selectedTaxCode ? Number(selectedTaxCode.rate) : null,
-        taxCalculationMethod: selectedTaxCode?.calculationMethod ?? null,
-        taxAmount: taxBreakdown.taxAmount,
-        taxableSubtotal: taxBreakdown.taxableSubtotal,
-        grandTotalAfterTax: taxBreakdown.grandTotalAfterTax,
-        isTaxEnabledSnapshot: taxBreakdown.isTaxApplied,
-        totalAmount: taxBreakdown.grandTotalAfterTax,
+        customGrandTotal: orderGrandTotalAfterTax,
+        taxCodeId: orderTaxCodeId,
+        taxCode: orderTaxCode,
+        taxDescription: orderTaxDescription,
+        taxDisplayLabel: orderTaxDisplayLabel,
+        taxRate: orderTaxRate,
+        taxCalculationMethod: orderTaxCalculationMethod,
+        taxAmount: orderTaxAmount,
+        taxableSubtotal: orderTaxableSubtotal,
+        grandTotalAfterTax: orderGrandTotalAfterTax,
+        isTaxEnabledSnapshot: orderIsTaxEnabledSnapshot,
+        totalAmount: orderGrandTotalAfterTax,
         totalPaid: Number(paymentSummary.totalPaid || 0),
         outstandingBalance: Number(paymentSummary.outstandingBalance || 0),
         requestDetails: requestDetailsLines.join("\n"),
@@ -371,7 +515,7 @@ export async function POST(req: Request) {
   } catch (error) {
     console.error("POST /api/admin/orders failed:", error);
     return NextResponse.json(
-      { ok: false, error: "Unable to create custom order right now." },
+      { ok: false, error: error instanceof Error && error.message ? error.message : "Unable to create custom order right now." },
       { status: 500 }
     );
   }

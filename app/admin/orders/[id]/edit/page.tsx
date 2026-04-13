@@ -171,6 +171,10 @@ export default async function AdminEditCustomOrderPage({
                 qty: item.qty,
                 unitPrice: Number(item.unitPrice ?? 0),
                 uom: item.uom,
+                taxCodeId: item.taxCodeId,
+                taxCode: item.taxCode,
+                taxRate: item.taxRate != null ? Number(item.taxRate) : null,
+                taxAmount: Number(item.taxAmount ?? 0),
               })),
             }}
             taxConfig={{
