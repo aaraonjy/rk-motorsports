@@ -125,6 +125,21 @@ function drawText(
   });
 }
 
+function drawRightAlignedText(
+  page: PDFPage,
+  font: PDFFont,
+  bold: PDFFont,
+  text: string,
+  rightX: number,
+  y: number,
+  size = 10,
+  isBold = false
+) {
+  const activeFont = isBold ? bold : font;
+  const textWidth = activeFont.widthOfTextAtSize(text, size);
+  drawText(page, font, bold, text, rightX - textWidth, y, size, isBold);
+}
+
 function wrapText(text: string, maxChars = 62) {
   const normalized = String(text || "").trim();
   if (!normalized) return ["-"];
@@ -440,35 +455,41 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
         y -= 16;
 
         if (taxSummary.isLineItemMode) {
-          const itemQtyX = 318;
-          const itemUomX = 358;
-          const itemUnitX = 402;
-          const itemTotalX = 468;
-          const itemTaxCodeX = 518;
-          const itemTaxAmountX = 548;
+          const qtyRightX = 326;
+          const uomRightX = 366;
+          const unitPriceRightX = 430;
+          const subtotalRightX = 488;
+          const taxAmountRightX = 530;
+          const grandTotalRightX = right - 4;
 
-          drawText(page, font, bold, "Description", descX + 8, y, 8.5, true);
-          drawText(page, font, bold, "Qty", itemQtyX, y, 8.5, true);
-          drawText(page, font, bold, "UOM", itemUomX, y, 8.5, true);
-          drawText(page, font, bold, "Unit Price", itemUnitX, y, 8.5, true);
-          drawText(page, font, bold, "Total", itemTotalX, y, 8.5, true);
-          drawText(page, font, bold, "Tax Code", itemTaxCodeX, y, 8.5, true);
-          drawText(page, font, bold, "Tax Amt", itemTaxAmountX, y, 8.5, true);
+          drawText(page, font, bold, "Description", descX + 8, y, 8, true);
+          drawText(page, font, bold, "Qty", 296, y, 8, true);
+          drawText(page, font, bold, "UOM", 336, y, 8, true);
+          drawText(page, font, bold, "Unit Price", 378, y, 8, true);
+          drawText(page, font, bold, "Subtotal", 438, y, 8, true);
+          drawText(page, font, bold, "Tax Amt", 485, y, 8, true);
+          drawText(page, font, bold, "Grand Total", 502, y, 8, true);
           y -= 12;
 
           for (const item of order.customItems) {
             if (y < 180) break;
-            const itemLines = wrapText(item.description, 34);
-            drawText(page, font, bold, itemLines[0], descX + 8, y, 8.5);
+            const itemLines = wrapText(item.description, 32);
+            const lineSubtotal = Number(item.lineTotal ?? 0);
+            const lineTaxAmount = Number(item.taxAmount ?? 0);
+            const lineGrandTotal = lineSubtotal + lineTaxAmount;
+
+            drawText(page, font, bold, itemLines[0], descX + 8, y, 8);
             if (itemLines[1]) {
-              drawText(page, font, bold, itemLines[1], descX + 8, y - 10, 8.5);
+              drawText(page, font, bold, itemLines[1], descX + 8, y - 10, 8);
             }
-            drawText(page, font, bold, String(item.qty), itemQtyX, y, 8.5);
-            drawText(page, font, bold, item.uom || "-", itemUomX, y, 8.5);
-            drawText(page, font, bold, formatMoney(item.unitPrice), itemUnitX, y, 8.5);
-            drawText(page, font, bold, formatMoney(item.lineTotal), itemTotalX, y, 8.5);
-            drawText(page, font, bold, item.taxCode || "No Tax", itemTaxCodeX, y, 8.5);
-            drawText(page, font, bold, formatMoney(item.taxAmount), itemTaxAmountX, y, 8.5);
+
+            drawRightAlignedText(page, font, bold, String(item.qty), qtyRightX, y, 8);
+            drawRightAlignedText(page, font, bold, item.uom || "-", uomRightX, y, 8);
+            drawRightAlignedText(page, font, bold, formatMoney(item.unitPrice), unitPriceRightX, y, 8);
+            drawRightAlignedText(page, font, bold, formatMoney(lineSubtotal), subtotalRightX, y, 8);
+            drawRightAlignedText(page, font, bold, formatMoney(lineTaxAmount), taxAmountRightX, y, 8);
+            drawRightAlignedText(page, font, bold, formatMoney(lineGrandTotal), grandTotalRightX, y, 8);
+
             y -= itemLines.length > 1 ? rowHeight + 10 : rowHeight;
           }
         } else {
