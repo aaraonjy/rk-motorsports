@@ -44,7 +44,7 @@ export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) 
   });
   const [isCreatingCode, setIsCreatingCode] = useState(false);
   const [pendingModuleToggle, setPendingModuleToggle] = useState<boolean | null>(null);
-  const [isCreateRowOpen, setIsCreateRowOpen] = useState(false);
+  const [isCreateFormOpen, setIsCreateFormOpen] = useState(false);
 
   const selectStyle = {
     backgroundImage:
@@ -53,6 +53,7 @@ export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) 
   } as const;
 
   const activeTaxCodes = useMemo(() => taxCodeRows.filter((item) => item.isActive), [taxCodeRows]);
+  const visibleTaxCodeRows = useMemo(() => taxCodeRows.filter((item) => item.isActive), [taxCodeRows]);
 
   const hasConfigChanges =
     config.defaultPortalTaxCodeId !== initialConfig.defaultPortalTaxCodeId ||
@@ -127,8 +128,8 @@ export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) 
         },
       ]);
       setNewTaxCode({ code: "", description: "", rate: "0", calculationMethod: "EXCLUSIVE", isActive: true });
+      setIsCreateFormOpen(false);
       setTaxCodeMessage({ type: "success", text: "Tax code created successfully." });
-      setIsCreateRowOpen(false);
     } catch (error) {
       setTaxCodeMessage({ type: "error", text: error instanceof Error ? error.message : "Unable to create tax code." });
     } finally {
@@ -180,19 +181,17 @@ export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) 
             </div>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-3 lg:items-stretch">
+          <div className="grid gap-4 lg:grid-cols-3">
             <div className="rounded-3xl border border-white/10 bg-black/25 p-4">
               <div className="text-lg font-semibold">Enable Tax Module</div>
               <p className="mt-2 text-sm text-white/65">Toggle tax usage for configured order flows. Historical taxed orders remain unchanged.</p>
-              <div className="mt-5 flex min-h-[56px] items-end">
-                <button
-                  type="button"
-                  onClick={handleModuleToggle}
-                  className={`inline-flex min-h-[48px] w-full items-center justify-center rounded-2xl border px-4 py-3 text-sm font-semibold transition ${config.taxModuleEnabled ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-200 hover:bg-emerald-500/20" : "border-white/12 bg-white/[0.04] text-white/85 hover:bg-white/[0.08]"}`}
-                >
-                  {config.taxModuleEnabled ? "ON" : "OFF"}
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={handleModuleToggle}
+                className={`mt-5 inline-flex min-h-[50px] w-full items-center justify-center rounded-2xl border px-4 py-3 text-sm font-semibold transition ${config.taxModuleEnabled ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-200 hover:bg-emerald-500/20" : "border-white/12 bg-white/[0.04] text-white/85 hover:bg-white/[0.08]"}`}
+              >
+                {config.taxModuleEnabled ? "ON" : "OFF"}
+              </button>
             </div>
 
             <div className="rounded-3xl border border-white/10 bg-black/25 p-4">
@@ -201,7 +200,7 @@ export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) 
               <select
                 value={config.defaultPortalTaxCodeId}
                 onChange={(event) => setConfig((prev) => ({ ...prev, defaultPortalTaxCodeId: event.target.value }))}
-                className={`${selectClassName} mt-5`}
+                className={`${selectClassName} mt-8`}
                 style={selectStyle}
               >
                 <option value="">No default tax code</option>
@@ -219,7 +218,7 @@ export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) 
               <select
                 value={config.defaultAdminTaxCodeId}
                 onChange={(event) => setConfig((prev) => ({ ...prev, defaultAdminTaxCodeId: event.target.value }))}
-                className={`${selectClassName} mt-5`}
+                className={`${selectClassName} mt-8`}
                 style={selectStyle}
               >
                 <option value="">No default tax code</option>
@@ -257,21 +256,21 @@ export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) 
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 className="text-2xl font-semibold">Tax Code Master</h2>
+            <p className="mt-2 max-w-3xl text-white/70">Create active/inactive tax codes and define their calculation method. Historical transaction snapshots will rely on these values in later batches.</p>
           </div>
-          <div className="text-sm text-white/65">{activeTaxCodes.length} tax code(s)</div>
+          <div className="flex items-center gap-3">
+            <div className="text-sm text-white/65">{visibleTaxCodeRows.length} tax code(s)</div>
+            <button
+              type="button"
+              onClick={() => setIsCreateFormOpen((prev) => !prev)}
+              className="inline-flex min-h-[44px] items-center justify-center rounded-2xl border border-white/12 bg-black/30 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10"
+            >
+              {isCreateFormOpen ? "Cancel" : "Create Tax Code"}
+            </button>
+          </div>
         </div>
 
-        <div className="mt-6 flex justify-end">
-          <button
-            type="button"
-            onClick={() => setIsCreateRowOpen((prev) => !prev)}
-            className="inline-flex min-h-[48px] items-center justify-center rounded-2xl border border-white/12 bg-black/30 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
-          >
-            {isCreateRowOpen ? "Close Create Tax Code" : "Create Tax Code"}
-          </button>
-        </div>
-
-        {isCreateRowOpen ? (
+        {isCreateFormOpen ? (
           <div className="mt-6 grid gap-3 md:grid-cols-[1.1fr_1.6fr_0.8fr_1fr_1fr_auto]">
             <input className={inputClassName} placeholder="Tax Code" value={newTaxCode.code} onChange={(e) => setNewTaxCode((prev) => ({ ...prev, code: e.target.value }))} />
             <input className={inputClassName} placeholder="Description" value={newTaxCode.description} onChange={(e) => setNewTaxCode((prev) => ({ ...prev, description: e.target.value }))} />
@@ -285,7 +284,7 @@ export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) 
               Active tax code
             </label>
             <button type="button" onClick={createTaxCode} disabled={isCreatingCode} className="inline-flex min-h-[50px] items-center justify-center rounded-2xl border border-white/12 bg-black/30 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-70">
-              {isCreatingCode ? "Creating..." : "Save New Tax Code"}
+              {isCreatingCode ? "Creating..." : "Save"}
             </button>
           </div>
         ) : null}
@@ -297,10 +296,10 @@ export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) 
         ) : null}
 
         <div className="mt-6 space-y-4">
-          {activeTaxCodes.length === 0 ? (
+          {visibleTaxCodeRows.length === 0 ? (
             <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-5 text-sm text-white/65">No active tax codes have been created yet.</div>
           ) : (
-            activeTaxCodes.map((row) => (
+            visibleTaxCodeRows.map((row) => (
               <div key={row.id} className="rounded-3xl border border-white/10 bg-black/20 p-4">
                 <div className="grid gap-3 md:grid-cols-[1.1fr_1.6fr_0.8fr_1fr_1fr_auto] md:items-center">
                   <input className={inputClassName} value={row.code} onChange={(e) => updateRow(row.id, { code: e.target.value.toUpperCase() })} />
