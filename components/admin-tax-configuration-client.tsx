@@ -43,6 +43,13 @@ export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) 
     isActive: true,
   });
   const [isCreatingCode, setIsCreatingCode] = useState(false);
+  const [pendingModuleToggle, setPendingModuleToggle] = useState<boolean | null>(null);
+
+  const selectStyle = {
+    backgroundImage:
+      'url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%228%22 viewBox=%220 0 12 8%22 fill=%22none%22%3E%3Cpath d=%22M1 1.5L6 6.5L11 1.5%22 stroke=%22%23ffffff%22 stroke-width=%221.5%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22 stroke-opacity=%220.82%22/%3E%3C/svg%3E")',
+    backgroundSize: "12px 8px",
+  } as const;
 
   const activeTaxCodes = useMemo(() => taxCodeRows.filter((item) => item.isActive), [taxCodeRows]);
 
@@ -68,17 +75,20 @@ export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) 
     }
   }
 
-  async function handleModuleToggle() {
-    const nextValue = !config.taxModuleEnabled;
-    const confirmed = window.confirm(
-      nextValue
-        ? "Turn ON the Tax Module? This will enable tax usage for configured order flows."
-        : "Turn OFF the Tax Module? Existing historical taxed orders will remain unchanged."
-    );
-    if (!confirmed) return;
-    const nextConfig = { ...config, taxModuleEnabled: nextValue };
+  function handleModuleToggle() {
+    setPendingModuleToggle(!config.taxModuleEnabled);
+  }
+
+  async function confirmModuleToggle() {
+    if (pendingModuleToggle === null) return;
+    const nextConfig = { ...config, taxModuleEnabled: pendingModuleToggle };
+    setPendingModuleToggle(null);
     setConfig(nextConfig);
     await saveConfiguration(nextConfig);
+  }
+
+  function closeModuleToggleModal() {
+    setPendingModuleToggle(null);
   }
 
   async function createTaxCode() {
@@ -187,6 +197,7 @@ export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) 
                 value={config.defaultPortalTaxCodeId}
                 onChange={(event) => setConfig((prev) => ({ ...prev, defaultPortalTaxCodeId: event.target.value }))}
                 className={`${selectClassName} mt-5`}
+                style={selectStyle}
               >
                 <option value="">No default tax code</option>
                 {activeTaxCodes.map((taxCode) => (
@@ -204,6 +215,7 @@ export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) 
                 value={config.defaultAdminTaxCodeId}
                 onChange={(event) => setConfig((prev) => ({ ...prev, defaultAdminTaxCodeId: event.target.value }))}
                 className={`${selectClassName} mt-5`}
+                style={selectStyle}
               >
                 <option value="">No default tax code</option>
                 {activeTaxCodes.map((taxCode) => (
@@ -247,7 +259,7 @@ export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) 
           <input className={inputClassName} placeholder="Tax Code" value={newTaxCode.code} onChange={(e) => setNewTaxCode((prev) => ({ ...prev, code: e.target.value }))} />
           <input className={inputClassName} placeholder="Description" value={newTaxCode.description} onChange={(e) => setNewTaxCode((prev) => ({ ...prev, description: e.target.value }))} />
           <input className={inputClassName} placeholder="0" type="number" min="0" max="100" step="0.01" value={newTaxCode.rate} onChange={(e) => setNewTaxCode((prev) => ({ ...prev, rate: e.target.value }))} />
-          <select className={selectClassName} value={newTaxCode.calculationMethod} onChange={(e) => setNewTaxCode((prev) => ({ ...prev, calculationMethod: e.target.value as "EXCLUSIVE" | "INCLUSIVE" }))}>
+          <select className={selectClassName} style={selectStyle} value={newTaxCode.calculationMethod} onChange={(e) => setNewTaxCode((prev) => ({ ...prev, calculationMethod: e.target.value as "EXCLUSIVE" | "INCLUSIVE" }))}>
             <option value="EXCLUSIVE">Exclusive</option>
             <option value="INCLUSIVE">Inclusive</option>
           </select>
@@ -276,7 +288,7 @@ export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) 
                   <input className={inputClassName} value={row.code} onChange={(e) => updateRow(row.id, { code: e.target.value.toUpperCase() })} />
                   <input className={inputClassName} value={row.description} onChange={(e) => updateRow(row.id, { description: e.target.value })} />
                   <input className={inputClassName} type="number" min="0" max="100" step="0.01" value={row.rate} onChange={(e) => updateRow(row.id, { rate: Number(e.target.value || 0) })} />
-                  <select className={selectClassName} value={row.calculationMethod} onChange={(e) => updateRow(row.id, { calculationMethod: e.target.value as "EXCLUSIVE" | "INCLUSIVE" })}>
+                  <select className={selectClassName} style={selectStyle} value={row.calculationMethod} onChange={(e) => updateRow(row.id, { calculationMethod: e.target.value as "EXCLUSIVE" | "INCLUSIVE" })}>
                     <option value="EXCLUSIVE">Exclusive</option>
                     <option value="INCLUSIVE">Inclusive</option>
                   </select>
@@ -298,6 +310,47 @@ export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) 
           )}
         </div>
       </div>
+
+      {pendingModuleToggle !== null ? (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/70 px-4">
+          <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-zinc-950 p-6 shadow-2xl">
+            <div>
+              <h3 className="text-lg font-semibold text-white">
+                {pendingModuleToggle ? "Enable Tax Module" : "Disable Tax Module"}
+              </h3>
+              <p className="mt-2 text-sm leading-6 text-white/60">
+                {pendingModuleToggle
+                  ? "Turn ON the Tax Module? This will enable tax usage for configured order flows."
+                  : "Turn OFF the Tax Module? Existing historical taxed orders will remain unchanged."}
+              </p>
+            </div>
+
+            <div className="mt-6 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={closeModuleToggleModal}
+                disabled={isSavingConfig}
+                className="rounded-xl border border-white/15 px-4 py-2.5 text-sm text-white/75 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={confirmModuleToggle}
+                disabled={isSavingConfig}
+                className={`rounded-xl border px-4 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                  pendingModuleToggle
+                    ? "border-emerald-500/40 text-emerald-200 hover:bg-emerald-500/10"
+                    : "border-red-500/40 text-red-300 hover:bg-red-500/10"
+                }`}
+              >
+                {isSavingConfig ? "Saving..." : pendingModuleToggle ? "Confirm Enable" : "Confirm Disable"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
