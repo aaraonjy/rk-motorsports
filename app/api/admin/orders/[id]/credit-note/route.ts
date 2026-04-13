@@ -82,9 +82,10 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       return respondCreditNote(req, { ok: false, redirectTo: "/admin" }, 400);
     }
 
-    const amount = Number(order.orderType === "CUSTOM_ORDER"
-      ? order.customGrandTotal || order.totalAmount || 0
-      : order.totalAmount || 0);
+    const amount = Number(
+      order.grandTotalAfterTax ??
+        (order.orderType === "CUSTOM_ORDER" ? order.customGrandTotal ?? order.totalAmount ?? 0 : order.totalAmount ?? 0)
+    );
 
     if (amount <= 0) {
       return respondCreditNote(req, { ok: false, redirectTo: "/admin" }, 400);

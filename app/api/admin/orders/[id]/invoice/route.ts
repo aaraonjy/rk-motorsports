@@ -57,6 +57,30 @@ function formatPaymentModeLabel(paymentMode?: string | null) {
   }
 }
 
+function getTaxSummary(order: {
+  taxableSubtotal?: unknown;
+  customSubtotal?: unknown;
+  customDiscount?: unknown;
+  totalAmount?: unknown;
+  taxAmount?: unknown;
+  taxCode?: string | null;
+  taxCalculationMethod?: string | null;
+  grandTotalAfterTax?: unknown;
+  customGrandTotal?: unknown;
+  isTaxEnabledSnapshot?: boolean | null;
+}) {
+  const taxAmount = Number(order.taxAmount ?? 0);
+  const hasTax = Boolean(order.isTaxEnabledSnapshot && taxAmount > 0);
+  const subtotal = Number(order.taxableSubtotal ?? order.customSubtotal ?? order.totalAmount ?? 0);
+  const discount = Number(order.customDiscount ?? 0);
+  const grandTotal = Number(order.grandTotalAfterTax ?? order.customGrandTotal ?? order.totalAmount ?? 0);
+  const method = String(order.taxCalculationMethod || "").toUpperCase();
+  const taxLabel = hasTax
+    ? `${method === "INCLUSIVE" ? "Tax Included" : "Tax"}${order.taxCode ? ` (${order.taxCode})` : ""}:`
+    : "Tax:";
+  return { subtotal, discount, taxAmount, hasTax, grandTotal, method, taxLabel };
+}
+
 function groupPaymentsByMode(payments: Array<{ paymentMode: string; amount: unknown }>) {
   const grouped = new Map<string, number>();
 
@@ -434,26 +458,25 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
         color: rgb(0.85, 0.85, 0.85),
       });
 
+      const taxSummary = getTaxSummary(order);
+
       y -= 22;
       drawText(page, font, bold, "Subtotal:", rightColumnX - 110, y, 10, true);
-      drawText(page, font, bold, formatMoney(order.customSubtotal ?? order.totalAmount), rightColumnX, y, 10);
+      drawText(page, font, bold, formatMoney(taxSummary.subtotal), rightColumnX, y, 10);
 
       y -= 18;
       drawText(page, font, bold, "Discount:", rightColumnX - 110, y, 10, true);
-      drawText(page, font, bold, formatMoney(order.customDiscount ?? 0), rightColumnX, y, 10);
+      drawText(page, font, bold, formatMoney(taxSummary.discount), rightColumnX, y, 10);
 
-      const taxAmount = Number(order.taxAmount ?? 0);
-      const taxHasAmount = Boolean(order.isTaxEnabledSnapshot && taxAmount > 0);
-
-      if (taxHasAmount) {
+      if (taxSummary.hasTax) {
         y -= 18;
-        drawText(page, font, bold, `Tax${order.taxCode ? ` (${order.taxCode})` : ""}:`, rightColumnX - 110, y, 10, true);
-        drawText(page, font, bold, formatMoney(taxAmount), rightColumnX, y, 10);
+        drawText(page, font, bold, taxSummary.taxLabel, rightColumnX - 110, y, 10, true);
+        drawText(page, font, bold, formatMoney(taxSummary.taxAmount), rightColumnX, y, 10);
       }
 
       y -= 24;
       drawText(page, font, bold, "Grand Total:", rightColumnX - 110, y, 12, true);
-      drawText(page, font, bold, formatMoney(order.grandTotalAfterTax ?? order.customGrandTotal ?? order.totalAmount), rightColumnX, y, 12, true);
+      drawText(page, font, bold, formatMoney(taxSummary.grandTotal), rightColumnX, y, 12, true);
 
       y -= 28;
       y = drawPaymentSummary({
@@ -478,13 +501,14 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
 
       let y = headerY - 26;
       const lines = buildStandardLines(order);
+      const taxSummary = getTaxSummary(order);
 
       for (const line of lines) {
         drawText(page, font, bold, line, left + 10, y, 9);
         y -= 12;
       }
 
-      drawText(page, font, bold, formatMoney(order.totalAmount), rightColumnX, headerY - 18, 10);
+      drawText(page, font, bold, formatMoney(taxSummary.subtotal), rightColumnX, headerY - 18, 10);
 
       y -= 14;
       page.drawLine({
@@ -494,9 +518,19 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
         color: rgb(0.85, 0.85, 0.85),
       });
 
-      y -= 28;
+      y -= 22;
+      drawText(page, font, bold, "Subtotal:", rightColumnX - 110, y, 10, true);
+      drawText(page, font, bold, formatMoney(taxSummary.subtotal), rightColumnX, y, 10);
+
+      if (taxSummary.hasTax) {
+        y -= 18;
+        drawText(page, font, bold, taxSummary.taxLabel, rightColumnX - 110, y, 10, true);
+        drawText(page, font, bold, formatMoney(taxSummary.taxAmount), rightColumnX, y, 10);
+      }
+
+      y -= 24;
       drawText(page, font, bold, "Grand Total:", rightColumnX - 110, y, 12, true);
-      drawText(page, font, bold, formatMoney(order.totalAmount), rightColumnX, y, 12, true);
+      drawText(page, font, bold, formatMoney(taxSummary.grandTotal), rightColumnX, y, 12, true);
 
       y -= 28;
       drawText(page, font, bold, "Thank you for your business.", left, y, 10);

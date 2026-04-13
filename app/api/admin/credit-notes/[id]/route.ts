@@ -216,9 +216,25 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
       y -= lines[1] ? 32 : 22;
     }
 
-    const creditSubtotal = Number(creditNote.order.taxableSubtotal ?? creditNote.order.customSubtotal ?? creditNote.order.totalAmount ?? 0);
+    const creditSubtotal = Number(
+      creditNote.order.taxableSubtotal ??
+        creditNote.order.customSubtotal ??
+        creditNote.order.totalAmount ??
+        0
+    );
     const creditTaxAmount = Number(creditNote.order.taxAmount ?? 0);
     const creditHasTax = Boolean(creditNote.order.isTaxEnabledSnapshot && creditTaxAmount > 0);
+    const creditGrandTotal = Number(
+      creditNote.order.grandTotalAfterTax ??
+        creditNote.order.customGrandTotal ??
+        creditNote.order.totalAmount ??
+        creditNote.amount ??
+        0
+    );
+    const taxMethod = String(creditNote.order.taxCalculationMethod || "").toUpperCase();
+    const taxLabel = `${taxMethod === "INCLUSIVE" ? "Tax Included Reversal" : "Tax Reversal"}${
+      creditNote.order.taxCode ? ` (${creditNote.order.taxCode})` : ""
+    }:`;
 
     y -= 8;
     page.drawLine({ start: { x: left, y }, end: { x: right, y }, thickness: 1, color: rgb(0.85, 0.85, 0.85) });
@@ -230,13 +246,13 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
 
     if (creditHasTax) {
       y -= 18;
-      drawText(page, font, bold, `Tax Reversal${creditNote.order.taxCode ? ` (${creditNote.order.taxCode})` : ""}:`, totalLabelX - 40, y, 10, true);
+      drawText(page, font, bold, taxLabel, totalLabelX - 40, y, 10, true);
       drawText(page, font, bold, `- ${formatMoney(creditTaxAmount)}`, totalValueX, y, 10);
     }
 
     y -= 24;
     drawText(page, font, bold, "CN Grand Total:", totalLabelX - 40, y, 12, true);
-    drawText(page, font, bold, `- ${formatMoney(creditNote.amount)}`, totalValueX, y, 12, true);
+    drawText(page, font, bold, `- ${formatMoney(creditGrandTotal)}`, totalValueX, y, 12, true);
 
     const pdfBytes = await pdfDoc.save();
 
