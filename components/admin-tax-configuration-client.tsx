@@ -33,6 +33,7 @@ const inputClassName =
 
 export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) {
   const [config, setConfig] = useState(initialConfig);
+  const [savedConfig, setSavedConfig] = useState(initialConfig);
   const [taxCodeRows, setTaxCodeRows] = useState<EditableTaxCode[]>(taxCodes);
   const [configMessage, setConfigMessage] = useState<MessageState>(null);
   const [taxCodeMessage, setTaxCodeMessage] = useState<MessageState>(null);
@@ -58,10 +59,10 @@ export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) 
   const visibleTaxCodeRows = useMemo(() => taxCodeRows.filter((item) => item.isActive), [taxCodeRows]);
 
   const hasConfigChanges =
-    config.taxModuleEnabled !== initialConfig.taxModuleEnabled ||
-    config.taxCalculationMode !== initialConfig.taxCalculationMode ||
-    config.defaultPortalTaxCodeId !== initialConfig.defaultPortalTaxCodeId ||
-    config.defaultAdminTaxCodeId !== initialConfig.defaultAdminTaxCodeId;
+    config.taxModuleEnabled !== savedConfig.taxModuleEnabled ||
+    config.taxCalculationMode !== savedConfig.taxCalculationMode ||
+    config.defaultPortalTaxCodeId !== savedConfig.defaultPortalTaxCodeId ||
+    config.defaultAdminTaxCodeId !== savedConfig.defaultAdminTaxCodeId;
 
   async function saveConfiguration(nextConfig = config) {
     setIsSavingConfig(true);
@@ -77,6 +78,7 @@ export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) 
         throw new Error(payload.error || "Unable to save tax configuration.");
       }
       setConfig(nextConfig);
+      setSavedConfig(nextConfig);
       setConfigMessage({ type: "success", text: "Tax configuration saved successfully." });
     } catch (error) {
       setConfigMessage({ type: "error", text: error instanceof Error ? error.message : "Unable to save tax configuration." });
