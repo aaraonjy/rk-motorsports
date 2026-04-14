@@ -7,7 +7,7 @@ import { db } from "@/lib/db";
 type TaxCsvRow = {
   date: Date;
   docNo: string;
-  transactionType: "INV" | "CN";
+  transactionType: "CS" | "INV" | "CN";
   referenceInvoiceNo: string;
   customerName: string;
   itemDescription: string;
@@ -76,7 +76,7 @@ function getOrderLineItemTaxRows(order: any): TaxCsvRow[] {
       rows.push({
         date: orderDate,
         docNo: order.orderNumber,
-        transactionType: "INV",
+        transactionType: getInvoiceTransactionType(order),
         referenceInvoiceNo: "-",
         customerName: order.user?.name || "-",
         itemDescription: item.description || "-",
@@ -98,7 +98,7 @@ function getOrderLineItemTaxRows(order: any): TaxCsvRow[] {
     rows.push({
       date: orderDate,
       docNo: order.orderNumber,
-      transactionType: "INV",
+      transactionType: getInvoiceTransactionType(order),
       referenceInvoiceNo: "-",
       customerName: order.user?.name || "-",
       itemDescription: order.customTitle || order.selectedTuneLabel || "Order Tax",

@@ -17,7 +17,7 @@ type TaxReportRow = {
   id: string;
   date: Date;
   docNo: string;
-  transactionType: "INV" | "CN";
+  transactionType: "CS" | "INV" | "CN";
   referenceInvoiceNo: string;
   customerName: string;
   itemDescription: string;
@@ -77,6 +77,10 @@ function buildQueryString(params: Record<string, string | undefined>) {
   return searchParams.toString();
 }
 
+function getInvoiceTransactionType(order: any): "CS" | "INV" {
+  return String(order.docType || "").toUpperCase() === "CS" ? "CS" : "INV";
+}
+
 function getOrderLineItemTaxRows(order: any): TaxReportRow[] {
   const orderDate = new Date(order.documentDate ?? order.createdAt);
   const rows: TaxReportRow[] = [];
@@ -95,7 +99,7 @@ function getOrderLineItemTaxRows(order: any): TaxReportRow[] {
         id: `order-item-${item.id}`,
         date: orderDate,
         docNo: order.orderNumber,
-        transactionType: "INV",
+        transactionType: getInvoiceTransactionType(order),
         referenceInvoiceNo: "-",
         customerName: order.user?.name || "-",
         itemDescription: item.description || "-",
@@ -118,7 +122,7 @@ function getOrderLineItemTaxRows(order: any): TaxReportRow[] {
       id: `order-${order.id}`,
       date: orderDate,
       docNo: order.orderNumber,
-      transactionType: "INV",
+      transactionType: getInvoiceTransactionType(order),
       referenceInvoiceNo: "-",
       customerName: order.user?.name || "-",
       itemDescription: order.customTitle || order.selectedTuneLabel || "Order Tax",
@@ -345,6 +349,7 @@ export default async function TaxReportPage({ searchParams }: TaxReportPageProps
                 >
                   <option value="ALL">All Types</option>
                   <option value="INV">Invoice</option>
+                  <option value="CS">Cash Sale</option>
                   <option value="CN">Credit Note</option>
                 </select>
                 <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/60">▾</div>

@@ -47,52 +47,12 @@ function formatPaymentModeLabel(paymentMode?: string | null) {
     case "BANK_TRANSFER":
       return "Bank Transfer";
     case "CARD_PAYMENT":
-    case "CARD":
       return "Card Payment";
     case "QR_PAYMENT":
-    case "QR":
       return "QR Payment";
     default:
       return paymentMode ? String(paymentMode).trim() : "Other";
   }
-}
-
-function getTaxSummary(order: {
-  orderType?: string | null;
-  taxableSubtotal?: unknown;
-  customSubtotal?: unknown;
-  customDiscount?: unknown;
-  totalAmount?: unknown;
-  taxAmount?: unknown;
-  taxCode?: string | null;
-  taxCalculationMethod?: string | null;
-  grandTotalAfterTax?: unknown;
-  customGrandTotal?: unknown;
-  isTaxEnabledSnapshot?: boolean | null;
-  customItems?: Array<{
-    taxCodeId?: string | null;
-    taxCode?: string | null;
-    taxAmount?: unknown;
-  }>;
-}) {
-  const taxAmount = Number(order.taxAmount ?? 0);
-  const hasTax = Boolean(order.isTaxEnabledSnapshot && taxAmount > 0);
-  const subtotal = Number(order.orderType === "CUSTOM_ORDER" ? (order.customSubtotal ?? order.taxableSubtotal ?? order.totalAmount ?? 0) : (order.totalAmount ?? 0));
-  const discount = Number(order.customDiscount ?? 0);
-  const grandTotal = Number(order.grandTotalAfterTax ?? order.customGrandTotal ?? order.totalAmount ?? 0);
-  const method = String(order.taxCalculationMethod || "").toUpperCase();
-  const isLineItemMode = Boolean(
-    order.orderType === "CUSTOM_ORDER" &&
-      (order.customItems || []).some(
-        (item) => Boolean(item.taxCodeId || item.taxCode) || Number(item.taxAmount ?? 0) > 0
-      )
-  );
-  const taxLabel = hasTax
-    ? isLineItemMode
-      ? `${method === "INCLUSIVE" ? "Tax Included Total" : "Tax Total"}:`
-      : `${method === "INCLUSIVE" ? "Tax Included" : "Tax"}${order.taxCode ? ` (${order.taxCode})` : ""}:`
-    : "Tax:";
-  return { subtotal, discount, taxAmount, hasTax, grandTotal, method, taxLabel, isLineItemMode };
 }
 
 function groupPaymentsByMode(payments: Array<{ paymentMode: string; amount: unknown }>) {
@@ -123,21 +83,6 @@ function drawText(
     font: isBold ? bold : font,
     color: rgb(0, 0, 0),
   });
-}
-
-function drawTextRight(
-  page: PDFPage,
-  font: PDFFont,
-  bold: PDFFont,
-  text: string,
-  rightX: number,
-  y: number,
-  size = 10,
-  isBold = false
-) {
-  const activeFont = isBold ? bold : font;
-  const width = activeFont.widthOfTextAtSize(text, size);
-  drawText(page, font, bold, text, rightX - width, y, size, isBold);
 }
 
 function wrapText(text: string, maxChars = 62) {
@@ -199,10 +144,14 @@ function drawInvoiceHeader(params: {
         height: h,
       });
     })
-    .catch(() => {})
+    .catch(() => {
+      // keep invoice generation working even if logo is missing
+    })
     .then(() => {
       const titleY = height - 84;
-      drawText(page, font, bold, docType === "CS" ? "CASH SALE" : "INVOICE", rightColumnX, titleY, 18, true);
+      const documentTitle = docType === "CS" ? "CASH SALE" : "INVOICE";
+      const documentNumberLabel = docType === "CS" ? "Cash Sale No" : "Invoice No";
+      drawText(page, font, bold, documentTitle, rightColumnX, titleY, 18, true);
 
       let y = logoBottomY - 26;
       drawText(page, font, bold, "34, Jalan Tembaga SD 5/2b,", left, y);
@@ -223,7 +172,7 @@ function drawInvoiceHeader(params: {
       });
 
       y -= 20;
-      drawText(page, font, bold, `${docType === "CS" ? "Cash Sale" : "Invoice"} No: ${orderNumber}`, left, y, 10, true);
+      drawText(page, font, bold, `${documentNumberLabel}: ${orderNumber}`, left, y, 10, true);
       drawText(page, font, bold, `Date: ${formatDate(invoiceDate)}`, rightColumnX, y, 10, true);
 
       y -= 28;
@@ -239,7 +188,31 @@ function drawInvoiceHeader(params: {
     });
 }
 
-function buildStandardLines(order: any) {
+function buildStandardLines(order: {
+  tuningType?: string | null;
+  vehicleBrand?: string | null;
+  vehicleModel?: string | null;
+  engineModel?: string | null;
+  vehicleYear?: string | null;
+  engineCapacity?: string | null;
+  ecuStage?: string | null;
+  currentEcuSetupStage?: string | null;
+  turboType?: string | null;
+  turboSpec?: string | null;
+  hardwareMods?: string | null;
+  fuelSystemMods?: string | null;
+  engineMods?: string | null;
+  engineModsOther?: string | null;
+  additionalDetails?: string | null;
+  ecuType?: string | null;
+  ecuReadTool?: string | null;
+  fuelGrade?: string | null;
+  waterMethanolInjection?: string | null;
+  tcuStage?: string | null;
+  tcuType?: string | null;
+  tcuReadTool?: string | null;
+  tcuVersion?: string | null;
+}) {
   const lines: string[] = [];
 
   if (isPresent(order.tuningType)) {
@@ -397,8 +370,6 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     const left = 50;
     const right = width - 50;
 
-    const invoiceDate = (order.documentDate as Date | null) || order.createdAt;
-
     const { y: headerStartY, rightColumnX } = await drawInvoiceHeader({
       pdfDoc,
       page,
@@ -408,7 +379,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
       right,
       height,
       orderNumber: order.orderNumber,
-      invoiceDate,
+      invoiceDate: order.createdAt,
       customerName: order.user?.name,
       customerPhone: order.user?.phone,
       customerEmail: order.user?.email,
@@ -416,7 +387,6 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     });
 
     const isCustomOrder = order.orderType === "CUSTOM_ORDER";
-    const taxSummary = getTaxSummary(order);
     const headerY = headerStartY - 62;
 
     page.drawRectangle({
@@ -431,6 +401,10 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
 
     if (isCustomOrder) {
       const descX = left + 10;
+      const itemQtyX = right - 245;
+      const itemUomX = right - 200;
+      const itemUnitX = right - 145;
+      const itemTotalX = right - 80;
 
       drawText(page, font, bold, "Description", descX, headerY + 9, 10, true);
 
@@ -454,72 +428,25 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
         drawText(page, font, bold, "Item Breakdown", descX, y, 10, true);
         y -= 16;
 
-        if (taxSummary.isLineItemMode) {
-          const lineHeaderSize = 8;
-          const lineValueSize = 8.5;
-          const qtyRightX = 280;
-          const uomRightX = 320;
-          const unitRightX = 385;
-          const subtotalRightX = 445;
-          const taxRightX = 490;
-          const grandRightX = 545;
+        drawText(page, font, bold, "Description", descX + 8, y, 9, true);
+        drawText(page, font, bold, "Qty", itemQtyX, y, 9, true);
+        drawText(page, font, bold, "UOM", itemUomX, y, 9, true);
+        drawText(page, font, bold, "Unit Price", itemUnitX, y, 9, true);
+        drawText(page, font, bold, "Total", itemTotalX, y, 9, true);
+        y -= 12;
 
-          drawText(page, font, bold, "Description", descX + 8, y, lineHeaderSize, true);
-          drawTextRight(page, font, bold, "Qty", qtyRightX, y, lineHeaderSize, true);
-          drawTextRight(page, font, bold, "UOM", uomRightX, y, lineHeaderSize, true);
-          drawTextRight(page, font, bold, "Unit Price", unitRightX, y, lineHeaderSize, true);
-          drawTextRight(page, font, bold, "Subtotal", subtotalRightX, y, lineHeaderSize, true);
-          drawTextRight(page, font, bold, "Tax Amt", taxRightX, y, lineHeaderSize, true);
-          drawTextRight(page, font, bold, "Grand Total", grandRightX, y, lineHeaderSize, true);
-          y -= 14;
-
-          for (const item of order.customItems) {
-            if (y < 180) break;
-
-            const itemLines = wrapText(item.description, 36);
-            const itemTaxAmount = Number(item.taxAmount || 0);
-            const itemGrandTotal = Number(item.lineTotal || 0) + itemTaxAmount;
-
-            drawText(page, font, bold, itemLines[0], descX + 8, y, lineValueSize);
-            if (itemLines[1]) {
-              drawText(page, font, bold, itemLines[1], descX + 8, y - 10, lineValueSize);
-            }
-
-            drawTextRight(page, font, bold, String(item.qty), qtyRightX, y, lineValueSize);
-            drawTextRight(page, font, bold, item.uom || "-", uomRightX, y, lineValueSize);
-            drawTextRight(page, font, bold, formatMoney(item.unitPrice), unitRightX, y, lineValueSize);
-            drawTextRight(page, font, bold, formatMoney(item.lineTotal), subtotalRightX, y, lineValueSize);
-            drawTextRight(page, font, bold, formatMoney(itemTaxAmount), taxRightX, y, lineValueSize);
-            drawTextRight(page, font, bold, formatMoney(itemGrandTotal), grandRightX, y, lineValueSize);
-
-            y -= itemLines.length > 1 ? rowHeight + 10 : rowHeight;
+        for (const item of order.customItems) {
+          if (y < 180) break;
+          const itemLines = wrapText(item.description, 40);
+          drawText(page, font, bold, itemLines[0], descX + 8, y, 9);
+          if (itemLines[1]) {
+            drawText(page, font, bold, itemLines[1], descX + 8, y - 10, 9);
           }
-        } else {
-          const itemQtyX = right - 245;
-          const itemUomX = right - 200;
-          const itemUnitX = right - 145;
-          const itemTotalX = right - 80;
-
-          drawText(page, font, bold, "Description", descX + 8, y, 9, true);
-          drawText(page, font, bold, "Qty", itemQtyX, y, 9, true);
-          drawText(page, font, bold, "UOM", itemUomX, y, 9, true);
-          drawText(page, font, bold, "Unit Price", itemUnitX, y, 9, true);
-          drawText(page, font, bold, "Total", itemTotalX, y, 9, true);
-          y -= 12;
-
-          for (const item of order.customItems) {
-            if (y < 180) break;
-            const itemLines = wrapText(item.description, 40);
-            drawText(page, font, bold, itemLines[0], descX + 8, y, 9);
-            if (itemLines[1]) {
-              drawText(page, font, bold, itemLines[1], descX + 8, y - 10, 9);
-            }
-            drawText(page, font, bold, String(item.qty), itemQtyX, y, 9);
-            drawText(page, font, bold, item.uom || "-", itemUomX, y, 9);
-            drawText(page, font, bold, formatMoney(item.unitPrice), itemUnitX, y, 9);
-            drawText(page, font, bold, formatMoney(item.lineTotal), itemTotalX, y, 9);
-            y -= itemLines.length > 1 ? rowHeight + 10 : rowHeight;
-          }
+          drawText(page, font, bold, String(item.qty), itemQtyX, y, 9);
+          drawText(page, font, bold, item.uom || "-", itemUomX, y, 9);
+          drawText(page, font, bold, formatMoney(item.unitPrice), itemUnitX, y, 9);
+          drawText(page, font, bold, formatMoney(item.lineTotal), itemTotalX, y, 9);
+          y -= itemLines.length > 1 ? rowHeight + 10 : rowHeight;
         }
       }
 
@@ -533,21 +460,24 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
 
       y -= 22;
       drawText(page, font, bold, "Subtotal:", rightColumnX - 110, y, 10, true);
-      drawText(page, font, bold, formatMoney(taxSummary.subtotal), rightColumnX, y, 10);
+      drawText(page, font, bold, formatMoney(order.customSubtotal ?? order.totalAmount), rightColumnX, y, 10);
 
       y -= 18;
       drawText(page, font, bold, "Discount:", rightColumnX - 110, y, 10, true);
-      drawText(page, font, bold, formatMoney(taxSummary.discount), rightColumnX, y, 10);
+      drawText(page, font, bold, formatMoney(order.customDiscount ?? 0), rightColumnX, y, 10);
 
-      if (taxSummary.hasTax) {
+      const taxAmount = Number(order.taxAmount ?? 0);
+      const taxHasAmount = Boolean(order.isTaxEnabledSnapshot && taxAmount > 0);
+
+      if (taxHasAmount) {
         y -= 18;
-        drawText(page, font, bold, taxSummary.taxLabel, rightColumnX - 110, y, 10, true);
-        drawText(page, font, bold, formatMoney(taxSummary.taxAmount), rightColumnX, y, 10);
+        drawText(page, font, bold, `Tax${order.taxCode ? ` (${order.taxCode})` : ""}:`, rightColumnX - 110, y, 10, true);
+        drawText(page, font, bold, formatMoney(taxAmount), rightColumnX, y, 10);
       }
 
       y -= 24;
       drawText(page, font, bold, "Grand Total:", rightColumnX - 110, y, 12, true);
-      drawText(page, font, bold, formatMoney(taxSummary.grandTotal), rightColumnX, y, 12, true);
+      drawText(page, font, bold, formatMoney(order.grandTotalAfterTax ?? order.customGrandTotal ?? order.totalAmount), rightColumnX, y, 12, true);
 
       y -= 28;
       y = drawPaymentSummary({
@@ -578,7 +508,20 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
         y -= 12;
       }
 
-      drawText(page, font, bold, formatMoney(taxSummary.subtotal), rightColumnX, headerY - 18, 10);
+      const standardTaxAmount = Number(order.taxAmount ?? 0);
+      const hasStandardTax = Boolean(order.isTaxEnabledSnapshot && standardTaxAmount > 0);
+      const standardSubtotal = Number(
+        hasStandardTax
+          ? order.taxableSubtotal ?? order.totalAmount ?? 0
+          : order.totalAmount ?? 0
+      );
+      const standardGrandTotal = Number(
+        hasStandardTax
+          ? order.grandTotalAfterTax ?? order.totalAmount ?? 0
+          : order.totalAmount ?? 0
+      );
+
+      drawText(page, font, bold, formatMoney(standardSubtotal), rightColumnX, headerY - 18, 10);
 
       y -= 14;
       page.drawLine({
@@ -588,19 +531,27 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
         color: rgb(0.85, 0.85, 0.85),
       });
 
-      y -= 22;
-      drawText(page, font, bold, "Subtotal:", rightColumnX - 110, y, 10, true);
-      drawText(page, font, bold, formatMoney(taxSummary.subtotal), rightColumnX, y, 10);
+      if (hasStandardTax) {
+        y -= 22;
+        drawText(page, font, bold, "Subtotal:", rightColumnX - 110, y, 10, true);
+        drawText(page, font, bold, formatMoney(standardSubtotal), rightColumnX, y, 10);
 
-      if (taxSummary.hasTax) {
         y -= 18;
-        drawText(page, font, bold, taxSummary.taxLabel, rightColumnX - 110, y, 10, true);
-        drawText(page, font, bold, formatMoney(taxSummary.taxAmount), rightColumnX, y, 10);
-      }
+        drawText(page, font, bold, `Tax${order.taxCode ? ` (${order.taxCode})` : ""}:`, rightColumnX - 110, y, 10, true);
+        drawText(page, font, bold, formatMoney(standardTaxAmount), rightColumnX, y, 10);
 
-      y -= 24;
-      drawText(page, font, bold, "Grand Total:", rightColumnX - 110, y, 12, true);
-      drawText(page, font, bold, formatMoney(taxSummary.grandTotal), rightColumnX, y, 12, true);
+        y -= 24;
+        drawText(page, font, bold, "Grand Total:", rightColumnX - 110, y, 12, true);
+        drawText(page, font, bold, formatMoney(standardGrandTotal), rightColumnX, y, 12, true);
+
+        y -= 28;
+      } else {
+        y -= 28;
+        drawText(page, font, bold, "Grand Total:", rightColumnX - 110, y, 12, true);
+        drawText(page, font, bold, formatMoney(standardGrandTotal), rightColumnX, y, 12, true);
+
+        y -= 28;
+      }
 
       y -= 28;
       drawText(page, font, bold, "Thank you for your business.", left, y, 10);
@@ -609,11 +560,12 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     }
 
     const pdfBytes = await pdfDoc.save();
+    const fileSuffix = order.orderNumber.replace(/^RK-/, "");
 
     return new NextResponse(new Uint8Array(pdfBytes), {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="${order.orderNumber}.pdf"`,
+        "Content-Disposition": `attachment; filename="RK-INV-${fileSuffix}.pdf"`,
         "Cache-Control": "private, no-store",
       },
     });
