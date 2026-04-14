@@ -290,7 +290,10 @@ function buildOrderWhere(
         }
       : {}),
     ...(filters?.tuningType && filters.tuningType !== "ALL"
-      ? { tuningType: filters.tuningType as any }
+      ? {
+          orderType: "STANDARD_TUNING",
+          tuningType: filters.tuningType as any,
+        }
       : {}),
     ...(filters?.orderType && filters.orderType !== "ALL"
       ? { orderType: filters.orderType as any }
