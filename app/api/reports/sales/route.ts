@@ -48,7 +48,7 @@ function getOrderSubtotal(order: OrderWithRelations) {
     return Number(order.customSubtotal ?? order.taxableSubtotal ?? order.totalAmount ?? 0);
   }
 
-  return Number(order.totalAmount ?? 0);
+  return Number(order.taxableSubtotal ?? order.totalAmount ?? 0);
 }
 
 function getOrderDiscount(order: OrderWithRelations) {

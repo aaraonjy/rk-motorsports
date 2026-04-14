@@ -123,8 +123,10 @@ export async function POST(
           data: admins.map((admin) => ({
             userId: admin.id,
             type: "PAYMENT_UPLOADED",
-            title: "Payment slip uploaded",
-            message: `${user.name} uploaded payment proof.`,
+            title: existingPayment ? "Payment slip replaced" : "Payment slip uploaded",
+            message: existingPayment
+              ? `${user.name} replaced payment proof.`
+              : `${user.name} uploaded payment proof.`,
             orderId: order.id,
           })),
         });
