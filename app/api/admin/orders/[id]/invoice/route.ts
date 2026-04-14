@@ -77,7 +77,7 @@ function getTaxSummary(order: {
 }) {
   const taxAmount = Number(order.taxAmount ?? 0);
   const hasTax = Boolean(order.isTaxEnabledSnapshot && taxAmount > 0);
-  const subtotal = Number(order.customSubtotal ?? order.taxableSubtotal ?? order.totalAmount ?? 0);
+  const subtotal = Number(order.orderType === "CUSTOM_ORDER" ? (order.customSubtotal ?? order.taxableSubtotal ?? order.totalAmount ?? 0) : (order.totalAmount ?? 0));
   const discount = Number(order.customDiscount ?? 0);
   const grandTotal = Number(order.grandTotalAfterTax ?? order.customGrandTotal ?? order.totalAmount ?? 0);
   const method = String(order.taxCalculationMethod || "").toUpperCase();

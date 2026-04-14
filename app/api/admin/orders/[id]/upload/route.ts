@@ -40,7 +40,7 @@ function hasSpacing(value: string) {
   return /\s/.test(value);
 }
 
-export async function PUT(
+export async function POST(
   req: Request,
   ctx: { params: Promise<{ id: string }> }
 ) {
