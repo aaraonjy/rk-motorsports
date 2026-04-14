@@ -158,25 +158,25 @@ const SUMMARY_CARDS: Array<{
     key: "pending_completion",
     label: "Pending Completion",
     toneClass:
-      "border-amber-500/30 bg-amber-500/10 text-amber-100 hover:border-amber-400/50 hover:bg-amber-500/15",
+      "border-amber-400/40 bg-black/60 text-amber-100 shadow-[0_0_24px_rgba(251,191,36,0.14)] hover:border-amber-300/60 hover:bg-black/70",
   },
   {
     key: "awaiting_payment",
     label: "Awaiting Payment",
     toneClass:
-      "border-orange-500/30 bg-orange-500/10 text-orange-100 hover:border-orange-400/50 hover:bg-orange-500/15",
+      "border-orange-400/40 bg-black/60 text-orange-100 shadow-[0_0_24px_rgba(251,146,60,0.14)] hover:border-orange-300/60 hover:bg-black/70",
   },
   {
     key: "new_orders",
     label: "New Orders",
     toneClass:
-      "border-sky-500/30 bg-sky-500/10 text-sky-100 hover:border-sky-400/50 hover:bg-sky-500/15",
+      "border-sky-400/40 bg-black/60 text-sky-100 shadow-[0_0_24px_rgba(56,189,248,0.14)] hover:border-sky-300/60 hover:bg-black/70",
   },
   {
     key: "partially_paid",
     label: "Partially Paid",
     toneClass:
-      "border-fuchsia-500/30 bg-fuchsia-500/10 text-fuchsia-100 hover:border-fuchsia-400/50 hover:bg-fuchsia-500/15",
+      "border-fuchsia-400/40 bg-black/60 text-fuchsia-100 shadow-[0_0_24px_rgba(217,70,239,0.14)] hover:border-fuchsia-300/60 hover:bg-black/70",
   },
 ];
 
@@ -329,8 +329,8 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 <a
                   key={card.key}
                   href={buildSummaryHref(params, isActive ? null : card.key)}
-                  className={`rounded-2xl border p-5 transition ${card.toneClass} ${
-                    isActive ? "ring-2 ring-white/20" : ""
+                  className={`rounded-2xl border p-5 backdrop-blur-md transition ${card.toneClass} ${
+                    isActive ? "ring-2 ring-white/25" : ""
                   }`}
                 >
                   <div className="text-3xl font-bold leading-none">{count}</div>
