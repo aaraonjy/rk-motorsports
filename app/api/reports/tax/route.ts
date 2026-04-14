@@ -1,4 +1,3 @@
-
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { createAuditLogFromRequest } from "@/lib/audit";
@@ -57,6 +56,10 @@ function escapeCsvValue(value: unknown) {
     return `"${normalized.replace(/"/g, '""')}"`;
   }
   return normalized;
+}
+
+function getInvoiceTransactionType(order: any): "CS" | "INV" {
+  return order?.docType === "CS" ? "CS" : "INV";
 }
 
 function getOrderLineItemTaxRows(order: any): TaxCsvRow[] {
