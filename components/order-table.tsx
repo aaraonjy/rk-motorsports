@@ -1513,7 +1513,7 @@ export function OrderTable({
                   }`}
                 >
                   <td className="px-4 py-4">
-                    <div className={`font-semibold break-words ${canNavigateToOrderEdit(order) ? "text-cyan-200" : ""}`}>{order.orderNumber}</div>
+                    <div className="font-semibold break-words text-white/90">{order.orderNumber}</div>
                     <div className="text-white/45">{new Date(order.createdAt).toLocaleDateString()}</div>
                     <div className="text-white/35 text-xs">
                       {new Date(order.createdAt).toLocaleTimeString([], {
