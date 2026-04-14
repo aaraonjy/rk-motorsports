@@ -1272,6 +1272,7 @@ export function OrderTable({
   admin?: boolean;
   transactionView?: TransactionView;
 }) {
+  const router = useRouter();
   const [activeRequest, setActiveRequest] = useState<{ details: string; title: string; subtitle: string } | null>(null);
   const [cancelOrderId, setCancelOrderId] = useState<string | null>(null);
   const [customerCancelOrderId, setCustomerCancelOrderId] = useState<string | null>(null);
@@ -1279,6 +1280,29 @@ export function OrderTable({
   const [createCreditNoteOrderId, setCreateCreditNoteOrderId] = useState<string | null>(null);
   const [uploadModal, setUploadModal] = useState<UploadModalState>(null);
   const displayRows = getDisplayRows(orders, admin ? transactionView : "ORDER");
+
+  const canNavigateToOrderEdit = (order: OrderWithRelations) =>
+    admin &&
+    isCustomOrder(order) &&
+    !["COMPLETED", "CANCELLED"].includes(order.status);
+
+  const handleOrderRowClick = (
+    event: React.MouseEvent<HTMLTableRowElement>,
+    order: OrderWithRelations
+  ) => {
+    if (!canNavigateToOrderEdit(order)) return;
+
+    const target = event.target as HTMLElement | null;
+    if (
+      target?.closest(
+        'a, button, input, textarea, select, label, form, [data-row-ignore-click="true"]'
+      )
+    ) {
+      return;
+    }
+
+    router.push(`/admin/orders/${order.id}/edit`);
+  };
 
   return (
     <>
@@ -1483,10 +1507,13 @@ export function OrderTable({
               return (
                 <tr
                   key={order.id}
-                  className="border-t border-white/10 align-top transition-colors hover:bg-white/[0.03]"
+                  onClick={(event) => handleOrderRowClick(event, order)}
+                  className={`border-t border-white/10 align-top transition-colors hover:bg-white/[0.03] ${
+                    canNavigateToOrderEdit(order) ? "cursor-pointer" : ""
+                  }`}
                 >
                   <td className="px-4 py-4">
-                    <div className="font-semibold break-words">{order.orderNumber}</div>
+                    <div className={`font-semibold break-words ${canNavigateToOrderEdit(order) ? "text-cyan-200" : ""}`}>{order.orderNumber}</div>
                     <div className="text-white/45">{new Date(order.createdAt).toLocaleDateString()}</div>
                     <div className="text-white/35 text-xs">
                       {new Date(order.createdAt).toLocaleTimeString([], {
