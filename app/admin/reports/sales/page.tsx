@@ -11,6 +11,7 @@ type SalesReportPageProps = {
     customerKeyword?: string;
     tuningType?: string;
     orderType?: string;
+    documentType?: string;
     dateFrom?: string;
     dateTo?: string;
   }>;
@@ -20,7 +21,7 @@ type SalesTransactionRow = {
   id: string;
   date: Date;
   docNo: string;
-  transactionType: "ORDER" | "CN";
+  documentType: "CS" | "INV" | "CN";
   customerName: string;
   customerEmail: string;
   customerPhone: string;
@@ -99,6 +100,36 @@ function getOrderAmount(order: OrderWithRelations) {
   }
 
   return Number(order.grandTotalAfterTax ?? order.totalAmount ?? 0);
+}
+
+function getOrderDocumentType(order: OrderWithRelations): "CS" | "INV" {
+  return order.docType === "CS" ? "CS" : "INV";
+}
+
+function getDocumentTypeLabel(value: "CS" | "INV" | "CN") {
+  switch (value) {
+    case "CS":
+      return "Cash Sale";
+    case "INV":
+      return "Invoice";
+    case "CN":
+      return "Credit Note";
+    default:
+      return value;
+  }
+}
+
+function getDocumentTypeBadgeClass(value: "CS" | "INV" | "CN") {
+  switch (value) {
+    case "CS":
+      return "inline-flex min-w-[96px] items-center justify-center rounded-full border border-cyan-500/30 bg-cyan-500/15 px-3 py-1 text-center text-xs font-semibold text-cyan-300";
+    case "INV":
+      return "inline-flex min-w-[96px] items-center justify-center rounded-full border border-white/15 bg-white/10 px-3 py-1 text-center text-xs font-semibold text-white/80";
+    case "CN":
+      return "inline-flex min-w-[96px] items-center justify-center rounded-full border border-red-500/30 bg-red-500/15 px-3 py-1 text-center text-xs font-semibold text-red-300";
+    default:
+      return "inline-flex min-w-[96px] items-center justify-center rounded-full border border-white/15 bg-white/10 px-3 py-1 text-center text-xs font-semibold text-white/80";
+  }
 }
 
 function getReportDisplayStatus(order: OrderWithRelations) {
@@ -210,7 +241,7 @@ function buildSalesTransactionRows(
         id: `order-${order.id}`,
         date: orderDate,
         docNo: order.orderNumber,
-        transactionType: "ORDER",
+        documentType: getOrderDocumentType(order),
         customerName: order.user?.name || "-",
         customerEmail: order.user?.email || "-",
         customerPhone: order.user?.phone || "-",
@@ -235,7 +266,7 @@ function buildSalesTransactionRows(
           id: `cn-${order.creditNote.id}`,
           date: cnDate,
           docNo: order.creditNote.cnNo,
-          transactionType: "CN",
+          documentType: "CN",
           customerName: order.user?.name || "-",
           customerEmail: order.user?.email || "-",
           customerPhone: order.user?.phone || "-",
@@ -283,6 +314,7 @@ export default async function SalesReportPage({
   const customerKeyword = params.customerKeyword || "";
   const tuningType = params.tuningType || "ALL";
   const orderType = params.orderType || "ALL";
+  const documentType = params.documentType || "ALL";
   const dateFrom = params.dateFrom || "";
   const dateTo = params.dateTo || "";
 
@@ -292,6 +324,7 @@ export default async function SalesReportPage({
     customerKeyword,
     tuningType,
     orderType,
+    documentType,
     page: 1,
     pageSize: 10000,
   })) as {
@@ -310,6 +343,7 @@ export default async function SalesReportPage({
     customerKeyword,
     tuningType,
     orderType,
+    documentType,
     dateFrom,
     dateTo,
   });
@@ -333,8 +367,8 @@ export default async function SalesReportPage({
           <div className="card-rk p-6 text-white/75">
             <p>
               Use the filters below to narrow down the sales report by order number, customer,
-              vehicle number, status, tuning type, order type, or date range. Credit Notes are
-              included as separate negative transactions for calculation purposes.
+              vehicle number, status, tuning type, order type, document type, or date range.
+              Credit Notes are included as separate negative transactions for calculation purposes.
             </p>
           </div>
 
@@ -472,6 +506,40 @@ export default async function SalesReportPage({
 
             <div>
               <label className="mb-2 block text-sm text-white/65">
+                Document Type
+              </label>
+              <div className="relative">
+                <select
+                  name="documentType"
+                  defaultValue={documentType}
+                  className="w-full appearance-none rounded-xl border border-white/15 bg-black/50 px-4 py-3 pr-12 text-white outline-none"
+                >
+                  <option value="ALL">All Transactions</option>
+                  <option value="CS">Cash Sales</option>
+                  <option value="INV">Invoice</option>
+                  <option value="CN">Credit Note</option>
+                </select>
+
+                <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/60">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    className="h-5 w-5"
+                    aria-hidden="true"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.51a.75.75 0 0 1-1.08 0l-4.25-4.51a.75.75 0 0 1 .02-1.06Z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm text-white/65">
                 Date From
               </label>
               <input
@@ -537,7 +605,7 @@ export default async function SalesReportPage({
                     <tr>
                       <th className="px-6 py-4 font-medium">Date</th>
                       <th className="px-6 py-4 font-medium">Doc No.</th>
-                      <th className="px-6 py-4 font-medium">Transaction Type</th>
+                      <th className="px-6 py-4 font-medium">Document Type</th>
                       <th className="px-6 py-4 font-medium">Customer</th>
                       <th className="px-6 py-4 font-medium">Order Type</th>
                       <th className="px-6 py-4 font-medium">Title / Summary</th>
@@ -556,18 +624,12 @@ export default async function SalesReportPage({
                     {transactionRows.map((row) => (
                       <tr key={row.id} className="border-t border-white/10 align-top">
                         <td className="px-6 py-5 text-white/90">{formatDate(row.date)}</td>
-                        <td className={`px-6 py-5 font-medium ${row.transactionType === "CN" ? "text-red-200" : "text-white"}`}>
+                        <td className={`px-6 py-5 font-medium ${row.documentType === "CN" ? "text-red-200" : "text-white"}`}>
                           {row.docNo}
                         </td>
                         <td className="px-6 py-5">
-                          <span
-                            className={
-                              row.transactionType === "CN"
-                                ? "inline-flex min-w-[88px] items-center justify-center rounded-full border border-red-500/30 bg-red-500/15 px-3 py-1 text-center text-xs font-semibold text-red-300"
-                                : "inline-flex min-w-[88px] items-center justify-center rounded-full border border-white/15 bg-white/10 px-3 py-1 text-center text-xs font-semibold text-white/80"
-                            }
-                          >
-                            {row.transactionType}
+                          <span className={getDocumentTypeBadgeClass(row.documentType)}>
+                            {getDocumentTypeLabel(row.documentType)}
                           </span>
                         </td>
                         <td className="px-6 py-5 text-white/90">
@@ -585,17 +647,17 @@ export default async function SalesReportPage({
                           </span>
                         </td>
                         <td className="px-6 py-5 text-white/90">{row.referenceInvoiceNo}</td>
-                        <td className={`whitespace-nowrap px-6 py-5 text-right font-medium ${row.transactionType === "CN" ? "text-red-200" : "text-white"}`}>
+                        <td className={`whitespace-nowrap px-6 py-5 text-right font-medium ${row.documentType === "CN" ? "text-red-200" : "text-white"}`}>
                           {formatCurrency(row.subtotal)}
                         </td>
-                        <td className={`whitespace-nowrap px-6 py-5 text-right font-medium ${row.transactionType === "CN" ? "text-red-200" : "text-white"}`}>
+                        <td className={`whitespace-nowrap px-6 py-5 text-right font-medium ${row.documentType === "CN" ? "text-red-200" : "text-white"}`}>
                           {formatCurrency(row.discount)}
                         </td>
-                        <td className="px-6 py-5 text-white/90 whitespace-nowrap">{row.taxCode}</td>
-                        <td className={`whitespace-nowrap px-6 py-5 text-right font-medium ${row.transactionType === "CN" ? "text-red-200" : "text-white"}`}>
+                        <td className="px-6 py-5 whitespace-nowrap text-white/90">{row.taxCode}</td>
+                        <td className={`whitespace-nowrap px-6 py-5 text-right font-medium ${row.documentType === "CN" ? "text-red-200" : "text-white"}`}>
                           {formatCurrency(row.taxAmount)}
                         </td>
-                        <td className={`whitespace-nowrap px-6 py-5 text-right font-medium ${row.transactionType === "CN" ? "text-red-200" : "text-white"}`}>
+                        <td className={`whitespace-nowrap px-6 py-5 text-right font-medium ${row.documentType === "CN" ? "text-red-200" : "text-white"}`}>
                           {formatCurrency(row.grandTotal)}
                         </td>
                       </tr>

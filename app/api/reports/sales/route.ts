@@ -7,7 +7,7 @@ import { type OrderWithRelations } from "@/components/order-table";
 type CsvTransactionRow = {
   date: Date;
   docNo: string;
-  transactionType: "ORDER" | "CN";
+  documentType: "CS" | "INV" | "CN";
   customer: string;
   customerEmail: string;
   customerPhone: string;
@@ -69,6 +69,23 @@ function getOrderGrandTotal(order: OrderWithRelations) {
   }
 
   return Number(order.grandTotalAfterTax ?? order.totalAmount ?? 0);
+}
+
+function getOrderDocumentType(order: OrderWithRelations): "CS" | "INV" {
+  return order.docType === "CS" ? "CS" : "INV";
+}
+
+function getDocumentTypeLabel(value: "CS" | "INV" | "CN") {
+  switch (value) {
+    case "CS":
+      return "Cash Sale";
+    case "INV":
+      return "Invoice";
+    case "CN":
+      return "Credit Note";
+    default:
+      return value;
+  }
 }
 
 function getReportDisplayStatus(order: OrderWithRelations) {
@@ -150,7 +167,7 @@ function buildRows(
       rows.push({
         date: orderDate,
         docNo: order.orderNumber,
-        transactionType: "ORDER",
+        documentType: getOrderDocumentType(order),
         customer: order.user?.name || "",
         customerEmail: order.user?.email || "",
         customerPhone: order.user?.phone || "",
@@ -174,7 +191,7 @@ function buildRows(
         rows.push({
           date: cnDate,
           docNo: order.creditNote.cnNo,
-          transactionType: "CN",
+          documentType: "CN",
           customer: order.user?.name || "",
           customerEmail: order.user?.email || "",
           customerPhone: order.user?.phone || "",
@@ -215,6 +232,7 @@ export async function GET(req: Request) {
   const customerKeyword = searchParams.get("customerKeyword") || "";
   const tuningType = searchParams.get("tuningType") || "ALL";
   const orderType = searchParams.get("orderType") || "ALL";
+  const documentType = searchParams.get("documentType") || "ALL";
   const dateFrom = searchParams.get("dateFrom") || "";
   const dateTo = searchParams.get("dateTo") || "";
 
@@ -224,6 +242,7 @@ export async function GET(req: Request) {
     customerKeyword,
     tuningType,
     orderType,
+    documentType,
     page: 1,
     pageSize: 10000,
   })) as {
@@ -240,7 +259,7 @@ export async function GET(req: Request) {
     [
       "Date",
       "Doc No.",
-      "Transaction Type",
+      "Document Type",
       "Customer",
       "Customer Email",
       "Customer Phone",
@@ -259,7 +278,7 @@ export async function GET(req: Request) {
     ...rows.map((row) => [
       new Intl.DateTimeFormat("en-GB").format(row.date),
       row.docNo,
-      row.transactionType,
+      getDocumentTypeLabel(row.documentType),
       row.customer,
       row.customerEmail,
       row.customerPhone,
@@ -290,7 +309,7 @@ export async function GET(req: Request) {
       entityType: "Report",
       entityCode: "Sales Report",
       description: `${user.name} exported Sales Report.`,
-      newValues: { status, search, customerKeyword, tuningType, orderType, dateFrom, dateTo },
+      newValues: { status, search, customerKeyword, tuningType, orderType, documentType, dateFrom, dateTo },
       status: "SUCCESS",
     });
   } catch (error) {
