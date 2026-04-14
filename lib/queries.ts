@@ -59,6 +59,19 @@ export async function getRecentOrdersForUser(
   };
 }
 
+type AdminOrderSummaryFilter =
+  | "pending_completion"
+  | "awaiting_payment"
+  | "new_orders"
+  | "partially_paid";
+
+type AdminOrderSummaryCounts = {
+  pendingCompletion: number;
+  awaitingPayment: number;
+  newOrders: number;
+  partiallyPaid: number;
+};
+
 type AllOrdersOptions = {
   status?: string;
   search?: string;
@@ -73,6 +86,7 @@ type AllOrdersOptions = {
   dateTo?: string;
   page?: number;
   pageSize?: number;
+  summary?: string;
 };
 
 function buildPaymentStatusWhere(filters?: AllOrdersOptions): Prisma.OrderWhereInput | null {
@@ -138,11 +152,52 @@ function buildPaymentStatusWhere(filters?: AllOrdersOptions): Prisma.OrderWhereI
   return null;
 }
 
-export async function getAllOrders(filters?: AllOrdersOptions) {
-  const page = Math.max(1, filters?.page ?? 1);
-  const pageSize = Math.max(1, filters?.pageSize ?? 5);
-  const skip = (page - 1) * pageSize;
+function buildSummaryWhere(summary?: string): Prisma.OrderWhereInput | null {
+  switch (summary as AdminOrderSummaryFilter | undefined) {
+    case "pending_completion":
+      return {
+        orderType: "CUSTOM_ORDER",
+        status: {
+          notIn: ["COMPLETED", "CANCELLED"],
+        },
+        totalPaid: {
+          gt: 0,
+        },
+      };
+    case "awaiting_payment":
+      return {
+        orderType: "CUSTOM_ORDER",
+        status: {
+          notIn: ["COMPLETED", "CANCELLED"],
+        },
+        totalPaid: 0,
+      };
+    case "new_orders":
+      return {
+        orderType: "CUSTOM_ORDER",
+        status: {
+          in: ["FILE_RECEIVED", "IN_PROGRESS"],
+        },
+      };
+    case "partially_paid":
+      return {
+        orderType: "CUSTOM_ORDER",
+        status: {
+          not: "CANCELLED",
+        },
+        totalPaid: {
+          gt: 0,
+        },
+        outstandingBalance: {
+          gt: 0,
+        },
+      };
+    default:
+      return null;
+  }
+}
 
+function buildCreatedAtWhere(filters?: AllOrdersOptions) {
   const createdAt: Prisma.DateTimeFilter = {};
 
   if (filters?.dateFrom) {
@@ -160,8 +215,21 @@ export async function getAllOrders(filters?: AllOrdersOptions) {
     }
   }
 
+  return createdAt;
+}
+
+function buildOrderWhere(
+  filters?: AllOrdersOptions,
+  options?: {
+    ignoreStatus?: boolean;
+    ignorePaymentStatus?: boolean;
+    ignoreSummary?: boolean;
+  }
+): Prisma.OrderWhereInput {
+  const createdAt = buildCreatedAtWhere(filters);
+
   const baseWhere: Prisma.OrderWhereInput = {
-    ...(filters?.status && filters.status !== "ALL"
+    ...(!options?.ignoreStatus && filters?.status && filters.status !== "ALL"
       ? { status: filters.status as any }
       : {}),
     ...(filters?.search
@@ -243,15 +311,109 @@ export async function getAllOrders(filters?: AllOrdersOptions) {
     ...(Object.keys(createdAt).length > 0 ? { createdAt } : {}),
   };
 
-  const paymentStatusWhere = buildPaymentStatusWhere(filters);
+  const clauses: Prisma.OrderWhereInput[] = [baseWhere];
 
-  const where: Prisma.OrderWhereInput = paymentStatusWhere
-    ? {
-        AND: [baseWhere, paymentStatusWhere],
-      }
-    : baseWhere;
+  if (!options?.ignorePaymentStatus) {
+    const paymentStatusWhere = buildPaymentStatusWhere(filters);
+    if (paymentStatusWhere) {
+      clauses.push(paymentStatusWhere);
+    }
+  }
 
-  const [orders, totalCount] = await Promise.all([
+  if (!options?.ignoreSummary) {
+    const summaryWhere = buildSummaryWhere(filters?.summary);
+    if (summaryWhere) {
+      clauses.push(summaryWhere);
+    }
+  }
+
+  return clauses.length === 1
+    ? baseWhere
+    : {
+        AND: clauses,
+      };
+}
+
+async function getAdminOrderSummaryCounts(
+  filters?: AllOrdersOptions
+): Promise<AdminOrderSummaryCounts> {
+  const summaryContextFilters: AllOrdersOptions = {
+    ...filters,
+    status: "ALL",
+    paymentStatus: "ALL",
+    page: undefined,
+    pageSize: undefined,
+    summary: undefined,
+  };
+
+  const [pendingCompletion, awaitingPayment, newOrders, partiallyPaid] =
+    await Promise.all([
+      db.order.count({
+        where: buildOrderWhere(
+          {
+            ...summaryContextFilters,
+            summary: "pending_completion",
+          },
+          {
+            ignoreStatus: true,
+            ignorePaymentStatus: true,
+          }
+        ),
+      }),
+      db.order.count({
+        where: buildOrderWhere(
+          {
+            ...summaryContextFilters,
+            summary: "awaiting_payment",
+          },
+          {
+            ignoreStatus: true,
+            ignorePaymentStatus: true,
+          }
+        ),
+      }),
+      db.order.count({
+        where: buildOrderWhere(
+          {
+            ...summaryContextFilters,
+            summary: "new_orders",
+          },
+          {
+            ignoreStatus: true,
+            ignorePaymentStatus: true,
+          }
+        ),
+      }),
+      db.order.count({
+        where: buildOrderWhere(
+          {
+            ...summaryContextFilters,
+            summary: "partially_paid",
+          },
+          {
+            ignoreStatus: true,
+            ignorePaymentStatus: true,
+          }
+        ),
+      }),
+    ]);
+
+  return {
+    pendingCompletion,
+    awaitingPayment,
+    newOrders,
+    partiallyPaid,
+  };
+}
+
+export async function getAllOrders(filters?: AllOrdersOptions) {
+  const page = Math.max(1, filters?.page ?? 1);
+  const pageSize = Math.max(1, filters?.pageSize ?? 5);
+  const skip = (page - 1) * pageSize;
+
+  const where = buildOrderWhere(filters);
+
+  const [orders, totalCount, summaryCounts] = await Promise.all([
     db.order.findMany({
       where,
       include: {
@@ -277,6 +439,7 @@ export async function getAllOrders(filters?: AllOrdersOptions) {
       take: pageSize,
     }),
     db.order.count({ where }),
+    getAdminOrderSummaryCounts(filters),
   ]);
 
   return {
@@ -285,6 +448,7 @@ export async function getAllOrders(filters?: AllOrdersOptions) {
     currentPage: page,
     pageSize,
     totalPages: Math.max(1, Math.ceil(totalCount / pageSize)),
+    summaryCounts,
   };
 }
 

@@ -5,22 +5,38 @@ import { OrderTable, type OrderWithRelations } from "@/components/order-table";
 import { ClearSuccessParam } from "@/components/clear-success-param";
 import { PaginationControls } from "@/components/pagination-controls";
 
+type AdminSearchParams = {
+  status?: string;
+  search?: string;
+  customerKeyword?: string;
+  tuningType?: string;
+  orderType?: string;
+  source?: string;
+  paymentStatus?: string;
+  outstandingOnly?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  page?: string;
+  success?: string;
+  documentType?: string;
+  summary?: string;
+};
+
 type AdminPageProps = {
-  searchParams?: Promise<{
-    status?: string;
-    search?: string;
-    customerKeyword?: string;
-    tuningType?: string;
-    orderType?: string;
-    source?: string;
-    paymentStatus?: string;
-    outstandingOnly?: string;
-    dateFrom?: string;
-    dateTo?: string;
-    page?: string;
-    success?: string;
-    documentType?: string;
-  }>;
+  searchParams?: Promise<AdminSearchParams>;
+};
+
+type AdminSummaryKey =
+  | "pending_completion"
+  | "awaiting_payment"
+  | "new_orders"
+  | "partially_paid";
+
+type AdminSummaryCounts = {
+  pendingCompletion: number;
+  awaitingPayment: number;
+  newOrders: number;
+  partiallyPaid: number;
 };
 
 type BannerState =
@@ -139,6 +155,103 @@ function Banner({ data }: { data: NonNullable<BannerState> }) {
   );
 }
 
+
+const SUMMARY_CARDS: Array<{
+  key: AdminSummaryKey;
+  label: string;
+  toneClass: string;
+}> = [
+  {
+    key: "pending_completion",
+    label: "Pending Completion",
+    toneClass:
+      "border-amber-500/30 bg-amber-500/10 text-amber-100 hover:border-amber-400/50 hover:bg-amber-500/15",
+  },
+  {
+    key: "awaiting_payment",
+    label: "Awaiting Payment",
+    toneClass:
+      "border-orange-500/30 bg-orange-500/10 text-orange-100 hover:border-orange-400/50 hover:bg-orange-500/15",
+  },
+  {
+    key: "new_orders",
+    label: "New Orders",
+    toneClass:
+      "border-sky-500/30 bg-sky-500/10 text-sky-100 hover:border-sky-400/50 hover:bg-sky-500/15",
+  },
+  {
+    key: "partially_paid",
+    label: "Partially Paid",
+    toneClass:
+      "border-fuchsia-500/30 bg-fuchsia-500/10 text-fuchsia-100 hover:border-fuchsia-400/50 hover:bg-fuchsia-500/15",
+  },
+];
+
+function getSummaryLabel(summary?: string) {
+  switch (summary) {
+    case "pending_completion":
+      return "Pending Completion";
+    case "awaiting_payment":
+      return "Awaiting Payment";
+    case "new_orders":
+      return "New Orders";
+    case "partially_paid":
+      return "Partially Paid";
+    default:
+      return "";
+  }
+}
+
+function getSummaryCount(
+  counts: AdminSummaryCounts,
+  key: AdminSummaryKey
+) {
+  switch (key) {
+    case "pending_completion":
+      return counts.pendingCompletion;
+    case "awaiting_payment":
+      return counts.awaitingPayment;
+    case "new_orders":
+      return counts.newOrders;
+    case "partially_paid":
+      return counts.partiallyPaid;
+  }
+}
+
+function buildSummaryHref(
+  params: AdminSearchParams,
+  summary: AdminSummaryKey | null
+) {
+  const nextParams = new URLSearchParams();
+
+  if (params.search) nextParams.set("search", params.search);
+  if (params.customerKeyword) {
+    nextParams.set("customerKeyword", params.customerKeyword);
+  }
+  if (params.tuningType && params.tuningType !== "ALL") {
+    nextParams.set("tuningType", params.tuningType);
+  }
+  if (params.orderType && params.orderType !== "ALL") {
+    nextParams.set("orderType", params.orderType);
+  }
+  if (params.source && params.source !== "ALL") {
+    nextParams.set("source", params.source);
+  }
+  if (params.documentType && params.documentType !== "ALL") {
+    nextParams.set("documentType", params.documentType);
+  }
+  if (params.outstandingOnly === "1") {
+    nextParams.set("outstandingOnly", "1");
+  }
+  if (params.dateFrom) nextParams.set("dateFrom", params.dateFrom);
+  if (params.dateTo) nextParams.set("dateTo", params.dateTo);
+  if (params.success) nextParams.set("success", params.success);
+  if (summary) nextParams.set("summary", summary);
+
+  const query = nextParams.toString();
+  return query ? `/admin?${query}` : "/admin";
+}
+
 export default async function AdminPage({ searchParams }: AdminPageProps) {
   const user = await getSessionUser();
   if (!user) redirect("/login");
@@ -157,6 +270,8 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const dateTo = params.dateTo || "";
   const page = Math.max(1, Number(params.page || "1") || 1);
   const documentType = params.documentType || "ALL";
+  const summary = params.summary || "ALL";
+  const activeSummaryLabel = getSummaryLabel(summary);
   const banner = getAdminBanner(params.success);
 
   const result = (await getAllOrders({
@@ -173,12 +288,14 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     page,
     pageSize: 5,
     documentType,
+    summary,
   })) as {
     orders: OrderWithRelations[];
     totalCount: number;
     currentPage: number;
     pageSize: number;
     totalPages: number;
+    summaryCounts: AdminSummaryCounts;
   };
 
   return (
@@ -193,6 +310,30 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         {banner ? <Banner data={banner} /> : null}
 
         <div className="mt-8 space-y-4">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {SUMMARY_CARDS.map((card) => {
+              const isActive = summary === card.key;
+              const count = getSummaryCount(result.summaryCounts, card.key);
+
+              return (
+                <a
+                  key={card.key}
+                  href={buildSummaryHref(params, isActive ? null : card.key)}
+                  className={`rounded-2xl border p-5 transition ${card.toneClass} ${
+                    isActive ? "ring-2 ring-white/20" : ""
+                  }`}
+                >
+                  <div className="text-3xl font-bold leading-none">{count}</div>
+                  <div className="mt-2 text-sm font-medium tracking-[0.02em]">
+                    {card.label}
+                  </div>
+                  <div className="mt-3 text-xs text-white/60">
+                    {isActive ? "Active filter" : "Click to view"}
+                  </div>
+                </a>
+              );
+            })}
+          </div>
           <div className="card-rk p-6 text-white/75">
             <p>
               Search by transaction number, customer name, phone number, email, vehicle no, status,
@@ -201,6 +342,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           </div>
 
           <form method="get" className="card-rk grid gap-4 p-6 md:grid-cols-2 xl:grid-cols-4">
+            {summary !== "ALL" ? <input type="hidden" name="summary" value={summary} /> : null}
             <div>
               <label className="mb-2 block text-sm text-white/65">
                 Search Transaction Number
@@ -488,6 +630,20 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             </div>
           </form>
 
+          {summary !== "ALL" ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white/75">
+              <span>
+                Showing: <span className="font-semibold text-white">{activeSummaryLabel}</span>
+              </span>
+              <a
+                href={buildSummaryHref(params, null)}
+                className="rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-white/70 transition hover:bg-white/10"
+              >
+                Clear Summary
+              </a>
+            </div>
+          ) : null}
+
           <OrderTable
             orders={result.orders}
             admin
@@ -511,6 +667,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               dateFrom: dateFrom || undefined,
               dateTo: dateTo || undefined,
               success: params.success,
+              summary: summary !== "ALL" ? summary : undefined,
             }}
           />
         </div>
