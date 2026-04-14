@@ -221,6 +221,9 @@ function buildSummaryHref(
   if (params.customerKeyword) {
     nextParams.set("customerKeyword", params.customerKeyword);
   }
+  if (params.status && params.status !== "ALL") {
+    nextParams.set("status", params.status);
+  }
   if (params.tuningType && params.tuningType !== "ALL") {
     nextParams.set("tuningType", params.tuningType);
   }
@@ -229,6 +232,9 @@ function buildSummaryHref(
   }
   if (params.source && params.source !== "ALL") {
     nextParams.set("source", params.source);
+  }
+  if (params.paymentStatus && params.paymentStatus !== "ALL") {
+    nextParams.set("paymentStatus", params.paymentStatus);
   }
   if (params.documentType && params.documentType !== "ALL") {
     nextParams.set("documentType", params.documentType);
