@@ -9,6 +9,8 @@ type TaxReportPageProps = {
     transactionType?: string;
     dateFrom?: string;
     dateTo?: string;
+    page?: string;
+    pageSize?: string;
   }>;
 };
 
@@ -218,6 +220,141 @@ function buildTaxReportRows(orders: any[], filters: { taxCode?: string; transact
   });
 }
 
+
+const PAGE_SIZE_OPTIONS = [20, 50, 100] as const;
+
+function parsePositiveInt(value: string | undefined, fallback: number) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+  return Math.floor(parsed);
+}
+
+function normalizePageSize(value: string | undefined) {
+  const parsed = parsePositiveInt(value, 20);
+  return PAGE_SIZE_OPTIONS.includes(parsed as (typeof PAGE_SIZE_OPTIONS)[number]) ? parsed : 20;
+}
+
+function paginateItems<T>(items: T[], page: number, pageSize: number) {
+  const totalCount = items.length;
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const currentPage = Math.min(Math.max(page, 1), totalPages);
+  const startIndex = totalCount === 0 ? 0 : (currentPage - 1) * pageSize;
+  const endIndex = Math.min(startIndex + pageSize, totalCount);
+
+  return {
+    items: items.slice(startIndex, endIndex),
+    totalCount,
+    totalPages,
+    currentPage,
+    startIndex,
+    endIndex,
+  };
+}
+
+function PaginationControls({
+  basePath,
+  baseParams,
+  currentPage,
+  pageSize,
+  totalCount,
+  totalPages,
+  startIndex,
+  endIndex,
+  itemLabel,
+}: {
+  basePath: string;
+  baseParams: Record<string, string | undefined>;
+  currentPage: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+  startIndex: number;
+  endIndex: number;
+  itemLabel: string;
+}) {
+  if (totalCount === 0) return null;
+
+  const buildHref = (nextPage: number, nextPageSize: number = pageSize) => {
+    const query = buildQueryString({
+      ...baseParams,
+      page: String(nextPage),
+      pageSize: String(nextPageSize),
+    });
+    return query ? `${basePath}?${query}` : basePath;
+  };
+
+  const pageButtons: number[] = [];
+  const startPage = Math.max(1, currentPage - 2);
+  const endPage = Math.min(totalPages, currentPage + 2);
+  for (let page = startPage; page <= endPage; page += 1) {
+    pageButtons.push(page);
+  }
+
+  return (
+    <div className="flex flex-col gap-4 border-t border-white/10 px-6 py-5 md:flex-row md:items-center md:justify-between">
+      <div className="text-sm text-white/60">
+        Showing {startIndex + 1}-{endIndex} of {totalCount} {itemLabel}
+        {totalCount === 1 ? "" : "s"}.
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-sm text-white/50">Rows per page</span>
+        {PAGE_SIZE_OPTIONS.map((option) => (
+          <Link
+            key={option}
+            href={buildHref(1, option)}
+            className={`rounded-xl border px-3 py-2 text-sm transition ${
+              option === pageSize
+                ? "border-white/25 bg-white/10 text-white"
+                : "border-white/15 bg-black/30 text-white/70 hover:bg-white/10"
+            }`}
+          >
+            {option}
+          </Link>
+        ))}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Link
+          href={buildHref(Math.max(1, currentPage - 1))}
+          className={`rounded-xl border px-3 py-2 text-sm transition ${
+            currentPage === 1
+              ? "pointer-events-none border-white/10 bg-black/20 text-white/30"
+              : "border-white/15 bg-black/30 text-white/85 hover:bg-white/10"
+          }`}
+        >
+          Previous
+        </Link>
+
+        {pageButtons.map((page) => (
+          <Link
+            key={page}
+            href={buildHref(page)}
+            className={`rounded-xl border px-3 py-2 text-sm transition ${
+              page === currentPage
+                ? "border-white/25 bg-white/10 text-white"
+                : "border-white/15 bg-black/30 text-white/70 hover:bg-white/10"
+            }`}
+          >
+            {page}
+          </Link>
+        ))}
+
+        <Link
+          href={buildHref(Math.min(totalPages, currentPage + 1))}
+          className={`rounded-xl border px-3 py-2 text-sm transition ${
+            currentPage >= totalPages
+              ? "pointer-events-none border-white/10 bg-black/20 text-white/30"
+              : "border-white/15 bg-black/30 text-white/85 hover:bg-white/10"
+          }`}
+        >
+          Next
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 export default async function TaxReportPage({ searchParams }: TaxReportPageProps) {
   const user = await getSessionUser();
   if (!user) redirect("/login");
@@ -228,6 +365,8 @@ export default async function TaxReportPage({ searchParams }: TaxReportPageProps
   const transactionType = params.transactionType || "ALL";
   const dateFrom = params.dateFrom || "";
   const dateTo = params.dateTo || "";
+  const page = parsePositiveInt(params.page, 1);
+  const pageSize = normalizePageSize(params.pageSize);
 
   const [orders, taxCodes] = await Promise.all([
     db.order.findMany({
@@ -285,6 +424,7 @@ export default async function TaxReportPage({ searchParams }: TaxReportPageProps
   ]);
 
   const rows = buildTaxReportRows(orders, { taxCode, transactionType, dateFrom, dateTo });
+  const paginatedRows = paginateItems(rows, page, pageSize);
 
   const totalTaxableAmount = rows.reduce((sum, row) => sum + row.taxableAmount, 0);
   const totalTaxAmount = rows.reduce((sum, row) => sum + row.taxAmount, 0);
@@ -417,12 +557,12 @@ export default async function TaxReportPage({ searchParams }: TaxReportPageProps
               <div>
                 <h2 className="text-2xl font-semibold text-white">Report Preview</h2>
                 <p className="mt-2 text-sm text-white/60">
-                  Showing {rows.length} tax row{rows.length === 1 ? "" : "s"}.
+                  Showing {paginatedRows.totalCount} tax row{paginatedRows.totalCount === 1 ? "" : "s"}.
                 </p>
               </div>
             </div>
 
-            {rows.length === 0 ? (
+            {paginatedRows.totalCount === 0 ? (
               <div className="px-6 py-12 text-center text-white/55">
                 No tax report data found for the selected filters.
               </div>
@@ -446,7 +586,7 @@ export default async function TaxReportPage({ searchParams }: TaxReportPageProps
                     </tr>
                   </thead>
                   <tbody>
-                    {rows.map((row) => (
+                    {paginatedRows.items.map((row) => (
                       <tr key={row.id} className="border-t border-white/10 align-top">
                         <td className="px-6 py-5 text-white/90">{formatDate(row.date)}</td>
                         <td className={`px-6 py-5 font-medium ${row.transactionType === "CN" ? "text-red-200" : "text-white"}`}>
@@ -482,6 +622,17 @@ export default async function TaxReportPage({ searchParams }: TaxReportPageProps
                 </table>
               </div>
             )}
+            <PaginationControls
+              basePath="/admin/reports/tax"
+              baseParams={{ taxCode, transactionType, dateFrom, dateTo }}
+              currentPage={paginatedRows.currentPage}
+              pageSize={pageSize}
+              totalCount={paginatedRows.totalCount}
+              totalPages={paginatedRows.totalPages}
+              startIndex={paginatedRows.startIndex}
+              endIndex={paginatedRows.endIndex}
+              itemLabel="tax row"
+            />
           </div>
         </div>
       </div>
