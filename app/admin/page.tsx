@@ -1,5 +1,5 @@
 import { getSessionUser } from "@/lib/auth";
-import { getAllOrders } from "@/lib/queries";
+import { getAllOrders, getAdminOrderSummaryCounts, type AdminOrderSummaryCounts } from "@/lib/queries";
 import { redirect } from "next/navigation";
 import { OrderTable, type OrderWithRelations } from "@/components/order-table";
 import { ClearSuccessParam } from "@/components/clear-success-param";
@@ -31,13 +31,6 @@ type AdminSummaryKey =
   | "awaiting_payment"
   | "new_orders"
   | "partially_paid";
-
-type AdminSummaryCounts = {
-  pendingCompletion: number;
-  awaitingPayment: number;
-  newOrders: number;
-  partiallyPaid: number;
-};
 
 type BannerState =
   | {
@@ -295,8 +288,19 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     currentPage: number;
     pageSize: number;
     totalPages: number;
-    summaryCounts: AdminSummaryCounts;
   };
+
+  const summaryCounts = await getAdminOrderSummaryCounts({
+    search,
+    customerKeyword,
+    tuningType,
+    orderType,
+    source,
+    outstandingOnly,
+    dateFrom,
+    dateTo,
+    documentType,
+  });
 
   return (
     <section className="section-pad">
@@ -313,7 +317,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {SUMMARY_CARDS.map((card) => {
               const isActive = summary === card.key;
-              const count = getSummaryCount(result.summaryCounts, card.key);
+              const count = getSummaryCount(summaryCounts, card.key);
 
               return (
                 <a

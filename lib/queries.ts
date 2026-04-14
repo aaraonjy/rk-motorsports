@@ -65,7 +65,7 @@ type AdminOrderSummaryFilter =
   | "new_orders"
   | "partially_paid";
 
-type AdminOrderSummaryCounts = {
+export type AdminOrderSummaryCounts = {
   pendingCompletion: number;
   awaitingPayment: number;
   newOrders: number;
@@ -334,7 +334,7 @@ function buildOrderWhere(
       };
 }
 
-async function getAdminOrderSummaryCounts(
+export async function getAdminOrderSummaryCounts(
   filters?: AllOrdersOptions
 ): Promise<AdminOrderSummaryCounts> {
   const summaryContextFilters: AllOrdersOptions = {
@@ -413,7 +413,7 @@ export async function getAllOrders(filters?: AllOrdersOptions) {
 
   const where = buildOrderWhere(filters);
 
-  const [orders, totalCount, summaryCounts] = await Promise.all([
+  const [orders, totalCount] = await Promise.all([
     db.order.findMany({
       where,
       include: {
@@ -439,7 +439,6 @@ export async function getAllOrders(filters?: AllOrdersOptions) {
       take: pageSize,
     }),
     db.order.count({ where }),
-    getAdminOrderSummaryCounts(filters),
   ]);
 
   return {
@@ -448,7 +447,6 @@ export async function getAllOrders(filters?: AllOrdersOptions) {
     currentPage: page,
     pageSize,
     totalPages: Math.max(1, Math.ceil(totalCount / pageSize)),
-    summaryCounts,
   };
 }
 
