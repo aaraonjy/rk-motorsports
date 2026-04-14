@@ -196,7 +196,7 @@ function getSummaryLabel(summary?: string) {
 }
 
 function getSummaryCount(
-  counts: AdminSummaryCounts,
+  counts: AdminOrderSummaryCounts,
   key: AdminSummaryKey
 ) {
   switch (key) {
