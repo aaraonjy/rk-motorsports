@@ -27,9 +27,9 @@ type MessageState = { type: "success" | "error"; text: string } | null;
 type EditableTaxCode = TaxCodeItem & { isSaving?: boolean };
 
 const selectClassName =
-  "w-full rounded-2xl border border-white/12 bg-black/35 px-4 py-3 text-white outline-none transition focus:border-red-400/50 pr-12 appearance-none bg-[right_0.9rem_center] bg-no-repeat";
+  "w-full rounded-2xl border border-white/12 bg-black/20 px-4 py-3 text-white outline-none transition focus:border-red-400/50 pr-12 appearance-none bg-[right_0.9rem_center] bg-no-repeat";
 const inputClassName =
-  "w-full rounded-2xl border border-white/12 bg-black/35 px-4 py-3 text-white outline-none transition focus:border-red-400/50";
+  "w-full rounded-2xl border border-white/12 bg-black/20 px-4 py-3 text-white outline-none transition focus:border-red-400/50";
 
 export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) {
   const [config, setConfig] = useState(initialConfig);
@@ -176,7 +176,7 @@ export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) 
 
   return (
     <div className="mt-8 space-y-8">
-      <div className="rounded-[28px] border border-white/10 bg-black/35 p-6 shadow-[0_20px_60px_rgba(0,0,0,0.28)] backdrop-blur-md">
+      <div className="card-rk p-6">
         <div className="flex flex-col gap-5">
           <div className="flex items-start justify-between gap-4">
             <div>
@@ -188,7 +188,7 @@ export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) 
           </div>
 
           <div className="grid gap-4 xl:grid-cols-4">
-            <div className="rounded-3xl border border-white/10 bg-black/25 p-4">
+            <div className="rounded-3xl border border-white/10 bg-black/20 p-4">
               <div className="flex min-h-[156px] flex-col">
                 <div className="text-lg font-semibold">Enable Tax Module</div>
                 <p className="mt-2 text-sm text-white/65">Toggle tax usage for configured order flows.</p>
@@ -202,7 +202,7 @@ export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) 
               </div>
             </div>
 
-            <div className="rounded-3xl border border-white/10 bg-black/25 p-4">
+            <div className="rounded-3xl border border-white/10 bg-black/20 p-4">
               <div className="flex min-h-[156px] flex-col">
                 <label className="text-lg font-semibold">Tax Calculation Mode</label>
                 <p className="mt-2 text-sm text-white/65">Prepare the system for transaction-level or line-item tax handling in later batches.</p>
@@ -223,7 +223,7 @@ export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) 
               </div>
             </div>
 
-            <div className="rounded-3xl border border-white/10 bg-black/25 p-4">
+            <div className="rounded-3xl border border-white/10 bg-black/20 p-4">
               <div className="flex min-h-[156px] flex-col">
                 <label className="text-lg font-semibold">Default Portal Tax Code</label>
                 <p className="mt-2 text-sm text-white/65">Used later for Custom Tuning Form auto-applied tax.</p>
@@ -243,7 +243,7 @@ export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) 
               </div>
             </div>
 
-            <div className="rounded-3xl border border-white/10 bg-black/25 p-4">
+            <div className="rounded-3xl border border-white/10 bg-black/20 p-4">
               <div className="flex min-h-[156px] flex-col">
                 <label className="text-lg font-semibold">Default Admin Tax Code</label>
                 <p className="mt-2 text-sm text-white/65">Used later for Custom Order Form default tax selection.</p>
@@ -285,7 +285,7 @@ export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) 
         </div>
       </div>
 
-      <div className="rounded-[28px] border border-white/10 bg-black/35 p-6 shadow-[0_20px_60px_rgba(0,0,0,0.28)] backdrop-blur-md">
+      <div className="card-rk p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 className="text-2xl font-semibold">Tax Code Master</h2>
@@ -312,7 +312,7 @@ export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) 
               <option value="EXCLUSIVE">Exclusive</option>
               <option value="INCLUSIVE">Inclusive</option>
             </select>
-            <label className="flex min-h-[50px] items-center gap-3 rounded-2xl border border-white/12 bg-black/35 px-4 py-3 text-sm text-white/85">
+            <label className="flex min-h-[50px] items-center gap-3 rounded-2xl border border-white/12 bg-black/20 px-4 py-3 text-sm text-white/85">
               <input type="checkbox" checked={newTaxCode.isActive} onChange={(e) => setNewTaxCode((prev) => ({ ...prev, isActive: e.target.checked }))} className="h-4 w-4 rounded border-white/15 bg-black/40" />
               Active tax code
             </label>
@@ -342,7 +342,7 @@ export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) 
                     <option value="EXCLUSIVE">Exclusive</option>
                     <option value="INCLUSIVE">Inclusive</option>
                   </select>
-                  <div className="flex min-h-[50px] items-center justify-between gap-3 rounded-2xl border border-white/12 bg-black/35 px-4 py-3 text-sm text-white/85">
+                  <div className="flex min-h-[50px] items-center justify-between gap-3 rounded-2xl border border-white/12 bg-black/20 px-4 py-3 text-sm text-white/85">
                     <label className="flex items-center gap-3">
                       <input type="checkbox" checked={row.isActive} onChange={(e) => updateRow(row.id, { isActive: e.target.checked })} className="h-4 w-4 rounded border-white/15 bg-black/40" />
                       Active
