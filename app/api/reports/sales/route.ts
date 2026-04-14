@@ -156,6 +156,7 @@ function isWithinDateRange(value: Date, dateFrom?: string, dateTo?: string) {
 
 function buildRows(
   orders: OrderWithRelations[],
+  documentType: string,
   dateFrom?: string,
   dateTo?: string
 ): CsvTransactionRow[] {
@@ -163,11 +164,16 @@ function buildRows(
 
   for (const order of orders) {
     const orderDate = new Date(order.createdAt);
-    if (isWithinDateRange(orderDate, dateFrom, dateTo)) {
+    const orderDocumentType = getOrderDocumentType(order);
+
+    if (
+      (documentType === "ALL" || documentType === orderDocumentType) &&
+      isWithinDateRange(orderDate, dateFrom, dateTo)
+    ) {
       rows.push({
         date: orderDate,
         docNo: order.orderNumber,
-        documentType: getOrderDocumentType(order),
+        documentType: orderDocumentType,
         customer: order.user?.name || "",
         customerEmail: order.user?.email || "",
         customerPhone: order.user?.phone || "",
@@ -187,7 +193,10 @@ function buildRows(
 
     if (order.creditNote) {
       const cnDate = new Date(order.creditNote.cnDate);
-      if (isWithinDateRange(cnDate, dateFrom, dateTo)) {
+      if (
+        (documentType === "ALL" || documentType === "CN") &&
+        isWithinDateRange(cnDate, dateFrom, dateTo)
+      ) {
         rows.push({
           date: cnDate,
           docNo: order.creditNote.cnNo,
@@ -242,7 +251,6 @@ export async function GET(req: Request) {
     customerKeyword,
     tuningType,
     orderType,
-    documentType,
     page: 1,
     pageSize: 10000,
   })) as {
@@ -253,7 +261,7 @@ export async function GET(req: Request) {
     totalPages: number;
   };
 
-  const rows = buildRows(result.orders, dateFrom, dateTo);
+  const rows = buildRows(result.orders, documentType, dateFrom, dateTo);
 
   const csvRows = [
     [
