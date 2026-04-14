@@ -97,6 +97,8 @@ function buildTransactions(
   const rows: RevenueTransaction[] = [];
 
   for (const order of orders) {
+    if (order.status === "CANCELLED") continue;
+
     const orderDate = new Date(order.createdAt);
     if (isWithinDateRange(orderDate, dateFrom, dateTo)) {
       rows.push({
