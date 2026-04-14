@@ -158,25 +158,25 @@ const SUMMARY_CARDS: Array<{
     key: "pending_completion",
     label: "Pending Completion",
     toneClass:
-      "border-amber-400/40 bg-black/60 text-amber-100 shadow-[0_0_24px_rgba(251,191,36,0.14)] hover:border-amber-300/60 hover:bg-black/70",
+      "border-amber-400/35 bg-black/40 text-amber-100 shadow-[0_0_16px_rgba(251,191,36,0.12)] hover:border-amber-300/50 hover:bg-black/50",
   },
   {
     key: "awaiting_payment",
     label: "Awaiting Payment",
     toneClass:
-      "border-orange-400/40 bg-black/60 text-orange-100 shadow-[0_0_24px_rgba(251,146,60,0.14)] hover:border-orange-300/60 hover:bg-black/70",
+      "border-orange-400/35 bg-black/40 text-orange-100 shadow-[0_0_16px_rgba(251,146,60,0.12)] hover:border-orange-300/50 hover:bg-black/50",
   },
   {
     key: "new_orders",
     label: "New Orders",
     toneClass:
-      "border-sky-400/40 bg-black/60 text-sky-100 shadow-[0_0_24px_rgba(56,189,248,0.14)] hover:border-sky-300/60 hover:bg-black/70",
+      "border-sky-400/35 bg-black/40 text-sky-100 shadow-[0_0_16px_rgba(56,189,248,0.12)] hover:border-sky-300/50 hover:bg-black/50",
   },
   {
     key: "partially_paid",
     label: "Partially Paid",
     toneClass:
-      "border-fuchsia-400/40 bg-black/60 text-fuchsia-100 shadow-[0_0_24px_rgba(217,70,239,0.14)] hover:border-fuchsia-300/60 hover:bg-black/70",
+      "border-fuchsia-400/35 bg-black/40 text-fuchsia-100 shadow-[0_0_16px_rgba(217,70,239,0.12)] hover:border-fuchsia-300/50 hover:bg-black/50",
   },
 ];
 
