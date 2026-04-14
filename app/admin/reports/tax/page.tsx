@@ -1,4 +1,3 @@
-
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
@@ -201,7 +200,7 @@ function buildTaxReportRows(orders: any[], filters: { taxCode?: string; transact
   const rows: TaxReportRow[] = [];
 
   for (const order of orders) {
-    const invoiceRows = getOrderLineItemTaxRows(order);
+    const invoiceRows = order.status === "CANCELLED" ? [] : getOrderLineItemTaxRows(order);
     const creditNoteRows = getCreditNoteTaxRows(order);
 
     for (const row of [...invoiceRows, ...creditNoteRows]) {

@@ -396,7 +396,12 @@ export async function getCustomersReport(filters?: CustomersReportOptions) {
     }
   }
 
-  const orderWhere: Prisma.OrderWhereInput = Object.keys(createdAt).length > 0 ? { createdAt } : {};
+  const orderWhere: Prisma.OrderWhereInput = {
+    ...(Object.keys(createdAt).length > 0 ? { createdAt } : {}),
+    status: {
+      not: "CANCELLED",
+    },
+  };
 
   const where: Prisma.UserWhereInput = {
     role: "CUSTOMER",
@@ -456,6 +461,7 @@ export async function getCustomersReport(filters?: CustomersReportOptions) {
           orderType: true,
           totalAmount: true,
           customGrandTotal: true,
+          status: true,
         },
       },
     },
@@ -463,15 +469,17 @@ export async function getCustomersReport(filters?: CustomersReportOptions) {
   });
 
   return customers.map((customer) => {
-    const totalOrders = customer.orders.length;
-    const totalSpent = customer.orders.reduce((sum, order) => {
+    const validOrders = customer.orders.filter((order) => order.status !== "CANCELLED");
+    const totalOrders = validOrders.length;
+    const totalSpent = validOrders.reduce((sum, order) => {
       return sum + Number(order.orderType === "CUSTOM_ORDER" ? order.customGrandTotal || 0 : order.totalAmount || 0);
     }, 0);
 
-    const lastOrderDate = totalOrders > 0 ? customer.orders[0].createdAt : null;
+    const lastOrderDate = totalOrders > 0 ? validOrders[0].createdAt : null;
 
     return {
       ...customer,
+      orders: validOrders,
       totalOrders,
       totalSpent,
       lastOrderDate,
@@ -538,13 +546,14 @@ export async function getCustomerByIdWithIntelligence(customerId: string) {
 
   if (!customer) return null;
 
-  const totalOrders = customer.orders.length;
-  const totalSpent = customer.orders.reduce((sum, order) => {
+  const validOrders = customer.orders.filter((order) => order.status !== "CANCELLED");
+  const totalOrders = validOrders.length;
+  const totalSpent = validOrders.reduce((sum, order) => {
     return sum + Number(order.orderType === "CUSTOM_ORDER" ? order.customGrandTotal || 0 : order.totalAmount || 0);
   }, 0);
 
   const averageOrderValue = totalOrders > 0 ? Math.round((totalSpent / totalOrders) * 100) / 100 : 0;
-  const lastOrderDate = totalOrders > 0 ? customer.orders[0].createdAt : null;
+  const lastOrderDate = totalOrders > 0 ? validOrders[0].createdAt : null;
 
   return {
     ...customer,

@@ -238,9 +238,10 @@ export async function GET(req: Request) {
   const rows: TaxCsvRow[] = [];
 
   for (const order of orders) {
-    const combinedRows = [...getOrderLineItemTaxRows(order), ...getCreditNoteTaxRows(order)];
+    const invoiceRows = order.status === "CANCELLED" ? [] : getOrderLineItemTaxRows(order);
+    const creditNoteRows = getCreditNoteTaxRows(order);
 
-    for (const row of combinedRows) {
+    for (const row of [...invoiceRows, ...creditNoteRows]) {
       if (!isWithinDateRange(row.date, dateFrom, dateTo)) continue;
       if (taxCode !== "ALL" && row.taxCode !== taxCode) continue;
       if (transactionType !== "ALL" && row.transactionType !== transactionType) continue;
