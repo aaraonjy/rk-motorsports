@@ -350,8 +350,6 @@ export default async function CustomerPaymentBalanceReportPage({
     dateTo,
   });
 
-  const paginatedRows = paginateItems(tableRows, page, pageSize);
-
   const tableRows = filteredOrders.map((order) => ({
     id: order.id,
     date: formatDate(new Date(order.createdAt)),
@@ -374,6 +372,8 @@ export default async function CustomerPaymentBalanceReportPage({
       amount: formatCurrency(Number(payment.amount || 0)),
     })),
   }));
+
+  const paginatedRows = paginateItems(tableRows, page, pageSize);
 
   return (
     <section className="section-pad">
