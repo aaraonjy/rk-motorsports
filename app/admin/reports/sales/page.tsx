@@ -228,6 +228,7 @@ function isWithinDateRange(value: Date, dateFrom?: string, dateTo?: string) {
 
 function buildSalesTransactionRows(
   orders: OrderWithRelations[],
+  documentType: string,
   dateFrom?: string,
   dateTo?: string
 ): SalesTransactionRow[] {
@@ -235,13 +236,17 @@ function buildSalesTransactionRows(
 
   for (const order of orders) {
     const orderDate = new Date(order.createdAt);
+    const orderDocumentType = getOrderDocumentType(order);
 
-    if (isWithinDateRange(orderDate, dateFrom, dateTo)) {
+    if (
+      (documentType === "ALL" || documentType === orderDocumentType) &&
+      isWithinDateRange(orderDate, dateFrom, dateTo)
+    ) {
       rows.push({
         id: `order-${order.id}`,
         date: orderDate,
         docNo: order.orderNumber,
-        documentType: getOrderDocumentType(order),
+        documentType: orderDocumentType,
         customerName: order.user?.name || "-",
         customerEmail: order.user?.email || "-",
         customerPhone: order.user?.phone || "-",
@@ -261,7 +266,10 @@ function buildSalesTransactionRows(
 
     if (order.creditNote) {
       const cnDate = new Date(order.creditNote.cnDate);
-      if (isWithinDateRange(cnDate, dateFrom, dateTo)) {
+      if (
+        (documentType === "ALL" || documentType === "CN") &&
+        isWithinDateRange(cnDate, dateFrom, dateTo)
+      ) {
         rows.push({
           id: `cn-${order.creditNote.id}`,
           date: cnDate,
@@ -324,7 +332,6 @@ export default async function SalesReportPage({
     customerKeyword,
     tuningType,
     orderType,
-    documentType,
     page: 1,
     pageSize: 10000,
   })) as {
@@ -335,7 +342,7 @@ export default async function SalesReportPage({
     totalPages: number;
   };
 
-  const transactionRows = buildSalesTransactionRows(result.orders, dateFrom, dateTo);
+  const transactionRows = buildSalesTransactionRows(result.orders, documentType, dateFrom, dateTo);
 
   const exportQuery = buildQueryString({
     status,
