@@ -174,10 +174,9 @@ function buildSummaryWhere(summary?: string): Prisma.OrderWhereInput | null {
       };
     case "new_orders":
       return {
-        orderType: "CUSTOM_ORDER",
-        status: {
-          in: ["FILE_RECEIVED", "IN_PROGRESS"],
-        },
+        orderType: "STANDARD_TUNING",
+        source: "ONLINE_PORTAL",
+        status: "FILE_RECEIVED",
       };
     case "partially_paid":
       return {
