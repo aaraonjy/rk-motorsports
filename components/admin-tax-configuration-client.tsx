@@ -27,9 +27,9 @@ type MessageState = { type: "success" | "error"; text: string } | null;
 type EditableTaxCode = TaxCodeItem & { isSaving?: boolean };
 
 const selectClassName =
-  "w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-none transition focus:border-red-400/50 pr-12 appearance-none bg-[right_0.9rem_center] bg-no-repeat";
+  "w-full rounded-2xl border border-white/12 bg-black/20 px-4 py-3 text-white outline-none transition focus:border-red-400/50 pr-12 appearance-none bg-[right_0.9rem_center] bg-no-repeat";
 const inputClassName =
-  "w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-none transition focus:border-red-400/50";
+  "w-full rounded-2xl border border-white/12 bg-black/20 px-4 py-3 text-white outline-none transition focus:border-red-400/50";
 
 export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) {
   const [config, setConfig] = useState(initialConfig);
@@ -182,7 +182,7 @@ export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) 
             <div>
               <h2 className="text-2xl font-semibold">Module Configuration</h2>
             </div>
-            <div className={`rounded-full border px-4 py-2 text-sm font-semibold ${config.taxModuleEnabled ? "border-emerald-500/30 bg-emerald-500/15 text-emerald-200" : "border-white/10 bg-white/5 text-white/75"}`}>
+            <div className={`rounded-full border px-4 py-2 text-sm font-semibold ${config.taxModuleEnabled ? "border-emerald-500/30 bg-emerald-500/15 text-emerald-200" : "border-white/12 bg-white/5 text-white/75"}`}>
               {config.taxModuleEnabled ? "Tax Module Enabled" : "Tax Module Disabled"}
             </div>
           </div>
@@ -195,7 +195,7 @@ export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) 
                 <button
                   type="button"
                   onClick={handleModuleToggle}
-                  className={`mt-auto inline-flex min-h-[50px] w-full items-center justify-center rounded-2xl border px-4 py-3 text-sm font-semibold transition ${config.taxModuleEnabled ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-200 hover:bg-emerald-500/20" : "border-white/10 bg-white/[0.04] text-white/85 hover:bg-white/[0.08]"}`}
+                  className={`mt-auto inline-flex min-h-[50px] w-full items-center justify-center rounded-2xl border px-4 py-3 text-sm font-semibold transition ${config.taxModuleEnabled ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-200 hover:bg-emerald-500/20" : "border-white/12 bg-white/[0.04] text-white/85 hover:bg-white/[0.08]"}`}
                 >
                   {config.taxModuleEnabled ? "ON" : "OFF"}
                 </button>
@@ -214,7 +214,8 @@ export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) 
                       taxCalculationMode: event.target.value as TaxCalculationModeValue,
                     }))
                   }
-                  className={`${selectClassName} mt-auto`}
+                  disabled={!config.taxModuleEnabled}
+                  className={`${selectClassName} mt-auto disabled:cursor-not-allowed disabled:opacity-50`}
                   style={selectStyle}
                 >
                   <option value="TRANSACTION">Per Transaction</option>
@@ -230,7 +231,8 @@ export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) 
                 <select
                   value={config.defaultPortalTaxCodeId}
                   onChange={(event) => setConfig((prev) => ({ ...prev, defaultPortalTaxCodeId: event.target.value }))}
-                  className={`${selectClassName} mt-auto`}
+                  disabled={!config.taxModuleEnabled}
+                  className={`${selectClassName} mt-auto disabled:cursor-not-allowed disabled:opacity-50`}
                   style={selectStyle}
                 >
                   <option value="">No default tax code</option>
@@ -250,7 +252,8 @@ export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) 
                 <select
                   value={config.defaultAdminTaxCodeId}
                   onChange={(event) => setConfig((prev) => ({ ...prev, defaultAdminTaxCodeId: event.target.value }))}
-                  className={`${selectClassName} mt-auto`}
+                  disabled={!config.taxModuleEnabled}
+                  className={`${selectClassName} mt-auto disabled:cursor-not-allowed disabled:opacity-50`}
                   style={selectStyle}
                 >
                   <option value="">No default tax code</option>
@@ -276,7 +279,7 @@ export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) 
                 type="button"
                 onClick={() => saveConfiguration()}
                 disabled={isSavingConfig}
-                className="inline-flex min-h-[48px] items-center justify-center rounded-2xl border border-white/10 bg-black/30 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-70"
+                className="inline-flex min-h-[48px] items-center justify-center rounded-2xl border border-white/12 bg-black/30 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-70"
               >
                 {isSavingConfig ? "Saving..." : "Save Tax Configuration"}
               </button>
@@ -296,7 +299,7 @@ export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) 
             <button
               type="button"
               onClick={() => setIsCreateFormOpen((prev) => !prev)}
-              className="inline-flex min-h-[44px] items-center justify-center rounded-2xl border border-white/10 bg-black/30 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10"
+              className="inline-flex min-h-[44px] items-center justify-center rounded-2xl border border-white/12 bg-black/30 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10"
             >
               {isCreateFormOpen ? "Cancel" : "Create Tax Code"}
             </button>
@@ -312,11 +315,11 @@ export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) 
               <option value="EXCLUSIVE">Exclusive</option>
               <option value="INCLUSIVE">Inclusive</option>
             </select>
-            <label className="flex min-h-[50px] items-center gap-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/85">
+            <label className="flex min-h-[50px] items-center gap-3 rounded-2xl border border-white/12 bg-black/20 px-4 py-3 text-sm text-white/85">
               <input type="checkbox" checked={newTaxCode.isActive} onChange={(e) => setNewTaxCode((prev) => ({ ...prev, isActive: e.target.checked }))} className="h-4 w-4 rounded border-white/15 bg-black/40" />
               Active tax code
             </label>
-            <button type="button" onClick={createTaxCode} disabled={isCreatingCode} className="inline-flex min-h-[50px] items-center justify-center rounded-2xl border border-white/10 bg-black/30 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-70">
+            <button type="button" onClick={createTaxCode} disabled={isCreatingCode} className="inline-flex min-h-[50px] items-center justify-center rounded-2xl border border-white/12 bg-black/30 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-70">
               {isCreatingCode ? "Creating..." : "Save"}
             </button>
           </div>
@@ -342,7 +345,7 @@ export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) 
                     <option value="EXCLUSIVE">Exclusive</option>
                     <option value="INCLUSIVE">Inclusive</option>
                   </select>
-                  <div className="flex min-h-[50px] items-center justify-between gap-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/85">
+                  <div className="flex min-h-[50px] items-center justify-between gap-3 rounded-2xl border border-white/12 bg-black/20 px-4 py-3 text-sm text-white/85">
                     <label className="flex items-center gap-3">
                       <input type="checkbox" checked={row.isActive} onChange={(e) => updateRow(row.id, { isActive: e.target.checked })} className="h-4 w-4 rounded border-white/15 bg-black/40" />
                       Active
@@ -351,7 +354,7 @@ export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) 
                       {Number(row.rate || 0).toFixed(2)}%
                     </span>
                   </div>
-                  <button type="button" onClick={() => saveTaxCode(row)} disabled={Boolean(row.isSaving)} className="inline-flex min-h-[50px] items-center justify-center rounded-2xl border border-white/10 bg-black/30 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-70">
+                  <button type="button" onClick={() => saveTaxCode(row)} disabled={Boolean(row.isSaving)} className="inline-flex min-h-[50px] items-center justify-center rounded-2xl border border-white/12 bg-black/30 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-70">
                     {row.isSaving ? "Saving..." : "Save"}
                   </button>
                 </div>
