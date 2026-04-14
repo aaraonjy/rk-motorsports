@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   CustomOrderItem,
   Order,
@@ -197,7 +197,13 @@ function formatDisplayDate(value?: string | Date | null) {
 }
 
 
-function getDisplayRows(orders: OrderWithRelations[], transactionView: TransactionView): DisplayRow[] {
+function getDisplayRows(
+  orders: OrderWithRelations[],
+  transactionView: TransactionView,
+  options?: {
+    hideCreditNoteRows?: boolean;
+  }
+): DisplayRow[] {
   if (transactionView === "ORDER") {
     return orders.map((order) => ({ kind: "ORDER", order }));
   }
@@ -210,7 +216,7 @@ function getDisplayRows(orders: OrderWithRelations[], transactionView: Transacti
 
   return orders.flatMap((order) => {
     const rows: DisplayRow[] = [{ kind: "ORDER", order }];
-    if (order.creditNote) {
+    if (order.creditNote && !options?.hideCreditNoteRows) {
       rows.push({ kind: "CN", order, creditNote: order.creditNote });
     }
     return rows;
@@ -1273,13 +1279,18 @@ export function OrderTable({
   transactionView?: TransactionView;
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [activeRequest, setActiveRequest] = useState<{ details: string; title: string; subtitle: string } | null>(null);
   const [cancelOrderId, setCancelOrderId] = useState<string | null>(null);
   const [customerCancelOrderId, setCustomerCancelOrderId] = useState<string | null>(null);
   const [releaseOrderId, setReleaseOrderId] = useState<string | null>(null);
   const [createCreditNoteOrderId, setCreateCreditNoteOrderId] = useState<string | null>(null);
   const [uploadModal, setUploadModal] = useState<UploadModalState>(null);
-  const displayRows = getDisplayRows(orders, admin ? transactionView : "ORDER");
+  const activePaymentStatus = searchParams.get("paymentStatus") || "ALL";
+  const hideCreditNoteRows = activePaymentStatus === "PAID";
+  const displayRows = getDisplayRows(orders, admin ? transactionView : "ORDER", {
+    hideCreditNoteRows,
+  });
 
   const canNavigateToOrderEdit = (order: OrderWithRelations) =>
     admin &&
