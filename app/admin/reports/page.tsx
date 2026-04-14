@@ -1,3 +1,4 @@
+
 import Link from "next/link";
 import { getSessionUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
@@ -72,6 +73,12 @@ export default async function AdminReportsPage() {
                 href="/admin/reports/customer-payment-balance"
                 title="Customer Payment Balance Report"
                 description="Review custom order payment balances with filters for customer, date range, order status, payment status, outstanding records, and export as CSV."
+              />
+
+              <ReportCard
+                href="/admin/reports/tax"
+                title="Tax Report"
+                description="Review invoice and credit note tax rows, filter by tax code, preview net tax with CN shown as negative rows, and export as CSV."
               />
             </div>
           </div>
