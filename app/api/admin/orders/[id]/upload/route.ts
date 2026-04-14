@@ -1,43 +1,28 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
+import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { getSessionUser } from "@/lib/auth";
-import { calculatePaymentSummary } from "@/lib/payment-summary";
-import { saveFile } from "@/lib/storage";
+import {
+  saveFile,
+  validatePackageUploadFiles,
+  validateSingleUploadFile,
+} from "@/lib/storage";
 
-type CustomOrderItemPayload = {
-  description: string;
-  qty: number;
-  unitPrice: number;
-  lineTotal: number;
-  uom?: string | null;
-};
-
-function sanitizeWholeNumber(value: unknown) {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed) || parsed < 0) return 0;
-  return Math.floor(parsed);
+function needsEcu(tuningType: string | null | undefined) {
+  return tuningType === "ECU" || tuningType === "ECU_TCU" || !tuningType;
 }
 
-function sanitizeMoneyAmount(value: unknown) {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed) || parsed < 0) return 0;
-  return Math.round((parsed + Number.EPSILON) * 100) / 100;
+function needsTcu(tuningType: string | null | undefined) {
+  return tuningType === "TCU" || tuningType === "ECU_TCU";
 }
 
-function nearlyEqual(a: number, b: number) {
-  return Math.abs(a - b) < 0.005;
-}
+function getUploadSuccess(uploads: Array<{ kind: string; file: File }>) {
+  const hasEcu = uploads.some((upload) => upload.kind === "ADMIN_ECU");
+  const hasTcu = uploads.some((upload) => upload.kind === "ADMIN_TCU");
 
-function isAllowedPaymentMode(value: string) {
-  return ["CASH", "CARD", "BANK_TRANSFER", "QR"].includes(value);
-}
-
-function isAllowedSupportingFile(file: File) {
-  return file.type.startsWith("image/") || file.type.startsWith("video/");
-}
-
-function hasSpacing(value: string) {
-  return /\s/.test(value);
+  if (hasEcu && hasTcu) return "tuned_files_uploaded";
+  if (hasTcu) return "tuned_tcu_uploaded";
+  return "tuned_ecu_uploaded";
 }
 
 export async function POST(
@@ -45,284 +30,152 @@ export async function POST(
   ctx: { params: Promise<{ id: string }> }
 ) {
   try {
-    const user = await getSessionUser();
-
-    if (!user) {
-      return NextResponse.json(
-        { ok: false, error: "You must be logged in." },
-        { status: 401 }
-      );
-    }
-
-    if (user.role !== "ADMIN") {
-      return NextResponse.json(
-        { ok: false, error: "Only admin can edit custom orders." },
-        { status: 403 }
-      );
-    }
+    await requireAdmin();
 
     const { id } = await ctx.params;
     const form = await req.formData();
 
+    const singleFile = form.get("file");
+    const target = String(form.get("target") || "").trim().toUpperCase();
+
+    const ecuFile = form.get("ecuFile");
+    const tcuFile = form.get("tcuFile");
+
     const order = await db.order.findUnique({
       where: { id },
       include: {
-        customItems: true,
-        payments: {
-          orderBy: { paymentDate: "asc" },
-          select: {
-            id: true,
-            amount: true,
-          },
-        },
+        files: true,
       },
     });
 
-    if (!order || order.orderType !== "CUSTOM_ORDER") {
-      return NextResponse.json(
-        { ok: false, error: "Custom order not found." },
-        { status: 404 }
-      );
+    if (!order) {
+      return NextResponse.redirect(new URL("/admin", req.url), 303);
     }
 
-    if (order.status === "COMPLETED" || order.status === "CANCELLED") {
-      return NextResponse.json(
-        { ok: false, error: "Completed or cancelled custom orders cannot be edited." },
-        { status: 400 }
-      );
-    }
+    const uploads: Array<{ kind: string; file: File }> = [];
 
-    const customerId = String(form.get("customerId") || "").trim();
-    const customTitle = String(form.get("customTitle") || "").trim();
-    const rawVehicleNo = String(form.get("vehicleNo") || "");
-    const submittedVehicleNo = rawVehicleNo.trim().toUpperCase();
-    const vehicleNo = submittedVehicleNo || order.vehicleNo || "";
-    const internalRemarks = String(form.get("internalRemarks") || "").trim();
-    const itemsRaw = String(form.get("items") || "[]");
-    const items = JSON.parse(itemsRaw) as CustomOrderItemPayload[];
-    const paymentMode = String(form.get("paymentMode") || "CASH").trim().toUpperCase();
-    const paymentAmount = sanitizeMoneyAmount(form.get("paymentAmount"));
-
-    if (!customerId || customerId !== order.userId) {
-      return NextResponse.json(
-        { ok: false, error: "Customer information is invalid." },
-        { status: 400 }
-      );
-    }
-
-    if (!customTitle) {
-      return NextResponse.json(
-        { ok: false, error: "Description is required." },
-        { status: 400 }
-      );
-    }
-
-    if (hasSpacing(rawVehicleNo)) {
-      return NextResponse.json(
-        { ok: false, error: "No spacing is allowed in Vehicle No." },
-        { status: 400 }
-      );
-    }
-
-    const normalizedItems = items
-      .map((item) => {
-        const description = String(item.description || "").trim();
-        const qty = Math.max(1, sanitizeWholeNumber(item.qty));
-        const unitPrice = Math.max(0, sanitizeMoneyAmount(item.unitPrice));
-        const lineTotal = Math.round((qty * unitPrice + Number.EPSILON) * 100) / 100;
-        const uom = String(item.uom || "").trim();
-
-        return {
-          description,
-          qty,
-          unitPrice,
-          lineTotal,
-          uom: uom || null,
-        };
-      })
-      .filter((item) => item.description.length > 0);
-
-    if (normalizedItems.length === 0) {
-      return NextResponse.json(
-        { ok: false, error: "Please provide at least one valid line item." },
-        { status: 400 }
-      );
-    }
-
-    const calculatedSubtotal = Math.round(
-      (normalizedItems.reduce((sum, item) => sum + item.lineTotal, 0) + Number.EPSILON) * 100
-    ) / 100;
-    const customDiscount = Math.max(0, sanitizeMoneyAmount(form.get("customDiscount")));
-    const calculatedGrandTotal = Math.round(
-      (Math.max(calculatedSubtotal - customDiscount, 0) + Number.EPSILON) * 100
-    ) / 100;
-
-    const customSubtotal = sanitizeMoneyAmount(form.get("customSubtotal"));
-    const customGrandTotal = sanitizeMoneyAmount(form.get("customGrandTotal"));
-
-    if (!nearlyEqual(customSubtotal, calculatedSubtotal) || !nearlyEqual(customGrandTotal, calculatedGrandTotal)) {
-      return NextResponse.json(
-        { ok: false, error: "Order totals are invalid. Please refresh and try again." },
-        { status: 400 }
-      );
-    }
-
-    const existingTotalPaid = order.payments.reduce(
-      (sum, payment) => sum + Number(payment.amount || 0),
-      0
-    );
-
-    if (calculatedGrandTotal < existingTotalPaid) {
-      return NextResponse.json(
-        { ok: false, error: "Grand total cannot be lower than the total paid amount." },
-        { status: 400 }
-      );
-    }
-
-    const supportingFiles = form
-      .getAll("supportingFiles")
-      .filter((value): value is File => value instanceof File && value.size > 0);
-
-    if (supportingFiles.length > 5) {
-      return NextResponse.json(
-        { ok: false, error: "Maximum 5 supporting files are allowed." },
-        { status: 400 }
-      );
-    }
-
-    const supportingFilesTotalSize = supportingFiles.reduce(
-      (sum, file) => sum + file.size,
-      0
-    );
-
-    if (supportingFilesTotalSize > 25 * 1024 * 1024) {
-      return NextResponse.json(
-        { ok: false, error: "Total supporting file size must not exceed 25MB." },
-        { status: 400 }
-      );
-    }
-
-    if (!supportingFiles.every(isAllowedSupportingFile)) {
-      return NextResponse.json(
-        { ok: false, error: "Supporting documents only allow image or video files." },
-        { status: 400 }
-      );
-    }
-
-    if (paymentAmount > 0 && !isAllowedPaymentMode(paymentMode)) {
-      return NextResponse.json(
-        { ok: false, error: "Invalid payment mode." },
-        { status: 400 }
-      );
-    }
-
-    const currentOutstandingBalance = Math.max(calculatedGrandTotal - existingTotalPaid, 0);
-
-    if (paymentAmount > currentOutstandingBalance) {
-      return NextResponse.json(
-        { ok: false, error: "Payment amount cannot exceed the outstanding balance." },
-        { status: 400 }
-      );
-    }
-
-    const paymentDateRaw = String(form.get("paymentDate") || "").trim();
-    const paymentDate = paymentDateRaw ? new Date(paymentDateRaw) : new Date();
-    if (paymentAmount > 0) {
-      if (Number.isNaN(paymentDate.getTime())) {
-        return NextResponse.json(
-          { ok: false, error: "Invalid payment date." },
-          { status: 400 }
-        );
-      }
-      paymentDate.setHours(0, 0, 0, 0);
-    }
-
-    const newPayments = [
-      ...order.payments.map((payment) => ({ amount: Number(payment.amount || 0) })),
-      ...(paymentAmount > 0 ? [{ amount: paymentAmount }] : []),
-    ];
-    const paymentSummary = calculatePaymentSummary(newPayments, calculatedGrandTotal);
-
-    const requestDetailsLines = [
-      `Order Type: Custom Order`,
-      `Title / Summary: ${customTitle}`,
-      `Vehicle No: ${vehicleNo || "None"}`,
-      `Internal Remarks: ${internalRemarks || "None"}`,
-      `Subtotal: RM${calculatedSubtotal}`,
-      `Discount: RM${customDiscount}`,
-      `Grand Total: RM${calculatedGrandTotal}`,
-      `New Payment Added: RM${paymentAmount}`,
-      `Items: ${normalizedItems.length}`,
-    ];
-
-    const supportingFilesToCreate: Array<{
-      kind: string;
-      fileName: string;
-      storagePath: string;
-      mimeType: string | null;
-    }> = [];
-
-    for (const file of supportingFiles) {
-      const savedFile = await saveFile(file, "custom-order-supporting-doc");
-      supportingFilesToCreate.push({
-        kind: "SUPPORTING_DOC",
-        fileName: savedFile.fileName,
-        storagePath: savedFile.storagePath,
-        mimeType: savedFile.mimeType,
+    if (singleFile instanceof File && singleFile.size > 0) {
+      uploads.push({
+        kind: target === "TCU" ? "ADMIN_TCU" : "ADMIN_ECU",
+        file: singleFile,
       });
     }
 
-    await db.$transaction(async (tx) => {
-      await tx.customOrderItem.deleteMany({
-        where: { orderId: order.id },
+    if (ecuFile instanceof File && ecuFile.size > 0) {
+      uploads.push({
+        kind: "ADMIN_ECU",
+        file: ecuFile,
       });
+    }
 
-      await tx.order.update({
-        where: { id: order.id },
-        data: {
-          customTitle,
-          vehicleNo: vehicleNo || null,
-          internalRemarks: internalRemarks || null,
-          customSubtotal: calculatedSubtotal,
-          customDiscount,
-          customGrandTotal: calculatedGrandTotal,
-          totalAmount: calculatedGrandTotal,
-          totalPaid: Number(paymentSummary.totalPaid || 0),
-          outstandingBalance: Number(paymentSummary.outstandingBalance || 0),
-          requestDetails: requestDetailsLines.join("\n"),
-          customItems: {
-            create: normalizedItems,
-          },
-          files:
-            supportingFilesToCreate.length
-              ? {
-                  create: supportingFilesToCreate,
-                }
-              : undefined,
+    if (tcuFile instanceof File && tcuFile.size > 0) {
+      uploads.push({
+        kind: "ADMIN_TCU",
+        file: tcuFile,
+      });
+    }
+
+    if (uploads.length === 0) {
+      return NextResponse.redirect(new URL("/admin", req.url), 303);
+    }
+
+    const validationMessage =
+      uploads.length > 1
+        ? validatePackageUploadFiles(uploads.map((upload) => upload.file))
+        : validateSingleUploadFile(uploads[0].file);
+
+    if (validationMessage) {
+      return NextResponse.json({ error: validationMessage }, { status: 400 });
+    }
+
+    for (const upload of uploads) {
+      const saved = await saveFile(
+        upload.file,
+        upload.kind === "ADMIN_TCU" ? "admin-tuned-tcu" : "admin-tuned-ecu"
+      );
+
+      const existing = await db.orderFile.findFirst({
+        where: {
+          orderId: id,
+          kind: upload.kind,
         },
       });
 
-      if (paymentAmount > 0) {
-        await tx.payment.create({
+      if (existing) {
+        await db.orderFile.update({
+          where: { id: existing.id },
           data: {
-            orderId: order.id,
-            paymentDate,
-            paymentMode,
-            amount: paymentAmount,
+            fileName: saved.fileName,
+            storagePath: saved.storagePath,
+            mimeType: saved.mimeType,
+          },
+        });
+      } else {
+        await db.orderFile.create({
+          data: {
+            orderId: id,
+            kind: upload.kind,
+            fileName: saved.fileName,
+            storagePath: saved.storagePath,
+            mimeType: saved.mimeType,
           },
         });
       }
+    }
+
+    const refreshedFiles = await db.orderFile.findMany({
+      where: { orderId: id },
     });
 
-    return NextResponse.json({
-      ok: true,
-      redirectTo: "/admin?success=custom_order_updated",
+    const hasRequiredEcu =
+      !needsEcu(order.tuningType) ||
+      refreshedFiles.some((f) => f.kind === "ADMIN_ECU") ||
+      refreshedFiles.some((f) => f.kind === "ADMIN_COMPLETED");
+
+    const hasRequiredTcu =
+      !needsTcu(order.tuningType) ||
+      refreshedFiles.some((f) => f.kind === "ADMIN_TCU");
+
+    const nextStatus =
+      hasRequiredEcu && hasRequiredTcu ? "AWAITING_PAYMENT" : "IN_PROGRESS";
+
+    await db.order.update({
+      where: { id },
+      data: {
+        status: nextStatus,
+      },
     });
-  } catch (error) {
-    console.error("PUT /api/admin/orders/[id]/upload failed:", error);
-    return NextResponse.json(
-      { ok: false, error: "Unable to update custom order right now." },
-      { status: 500 }
+
+    if (nextStatus === "AWAITING_PAYMENT") {
+      try {
+        await db.notification.create({
+          data: {
+            userId: order.userId,
+            type: "TUNED_FILE_READY",
+            title: "Tuned file ready",
+            message:
+              order.tuningType === "ECU_TCU"
+                ? "Your tuned ECU and TCU files are ready, pending payment."
+                : order.tuningType === "TCU"
+                  ? "Your tuned TCU file is ready, pending payment."
+                  : "Your tuned ECU file is ready, pending payment.",
+            orderId: id,
+          },
+        });
+      } catch (err) {
+        console.error("Customer notification failed:", err);
+      }
+    }
+
+    revalidatePath("/admin");
+    revalidatePath("/dashboard");
+
+    return NextResponse.redirect(
+      new URL(`/admin?success=${getUploadSuccess(uploads)}&t=${Date.now()}`, req.url),
+      303
     );
+  } catch (error) {
+    console.error("POST /api/admin/orders/[id]/upload failed:", error);
+    return NextResponse.redirect(new URL("/admin", req.url), 303);
   }
 }
