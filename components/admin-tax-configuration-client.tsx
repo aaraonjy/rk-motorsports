@@ -58,7 +58,7 @@ export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) 
   } as const;
 
   const activeTaxCodes = useMemo(() => taxCodeRows.filter((item) => item.isActive), [taxCodeRows]);
-  const visibleTaxCodeRows = useMemo(() => taxCodeRows.filter((item) => item.isActive), [taxCodeRows]);
+  const visibleTaxCodeRows = useMemo(() => taxCodeRows, [taxCodeRows]);
 
   const hasConfigChanges =
     config.taxModuleEnabled !== savedConfig.taxModuleEnabled ||
@@ -342,10 +342,17 @@ export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) 
 
         <div className="mt-6 space-y-4">
           {visibleTaxCodeRows.length === 0 ? (
-            <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-5 text-sm text-white/65">No active tax codes have been created yet.</div>
+            <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-5 text-sm text-white/65">No tax codes have been created yet.</div>
           ) : (
             visibleTaxCodeRows.map((row) => (
-              <div key={row.id} className="rounded-3xl border border-white/10 bg-black/20 p-4">
+              <div
+                key={row.id}
+                className={`rounded-3xl border p-4 transition ${
+                  row.isActive
+                    ? "border-white/10 bg-black/20"
+                    : "border-white/10 bg-black/10 opacity-65"
+                }`}
+              >
                 <div className="grid gap-3 md:grid-cols-[1fr_1.5fr_0.7fr_1fr_1fr_1fr_auto] md:items-center">
                   <input className={inputClassName} value={row.code} onChange={(e) => updateRow(row.id, { code: e.target.value.toUpperCase() })} />
                   <input className={inputClassName} value={row.description} onChange={(e) => updateRow(row.id, { description: e.target.value })} />
@@ -361,11 +368,22 @@ export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) 
                   <div className="flex min-h-[50px] items-center justify-between gap-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/85">
                     <label className="flex items-center gap-3">
                       <input type="checkbox" checked={row.isActive} onChange={(e) => updateRow(row.id, { isActive: e.target.checked })} className="h-4 w-4 rounded border-white/15 bg-black/40" />
-                      Active
+                      {row.isActive ? "Active" : "Inactive"}
                     </label>
-                    <span className="rounded-full border border-emerald-500/30 bg-emerald-500/15 px-3 py-1 text-xs font-semibold text-emerald-200">
-                      {Number(row.rate || 0).toFixed(2)}%
-                    </span>
+                    <div className="flex items-center gap-2">
+                      {!row.isActive ? (
+                        <span className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-1 text-xs font-semibold text-white/60">
+                          Inactive
+                        </span>
+                      ) : null}
+                      <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${
+                        row.isActive
+                          ? "border-emerald-500/30 bg-emerald-500/15 text-emerald-200"
+                          : "border-white/10 bg-white/[0.06] text-white/60"
+                      }`}>
+                        {Number(row.rate || 0).toFixed(2)}%
+                      </span>
+                    </div>
                   </div>
                   <button type="button" onClick={() => saveTaxCode(row)} disabled={Boolean(row.isSaving)} className="inline-flex min-h-[50px] items-center justify-center rounded-2xl border border-white/10 bg-black/30 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-70">
                     {row.isSaving ? "Saving..." : "Save"}
