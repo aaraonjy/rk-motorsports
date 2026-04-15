@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 type TaxReportPageProps = {
   searchParams?: Promise<{
     taxCode?: string;
+    taxType?: string;
     transactionType?: string;
     dateFrom?: string;
     dateTo?: string;
@@ -26,6 +27,7 @@ type TaxReportRow = {
   unitPrice: number;
   taxableAmount: number;
   taxCode: string;
+  taxType: "SALES" | "SERVICE" | "";
   taxRate: number;
   taxAmount: number;
 };
@@ -82,6 +84,10 @@ function getInvoiceTransactionType(order: any): "CS" | "INV" {
   return String(order.docType || "").toUpperCase() === "CS" ? "CS" : "INV";
 }
 
+function getTaxTypeLabel(value?: string | null) {
+  return value === "SALES" ? "Sales Tax" : "Service Tax";
+}
+
 function getOrderLineItemTaxRows(order: any): TaxReportRow[] {
   const orderDate = new Date(order.documentDate ?? order.createdAt);
   const rows: TaxReportRow[] = [];
@@ -108,6 +114,7 @@ function getOrderLineItemTaxRows(order: any): TaxReportRow[] {
         unitPrice: Number(item.unitPrice ?? 0),
         taxableAmount: Number(item.lineTotal ?? 0),
         taxCode,
+        taxType: "",
         taxRate: Number(item.taxRate ?? 0),
         taxAmount,
       });
@@ -131,6 +138,7 @@ function getOrderLineItemTaxRows(order: any): TaxReportRow[] {
       unitPrice: Number(order.taxableSubtotal ?? order.customSubtotal ?? order.totalAmount ?? 0),
       taxableAmount: Number(order.taxableSubtotal ?? order.customSubtotal ?? order.totalAmount ?? 0),
       taxCode: orderTaxCode,
+      taxType: "",
       taxRate: Number(order.taxRate ?? 0),
       taxAmount: orderTaxAmount,
     });
@@ -198,7 +206,11 @@ function getCreditNoteTaxRows(order: any): TaxReportRow[] {
   return rows;
 }
 
-function buildTaxReportRows(orders: any[], filters: { taxCode?: string; transactionType?: string; dateFrom?: string; dateTo?: string; }) {
+function buildTaxReportRows(
+  orders: any[],
+  filters: { taxCode?: string; taxType?: string; transactionType?: string; dateFrom?: string; dateTo?: string },
+  taxTypeByCode: Record<string, "SALES" | "SERVICE">
+) {
   const rows: TaxReportRow[] = [];
 
   for (const order of orders) {
@@ -206,10 +218,12 @@ function buildTaxReportRows(orders: any[], filters: { taxCode?: string; transact
     const creditNoteRows = getCreditNoteTaxRows(order);
 
     for (const row of [...invoiceRows, ...creditNoteRows]) {
+      const rowTaxType = taxTypeByCode[row.taxCode] || "";
       if (!isWithinDateRange(row.date, filters.dateFrom, filters.dateTo)) continue;
       if (filters.taxCode && filters.taxCode !== "ALL" && row.taxCode !== filters.taxCode) continue;
+      if (filters.taxType && filters.taxType !== "ALL" && rowTaxType !== filters.taxType) continue;
       if (filters.transactionType && filters.transactionType !== "ALL" && row.transactionType !== filters.transactionType) continue;
-      rows.push(row);
+      rows.push({ ...row, taxType: rowTaxType });
     }
   }
 
@@ -362,6 +376,7 @@ export default async function TaxReportPage({ searchParams }: TaxReportPageProps
 
   const params = (await searchParams) || {};
   const taxCode = params.taxCode || "ALL";
+  const taxType = params.taxType || "ALL";
   const transactionType = params.transactionType || "ALL";
   const dateFrom = params.dateFrom || "";
   const dateTo = params.dateTo || "";
@@ -417,13 +432,16 @@ export default async function TaxReportPage({ searchParams }: TaxReportPageProps
       orderBy: { createdAt: "desc" },
     }),
     db.taxCode.findMany({
-      where: { isActive: true },
       orderBy: [{ sortOrder: "asc" }, { code: "asc" }],
-      select: { code: true },
+      select: { code: true, taxType: true, isActive: true },
     }),
   ]);
 
-  const rows = buildTaxReportRows(orders, { taxCode, transactionType, dateFrom, dateTo });
+  const taxTypeByCode = Object.fromEntries(
+    taxCodes.map((item) => [item.code, item.taxType])
+  ) as Record<string, "SALES" | "SERVICE">;
+
+  const rows = buildTaxReportRows(orders, { taxCode, taxType, transactionType, dateFrom, dateTo }, taxTypeByCode);
   const paginatedRows = paginateItems(rows, page, pageSize);
 
   const totalTaxableAmount = rows.reduce((sum, row) => sum + row.taxableAmount, 0);
@@ -431,6 +449,7 @@ export default async function TaxReportPage({ searchParams }: TaxReportPageProps
 
   const exportQuery = buildQueryString({
     taxCode,
+    taxType,
     transactionType,
     dateFrom,
     dateTo,
@@ -468,11 +487,27 @@ export default async function TaxReportPage({ searchParams }: TaxReportPageProps
                   className="w-full appearance-none rounded-xl border border-white/15 bg-black/50 px-4 py-3 pr-12 text-white outline-none"
                 >
                   <option value="ALL">All Tax Codes</option>
-                  {taxCodes.map((item) => (
+                  {taxCodes.filter((item) => item.isActive).map((item) => (
                     <option key={item.code} value={item.code}>
                       {item.code}
                     </option>
                   ))}
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/60">▾</div>
+              </div>
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm text-white/65">Tax Type</label>
+              <div className="relative">
+                <select
+                  name="taxType"
+                  defaultValue={taxType}
+                  className="w-full appearance-none rounded-xl border border-white/15 bg-black/50 px-4 py-3 pr-12 text-white outline-none"
+                >
+                  <option value="ALL">All Tax Types</option>
+                  <option value="SALES">Sales Tax</option>
+                  <option value="SERVICE">Service Tax</option>
                 </select>
                 <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/60">▾</div>
               </div>
@@ -624,7 +659,7 @@ export default async function TaxReportPage({ searchParams }: TaxReportPageProps
             )}
             <PaginationControls
               basePath="/admin/reports/tax"
-              baseParams={{ taxCode, transactionType, dateFrom, dateTo }}
+              baseParams={{ taxCode, taxType, transactionType, dateFrom, dateTo }}
               currentPage={paginatedRows.currentPage}
               pageSize={pageSize}
               totalCount={paginatedRows.totalCount}

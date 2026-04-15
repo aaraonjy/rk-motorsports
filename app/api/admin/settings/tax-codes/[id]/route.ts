@@ -28,6 +28,10 @@ function normalizeCalculationMethod(value: unknown) {
   return value === "INCLUSIVE" ? "INCLUSIVE" : "EXCLUSIVE";
 }
 
+function normalizeTaxType(value: unknown) {
+  return value === "SALES" ? "SALES" : "SERVICE";
+}
+
 export async function PATCH(req: Request, context: Params) {
   try {
     const admin = await requireAdmin();
@@ -44,6 +48,7 @@ export async function PATCH(req: Request, context: Params) {
     const displayLabel = normalizeText(body.displayLabel);
     const rate = normalizeRate(body.rate);
     const calculationMethod = normalizeCalculationMethod(body.calculationMethod);
+    const taxType = normalizeTaxType(body.taxType);
     const isActive = Boolean(body.isActive);
     const sortOrder = Math.max(0, Number(body.sortOrder || 0) || 0);
 
@@ -87,6 +92,7 @@ export async function PATCH(req: Request, context: Params) {
         code,
         description,
         displayLabel: displayLabel || null,
+        taxType,
         rate: new Prisma.Decimal(rate.toFixed(2)),
         calculationMethod,
         isActive,
@@ -107,6 +113,7 @@ export async function PATCH(req: Request, context: Params) {
         code: existing.code,
         description: existing.description,
         displayLabel: existing.displayLabel,
+        taxType: existing.taxType,
         rate: Number(existing.rate),
         calculationMethod: existing.calculationMethod,
         isActive: existing.isActive,
@@ -116,6 +123,7 @@ export async function PATCH(req: Request, context: Params) {
         code: updated.code,
         description: updated.description,
         displayLabel: updated.displayLabel,
+        taxType: updated.taxType,
         rate: Number(updated.rate),
         calculationMethod: updated.calculationMethod,
         isActive: updated.isActive,

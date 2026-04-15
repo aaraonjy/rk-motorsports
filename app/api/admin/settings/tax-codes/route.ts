@@ -22,6 +22,10 @@ function normalizeCalculationMethod(value: unknown) {
   return value === "INCLUSIVE" ? "INCLUSIVE" : "EXCLUSIVE";
 }
 
+function normalizeTaxType(value: unknown) {
+  return value === "SALES" ? "SALES" : "SERVICE";
+}
+
 export async function POST(req: Request) {
   try {
     const admin = await requireAdmin();
@@ -32,6 +36,7 @@ export async function POST(req: Request) {
     const displayLabel = normalizeText(body.displayLabel);
     const rate = normalizeRate(body.rate);
     const calculationMethod = normalizeCalculationMethod(body.calculationMethod);
+    const taxType = normalizeTaxType(body.taxType);
     const isActive = Boolean(body.isActive);
     const sortOrder = Math.max(0, Number(body.sortOrder || 0) || 0);
 
@@ -57,6 +62,7 @@ export async function POST(req: Request) {
         code,
         description,
         displayLabel: displayLabel || null,
+        taxType,
         rate: new Prisma.Decimal(rate.toFixed(2)),
         calculationMethod,
         isActive,
@@ -77,6 +83,7 @@ export async function POST(req: Request) {
         code: created.code,
         description: created.description,
         displayLabel: created.displayLabel,
+        taxType: created.taxType,
         rate: Number(created.rate),
         calculationMethod: created.calculationMethod,
         isActive: created.isActive,

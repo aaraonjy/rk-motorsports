@@ -1,5 +1,6 @@
 export type TaxCalculationMethodValue = "EXCLUSIVE" | "INCLUSIVE";
 export type TaxCalculationModeValue = "TRANSACTION" | "LINE_ITEM";
+export type TaxTypeValue = "SALES" | "SERVICE";
 
 export type TaxBreakdownInput = {
   subtotal: number;
