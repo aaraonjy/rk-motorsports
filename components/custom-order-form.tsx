@@ -571,7 +571,7 @@ export function CustomOrderForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="grid gap-8 xl:grid-cols-[minmax(0,1.45fr)_minmax(360px,0.95fr)]">
+    <form onSubmit={handleSubmit} className="grid gap-8 xl:grid-cols-[minmax(0,1.35fr)_minmax(340px,0.9fr)]">
       <div className="rounded-[2rem] border border-white/10 bg-black/45 p-6 backdrop-blur-md md:p-8">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/45">
@@ -752,7 +752,7 @@ export function CustomOrderForm({
                   </button>
                 </div>
 
-                <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(220px,1.35fr)_minmax(240px,1.75fr)_minmax(80px,0.55fr)_minmax(100px,0.7fr)_minmax(140px,0.9fr)_minmax(150px,0.95fr)]">
+                <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-[minmax(220px,1.3fr)_minmax(220px,1.5fr)_minmax(80px,0.5fr)_minmax(90px,0.55fr)_minmax(130px,0.75fr)_minmax(140px,0.8fr)]">
                   <div>
                     <label className="label-rk">Product Code</label>
                     <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3">

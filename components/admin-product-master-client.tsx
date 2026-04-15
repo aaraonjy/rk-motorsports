@@ -105,6 +105,7 @@ export function AdminProductMasterClient({ initialProducts, locations }: Props) 
   const [itemTypeFilter, setItemTypeFilter] = useState<"ALL" | InventoryItemTypeValue>("ALL");
   const [statusFilter, setStatusFilter] = useState<"ALL" | "ACTIVE" | "INACTIVE">("ALL");
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [form, setForm] = useState<ProductFormState>(emptyForm(defaultLocationId));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
@@ -131,11 +132,19 @@ export function AdminProductMasterClient({ initialProducts, locations }: Props) 
     });
   }, [products, keyword, itemTypeFilter, statusFilter]);
 
-  function resetForm() {
+  function closeModal() {
+    setIsModalOpen(false);
+    setEditingId(null);
+    setForm(emptyForm(defaultLocationId));
+    setSubmitError("");
+  }
+
+  function openAddModal() {
     setEditingId(null);
     setForm(emptyForm(defaultLocationId));
     setSubmitError("");
     setSubmitSuccess("");
+    setIsModalOpen(true);
   }
 
   function startEdit(product: InventoryProductRecord) {
@@ -157,6 +166,7 @@ export function AdminProductMasterClient({ initialProducts, locations }: Props) 
     });
     setSubmitError("");
     setSubmitSuccess("");
+    setIsModalOpen(true);
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -203,10 +213,9 @@ export function AdminProductMasterClient({ initialProducts, locations }: Props) 
         }
         return [saved, ...prev];
       });
-      setEditingId(null);
-      setForm(emptyForm(defaultLocationId));
-      setSubmitError("");
+
       setSubmitSuccess(editingId ? "Product updated successfully." : "Product created successfully.");
+      closeModal();
     } catch {
       setSubmitError("Unable to save product right now.");
     } finally {
@@ -231,9 +240,6 @@ export function AdminProductMasterClient({ initialProducts, locations }: Props) 
         return;
       }
       setProducts((prev) => prev.filter((item) => item.id !== product.id));
-      if (editingId === product.id) {
-        resetForm();
-      }
       setSubmitSuccess("Product deleted successfully.");
     } catch {
       setSubmitError("Unable to delete product right now.");
@@ -241,127 +247,14 @@ export function AdminProductMasterClient({ initialProducts, locations }: Props) 
   }
 
   return (
-    <div className="grid gap-8 xl:grid-cols-[1.05fr_1.55fr]">
-      <form onSubmit={handleSubmit} className="rounded-[2rem] border border-white/10 bg-black/45 p-6 backdrop-blur-md md:p-8">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/45">Product Master</p>
-            <h2 className="mt-3 text-2xl font-bold text-white">{editingId ? "Edit Product" : "Create Product"}</h2>
-          </div>
-          {editingId ? (
-            <button type="button" onClick={resetForm} className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/80 transition hover:bg-white/10">
-              Cancel Edit
-            </button>
-          ) : null}
-        </div>
-
-        <div className="mt-6 space-y-5">
-          <div className="grid gap-4 md:grid-cols-2">
-            <div>
-              <label className="label-rk">Product Code</label>
-              <input className="input-rk" value={form.code} onChange={(e) => setForm((prev) => ({ ...prev, code: e.target.value.toUpperCase() }))} placeholder="e.g. BP-BREMBO-M4" required />
-            </div>
-            <div>
-              <label className="label-rk">Base UOM</label>
-              <input className="input-rk" value={form.baseUom} onChange={(e) => setForm((prev) => ({ ...prev, baseUom: e.target.value.toUpperCase() }))} placeholder="PCS" required />
-            </div>
-          </div>
-
-          <div>
-            <label className="label-rk">Description</label>
-            <input className="input-rk" value={form.description} onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))} placeholder="e.g. Brake Pad (Brembo M4)" required />
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-3">
-            <div>
-              <label className="label-rk">Group</label>
-              <input className="input-rk" value={form.group} onChange={(e) => setForm((prev) => ({ ...prev, group: e.target.value }))} placeholder="Optional" />
-            </div>
-            <div>
-              <label className="label-rk">Sub-Group</label>
-              <input className="input-rk" value={form.subGroup} onChange={(e) => setForm((prev) => ({ ...prev, subGroup: e.target.value }))} placeholder="Optional" />
-            </div>
-            <div>
-              <label className="label-rk">Brand</label>
-              <input className="input-rk" value={form.brand} onChange={(e) => setForm((prev) => ({ ...prev, brand: e.target.value }))} placeholder="Optional" />
-            </div>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <div>
-              <label className="label-rk">Item Type</label>
-              <div className="relative">
-                <select className="input-rk appearance-none pr-12" value={form.itemType} onChange={(e) => {
-                  const itemType = e.target.value as InventoryItemTypeValue;
-                  setForm((prev) => ({
-                    ...prev,
-                    itemType,
-                    trackInventory: itemType === "STOCK_ITEM",
-                  }));
-                }}>
-                  <option value="STOCK_ITEM">Stock Item</option>
-                  <option value="SERVICE_ITEM">Service Item</option>
-                  <option value="NON_STOCK_ITEM">Non-Stock Item</option>
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/60">▾</div>
-              </div>
-            </div>
-            <div>
-              <label className="label-rk">Default Location</label>
-              <div className="relative">
-                <select className="input-rk appearance-none pr-12" value={form.defaultLocationId} onChange={(e) => setForm((prev) => ({ ...prev, defaultLocationId: e.target.value }))}>
-                  <option value="">No default location</option>
-                  {locations.filter((item) => item.isActive).map((location) => (
-                    <option key={location.id} value={location.id}>{location.code} — {location.name}</option>
-                  ))}
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/60">▾</div>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <div>
-              <label className="label-rk">Unit Cost (RM)</label>
-              <input type="number" min="0" step="0.01" className="input-rk" value={form.unitCost} onChange={(e) => setForm((prev) => ({ ...prev, unitCost: e.target.value }))} />
-            </div>
-            <div>
-              <label className="label-rk">Selling Price (RM)</label>
-              <input type="number" min="0" step="0.01" className="input-rk" value={form.sellingPrice} onChange={(e) => setForm((prev) => ({ ...prev, sellingPrice: e.target.value }))} />
-            </div>
-          </div>
-
-          <div className="grid gap-3 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-white/75 md:grid-cols-3">
-            <label className="flex items-center gap-3">
-              <input type="checkbox" checked={form.trackInventory} disabled={form.itemType !== "STOCK_ITEM"} onChange={(e) => setForm((prev) => ({ ...prev, trackInventory: e.target.checked }))} />
-              <span>Track Inventory</span>
-            </label>
-            <label className="flex items-center gap-3">
-              <input type="checkbox" checked={form.serialNumberTracking} onChange={(e) => setForm((prev) => ({ ...prev, serialNumberTracking: e.target.checked }))} />
-              <span>Serial Number Tracking</span>
-            </label>
-            <label className="flex items-center gap-3">
-              <input type="checkbox" checked={form.isActive} onChange={(e) => setForm((prev) => ({ ...prev, isActive: e.target.checked }))} />
-              <span>Active</span>
-            </label>
-          </div>
-
-          {submitError ? <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{submitError}</div> : null}
-          {submitSuccess ? <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">{submitSuccess}</div> : null}
-
-          <button disabled={isSubmitting} className="inline-flex min-w-[190px] items-center justify-center rounded-xl bg-red-500 px-5 py-3 font-semibold text-white transition hover:bg-red-400 disabled:cursor-not-allowed disabled:opacity-60">
-            {isSubmitting ? "Saving..." : editingId ? "Update Product" : "Create Product"}
-          </button>
-        </div>
-      </form>
-
+    <>
       <div className="rounded-[2rem] border border-white/10 bg-black/45 p-6 backdrop-blur-md md:p-8">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+        <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/45">Product List</p>
             <h2 className="mt-3 text-2xl font-bold text-white">Existing Products</h2>
           </div>
-          <div className="grid w-full gap-3 sm:grid-cols-2 xl:w-auto xl:min-w-[640px] xl:grid-cols-[minmax(260px,1.4fr)_minmax(170px,0.8fr)_minmax(170px,0.8fr)]">
+          <div className="grid w-full gap-3 md:grid-cols-2 xl:w-auto xl:min-w-[720px] xl:grid-cols-[minmax(260px,1.5fr)_minmax(170px,0.8fr)_minmax(170px,0.8fr)_auto]">
             <input className="input-rk w-full min-w-0" value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder="Search code / description / brand" />
             <div className="relative min-w-0">
               <select className="input-rk w-full appearance-none pr-12" value={itemTypeFilter} onChange={(e) => setItemTypeFilter(e.target.value as any)}>
@@ -380,8 +273,22 @@ export function AdminProductMasterClient({ initialProducts, locations }: Props) 
               </select>
               <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/60">▾</div>
             </div>
+            <button
+              type="button"
+              onClick={openAddModal}
+              className="inline-flex items-center justify-center rounded-xl bg-red-500 px-5 py-3 font-semibold text-white transition hover:bg-red-400"
+            >
+              Add Product
+            </button>
           </div>
         </div>
+
+        {(submitError || submitSuccess) ? (
+          <div className="mt-5 space-y-3">
+            {submitError ? <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{submitError}</div> : null}
+            {submitSuccess ? <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">{submitSuccess}</div> : null}
+          </div>
+        ) : null}
 
         <div className="mt-6 overflow-x-auto">
           <table className="min-w-full divide-y divide-white/10 text-sm">
@@ -420,7 +327,7 @@ export function AdminProductMasterClient({ initialProducts, locations }: Props) 
                   </td>
                   <td className="px-3 py-4">
                     <div className="flex justify-end gap-2">
-                      <button type="button" onClick={() => startEdit(product)} className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-semibold text-white transition hover:bg-white/10">Edit</button>
+                      <button type="button" onClick={() => startEdit(product)} className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-semibold text-white transition hover:bg-white/10">Edit Product</button>
                       <button type="button" onClick={() => handleDelete(product)} className="rounded-lg border border-red-500/25 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-200 transition hover:bg-red-500/15">Delete</button>
                     </div>
                   </td>
@@ -430,6 +337,125 @@ export function AdminProductMasterClient({ initialProducts, locations }: Props) 
           </table>
         </div>
       </div>
-    </div>
+
+      {isModalOpen ? (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/75 p-4">
+          <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-[2rem] border border-white/10 bg-[#0b0b0f] p-6 shadow-2xl md:p-8">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/45">Product Master</p>
+                <h2 className="mt-3 text-2xl font-bold text-white">{editingId ? "Edit Product" : "Add Product"}</h2>
+              </div>
+              <button type="button" onClick={closeModal} className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/80 transition hover:bg-white/10">
+                Close
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="mt-6 space-y-5">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <label className="label-rk">Product Code</label>
+                  <input className="input-rk" value={form.code} onChange={(e) => setForm((prev) => ({ ...prev, code: e.target.value.toUpperCase() }))} placeholder="e.g. BP-BREMBO-M4" required />
+                </div>
+                <div>
+                  <label className="label-rk">Base UOM</label>
+                  <input className="input-rk" value={form.baseUom} onChange={(e) => setForm((prev) => ({ ...prev, baseUom: e.target.value.toUpperCase() }))} placeholder="PCS" required />
+                </div>
+              </div>
+
+              <div>
+                <label className="label-rk">Description</label>
+                <input className="input-rk" value={form.description} onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))} placeholder="e.g. Brake Pad (Brembo M4)" required />
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-3">
+                <div>
+                  <label className="label-rk">Group</label>
+                  <input className="input-rk" value={form.group} onChange={(e) => setForm((prev) => ({ ...prev, group: e.target.value }))} placeholder="Optional" />
+                </div>
+                <div>
+                  <label className="label-rk">Sub-Group</label>
+                  <input className="input-rk" value={form.subGroup} onChange={(e) => setForm((prev) => ({ ...prev, subGroup: e.target.value }))} placeholder="Optional" />
+                </div>
+                <div>
+                  <label className="label-rk">Brand</label>
+                  <input className="input-rk" value={form.brand} onChange={(e) => setForm((prev) => ({ ...prev, brand: e.target.value }))} placeholder="Optional" />
+                </div>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <label className="label-rk">Item Type</label>
+                  <div className="relative">
+                    <select className="input-rk appearance-none pr-12" value={form.itemType} onChange={(e) => {
+                      const itemType = e.target.value as InventoryItemTypeValue;
+                      setForm((prev) => ({
+                        ...prev,
+                        itemType,
+                        trackInventory: itemType === "STOCK_ITEM",
+                      }));
+                    }}>
+                      <option value="STOCK_ITEM">Stock Item</option>
+                      <option value="SERVICE_ITEM">Service Item</option>
+                      <option value="NON_STOCK_ITEM">Non-Stock Item</option>
+                    </select>
+                    <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/60">▾</div>
+                  </div>
+                </div>
+                <div>
+                  <label className="label-rk">Default Location</label>
+                  <div className="relative">
+                    <select className="input-rk appearance-none pr-12" value={form.defaultLocationId} onChange={(e) => setForm((prev) => ({ ...prev, defaultLocationId: e.target.value }))}>
+                      <option value="">No default location</option>
+                      {locations.filter((item) => item.isActive).map((location) => (
+                        <option key={location.id} value={location.id}>{location.code} — {location.name}</option>
+                      ))}
+                    </select>
+                    <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/60">▾</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <label className="label-rk">Unit Cost (RM)</label>
+                  <input type="number" min="0" step="0.01" className="input-rk" value={form.unitCost} onChange={(e) => setForm((prev) => ({ ...prev, unitCost: e.target.value }))} />
+                </div>
+                <div>
+                  <label className="label-rk">Selling Price (RM)</label>
+                  <input type="number" min="0" step="0.01" className="input-rk" value={form.sellingPrice} onChange={(e) => setForm((prev) => ({ ...prev, sellingPrice: e.target.value }))} />
+                </div>
+              </div>
+
+              <div className="grid gap-3 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-white/75 md:grid-cols-3">
+                <label className="flex items-center gap-3">
+                  <input type="checkbox" checked={form.trackInventory} disabled={form.itemType !== "STOCK_ITEM"} onChange={(e) => setForm((prev) => ({ ...prev, trackInventory: e.target.checked }))} />
+                  <span>Track Inventory</span>
+                </label>
+                <label className="flex items-center gap-3">
+                  <input type="checkbox" checked={form.serialNumberTracking} onChange={(e) => setForm((prev) => ({ ...prev, serialNumberTracking: e.target.checked }))} />
+                  <span>Serial Number Tracking</span>
+                </label>
+                <label className="flex items-center gap-3">
+                  <input type="checkbox" checked={form.isActive} onChange={(e) => setForm((prev) => ({ ...prev, isActive: e.target.checked }))} />
+                  <span>Active</span>
+                </label>
+              </div>
+
+              {submitError ? <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{submitError}</div> : null}
+
+              <div className="flex flex-wrap items-center gap-3 pt-2">
+                <button disabled={isSubmitting} className="inline-flex min-w-[190px] items-center justify-center rounded-xl bg-red-500 px-5 py-3 font-semibold text-white transition hover:bg-red-400 disabled:cursor-not-allowed disabled:opacity-60">
+                  {isSubmitting ? "Saving..." : editingId ? "Save Changes" : "Create Product"}
+                </button>
+                <button type="button" onClick={closeModal} className="rounded-xl border border-white/15 bg-white/5 px-5 py-3 text-sm text-white/80 transition hover:bg-white/10">
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+    </>
   );
 }
