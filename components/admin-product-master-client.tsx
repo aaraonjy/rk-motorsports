@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 type InventoryItemTypeValue = "STOCK_ITEM" | "SERVICE_ITEM" | "NON_STOCK_ITEM";
 type MasterOption = { id: string; code: string; name: string; isActive: boolean };
@@ -105,6 +105,136 @@ function getItemTypeLabel(value: InventoryItemTypeValue) {
     default:
       return value;
   }
+}
+
+
+type SearchableSelectOption = {
+  id: string;
+  code: string;
+  name: string;
+  isActive: boolean;
+};
+
+function SearchableSelect({
+  label,
+  placeholder,
+  options,
+  value,
+  disabled = false,
+  onChange,
+}: {
+  label: string;
+  placeholder: string;
+  options: SearchableSelectOption[];
+  value: string;
+  disabled?: boolean;
+  onChange: (option: SearchableSelectOption | null) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState(value);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    setSearch(value);
+  }, [value]);
+
+  useEffect(() => {
+    function handleOutsideClick(event: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, []);
+
+  const filteredOptions = useMemo(() => {
+    const keyword = search.trim().toLowerCase();
+    const activeOptions = options.filter((item) => item.isActive);
+    if (!keyword) return activeOptions;
+    return activeOptions.filter(
+      (item) =>
+        item.code.toLowerCase().includes(keyword) ||
+        item.name.toLowerCase().includes(keyword) ||
+        `${item.code} — ${item.name}`.toLowerCase().includes(keyword)
+    );
+  }, [options, search]);
+
+  const selectedOption = useMemo(() => {
+    return (
+      options.find(
+        (item) =>
+          `${item.code} — ${item.name}` === value ||
+          item.name === value ||
+          item.code === value
+      ) || null
+    );
+  }, [options, value]);
+
+  return (
+    <div ref={containerRef} className="relative">
+      <label className="label-rk">{label}</label>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => {
+          if (disabled) return;
+          setIsOpen((prev) => !prev);
+          setSearch(selectedOption ? `${selectedOption.code} — ${selectedOption.name}` : "");
+        }}
+        className={`input-rk flex items-center justify-between gap-3 text-left ${disabled ? "cursor-not-allowed opacity-60" : ""}`}
+      >
+        <span className={selectedOption ? "truncate text-white" : "truncate text-white/45"}>
+          {selectedOption ? `${selectedOption.code} — ${selectedOption.name}` : placeholder}
+        </span>
+        <span className="shrink-0 text-white/60">▾</span>
+      </button>
+
+      {isOpen ? (
+        <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-[120] overflow-hidden rounded-2xl border border-white/10 bg-[#0b0b0f] shadow-2xl">
+          <div className="border-b border-white/10 p-3">
+            <input
+              autoFocus
+              className="input-rk"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={`Search ${label.toLowerCase()}`}
+            />
+          </div>
+
+          <div className="max-h-56 overflow-y-auto p-2">
+            {filteredOptions.length === 0 ? (
+              <div className="rounded-xl px-3 py-3 text-sm text-white/45">
+                No matching {label.toLowerCase()} found.
+              </div>
+            ) : (
+              filteredOptions.map((option) => {
+                const displayLabel = `${option.code} — ${option.name}`;
+                const isSelected = selectedOption?.id === option.id;
+
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => {
+                      onChange(option);
+                      setSearch(displayLabel);
+                      setIsOpen(false);
+                    }}
+                    className={`flex w-full items-center rounded-xl px-3 py-3 text-left text-sm transition ${
+                      isSelected ? "bg-white/10 text-white" : "text-white/85 hover:bg-white/10 hover:text-white"
+                    }`}
+                  >
+                    {displayLabel}
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 export function AdminProductMasterClient({
@@ -397,58 +527,50 @@ export function AdminProductMasterClient({
 
               <div><label className="label-rk">Description</label><input className="input-rk" value={form.description} onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))} placeholder="e.g. Brake Pad (Brembo M4)" required /></div>
 
-              <div className="grid gap-4 md:grid-cols-3">
-                <div>
-                  <label className="label-rk">Group</label>
-                  <input
-                    list="product-group-options"
-                    className="input-rk"
-                    value={form.groupSearch}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      const match = activeGroups.find((item) => `${item.code} — ${item.name}` === value || item.name === value || item.code === value);
-                      setForm((prev) => ({ ...prev, groupSearch: value, groupId: match?.id || "", subGroupId: "", subGroupSearch: "" }));
-                    }}
-                    placeholder="Search or select group"
-                  />
-                  <datalist id="product-group-options">
-                    {activeGroups.map((item) => <option key={item.id} value={`${item.code} — ${item.name}`} />)}
-                  </datalist>
-                </div>
-                <div>
-                  <label className="label-rk">Sub-Group</label>
-                  <input
-                    list="product-sub-group-options"
-                    className="input-rk"
-                    value={form.subGroupSearch}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      const match = filteredSubGroups.find((item) => `${item.code} — ${item.name}` === value || item.name === value || item.code === value);
-                      setForm((prev) => ({ ...prev, subGroupSearch: value, subGroupId: match?.id || "" }));
-                    }}
-                    placeholder={form.groupId ? "Search or select sub-group" : "Select group first"}
-                  />
-                  <datalist id="product-sub-group-options">
-                    {filteredSubGroups.map((item) => <option key={item.id} value={`${item.code} — ${item.name}`} />)}
-                  </datalist>
-                </div>
-                <div>
-                  <label className="label-rk">Brand</label>
-                  <input
-                    list="product-brand-options"
-                    className="input-rk"
-                    value={form.brandSearch}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      const match = activeBrands.find((item) => `${item.code} — ${item.name}` === value || item.name === value || item.code === value);
-                      setForm((prev) => ({ ...prev, brandSearch: value, brandId: match?.id || "" }));
-                    }}
-                    placeholder="Search or select brand"
-                  />
-                  <datalist id="product-brand-options">
-                    {activeBrands.map((item) => <option key={item.id} value={`${item.code} — ${item.name}`} />)}
-                  </datalist>
-                </div>
+              
+<div className="grid gap-4 md:grid-cols-3">
+                <SearchableSelect
+                  label="Group"
+                  placeholder="Search or select group"
+                  options={activeGroups}
+                  value={form.groupSearch}
+                  onChange={(option) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      groupSearch: option ? `${option.code} — ${option.name}` : "",
+                      groupId: option?.id || "",
+                      subGroupId: "",
+                      subGroupSearch: "",
+                    }))
+                  }
+                />
+                <SearchableSelect
+                  label="Sub-Group"
+                  placeholder={form.groupId ? "Search or select sub-group" : "Select group first"}
+                  options={filteredSubGroups}
+                  value={form.subGroupSearch}
+                  disabled={!form.groupId}
+                  onChange={(option) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      subGroupSearch: option ? `${option.code} — ${option.name}` : "",
+                      subGroupId: option?.id || "",
+                    }))
+                  }
+                />
+                <SearchableSelect
+                  label="Brand"
+                  placeholder="Search or select brand"
+                  options={activeBrands}
+                  value={form.brandSearch}
+                  onChange={(option) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      brandSearch: option ? `${option.code} — ${option.name}` : "",
+                      brandId: option?.id || "",
+                    }))
+                  }
+                />
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
