@@ -786,12 +786,14 @@ export function CustomOrderForm({
 
                     <div>
                       <label className="label-rk">Description</label>
-                      <input
-                        className="input-rk"
-                        value={row.description}
-                        onChange={(e) => updateRow(row.id, "description", e.target.value)}
-                        placeholder="e.g. Dyno tuning session"
-                      />
+                      <div className="flex min-h-[96px] items-center">
+                        <input
+                          className="input-rk"
+                          value={row.description}
+                          onChange={(e) => updateRow(row.id, "description", e.target.value)}
+                          placeholder="e.g. Dyno tuning session"
+                        />
+                      </div>
                     </div>
                   </div>
 
