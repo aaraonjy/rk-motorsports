@@ -753,14 +753,14 @@ export function CustomOrderForm({
                 </div>
 
                 <div className="mt-4 space-y-4">
-                  <div className="grid gap-4 xl:grid-cols-[minmax(240px,1.1fr)_minmax(0,1.4fr)]">
+                  <div className="grid gap-4 xl:grid-cols-2">
                     <div>
                       <label className="label-rk">Product Code</label>
-                      <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
-                        <div className={`text-sm ${row.productCodeSnapshot ? "font-semibold text-white" : "text-white/45"}`}>
+                      <div className="input-rk flex min-h-[56px] items-center justify-between gap-3">
+                        <div className={`min-w-0 truncate text-sm ${row.productCodeSnapshot ? "font-semibold text-white" : "text-white/45"}`}>
                           {row.productCodeSnapshot || ""}
                         </div>
-                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <div className="flex shrink-0 items-center gap-2">
                           <button
                             type="button"
                             onClick={() => {
@@ -786,14 +786,12 @@ export function CustomOrderForm({
 
                     <div>
                       <label className="label-rk">Description</label>
-                      <div className="flex min-h-[96px] items-center">
-                        <input
-                          className="input-rk"
-                          value={row.description}
-                          onChange={(e) => updateRow(row.id, "description", e.target.value)}
-                          placeholder="e.g. Dyno tuning session"
-                        />
-                      </div>
+                      <input
+                        className="input-rk"
+                        value={row.description}
+                        onChange={(e) => updateRow(row.id, "description", e.target.value)}
+                        placeholder="e.g. Dyno tuning session"
+                      />
                     </div>
                   </div>
 
