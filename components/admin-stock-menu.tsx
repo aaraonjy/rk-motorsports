@@ -9,11 +9,17 @@ const activeItems = [
     label: "Product List",
     href: "/admin/products",
   },
+  {
+    label: "Product Group",
+    href: "/admin/product-groups",
+  },
+  {
+    label: "Product Sub-Group",
+    href: "/admin/product-sub-groups",
+  },
 ] as const;
 
 const upcomingItems = [
-  "Group List",
-  "Sub-Group List",
   "Stock Location",
   "Serial No",
   "Opening Stock",
@@ -42,7 +48,7 @@ export function AdminStockMenu() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const isActive = pathname.startsWith("/admin/products");
+  const isActive = pathname.startsWith("/admin/products") || pathname.startsWith("/admin/product-groups") || pathname.startsWith("/admin/product-sub-groups");
 
   return (
     <div ref={dropdownRef} className="relative">
