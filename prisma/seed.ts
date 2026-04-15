@@ -1,3 +1,4 @@
+
 import { PrismaClient, Role, AccountSource } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
@@ -64,8 +65,6 @@ async function main() {
       defaultLocationId: defaultLocation.id,
     },
   });
-
-  console.log("Seed completed successfully.");
 }
 
 main()

@@ -232,6 +232,9 @@ model InventoryProduct {
   group                String?
   subGroup             String?
   brand                String?
+  groupId              String?
+  subGroupId           String?
+  brandId              String?
   itemType             InventoryItemType
   baseUom              String
   unitCost             Decimal            @default(0) @db.Decimal(12, 2)
@@ -243,11 +246,60 @@ model InventoryProduct {
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
   defaultLocation      StockLocation?     @relation(fields: [defaultLocationId], references: [id], onDelete: SetNull)
+  productGroup         ProductGroup?      @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  productSubGroup      ProductSubGroup?   @relation(fields: [subGroupId], references: [id], onDelete: SetNull)
+  productBrand         ProductBrand?      @relation(fields: [brandId], references: [id], onDelete: SetNull)
   customOrderItems     CustomOrderItem[]
 
   @@index([isActive, code])
   @@index([itemType, isActive])
   @@index([defaultLocationId])
+  @@index([groupId])
+  @@index([subGroupId])
+  @@index([brandId])
+}
+
+
+model ProductGroup {
+  id          String            @id @default(cuid())
+  code        String            @unique
+  name        String
+  isActive    Boolean           @default(true)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  subGroups   ProductSubGroup[]
+  products    InventoryProduct[]
+
+  @@index([isActive, code])
+  @@index([name])
+}
+
+model ProductSubGroup {
+  id          String            @id @default(cuid())
+  code        String            @unique
+  name        String
+  groupId     String
+  isActive    Boolean           @default(true)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  group       ProductGroup      @relation(fields: [groupId], references: [id], onDelete: Restrict)
+  products    InventoryProduct[]
+
+  @@index([groupId, isActive])
+  @@index([name])
+}
+
+model ProductBrand {
+  id          String            @id @default(cuid())
+  code        String            @unique
+  name        String
+  isActive    Boolean           @default(true)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  products    InventoryProduct[]
+
+  @@index([isActive, code])
+  @@index([name])
 }
 
 model Order {

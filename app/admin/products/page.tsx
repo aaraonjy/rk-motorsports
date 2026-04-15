@@ -1,3 +1,4 @@
+
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -8,40 +9,42 @@ export default async function AdminProductsPage() {
   if (!user) redirect("/login");
   if (user.role !== "ADMIN") redirect("/dashboard");
 
-  const [products, locations] = await Promise.all([
+  const [products, locations, groups, subGroups, brands] = await Promise.all([
     db.inventoryProduct.findMany({
       orderBy: [{ isActive: "desc" }, { code: "asc" }],
       include: {
-        defaultLocation: {
-          select: {
-            id: true,
-            code: true,
-            name: true,
-          },
-        },
+        defaultLocation: { select: { id: true, code: true, name: true } },
+        productGroup: { select: { id: true, code: true, name: true, isActive: true } },
+        productSubGroup: { select: { id: true, code: true, name: true, groupId: true, isActive: true } },
+        productBrand: { select: { id: true, code: true, name: true, isActive: true } },
       },
     }),
     db.stockLocation.findMany({
       orderBy: [{ isActive: "desc" }, { code: "asc" }],
-      select: {
-        id: true,
-        code: true,
-        name: true,
-        isActive: true,
-      },
+      select: { id: true, code: true, name: true, isActive: true },
+    }),
+    db.productGroup.findMany({
+      orderBy: [{ isActive: "desc" }, { code: "asc" }],
+      select: { id: true, code: true, name: true, isActive: true },
+    }),
+    db.productSubGroup.findMany({
+      orderBy: [{ isActive: "desc" }, { code: "asc" }],
+      select: { id: true, code: true, name: true, groupId: true, isActive: true },
+    }),
+    db.productBrand.findMany({
+      orderBy: [{ isActive: "desc" }, { code: "asc" }],
+      select: { id: true, code: true, name: true, isActive: true },
     }),
   ]);
 
   return (
     <section className="section-pad">
       <div className="container-rk max-w-7xl">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h1 className="text-4xl font-bold">Product Master</h1>
-            <p className="mt-4 max-w-3xl text-white/70">
-              Manage the new custom-order product master separately from the existing tuning package catalog.
-            </p>
-          </div>
+        <div>
+          <h1 className="text-4xl font-bold">Product Master</h1>
+          <p className="mt-4 max-w-3xl text-white/70">
+            Manage the new custom-order product master separately from the existing tuning package catalog.
+          </p>
         </div>
 
         <div className="mt-10">
@@ -53,6 +56,9 @@ export default async function AdminProductsPage() {
               group: product.group,
               subGroup: product.subGroup,
               brand: product.brand,
+              groupId: product.groupId,
+              subGroupId: product.subGroupId,
+              brandId: product.brandId,
               itemType: product.itemType,
               baseUom: product.baseUom,
               unitCost: Number(product.unitCost ?? 0),
@@ -66,6 +72,9 @@ export default async function AdminProductsPage() {
               updatedAt: product.updatedAt.toISOString(),
             }))}
             locations={locations}
+            productGroups={groups}
+            productSubGroups={subGroups}
+            productBrands={brands}
           />
         </div>
       </div>

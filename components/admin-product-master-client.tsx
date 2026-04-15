@@ -1,15 +1,12 @@
+
 "use client";
 
 import { useMemo, useState } from "react";
 
 type InventoryItemTypeValue = "STOCK_ITEM" | "SERVICE_ITEM" | "NON_STOCK_ITEM";
-
-type StockLocationOption = {
-  id: string;
-  code: string;
-  name: string;
-  isActive: boolean;
-};
+type MasterOption = { id: string; code: string; name: string; isActive: boolean };
+type SubGroupOption = MasterOption & { groupId: string };
+type StockLocationOption = { id: string; code: string; name: string; isActive: boolean };
 
 type InventoryProductRecord = {
   id: string;
@@ -18,6 +15,9 @@ type InventoryProductRecord = {
   group: string | null;
   subGroup: string | null;
   brand: string | null;
+  groupId: string | null;
+  subGroupId: string | null;
+  brandId: string | null;
   itemType: InventoryItemTypeValue;
   baseUom: string;
   unitCost: number;
@@ -34,9 +34,12 @@ type InventoryProductRecord = {
 type ProductFormState = {
   code: string;
   description: string;
-  group: string;
-  subGroup: string;
-  brand: string;
+  groupId: string;
+  subGroupId: string;
+  brandId: string;
+  groupSearch: string;
+  subGroupSearch: string;
+  brandSearch: string;
   itemType: InventoryItemTypeValue;
   baseUom: string;
   unitCost: string;
@@ -50,25 +53,10 @@ type ProductFormState = {
 type Props = {
   initialProducts: InventoryProductRecord[];
   locations: StockLocationOption[];
+  productGroups: MasterOption[];
+  productSubGroups: SubGroupOption[];
+  productBrands: MasterOption[];
 };
-
-function emptyForm(defaultLocationId = ""): ProductFormState {
-  return {
-    code: "",
-    description: "",
-    group: "",
-    subGroup: "",
-    brand: "",
-    itemType: "STOCK_ITEM",
-    baseUom: "PCS",
-    unitCost: "0.00",
-    sellingPrice: "0.00",
-    trackInventory: true,
-    serialNumberTracking: false,
-    isActive: true,
-    defaultLocationId,
-  };
-}
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("en-MY", {
@@ -85,6 +73,27 @@ function normalizeMoneyInput(value: string) {
   return parsed.toFixed(2);
 }
 
+function emptyForm(defaultLocationId = ""): ProductFormState {
+  return {
+    code: "",
+    description: "",
+    groupId: "",
+    subGroupId: "",
+    brandId: "",
+    groupSearch: "",
+    subGroupSearch: "",
+    brandSearch: "",
+    itemType: "STOCK_ITEM",
+    baseUom: "PCS",
+    unitCost: "0.00",
+    sellingPrice: "0.00",
+    trackInventory: true,
+    serialNumberTracking: false,
+    isActive: true,
+    defaultLocationId,
+  };
+}
+
 function getItemTypeLabel(value: InventoryItemTypeValue) {
   switch (value) {
     case "STOCK_ITEM":
@@ -98,7 +107,13 @@ function getItemTypeLabel(value: InventoryItemTypeValue) {
   }
 }
 
-export function AdminProductMasterClient({ initialProducts, locations }: Props) {
+export function AdminProductMasterClient({
+  initialProducts,
+  locations,
+  productGroups,
+  productSubGroups,
+  productBrands,
+}: Props) {
   const defaultLocationId = locations.find((item) => item.isActive)?.id || "";
   const [products, setProducts] = useState(initialProducts);
   const [keyword, setKeyword] = useState("");
@@ -111,9 +126,15 @@ export function AdminProductMasterClient({ initialProducts, locations }: Props) 
   const [submitError, setSubmitError] = useState("");
   const [submitSuccess, setSubmitSuccess] = useState("");
 
+  const activeGroups = useMemo(() => productGroups.filter((item) => item.isActive), [productGroups]);
+  const activeBrands = useMemo(() => productBrands.filter((item) => item.isActive), [productBrands]);
+  const filteredSubGroups = useMemo(
+    () => productSubGroups.filter((item) => item.isActive && (!form.groupId || item.groupId === form.groupId)),
+    [productSubGroups, form.groupId]
+  );
+
   const filteredProducts = useMemo(() => {
     const normalizedKeyword = keyword.trim().toLowerCase();
-
     return products.filter((product) => {
       const matchesKeyword =
         !normalizedKeyword ||
@@ -124,10 +145,7 @@ export function AdminProductMasterClient({ initialProducts, locations }: Props) 
         (product.subGroup || "").toLowerCase().includes(normalizedKeyword);
 
       const matchesType = itemTypeFilter === "ALL" || product.itemType === itemTypeFilter;
-      const matchesStatus =
-        statusFilter === "ALL" ||
-        (statusFilter === "ACTIVE" ? product.isActive : !product.isActive);
-
+      const matchesStatus = statusFilter === "ALL" || (statusFilter === "ACTIVE" ? product.isActive : !product.isActive);
       return matchesKeyword && matchesType && matchesStatus;
     });
   }, [products, keyword, itemTypeFilter, statusFilter]);
@@ -152,9 +170,12 @@ export function AdminProductMasterClient({ initialProducts, locations }: Props) 
     setForm({
       code: product.code,
       description: product.description,
-      group: product.group || "",
-      subGroup: product.subGroup || "",
-      brand: product.brand || "",
+      groupId: product.groupId || "",
+      subGroupId: product.subGroupId || "",
+      brandId: product.brandId || "",
+      groupSearch: product.group || "",
+      subGroupSearch: product.subGroup || "",
+      brandSearch: product.brand || "",
       itemType: product.itemType,
       baseUom: product.baseUom,
       unitCost: product.unitCost.toFixed(2),
@@ -169,36 +190,77 @@ export function AdminProductMasterClient({ initialProducts, locations }: Props) 
     setIsModalOpen(true);
   }
 
+  function resolveMasterSelection(
+    search: string,
+    options: Array<MasterOption | SubGroupOption>,
+    label: string
+  ) {
+    const normalized = search.trim().toLowerCase();
+    if (!normalized) return { id: "", error: "" };
+    const matched = options.find(
+      (item) =>
+        item.isActive &&
+        (item.name.toLowerCase() === normalized ||
+          item.code.toLowerCase() === normalized ||
+          `${item.code} — ${item.name}`.toLowerCase() === normalized)
+    );
+    if (!matched) return { id: "", error: `${label} not found.` };
+    return { id: matched.id, error: "" };
+  }
+
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setIsSubmitting(true);
     setSubmitError("");
     setSubmitSuccess("");
 
+    const groupResolved = resolveMasterSelection(form.groupSearch, activeGroups, "Group");
+    if (groupResolved.error) {
+      setSubmitError(groupResolved.error);
+      setIsSubmitting(false);
+      return;
+    }
+
+    const subGroupPool = form.groupId || groupResolved.id
+      ? productSubGroups.filter((item) => item.groupId === (form.groupId || groupResolved.id))
+      : productSubGroups;
+
+    const subGroupResolved = resolveMasterSelection(form.subGroupSearch, subGroupPool, "Sub-Group");
+    if (subGroupResolved.error) {
+      setSubmitError(subGroupResolved.error);
+      setIsSubmitting(false);
+      return;
+    }
+
+    const brandResolved = resolveMasterSelection(form.brandSearch, activeBrands, "Brand");
+    if (brandResolved.error) {
+      setSubmitError(brandResolved.error);
+      setIsSubmitting(false);
+      return;
+    }
+
     try {
       const payload = {
-        ...form,
         code: form.code.trim().toUpperCase(),
         description: form.description.trim(),
-        group: form.group.trim(),
-        subGroup: form.subGroup.trim(),
-        brand: form.brand.trim(),
+        groupId: groupResolved.id || form.groupId || null,
+        subGroupId: subGroupResolved.id || form.subGroupId || null,
+        brandId: brandResolved.id || form.brandId || null,
         baseUom: form.baseUom.trim().toUpperCase(),
+        itemType: form.itemType,
         unitCost: Number(normalizeMoneyInput(form.unitCost)),
         sellingPrice: Number(normalizeMoneyInput(form.sellingPrice)),
+        trackInventory: form.itemType === "STOCK_ITEM" ? form.trackInventory : false,
+        serialNumberTracking: form.serialNumberTracking,
+        isActive: form.isActive,
         defaultLocationId: form.defaultLocationId || null,
       };
 
-      const response = await fetch(
-        editingId ? `/api/admin/products/${editingId}` : "/api/admin/products",
-        {
-          method: editingId ? "PATCH" : "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(payload),
-        }
-      );
+      const response = await fetch(editingId ? `/api/admin/products/${editingId}` : "/api/admin/products", {
+        method: editingId ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
 
       const data = await response.json();
       if (!response.ok || !data.ok) {
@@ -207,13 +269,7 @@ export function AdminProductMasterClient({ initialProducts, locations }: Props) 
       }
 
       const saved = data.product as InventoryProductRecord;
-      setProducts((prev) => {
-        if (editingId) {
-          return prev.map((item) => (item.id === saved.id ? saved : item));
-        }
-        return [saved, ...prev];
-      });
-
+      setProducts((prev) => (editingId ? prev.map((item) => (item.id === saved.id ? saved : item)) : [saved, ...prev]));
       setSubmitSuccess(editingId ? "Product updated successfully." : "Product created successfully.");
       closeModal();
     } catch {
@@ -226,14 +282,10 @@ export function AdminProductMasterClient({ initialProducts, locations }: Props) 
   async function handleDelete(product: InventoryProductRecord) {
     const confirmed = window.confirm(`Delete product ${product.code}? This cannot be undone.`);
     if (!confirmed) return;
-
     setSubmitError("");
     setSubmitSuccess("");
-
     try {
-      const response = await fetch(`/api/admin/products/${product.id}`, {
-        method: "DELETE",
-      });
+      const response = await fetch(`/api/admin/products/${product.id}`, { method: "DELETE" });
       const data = await response.json();
       if (!response.ok || !data.ok) {
         setSubmitError(data.error || "Unable to delete product.");
@@ -273,11 +325,7 @@ export function AdminProductMasterClient({ initialProducts, locations }: Props) 
               </select>
               <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/60">▾</div>
             </div>
-            <button
-              type="button"
-              onClick={openAddModal}
-              className="inline-flex items-center justify-center rounded-xl bg-red-500 px-5 py-3 font-semibold text-white transition hover:bg-red-400"
-            >
+            <button type="button" onClick={openAddModal} className="inline-flex items-center justify-center rounded-xl bg-red-500 px-5 py-3 font-semibold text-white transition hover:bg-red-400">
               Add Product
             </button>
           </div>
@@ -305,9 +353,7 @@ export function AdminProductMasterClient({ initialProducts, locations }: Props) 
             </thead>
             <tbody className="divide-y divide-white/10">
               {filteredProducts.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-3 py-8 text-center text-white/50">No products found.</td>
-                </tr>
+                <tr><td colSpan={7} className="px-3 py-8 text-center text-white/50">No products found.</td></tr>
               ) : filteredProducts.map((product) => (
                 <tr key={product.id} className="align-top text-white/80">
                   <td className="px-3 py-4 font-semibold text-white">{product.code}</td>
@@ -341,43 +387,67 @@ export function AdminProductMasterClient({ initialProducts, locations }: Props) 
       {isModalOpen ? (
         <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/75 p-4">
           <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-[2rem] border border-white/10 bg-[#0b0b0f] p-6 shadow-2xl md:p-8">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/45">Product Master</p>
-                <h2 className="mt-3 text-2xl font-bold text-white">{editingId ? "Edit Product" : "Add Product"}</h2>
-              </div>
-              
-            </div>
+            <div><p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/45">Product Master</p><h2 className="mt-3 text-2xl font-bold text-white">{editingId ? "Edit Product" : "Add Product"}</h2></div>
 
             <form onSubmit={handleSubmit} className="mt-6 space-y-5">
               <div className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <label className="label-rk">Product Code</label>
-                  <input className="input-rk" value={form.code} onChange={(e) => setForm((prev) => ({ ...prev, code: e.target.value.toUpperCase() }))} placeholder="e.g. BP-BREMBO-M4" required />
-                </div>
-                <div>
-                  <label className="label-rk">Base UOM</label>
-                  <input className="input-rk" value={form.baseUom} onChange={(e) => setForm((prev) => ({ ...prev, baseUom: e.target.value.toUpperCase() }))} placeholder="PCS" required />
-                </div>
+                <div><label className="label-rk">Product Code</label><input className="input-rk" value={form.code} onChange={(e) => setForm((prev) => ({ ...prev, code: e.target.value.toUpperCase() }))} placeholder="e.g. BP-BREMBO-M4" required /></div>
+                <div><label className="label-rk">Base UOM</label><input className="input-rk" value={form.baseUom} onChange={(e) => setForm((prev) => ({ ...prev, baseUom: e.target.value.toUpperCase() }))} placeholder="PCS" required /></div>
               </div>
 
-              <div>
-                <label className="label-rk">Description</label>
-                <input className="input-rk" value={form.description} onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))} placeholder="e.g. Brake Pad (Brembo M4)" required />
-              </div>
+              <div><label className="label-rk">Description</label><input className="input-rk" value={form.description} onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))} placeholder="e.g. Brake Pad (Brembo M4)" required /></div>
 
               <div className="grid gap-4 md:grid-cols-3">
                 <div>
                   <label className="label-rk">Group</label>
-                  <input className="input-rk" value={form.group} onChange={(e) => setForm((prev) => ({ ...prev, group: e.target.value }))} placeholder="Optional" />
+                  <input
+                    list="product-group-options"
+                    className="input-rk"
+                    value={form.groupSearch}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      const match = activeGroups.find((item) => `${item.code} — ${item.name}` === value || item.name === value || item.code === value);
+                      setForm((prev) => ({ ...prev, groupSearch: value, groupId: match?.id || "", subGroupId: "", subGroupSearch: "" }));
+                    }}
+                    placeholder="Search or select group"
+                  />
+                  <datalist id="product-group-options">
+                    {activeGroups.map((item) => <option key={item.id} value={`${item.code} — ${item.name}`} />)}
+                  </datalist>
                 </div>
                 <div>
                   <label className="label-rk">Sub-Group</label>
-                  <input className="input-rk" value={form.subGroup} onChange={(e) => setForm((prev) => ({ ...prev, subGroup: e.target.value }))} placeholder="Optional" />
+                  <input
+                    list="product-sub-group-options"
+                    className="input-rk"
+                    value={form.subGroupSearch}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      const match = filteredSubGroups.find((item) => `${item.code} — ${item.name}` === value || item.name === value || item.code === value);
+                      setForm((prev) => ({ ...prev, subGroupSearch: value, subGroupId: match?.id || "" }));
+                    }}
+                    placeholder={form.groupId ? "Search or select sub-group" : "Select group first"}
+                  />
+                  <datalist id="product-sub-group-options">
+                    {filteredSubGroups.map((item) => <option key={item.id} value={`${item.code} — ${item.name}`} />)}
+                  </datalist>
                 </div>
                 <div>
                   <label className="label-rk">Brand</label>
-                  <input className="input-rk" value={form.brand} onChange={(e) => setForm((prev) => ({ ...prev, brand: e.target.value }))} placeholder="Optional" />
+                  <input
+                    list="product-brand-options"
+                    className="input-rk"
+                    value={form.brandSearch}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      const match = activeBrands.find((item) => `${item.code} — ${item.name}` === value || item.name === value || item.code === value);
+                      setForm((prev) => ({ ...prev, brandSearch: value, brandId: match?.id || "" }));
+                    }}
+                    placeholder="Search or select brand"
+                  />
+                  <datalist id="product-brand-options">
+                    {activeBrands.map((item) => <option key={item.id} value={`${item.code} — ${item.name}`} />)}
+                  </datalist>
                 </div>
               </div>
 
@@ -387,11 +457,7 @@ export function AdminProductMasterClient({ initialProducts, locations }: Props) 
                   <div className="relative">
                     <select className="input-rk appearance-none pr-12" value={form.itemType} onChange={(e) => {
                       const itemType = e.target.value as InventoryItemTypeValue;
-                      setForm((prev) => ({
-                        ...prev,
-                        itemType,
-                        trackInventory: itemType === "STOCK_ITEM",
-                      }));
+                      setForm((prev) => ({ ...prev, itemType, trackInventory: itemType === "STOCK_ITEM" }));
                     }}>
                       <option value="STOCK_ITEM">Stock Item</option>
                       <option value="SERVICE_ITEM">Service Item</option>
@@ -415,29 +481,14 @@ export function AdminProductMasterClient({ initialProducts, locations }: Props) 
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <label className="label-rk">Unit Cost (RM)</label>
-                  <input type="number" min="0" step="0.01" className="input-rk" value={form.unitCost} onChange={(e) => setForm((prev) => ({ ...prev, unitCost: e.target.value }))} />
-                </div>
-                <div>
-                  <label className="label-rk">Selling Price (RM)</label>
-                  <input type="number" min="0" step="0.01" className="input-rk" value={form.sellingPrice} onChange={(e) => setForm((prev) => ({ ...prev, sellingPrice: e.target.value }))} />
-                </div>
+                <div><label className="label-rk">Unit Cost (RM)</label><input type="number" min="0" step="0.01" className="input-rk" value={form.unitCost} onChange={(e) => setForm((prev) => ({ ...prev, unitCost: e.target.value }))} /></div>
+                <div><label className="label-rk">Selling Price (RM)</label><input type="number" min="0" step="0.01" className="input-rk" value={form.sellingPrice} onChange={(e) => setForm((prev) => ({ ...prev, sellingPrice: e.target.value }))} /></div>
               </div>
 
               <div className="grid gap-3 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-white/75 md:grid-cols-3">
-                <label className="flex items-center gap-3">
-                  <input type="checkbox" checked={form.trackInventory} disabled={form.itemType !== "STOCK_ITEM"} onChange={(e) => setForm((prev) => ({ ...prev, trackInventory: e.target.checked }))} />
-                  <span>Track Inventory</span>
-                </label>
-                <label className="flex items-center gap-3">
-                  <input type="checkbox" checked={form.serialNumberTracking} onChange={(e) => setForm((prev) => ({ ...prev, serialNumberTracking: e.target.checked }))} />
-                  <span>Serial Number Tracking</span>
-                </label>
-                <label className="flex items-center gap-3">
-                  <input type="checkbox" checked={form.isActive} onChange={(e) => setForm((prev) => ({ ...prev, isActive: e.target.checked }))} />
-                  <span>Active</span>
-                </label>
+                <label className="flex items-center gap-3"><input type="checkbox" checked={form.trackInventory} disabled={form.itemType !== "STOCK_ITEM"} onChange={(e) => setForm((prev) => ({ ...prev, trackInventory: e.target.checked }))} /><span>Track Inventory</span></label>
+                <label className="flex items-center gap-3"><input type="checkbox" checked={form.serialNumberTracking} onChange={(e) => setForm((prev) => ({ ...prev, serialNumberTracking: e.target.checked }))} /><span>Serial Number Tracking</span></label>
+                <label className="flex items-center gap-3"><input type="checkbox" checked={form.isActive} onChange={(e) => setForm((prev) => ({ ...prev, isActive: e.target.checked }))} /><span>Active</span></label>
               </div>
 
               {submitError ? <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{submitError}</div> : null}
@@ -446,9 +497,7 @@ export function AdminProductMasterClient({ initialProducts, locations }: Props) 
                 <button disabled={isSubmitting} className="inline-flex min-w-[190px] items-center justify-center rounded-xl bg-red-500 px-5 py-3 font-semibold text-white transition hover:bg-red-400 disabled:cursor-not-allowed disabled:opacity-60">
                   {isSubmitting ? "Saving..." : editingId ? "Save Changes" : "Create Product"}
                 </button>
-                <button type="button" onClick={closeModal} className="rounded-xl border border-white/15 bg-white/5 px-5 py-3 text-sm text-white/80 transition hover:bg-white/10">
-                  Cancel
-                </button>
+                <button type="button" onClick={closeModal} className="rounded-xl border border-white/15 bg-white/5 px-5 py-3 text-sm text-white/80 transition hover:bg-white/10">Cancel</button>
               </div>
             </form>
           </div>
