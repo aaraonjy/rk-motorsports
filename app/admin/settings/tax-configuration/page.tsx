@@ -47,6 +47,7 @@ export default async function TaxConfigurationPage() {
             description: taxCode.description,
             rate: Number(taxCode.rate),
             calculationMethod: taxCode.calculationMethod,
+            taxType: taxCode.taxType,
             isActive: taxCode.isActive,
           }))}
         />
