@@ -137,7 +137,7 @@ export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) 
           isActive: newTaxCode.isActive,
         },
       ]);
-      setNewTaxCode({ code: "", description: "", rate: "0", calculationMethod: "EXCLUSIVE", isActive: true });
+      setNewTaxCode({ code: "", description: "", rate: "0", calculationMethod: "EXCLUSIVE", taxType: "SERVICE", isActive: true });
       setIsCreateFormOpen(false);
       setTaxCodeMessage({ type: "success", text: "Tax code created successfully." });
     } catch (error) {
