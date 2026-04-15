@@ -11,18 +11,22 @@ export async function POST(req: Request) {
 
     const taxModuleEnabled = Boolean(body.taxModuleEnabled);
     const taxCalculationMode = normalizeTaxCalculationMode(body.taxCalculationMode);
-    const defaultPortalTaxCodeId = typeof body.defaultPortalTaxCodeId === "string" && body.defaultPortalTaxCodeId.trim()
-      ? body.defaultPortalTaxCodeId.trim()
-      : null;
-    const defaultAdminTaxCodeId = typeof body.defaultAdminTaxCodeId === "string" && body.defaultAdminTaxCodeId.trim()
-      ? body.defaultAdminTaxCodeId.trim()
-      : null;
+    const defaultPortalTaxCodeId =
+      typeof body.defaultPortalTaxCodeId === "string" && body.defaultPortalTaxCodeId.trim()
+        ? body.defaultPortalTaxCodeId.trim()
+        : null;
+    const defaultAdminTaxCodeId =
+      typeof body.defaultAdminTaxCodeId === "string" && body.defaultAdminTaxCodeId.trim()
+        ? body.defaultAdminTaxCodeId.trim()
+        : null;
 
     const selectedIds = [defaultPortalTaxCodeId, defaultAdminTaxCodeId].filter(Boolean) as string[];
-    if (selectedIds.length > 0) {
+    const uniqueSelectedIds = [...new Set(selectedIds)];
+
+    if (uniqueSelectedIds.length > 0) {
       const selectedCodes = await db.taxCode.findMany({
         where: {
-          id: { in: selectedIds },
+          id: { in: uniqueSelectedIds },
         },
         select: {
           id: true,
@@ -39,7 +43,7 @@ export async function POST(req: Request) {
         );
       }
 
-      if (selectedCodes.length !== selectedIds.length) {
+      if (selectedCodes.length !== uniqueSelectedIds.length) {
         return NextResponse.json(
           { ok: false, error: "One or more selected tax codes were not found." },
           { status: 400 }
