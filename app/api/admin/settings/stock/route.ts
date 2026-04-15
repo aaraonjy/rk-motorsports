@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
+import { StockCostingMethod } from "@prisma/client";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { createAuditLogFromRequest } from "@/lib/audit";
 
-function normalizeCostingMethod(value: unknown) {
-  return value === "AVERAGE" ? "AVERAGE" : "AVERAGE";
+function normalizeCostingMethod(value: unknown): StockCostingMethod {
+  return value === StockCostingMethod.AVERAGE
+    ? StockCostingMethod.AVERAGE
+    : StockCostingMethod.AVERAGE;
 }
 
 export async function POST(req: Request) {
@@ -18,18 +21,33 @@ export async function POST(req: Request) {
     const costingMethod = normalizeCostingMethod(body.costingMethod);
     const multiUomEnabled = Boolean(body.multiUomEnabled);
     const serialTrackingEnabled = Boolean(body.serialTrackingEnabled);
-    const defaultLocationId = typeof body.defaultLocationId === "string" && body.defaultLocationId.trim() ? body.defaultLocationId.trim() : null;
+    const defaultLocationId =
+      typeof body.defaultLocationId === "string" && body.defaultLocationId.trim()
+        ? body.defaultLocationId.trim()
+        : null;
 
     if (!defaultLocationId) {
-      return NextResponse.json({ ok: false, error: "Default stock location is required." }, { status: 400 });
+      return NextResponse.json(
+        { ok: false, error: "Default stock location is required." },
+        { status: 400 }
+      );
     }
 
-    const location = await db.stockLocation.findUnique({ where: { id: defaultLocationId }, select: { id: true, code: true, isActive: true } });
+    const location = await db.stockLocation.findUnique({
+      where: { id: defaultLocationId },
+      select: { id: true, code: true, isActive: true },
+    });
+
     if (!location || !location.isActive) {
-      return NextResponse.json({ ok: false, error: "Selected default stock location is invalid." }, { status: 400 });
+      return NextResponse.json(
+        { ok: false, error: "Selected default stock location is invalid." },
+        { status: 400 }
+      );
     }
 
-    const existing = await db.stockConfiguration.findUnique({ where: { id: "default" } });
+    const existing = await db.stockConfiguration.findUnique({
+      where: { id: "default" },
+    });
 
     const saved = await db.stockConfiguration.upsert({
       where: { id: "default" },
@@ -63,15 +81,17 @@ export async function POST(req: Request) {
       entityId: saved.id,
       entityCode: "default",
       description: `${admin.name} ${existing ? "updated" : "created"} the stock configuration settings.`,
-      oldValues: existing ? {
-        stockModuleEnabled: existing.stockModuleEnabled,
-        multiLocationEnabled: existing.multiLocationEnabled,
-        allowNegativeStock: existing.allowNegativeStock,
-        costingMethod: existing.costingMethod,
-        multiUomEnabled: existing.multiUomEnabled,
-        serialTrackingEnabled: existing.serialTrackingEnabled,
-        defaultLocationId: existing.defaultLocationId,
-      } : null,
+      oldValues: existing
+        ? {
+            stockModuleEnabled: existing.stockModuleEnabled,
+            multiLocationEnabled: existing.multiLocationEnabled,
+            allowNegativeStock: existing.allowNegativeStock,
+            costingMethod: existing.costingMethod,
+            multiUomEnabled: existing.multiUomEnabled,
+            serialTrackingEnabled: existing.serialTrackingEnabled,
+            defaultLocationId: existing.defaultLocationId,
+          }
+        : null,
       newValues: {
         stockModuleEnabled: saved.stockModuleEnabled,
         multiLocationEnabled: saved.multiLocationEnabled,
@@ -88,8 +108,17 @@ export async function POST(req: Request) {
   } catch (error) {
     console.error("POST /api/admin/settings/stock failed:", error);
     return NextResponse.json(
-      { ok: false, error: error instanceof Error ? error.message : "Unable to save stock settings." },
-      { status: error instanceof Error && error.message === "FORBIDDEN" ? 403 : 500 }
+      {
+        ok: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Unable to save stock settings.",
+      },
+      {
+        status:
+          error instanceof Error && error.message === "FORBIDDEN" ? 403 : 500,
+      }
     );
   }
 }
