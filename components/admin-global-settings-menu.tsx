@@ -13,6 +13,10 @@ const settingsItems = [
     label: "Tax Configuration",
     href: "/admin/settings/tax-configuration",
   },
+  {
+    label: "Stock Settings",
+    href: "/admin/settings/stock",
+  },
 ] as const;
 
 export function AdminGlobalSettingsMenu() {
