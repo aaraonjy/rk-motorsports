@@ -499,7 +499,7 @@ function CustomOrderDetails({ order }: { order: OrderWithRelations }) {
       {hasOrderTax(order) ? (
         <div>
           <span className="text-white/45">Tax Amount:</span>{" "}
-          <span className="text-emerald-200">{formatCurrency(getOrderTaxAmount(order))}</span>
+          <span className="text-white/90">{formatCurrency(getOrderTaxAmount(order))}</span>
         </div>
       ) : null}
 
