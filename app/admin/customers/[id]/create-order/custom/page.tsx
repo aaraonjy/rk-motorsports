@@ -36,7 +36,7 @@ export default async function AdminCustomerCustomOrderPage({
   if (user.role !== "ADMIN") redirect("/dashboard");
 
   const { id } = await params;
-  const [customer, taxConfig, taxCodes] = await Promise.all([
+  const [customer, taxConfig, taxCodes, products] = await Promise.all([
     getCustomerById(id),
     db.taxConfiguration.findUnique({ where: { id: "default" } }),
     db.taxCode.findMany({
@@ -48,6 +48,19 @@ export default async function AdminCustomerCustomOrderPage({
         description: true,
         rate: true,
         calculationMethod: true,
+      },
+    }),
+    db.inventoryProduct.findMany({
+      where: { isActive: true },
+      orderBy: [{ code: "asc" }],
+      select: {
+        id: true,
+        code: true,
+        description: true,
+        itemType: true,
+        baseUom: true,
+        sellingPrice: true,
+        isActive: true,
       },
     }),
   ]);
@@ -124,6 +137,10 @@ export default async function AdminCustomerCustomOrderPage({
         <div className="mt-10">
           <CustomOrderForm
             customerId={customer.id}
+            productOptions={products.map((item) => ({
+              ...item,
+              sellingPrice: Number(item.sellingPrice ?? 0),
+            }))}
             taxConfig={{
               taxModuleEnabled: taxConfig?.taxModuleEnabled ?? false,
               taxCalculationMode: normalizeTaxCalculationMode(taxConfig?.taxCalculationMode),

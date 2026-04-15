@@ -82,6 +82,16 @@ enum TaxType {
   SERVICE
 }
 
+enum InventoryItemType {
+  STOCK_ITEM
+  SERVICE_ITEM
+  NON_STOCK_ITEM
+}
+
+enum StockCostingMethod {
+  AVERAGE
+}
+
 model User {
   id                 String         @id @default(cuid())
   name               String
@@ -186,6 +196,60 @@ model TaxConfiguration {
   @@index([defaultAdminTaxCodeId])
 }
 
+
+
+model StockConfiguration {
+  id                    String             @id
+  stockModuleEnabled    Boolean            @default(false)
+  multiLocationEnabled  Boolean            @default(false)
+  allowNegativeStock    Boolean            @default(false)
+  costingMethod         StockCostingMethod @default(AVERAGE)
+  multiUomEnabled       Boolean            @default(false)
+  serialTrackingEnabled Boolean            @default(false)
+  defaultLocationId     String?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+  defaultLocation       StockLocation?     @relation(fields: [defaultLocationId], references: [id], onDelete: SetNull)
+
+  @@index([defaultLocationId])
+}
+
+model StockLocation {
+  id                String               @id @default(cuid())
+  code              String               @unique
+  name              String
+  isActive          Boolean              @default(true)
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  defaultForConfigs StockConfiguration[]
+  inventoryProducts InventoryProduct[]
+}
+
+model InventoryProduct {
+  id                   String             @id @default(cuid())
+  code                 String             @unique
+  description          String
+  group                String?
+  subGroup             String?
+  brand                String?
+  itemType             InventoryItemType
+  baseUom              String
+  unitCost             Decimal            @default(0) @db.Decimal(12, 2)
+  sellingPrice         Decimal            @default(0) @db.Decimal(12, 2)
+  trackInventory       Boolean            @default(false)
+  serialNumberTracking Boolean            @default(false)
+  isActive             Boolean            @default(true)
+  defaultLocationId    String?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+  defaultLocation      StockLocation?     @relation(fields: [defaultLocationId], references: [id], onDelete: SetNull)
+  customOrderItems     CustomOrderItem[]
+
+  @@index([isActive, code])
+  @@index([itemType, isActive])
+  @@index([defaultLocationId])
+}
+
 model Order {
   id                     String            @id @default(cuid())
   orderNumber            String            @unique
@@ -275,23 +339,29 @@ model OrderItem {
 }
 
 model CustomOrderItem {
-  id          String   @id @default(cuid())
-  orderId      String
-  description  String
-  qty          Int      @default(1)
-  uom          String?
-  unitPrice    Decimal  @db.Decimal(12, 2)
-  lineTotal    Decimal  @db.Decimal(12, 2)
-  taxCodeId    String?
-  taxCode      String?
-  taxRate      Decimal? @db.Decimal(5, 2)
-  taxAmount    Decimal  @default(0) @db.Decimal(12, 2)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  order        Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  taxCodeRef   TaxCode? @relation(fields: [taxCodeId], references: [id], onDelete: SetNull)
+  id                  String             @id @default(cuid())
+  orderId             String
+  inventoryProductId  String?
+  productCodeSnapshot String?
+  itemTypeSnapshot    InventoryItemType?
+  description         String
+  qty                 Int                @default(1)
+  uom                 String?
+  unitPrice           Decimal            @db.Decimal(12, 2)
+  lineTotal           Decimal            @db.Decimal(12, 2)
+  taxCodeId           String?
+  taxCode             String?
+  taxRate             Decimal?           @db.Decimal(5, 2)
+  taxAmount           Decimal            @default(0) @db.Decimal(12, 2)
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  order               Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  inventoryProduct    InventoryProduct?  @relation(fields: [inventoryProductId], references: [id], onDelete: SetNull)
+  taxCodeRef          TaxCode?           @relation(fields: [taxCodeId], references: [id], onDelete: SetNull)
 
   @@index([orderId])
+  @@index([inventoryProductId])
+  @@index([productCodeSnapshot])
   @@index([taxCodeId])
   @@index([taxCode])
 }

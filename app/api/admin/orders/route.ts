@@ -14,6 +14,9 @@ import {
 } from "@/lib/tax";
 
 type CustomOrderItemPayload = {
+  inventoryProductId?: string | null;
+  productCodeSnapshot?: string | null;
+  itemTypeSnapshot?: "STOCK_ITEM" | "SERVICE_ITEM" | "NON_STOCK_ITEM" | null;
   description: string;
   qty: number;
   unitPrice: number;
@@ -136,6 +139,9 @@ export async function POST(req: Request) {
 
     const normalizedItemsBase = items
       .map((item) => {
+        const inventoryProductId = String(item.inventoryProductId || "").trim();
+        const productCodeSnapshot = String(item.productCodeSnapshot || "").trim().toUpperCase();
+        const itemTypeSnapshot = String(item.itemTypeSnapshot || "").trim();
         const description = String(item.description || "").trim();
         const qty = Math.max(1, sanitizeWholeNumber(item.qty));
         const unitPrice = Math.max(0, sanitizeMoneyAmount(item.unitPrice));
@@ -146,6 +152,9 @@ export async function POST(req: Request) {
         const submittedTaxAmount = Math.max(0, sanitizeMoneyAmount(item.taxAmount));
 
         return {
+          inventoryProductId,
+          productCodeSnapshot,
+          itemTypeSnapshot,
           description,
           qty,
           unitPrice,
@@ -165,6 +174,42 @@ export async function POST(req: Request) {
       );
     }
 
+    const submittedInventoryProductIds = Array.from(
+      new Set(
+        normalizedItemsBase
+          .map((item) => item.inventoryProductId)
+          .filter(Boolean)
+      )
+    );
+
+    const inventoryProducts = submittedInventoryProductIds.length
+      ? await db.inventoryProduct.findMany({
+          where: {
+            id: { in: submittedInventoryProductIds },
+          },
+        })
+      : [];
+
+    const inventoryProductMap = new Map(inventoryProducts.map((item) => [item.id, item]));
+
+    for (const item of normalizedItemsBase) {
+      const selectedProduct = item.inventoryProductId
+        ? inventoryProductMap.get(item.inventoryProductId) || null
+        : null;
+
+      if (item.inventoryProductId && !selectedProduct) {
+        throw new Error("Selected product is invalid or inactive.");
+      }
+
+      if (selectedProduct && !selectedProduct.isActive) {
+        throw new Error("Selected product is invalid or inactive.");
+      }
+
+      if (selectedProduct && item.productCodeSnapshot && item.productCodeSnapshot !== selectedProduct.code) {
+        throw new Error("Selected product information is outdated. Please reselect the product and try again.");
+      }
+    }
+
     const calculatedSubtotal = Math.round((normalizedItemsBase.reduce(
       (sum, item) => sum + item.lineTotal,
       0
@@ -175,17 +220,32 @@ export async function POST(req: Request) {
     const submittedGrandTotal = sanitizeMoneyAmount(form.get("customGrandTotal"));
     const submittedTaxCodeId = String(form.get("taxCodeId") || "").trim();
 
-    let normalizedItems = normalizedItemsBase.map((item) => ({
-      description: item.description,
-      qty: item.qty,
-      unitPrice: item.unitPrice,
-      lineTotal: item.lineTotal,
-      uom: item.uom,
-      taxCodeId: null as string | null,
-      taxCode: null as string | null,
-      taxRate: null as number | null,
-      taxAmount: 0,
-    }));
+    let normalizedItems = normalizedItemsBase.map((item) => {
+      const selectedProduct = item.inventoryProductId
+        ? inventoryProductMap.get(item.inventoryProductId) || null
+        : null;
+
+      return {
+        inventoryProductId: selectedProduct?.id ?? null,
+        productCodeSnapshot: selectedProduct?.code ?? null,
+        itemTypeSnapshot:
+          selectedProduct?.itemType ??
+          (item.itemTypeSnapshot === "SERVICE_ITEM" ||
+          item.itemTypeSnapshot === "NON_STOCK_ITEM" ||
+          item.itemTypeSnapshot === "STOCK_ITEM"
+            ? item.itemTypeSnapshot
+            : null),
+        description: item.description,
+        qty: item.qty,
+        unitPrice: item.unitPrice,
+        lineTotal: item.lineTotal,
+        uom: item.uom,
+        taxCodeId: null as string | null,
+        taxCode: null as string | null,
+        taxRate: null as number | null,
+        taxAmount: 0,
+      };
+    });
 
     let orderTaxCodeId: string | null = null;
     let orderTaxCode: string | null = null;
@@ -220,6 +280,22 @@ export async function POST(req: Request) {
       const taxCodeMap = new Map(availableTaxCodes.map((item) => [item.id, item]));
 
       normalizedItems = normalizedItemsBase.map((item) => {
+        const selectedProduct = item.inventoryProductId
+          ? inventoryProductMap.get(item.inventoryProductId) || null
+          : null;
+
+        if (item.inventoryProductId && !selectedProduct) {
+          throw new Error("Selected product is invalid or inactive.");
+        }
+
+        if (selectedProduct && !selectedProduct.isActive) {
+          throw new Error("Selected product is invalid or inactive.");
+        }
+
+        if (selectedProduct && item.productCodeSnapshot && item.productCodeSnapshot !== selectedProduct.code) {
+          throw new Error("Selected product information is outdated. Please reselect the product and try again.");
+        }
+
         const selectedTaxCode = item.submittedTaxCodeId
           ? taxCodeMap.get(item.submittedTaxCodeId) || null
           : null;
@@ -247,6 +323,9 @@ export async function POST(req: Request) {
         }
 
         return {
+          inventoryProductId: selectedProduct?.id ?? null,
+          productCodeSnapshot: selectedProduct?.code ?? null,
+          itemTypeSnapshot: selectedProduct?.itemType ?? (item.itemTypeSnapshot === "SERVICE_ITEM" || item.itemTypeSnapshot === "NON_STOCK_ITEM" ? item.itemTypeSnapshot : item.itemTypeSnapshot === "STOCK_ITEM" ? item.itemTypeSnapshot : null),
           description: item.description,
           qty: item.qty,
           unitPrice: item.unitPrice,
@@ -444,6 +523,7 @@ export async function POST(req: Request) {
       `Grand Total: RM${orderGrandTotalAfterTax.toFixed(2)}`,
       `Initial Payment: RM${paymentAmount.toFixed(2)}`,
       `Items: ${normalizedItems.length}`,
+      `Linked Products: ${normalizedItems.filter((item) => item.inventoryProductId).length}`,
     ];
 
     const order = await db.order.create({

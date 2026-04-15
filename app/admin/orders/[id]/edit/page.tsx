@@ -20,7 +20,7 @@ export default async function AdminEditCustomOrderPage({
 
   const { id } = await params;
 
-  const [order, taxConfig, taxCodes] = await Promise.all([
+  const [order, taxConfig, taxCodes, products] = await Promise.all([
     db.order.findUnique({
       where: { id },
       include: {
@@ -56,6 +56,19 @@ export default async function AdminEditCustomOrderPage({
         description: true,
         rate: true,
         calculationMethod: true,
+      },
+    }),
+    db.inventoryProduct.findMany({
+      where: { isActive: true },
+      orderBy: [{ code: "asc" }],
+      select: {
+        id: true,
+        code: true,
+        description: true,
+        itemType: true,
+        baseUom: true,
+        sellingPrice: true,
+        isActive: true,
       },
     }),
   ]);
@@ -167,6 +180,9 @@ export default async function AdminEditCustomOrderPage({
               })),
               items: order.customItems.map((item) => ({
                 id: item.id,
+                inventoryProductId: item.inventoryProductId,
+                productCodeSnapshot: item.productCodeSnapshot,
+                itemTypeSnapshot: item.itemTypeSnapshot,
                 description: item.description,
                 qty: item.qty,
                 unitPrice: Number(item.unitPrice ?? 0),
@@ -177,6 +193,10 @@ export default async function AdminEditCustomOrderPage({
                 taxAmount: Number(item.taxAmount ?? 0),
               })),
             }}
+            productOptions={products.map((item) => ({
+              ...item,
+              sellingPrice: Number(item.sellingPrice ?? 0),
+            }))}
             taxConfig={{
               taxModuleEnabled: taxConfig?.taxModuleEnabled ?? false,
               taxCalculationMode: normalizeTaxCalculationMode(taxConfig?.taxCalculationMode),

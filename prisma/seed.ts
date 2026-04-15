@@ -26,12 +26,42 @@ async function main() {
     },
   });
 
+  const defaultLocation = await prisma.stockLocation.upsert({
+    where: { code: "MAIN" },
+    update: {
+      name: "Main Store",
+      isActive: true,
+    },
+    create: {
+      code: "MAIN",
+      name: "Main Store",
+      isActive: true,
+    },
+  });
+
   await prisma.taxConfiguration.upsert({
     where: { id: "default" },
     update: {},
     create: {
       id: "default",
       taxModuleEnabled: false,
+    },
+  });
+
+  await prisma.stockConfiguration.upsert({
+    where: { id: "default" },
+    update: {
+      defaultLocationId: defaultLocation.id,
+    },
+    create: {
+      id: "default",
+      stockModuleEnabled: false,
+      multiLocationEnabled: false,
+      allowNegativeStock: false,
+      costingMethod: "AVERAGE",
+      multiUomEnabled: false,
+      serialTrackingEnabled: false,
+      defaultLocationId: defaultLocation.id,
     },
   });
 

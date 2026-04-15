@@ -44,6 +44,9 @@ type CustomOrderInitialData = {
   }>;
   items: Array<{
     id: string;
+    inventoryProductId?: string | null;
+    productCodeSnapshot?: string | null;
+    itemTypeSnapshot?: "STOCK_ITEM" | "SERVICE_ITEM" | "NON_STOCK_ITEM" | null;
     description: string;
     qty: number;
     unitPrice: number;
@@ -63,6 +66,16 @@ type TaxCodeOption = {
   calculationMethod: TaxCalculationMethodValue;
 };
 
+type ProductOption = {
+  id: string;
+  code: string;
+  description: string;
+  itemType: "STOCK_ITEM" | "SERVICE_ITEM" | "NON_STOCK_ITEM";
+  baseUom: string;
+  sellingPrice: number;
+  isActive: boolean;
+};
+
 type CustomOrderFormProps = {
   customerId: string;
   orderId?: string;
@@ -70,6 +83,7 @@ type CustomOrderFormProps = {
   submitLabel?: string;
   submittingLabel?: string;
   errorTitle?: string;
+  productOptions?: ProductOption[];
   taxConfig?: {
     taxModuleEnabled: boolean;
     taxCalculationMode: TaxCalculationModeValue;
@@ -80,6 +94,9 @@ type CustomOrderFormProps = {
 
 type CustomLineItem = {
   id: string;
+  inventoryProductId: string;
+  productCodeSnapshot: string;
+  itemTypeSnapshot: "STOCK_ITEM" | "SERVICE_ITEM" | "NON_STOCK_ITEM" | "";
   description: string;
   qty: string;
   uom: string;
@@ -96,12 +113,28 @@ type ApiResponse = {
 function createEmptyRow(defaultTaxCodeId = ""): CustomLineItem {
   return {
     id: crypto.randomUUID(),
+    inventoryProductId: "",
+    productCodeSnapshot: "",
+    itemTypeSnapshot: "",
     description: "",
     qty: "1",
     uom: "",
     unitPrice: "0.00",
     taxCodeId: defaultTaxCodeId,
   };
+}
+
+function getItemTypeLabel(value: "STOCK_ITEM" | "SERVICE_ITEM" | "NON_STOCK_ITEM" | "") {
+  switch (value) {
+    case "STOCK_ITEM":
+      return "Stock Item";
+    case "SERVICE_ITEM":
+      return "Service Item";
+    case "NON_STOCK_ITEM":
+      return "Non-Stock Item";
+    default:
+      return "-";
+  }
 }
 
 function parseWholeNumber(value: string) {
@@ -167,6 +200,7 @@ export function CustomOrderForm({
   submitLabel = "Create Custom Order",
   submittingLabel,
   errorTitle = "Create Order Failed",
+  productOptions = [],
   taxConfig,
 }: CustomOrderFormProps) {
   const isEditMode = !!orderId;
@@ -190,6 +224,9 @@ export function CustomOrderForm({
     if (initialData?.items?.length) {
       return initialData.items.map((item) => ({
         id: item.id || crypto.randomUUID(),
+        inventoryProductId: item.inventoryProductId || "",
+        productCodeSnapshot: item.productCodeSnapshot || "",
+        itemTypeSnapshot: item.itemTypeSnapshot || "",
         description: item.description,
         qty: String(item.qty),
         uom: item.uom || "",
@@ -200,6 +237,8 @@ export function CustomOrderForm({
 
     return [createEmptyRow(defaultLineItemTaxCodeId)];
   });
+  const [productPickerRowId, setProductPickerRowId] = useState<string | null>(null);
+  const [productKeyword, setProductKeyword] = useState("");
   const [submitError, setSubmitError] = useState("");
   const [supportingFiles, setSupportingFiles] = useState<File[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -251,6 +290,9 @@ export function CustomOrderForm({
 
         return {
           ...row,
+          inventoryProductId: row.inventoryProductId,
+          productCodeSnapshot: row.productCodeSnapshot,
+          itemTypeSnapshot: row.itemTypeSnapshot,
           qty,
           unitPrice,
           lineTotal,
@@ -321,13 +363,60 @@ export function CustomOrderForm({
 
   function updateRow(
     rowId: string,
-    field: keyof Pick<CustomLineItem, "description" | "qty" | "uom" | "unitPrice" | "taxCodeId">,
+    field: keyof Pick<CustomLineItem, "inventoryProductId" | "productCodeSnapshot" | "itemTypeSnapshot" | "description" | "qty" | "uom" | "unitPrice" | "taxCodeId">,
     value: string
   ) {
     setRows((prev) =>
       prev.map((row) => (row.id === rowId ? { ...row, [field]: value } : row))
     );
   }
+
+  function applyProductToRow(rowId: string, product: ProductOption) {
+    setRows((prev) =>
+      prev.map((row) =>
+        row.id === rowId
+          ? {
+              ...row,
+              inventoryProductId: product.id,
+              productCodeSnapshot: product.code,
+              itemTypeSnapshot: product.itemType,
+              description: product.description,
+              uom: product.baseUom,
+              unitPrice: Number(product.sellingPrice || 0).toFixed(2),
+            }
+          : row
+      )
+    );
+    setProductPickerRowId(null);
+    setProductKeyword("");
+  }
+
+  function clearProductFromRow(rowId: string) {
+    setRows((prev) =>
+      prev.map((row) =>
+        row.id === rowId
+          ? {
+              ...row,
+              inventoryProductId: "",
+              productCodeSnapshot: "",
+              itemTypeSnapshot: "",
+            }
+          : row
+      )
+    );
+  }
+
+  const filteredProductOptions = useMemo(() => {
+    const keyword = productKeyword.trim().toLowerCase();
+    return productOptions.filter((product) => {
+      if (!product.isActive) return false;
+      if (!keyword) return true;
+      return (
+        product.code.toLowerCase().includes(keyword) ||
+        product.description.toLowerCase().includes(keyword)
+      );
+    });
+  }, [productKeyword, productOptions]);
 
   function addRow() {
     setRows((prev) => [...prev, createEmptyRow(isLineItemTaxMode ? taxConfig?.defaultAdminTaxCodeId || "" : "")]);
@@ -386,6 +475,9 @@ export function CustomOrderForm({
     const items = normalizedRows
       .filter((row) => row.description.trim())
       .map((row) => ({
+        inventoryProductId: row.inventoryProductId || null,
+        productCodeSnapshot: row.productCodeSnapshot || null,
+        itemTypeSnapshot: row.itemTypeSnapshot || null,
         description: row.description.trim(),
         qty: row.qty,
         uom: row.uom.trim() || null,
@@ -660,7 +752,37 @@ export function CustomOrderForm({
                   </button>
                 </div>
 
-                <div className="mt-4 grid gap-4 md:grid-cols-[1.7fr_0.55fr_0.7fr_0.8fr_0.9fr]">
+                <div className="mt-4 grid gap-4 md:grid-cols-[1.1fr_1.5fr_0.55fr_0.7fr_0.8fr_0.9fr]">
+                  <div>
+                    <label className="label-rk">Product Code</label>
+                    <div className="input-rk flex items-center justify-between gap-3">
+                      <span className={row.productCodeSnapshot ? "font-semibold text-white" : "text-white/45"}>
+                        {row.productCodeSnapshot || "Manual line"}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setProductPickerRowId(row.id);
+                            setProductKeyword("");
+                          }}
+                          className="rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/10"
+                        >
+                          Pick Product
+                        </button>
+                        {row.inventoryProductId ? (
+                          <button
+                            type="button"
+                            onClick={() => clearProductFromRow(row.id)}
+                            className="rounded-lg border border-red-500/25 bg-red-500/10 px-3 py-1.5 text-xs font-semibold text-red-200 transition hover:bg-red-500/15"
+                          >
+                            Clear
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+
                   <div>
                     <label className="label-rk">Description</label>
                     <input
@@ -712,6 +834,15 @@ export function CustomOrderForm({
                     </div>
                   </div>
                 </div>
+
+                {row.inventoryProductId ? (
+                  <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-xs text-white/65">
+                    <span className="font-semibold text-white/80">Linked Product</span>
+                    <span>{row.productCodeSnapshot}</span>
+                    <span>•</span>
+                    <span>{getItemTypeLabel(row.itemTypeSnapshot)}</span>
+                  </div>
+                ) : null}
 
                 {isLineItemTaxMode ? (
                   <div className="mt-4 border-t border-white/10 pt-4">
@@ -919,7 +1050,79 @@ export function CustomOrderForm({
             </div>
           </div>
 
-          {submitError ? (
+          {productPickerRowId ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="max-h-[85vh] w-full max-w-4xl overflow-hidden rounded-[2rem] border border-white/10 bg-[#0b0b0f] shadow-2xl">
+            <div className="border-b border-white/10 p-6">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.28em] text-white/45">Product Picker</p>
+                  <h3 className="mt-2 text-2xl font-bold text-white">Select Product</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setProductPickerRowId(null);
+                    setProductKeyword("");
+                  }}
+                  className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm text-white transition hover:bg-white/10"
+                >
+                  Close
+                </button>
+              </div>
+              <input
+                className="input-rk mt-5"
+                value={productKeyword}
+                onChange={(e) => setProductKeyword(e.target.value)}
+                placeholder="Search by product code or description"
+              />
+            </div>
+
+            <div className="max-h-[60vh] overflow-y-auto p-6">
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-white/10 text-sm">
+                  <thead>
+                    <tr className="text-left text-white/45">
+                      <th className="px-3 py-3 font-medium">Code</th>
+                      <th className="px-3 py-3 font-medium">Description</th>
+                      <th className="px-3 py-3 font-medium">Type</th>
+                      <th className="px-3 py-3 font-medium">UOM</th>
+                      <th className="px-3 py-3 font-medium">Price</th>
+                      <th className="px-3 py-3 font-medium text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/10">
+                    {filteredProductOptions.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="px-3 py-8 text-center text-white/50">No active product found.</td>
+                      </tr>
+                    ) : filteredProductOptions.map((product) => (
+                      <tr key={product.id} className="align-top text-white/80">
+                        <td className="px-3 py-4 font-semibold text-white">{product.code}</td>
+                        <td className="px-3 py-4">{product.description}</td>
+                        <td className="px-3 py-4">{getItemTypeLabel(product.itemType)}</td>
+                        <td className="px-3 py-4">{product.baseUom}</td>
+                        <td className="px-3 py-4">{formatCurrency(product.sellingPrice)}</td>
+                        <td className="px-3 py-4 text-right">
+                          <button
+                            type="button"
+                            onClick={() => applyProductToRow(productPickerRowId, product)}
+                            className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-200 transition hover:bg-amber-500/15"
+                          >
+                            Select
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {submitError ? (
             <div className="mt-6 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
               <div className="font-semibold uppercase tracking-[0.18em] text-red-300/80">
                 {errorTitle}
