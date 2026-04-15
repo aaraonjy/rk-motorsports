@@ -346,9 +346,7 @@ export function AdminProductMasterClient({ initialProducts, locations }: Props) 
                 <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/45">Product Master</p>
                 <h2 className="mt-3 text-2xl font-bold text-white">{editingId ? "Edit Product" : "Add Product"}</h2>
               </div>
-              <button type="button" onClick={closeModal} className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/80 transition hover:bg-white/10">
-                Close
-              </button>
+              
             </div>
 
             <form onSubmit={handleSubmit} className="mt-6 space-y-5">

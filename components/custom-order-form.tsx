@@ -758,7 +758,7 @@ export function CustomOrderForm({
                       <label className="label-rk">Product Code</label>
                       <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
                         <div className={`text-sm ${row.productCodeSnapshot ? "font-semibold text-white" : "text-white/45"}`}>
-                          {row.productCodeSnapshot || "Manual line"}
+                          {row.productCodeSnapshot || ""}
                         </div>
                         <div className="mt-3 flex flex-wrap items-center gap-2">
                           <button
@@ -769,7 +769,7 @@ export function CustomOrderForm({
                             }}
                             className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-semibold text-white transition hover:bg-white/10"
                           >
-                            Pick Product
+                            Select Product
                           </button>
                           {row.inventoryProductId ? (
                             <button
