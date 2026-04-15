@@ -752,85 +752,89 @@ export function CustomOrderForm({
                   </button>
                 </div>
 
-                <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-[minmax(220px,1.3fr)_minmax(220px,1.5fr)_minmax(80px,0.5fr)_minmax(90px,0.55fr)_minmax(130px,0.75fr)_minmax(140px,0.8fr)]">
-                  <div>
-                    <label className="label-rk">Product Code</label>
-                    <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
-                      <div className={`text-sm ${row.productCodeSnapshot ? "font-semibold text-white" : "text-white/45"}`}>
-                        {row.productCodeSnapshot || "Manual line"}
-                      </div>
-                      <div className="mt-3 flex flex-wrap items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setProductPickerRowId(row.id);
-                            setProductKeyword("");
-                          }}
-                          className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-semibold text-white transition hover:bg-white/10"
-                        >
-                          Pick Product
-                        </button>
-                        {row.inventoryProductId ? (
+                <div className="mt-4 space-y-4">
+                  <div className="grid gap-4 xl:grid-cols-[minmax(240px,1.1fr)_minmax(0,1.4fr)]">
+                    <div>
+                      <label className="label-rk">Product Code</label>
+                      <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
+                        <div className={`text-sm ${row.productCodeSnapshot ? "font-semibold text-white" : "text-white/45"}`}>
+                          {row.productCodeSnapshot || "Manual line"}
+                        </div>
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
                           <button
                             type="button"
-                            onClick={() => clearProductFromRow(row.id)}
-                            className="rounded-lg border border-red-500/25 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-200 transition hover:bg-red-500/15"
+                            onClick={() => {
+                              setProductPickerRowId(row.id);
+                              setProductKeyword("");
+                            }}
+                            className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-semibold text-white transition hover:bg-white/10"
                           >
-                            Clear
+                            Pick Product
                           </button>
-                        ) : null}
+                          {row.inventoryProductId ? (
+                            <button
+                              type="button"
+                              onClick={() => clearProductFromRow(row.id)}
+                              className="rounded-lg border border-red-500/25 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-200 transition hover:bg-red-500/15"
+                            >
+                              Clear
+                            </button>
+                          ) : null}
+                        </div>
                       </div>
+                    </div>
+
+                    <div>
+                      <label className="label-rk">Description</label>
+                      <input
+                        className="input-rk"
+                        value={row.description}
+                        onChange={(e) => updateRow(row.id, "description", e.target.value)}
+                        placeholder="e.g. Dyno tuning session"
+                      />
                     </div>
                   </div>
 
-                  <div>
-                    <label className="label-rk">Description</label>
-                    <input
-                      className="input-rk"
-                      value={row.description}
-                      onChange={(e) => updateRow(row.id, "description", e.target.value)}
-                      placeholder="e.g. Dyno tuning session"
-                    />
-                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                    <div>
+                      <label className="label-rk">Qty</label>
+                      <input
+                        type="number"
+                        min="1"
+                        step="1"
+                        className="input-rk"
+                        value={row.qty}
+                        onChange={(e) => updateRow(row.id, "qty", e.target.value)}
+                      />
+                    </div>
 
-                  <div>
-                    <label className="label-rk">Qty</label>
-                    <input
-                      type="number"
-                      min="1"
-                      step="1"
-                      className="input-rk"
-                      value={row.qty}
-                      onChange={(e) => updateRow(row.id, "qty", e.target.value)}
-                    />
-                  </div>
+                    <div>
+                      <label className="label-rk">UOM</label>
+                      <input
+                        className="input-rk"
+                        value={row.uom}
+                        onChange={(e) => updateRow(row.id, "uom", e.target.value)}
+                        placeholder="e.g. pcs"
+                      />
+                    </div>
 
-                  <div>
-                    <label className="label-rk">UOM</label>
-                    <input
-                      className="input-rk"
-                      value={row.uom}
-                      onChange={(e) => updateRow(row.id, "uom", e.target.value)}
-                      placeholder="e.g. pcs"
-                    />
-                  </div>
+                    <div>
+                      <label className="label-rk">Unit Price (RM)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        className="input-rk"
+                        value={row.unitPrice}
+                        onChange={(e) => updateRow(row.id, "unitPrice", e.target.value)}
+                      />
+                    </div>
 
-                  <div>
-                    <label className="label-rk">Unit Price (RM)</label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      className="input-rk"
-                      value={row.unitPrice}
-                      onChange={(e) => updateRow(row.id, "unitPrice", e.target.value)}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="label-rk">Total</label>
-                    <div className="input-rk flex items-center text-white/85">
-                      {formatCurrency(lineTotal)}
+                    <div>
+                      <label className="label-rk">Total</label>
+                      <div className="input-rk flex items-center text-white/85">
+                        {formatCurrency(lineTotal)}
+                      </div>
                     </div>
                   </div>
                 </div>

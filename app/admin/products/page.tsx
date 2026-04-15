@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -42,12 +41,6 @@ export default async function AdminProductsPage() {
             <p className="mt-4 max-w-3xl text-white/70">
               Manage the new custom-order product master separately from the existing tuning package catalog.
             </p>
-          </div>
-
-          <div className="flex flex-wrap gap-3">
-            <Link href="/admin" className="rounded-xl border border-white/15 bg-black/30 px-4 py-3 text-white transition hover:bg-white/10">
-              Back to Admin
-            </Link>
           </div>
         </div>
 

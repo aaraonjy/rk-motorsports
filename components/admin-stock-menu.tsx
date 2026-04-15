@@ -9,10 +9,6 @@ const activeItems = [
     label: "Product List",
     href: "/admin/products",
   },
-  {
-    label: "Stock Settings",
-    href: "/admin/settings/stock",
-  },
 ] as const;
 
 const upcomingItems = [
@@ -46,7 +42,7 @@ export function AdminStockMenu() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const isActive = pathname.startsWith("/admin/products") || pathname.startsWith("/admin/settings/stock");
+  const isActive = pathname.startsWith("/admin/products");
 
   return (
     <div ref={dropdownRef} className="relative">

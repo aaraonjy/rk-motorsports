@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -32,15 +31,6 @@ export default async function AdminStockSettingsPage() {
             <p className="mt-4 max-w-3xl text-white/70">
               Configure the stock module foundation without affecting current order logic or stock movement yet.
             </p>
-          </div>
-
-          <div className="flex flex-wrap gap-3">
-            <Link href="/admin/products" className="rounded-xl border border-white/15 bg-black/30 px-4 py-3 text-white transition hover:bg-white/10">
-              Product Master
-            </Link>
-            <Link href="/admin/settings" className="rounded-xl border border-white/15 bg-black/30 px-4 py-3 text-white transition hover:bg-white/10">
-              Settings Hub
-            </Link>
           </div>
         </div>
 
