@@ -7,9 +7,9 @@ type TaxCodeItem = {
   id: string;
   code: string;
   description: string;
-  taxType: TaxTypeValue;
   rate: number;
   calculationMethod: "EXCLUSIVE" | "INCLUSIVE";
+  taxType: TaxTypeValue;
   isActive: boolean;
 };
 
@@ -32,10 +32,6 @@ const selectClassName =
 const inputClassName =
   "w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-none transition focus:border-red-400/50";
 
-function getTaxTypeLabel(value: TaxTypeValue) {
-  return value === "SALES" ? "Sales Tax" : "Service Tax";
-}
-
 export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) {
   const [config, setConfig] = useState(initialConfig);
   const [savedConfig, setSavedConfig] = useState(initialConfig);
@@ -46,9 +42,9 @@ export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) 
   const [newTaxCode, setNewTaxCode] = useState({
     code: "",
     description: "",
-    taxType: "SERVICE" as TaxTypeValue,
     rate: "0",
     calculationMethod: "EXCLUSIVE" as "EXCLUSIVE" | "INCLUSIVE",
+    taxType: "SERVICE" as TaxTypeValue,
     isActive: true,
   });
   const [isCreatingCode, setIsCreatingCode] = useState(false);
@@ -119,9 +115,9 @@ export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) 
         body: JSON.stringify({
           code: newTaxCode.code,
           description: newTaxCode.description,
-          taxType: newTaxCode.taxType,
           rate: Number(newTaxCode.rate || 0),
           calculationMethod: newTaxCode.calculationMethod,
+          taxType: newTaxCode.taxType,
           isActive: newTaxCode.isActive,
         }),
       });
@@ -135,13 +131,13 @@ export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) 
           id: payload.id,
           code: newTaxCode.code.trim().toUpperCase(),
           description: newTaxCode.description.trim(),
-          taxType: newTaxCode.taxType,
           rate: Number(newTaxCode.rate || 0),
           calculationMethod: newTaxCode.calculationMethod,
+          taxType: newTaxCode.taxType,
           isActive: newTaxCode.isActive,
         },
       ]);
-      setNewTaxCode({ code: "", description: "", taxType: "SERVICE", rate: "0", calculationMethod: "EXCLUSIVE", isActive: true });
+      setNewTaxCode({ code: "", description: "", rate: "0", calculationMethod: "EXCLUSIVE", isActive: true });
       setIsCreateFormOpen(false);
       setTaxCodeMessage({ type: "success", text: "Tax code created successfully." });
     } catch (error) {
@@ -161,9 +157,9 @@ export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) 
         body: JSON.stringify({
           code: row.code,
           description: row.description,
-          taxType: row.taxType,
           rate: row.rate,
           calculationMethod: row.calculationMethod,
+          taxType: row.taxType,
           isActive: row.isActive,
         }),
       });
@@ -316,22 +312,17 @@ export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) 
         </div>
 
         {isCreateFormOpen ? (
-          <div className="mt-6 grid gap-3 md:grid-cols-[1fr_1.5fr_1fr_0.8fr_1fr_1fr_auto]">
+          <div className="mt-6 grid gap-3 md:grid-cols-[1fr_1.5fr_0.7fr_1fr_1fr_1fr_auto]">
             <input className={inputClassName} placeholder="Tax Code" value={newTaxCode.code} onChange={(e) => setNewTaxCode((prev) => ({ ...prev, code: e.target.value }))} />
             <input className={inputClassName} placeholder="Description" value={newTaxCode.description} onChange={(e) => setNewTaxCode((prev) => ({ ...prev, description: e.target.value }))} />
-            <select
-              className={selectClassName}
-              style={selectStyle}
-              value={newTaxCode.taxType}
-              onChange={(e) => setNewTaxCode((prev) => ({ ...prev, taxType: e.target.value as TaxTypeValue }))}
-            >
-              <option value="SALES">Sales Tax</option>
-              <option value="SERVICE">Service Tax</option>
-            </select>
             <input className={inputClassName} placeholder="0" type="number" min="0" max="100" step="0.01" value={newTaxCode.rate} onChange={(e) => setNewTaxCode((prev) => ({ ...prev, rate: e.target.value }))} />
             <select className={selectClassName} style={selectStyle} value={newTaxCode.calculationMethod} onChange={(e) => setNewTaxCode((prev) => ({ ...prev, calculationMethod: e.target.value as "EXCLUSIVE" | "INCLUSIVE" }))}>
               <option value="EXCLUSIVE">Exclusive</option>
               <option value="INCLUSIVE">Inclusive</option>
+            </select>
+            <select className={selectClassName} style={selectStyle} value={newTaxCode.taxType} onChange={(e) => setNewTaxCode((prev) => ({ ...prev, taxType: e.target.value as TaxTypeValue }))}>
+              <option value="SERVICE">Service Tax</option>
+              <option value="SALES">Sales Tax</option>
             </select>
             <label className="flex min-h-[50px] items-center gap-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/85">
               <input type="checkbox" checked={newTaxCode.isActive} onChange={(e) => setNewTaxCode((prev) => ({ ...prev, isActive: e.target.checked }))} className="h-4 w-4 rounded border-white/15 bg-black/40" />
@@ -355,22 +346,17 @@ export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) 
           ) : (
             visibleTaxCodeRows.map((row) => (
               <div key={row.id} className="rounded-3xl border border-white/10 bg-black/20 p-4">
-                <div className="grid gap-3 md:grid-cols-[1fr_1.5fr_1fr_0.8fr_1fr_1fr_auto] md:items-center">
+                <div className="grid gap-3 md:grid-cols-[1fr_1.5fr_0.7fr_1fr_1fr_1fr_auto] md:items-center">
                   <input className={inputClassName} value={row.code} onChange={(e) => updateRow(row.id, { code: e.target.value.toUpperCase() })} />
                   <input className={inputClassName} value={row.description} onChange={(e) => updateRow(row.id, { description: e.target.value })} />
-                  <select
-                    className={selectClassName}
-                    style={selectStyle}
-                    value={row.taxType}
-                    onChange={(e) => updateRow(row.id, { taxType: e.target.value as TaxTypeValue })}
-                  >
-                    <option value="SALES">Sales Tax</option>
-                    <option value="SERVICE">Service Tax</option>
-                  </select>
                   <input className={inputClassName} type="number" min="0" max="100" step="0.01" value={row.rate} onChange={(e) => updateRow(row.id, { rate: Number(e.target.value || 0) })} />
                   <select className={selectClassName} style={selectStyle} value={row.calculationMethod} onChange={(e) => updateRow(row.id, { calculationMethod: e.target.value as "EXCLUSIVE" | "INCLUSIVE" })}>
                     <option value="EXCLUSIVE">Exclusive</option>
                     <option value="INCLUSIVE">Inclusive</option>
+                  </select>
+                  <select className={selectClassName} style={selectStyle} value={row.taxType} onChange={(e) => updateRow(row.id, { taxType: e.target.value as TaxTypeValue })}>
+                    <option value="SERVICE">Service Tax</option>
+                    <option value="SALES">Sales Tax</option>
                   </select>
                   <div className="flex min-h-[50px] items-center justify-between gap-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/85">
                     <label className="flex items-center gap-3">

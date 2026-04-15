@@ -27,7 +27,7 @@ type TaxReportRow = {
   unitPrice: number;
   taxableAmount: number;
   taxCode: string;
-  taxType: "SALES" | "SERVICE" | "";
+  taxType: "SALES" | "SERVICE";
   taxRate: number;
   taxAmount: number;
 };
@@ -84,11 +84,15 @@ function getInvoiceTransactionType(order: any): "CS" | "INV" {
   return String(order.docType || "").toUpperCase() === "CS" ? "CS" : "INV";
 }
 
-function getTaxTypeLabel(value?: string | null) {
+function normalizeTaxType(value: unknown): "SALES" | "SERVICE" {
+  return value === "SALES" ? "SALES" : "SERVICE";
+}
+
+function getTaxTypeLabel(value: "SALES" | "SERVICE") {
   return value === "SALES" ? "Sales Tax" : "Service Tax";
 }
 
-function getOrderLineItemTaxRows(order: any): TaxReportRow[] {
+function getOrderLineItemTaxRows(order: any, taxTypeMap: Map<string, "SALES" | "SERVICE">): TaxReportRow[] {
   const orderDate = new Date(order.documentDate ?? order.createdAt);
   const rows: TaxReportRow[] = [];
 
@@ -114,7 +118,7 @@ function getOrderLineItemTaxRows(order: any): TaxReportRow[] {
         unitPrice: Number(item.unitPrice ?? 0),
         taxableAmount: Number(item.lineTotal ?? 0),
         taxCode,
-        taxType: "",
+        taxType: taxTypeMap.get(taxCode) ?? "SERVICE",
         taxRate: Number(item.taxRate ?? 0),
         taxAmount,
       });
@@ -138,7 +142,7 @@ function getOrderLineItemTaxRows(order: any): TaxReportRow[] {
       unitPrice: Number(order.taxableSubtotal ?? order.customSubtotal ?? order.totalAmount ?? 0),
       taxableAmount: Number(order.taxableSubtotal ?? order.customSubtotal ?? order.totalAmount ?? 0),
       taxCode: orderTaxCode,
-      taxType: "",
+      taxType: taxTypeMap.get(orderTaxCode) ?? "SERVICE",
       taxRate: Number(order.taxRate ?? 0),
       taxAmount: orderTaxAmount,
     });
@@ -147,7 +151,7 @@ function getOrderLineItemTaxRows(order: any): TaxReportRow[] {
   return rows;
 }
 
-function getCreditNoteTaxRows(order: any): TaxReportRow[] {
+function getCreditNoteTaxRows(order: any, taxTypeMap: Map<string, "SALES" | "SERVICE">): TaxReportRow[] {
   if (!order.creditNote) return [];
 
   const cnDate = new Date(order.creditNote.cnDate);
@@ -175,6 +179,7 @@ function getCreditNoteTaxRows(order: any): TaxReportRow[] {
         unitPrice: Number(item.unitPrice ?? 0),
         taxableAmount: -Math.abs(Number(item.lineTotal ?? 0)),
         taxCode,
+        taxType: taxTypeMap.get(taxCode) ?? "SERVICE",
         taxRate: Number(item.taxRate ?? 0),
         taxAmount: -Math.abs(taxAmount),
       });
@@ -198,6 +203,7 @@ function getCreditNoteTaxRows(order: any): TaxReportRow[] {
       unitPrice: Number(order.taxableSubtotal ?? order.customSubtotal ?? order.totalAmount ?? 0),
       taxableAmount: -Math.abs(Number(order.taxableSubtotal ?? order.customSubtotal ?? order.totalAmount ?? 0)),
       taxCode: orderTaxCode,
+      taxType: taxTypeMap.get(orderTaxCode) ?? "SERVICE",
       taxRate: Number(order.taxRate ?? 0),
       taxAmount: -Math.abs(orderTaxAmount),
     });
@@ -206,24 +212,19 @@ function getCreditNoteTaxRows(order: any): TaxReportRow[] {
   return rows;
 }
 
-function buildTaxReportRows(
-  orders: any[],
-  filters: { taxCode?: string; taxType?: string; transactionType?: string; dateFrom?: string; dateTo?: string },
-  taxTypeByCode: Record<string, "SALES" | "SERVICE">
-) {
+function buildTaxReportRows(orders: any[], taxTypeMap: Map<string, "SALES" | "SERVICE">, filters: { taxCode?: string; taxType?: string; transactionType?: string; dateFrom?: string; dateTo?: string; }) {
   const rows: TaxReportRow[] = [];
 
   for (const order of orders) {
-    const invoiceRows = order.status === "CANCELLED" ? [] : getOrderLineItemTaxRows(order);
-    const creditNoteRows = getCreditNoteTaxRows(order);
+    const invoiceRows = order.status === "CANCELLED" ? [] : getOrderLineItemTaxRows(order, taxTypeMap);
+    const creditNoteRows = getCreditNoteTaxRows(order, taxTypeMap);
 
     for (const row of [...invoiceRows, ...creditNoteRows]) {
-      const rowTaxType = taxTypeByCode[row.taxCode] || "";
       if (!isWithinDateRange(row.date, filters.dateFrom, filters.dateTo)) continue;
       if (filters.taxCode && filters.taxCode !== "ALL" && row.taxCode !== filters.taxCode) continue;
-      if (filters.taxType && filters.taxType !== "ALL" && rowTaxType !== filters.taxType) continue;
+      if (filters.taxType && filters.taxType !== "ALL" && row.taxType !== filters.taxType) continue;
       if (filters.transactionType && filters.transactionType !== "ALL" && row.transactionType !== filters.transactionType) continue;
-      rows.push({ ...row, taxType: rowTaxType });
+      rows.push(row);
     }
   }
 
@@ -432,16 +433,14 @@ export default async function TaxReportPage({ searchParams }: TaxReportPageProps
       orderBy: { createdAt: "desc" },
     }),
     db.taxCode.findMany({
+      where: { isActive: true },
       orderBy: [{ sortOrder: "asc" }, { code: "asc" }],
-      select: { code: true, taxType: true, isActive: true },
+      select: { code: true, taxType: true },
     }),
   ]);
 
-  const taxTypeByCode = Object.fromEntries(
-    taxCodes.map((item) => [item.code, item.taxType])
-  ) as Record<string, "SALES" | "SERVICE">;
-
-  const rows = buildTaxReportRows(orders, { taxCode, taxType, transactionType, dateFrom, dateTo }, taxTypeByCode);
+  const taxTypeMap = new Map(taxCodes.map((item) => [item.code, normalizeTaxType(item.taxType)] as const));
+  const rows = buildTaxReportRows(orders, taxTypeMap, { taxCode, taxType, transactionType, dateFrom, dateTo });
   const paginatedRows = paginateItems(rows, page, pageSize);
 
   const totalTaxableAmount = rows.reduce((sum, row) => sum + row.taxableAmount, 0);
@@ -487,7 +486,7 @@ export default async function TaxReportPage({ searchParams }: TaxReportPageProps
                   className="w-full appearance-none rounded-xl border border-white/15 bg-black/50 px-4 py-3 pr-12 text-white outline-none"
                 >
                   <option value="ALL">All Tax Codes</option>
-                  {taxCodes.filter((item) => item.isActive).map((item) => (
+                  {taxCodes.map((item) => (
                     <option key={item.code} value={item.code}>
                       {item.code}
                     </option>
@@ -498,6 +497,7 @@ export default async function TaxReportPage({ searchParams }: TaxReportPageProps
             </div>
 
             <div>
+              <div>
               <label className="mb-2 block text-sm text-white/65">Tax Type</label>
               <div className="relative">
                 <select
@@ -513,8 +513,7 @@ export default async function TaxReportPage({ searchParams }: TaxReportPageProps
               </div>
             </div>
 
-            <div>
-              <label className="mb-2 block text-sm text-white/65">Transaction Type</label>
+            <label className="mb-2 block text-sm text-white/65">Transaction Type</label>
               <div className="relative">
                 <select
                   name="transactionType"
@@ -616,6 +615,7 @@ export default async function TaxReportPage({ searchParams }: TaxReportPageProps
                       <th className="px-6 py-4 font-medium text-right">Unit Price</th>
                       <th className="px-6 py-4 font-medium text-right">Taxable Amount</th>
                       <th className="px-6 py-4 font-medium">Tax Code</th>
+                      <th className="px-6 py-4 font-medium">Tax Type</th>
                       <th className="px-6 py-4 font-medium text-right">Tax Rate</th>
                       <th className="px-6 py-4 font-medium text-right">Tax Amount</th>
                     </tr>
@@ -647,6 +647,7 @@ export default async function TaxReportPage({ searchParams }: TaxReportPageProps
                           {formatCurrency(row.taxableAmount)}
                         </td>
                         <td className="px-6 py-5 text-white/90">{row.taxCode}</td>
+                        <td className="px-6 py-5 text-white/90">{getTaxTypeLabel(row.taxType)}</td>
                         <td className="px-6 py-5 text-right text-white/90">{row.taxRate.toFixed(2)}%</td>
                         <td className={`px-6 py-5 text-right font-semibold ${row.taxAmount < 0 ? "text-red-200" : "text-amber-200"}`}>
                           {formatCurrency(row.taxAmount)}

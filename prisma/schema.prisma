@@ -157,9 +157,9 @@ model TaxCode {
   code                     String               @unique
   description              String
   displayLabel             String?
-  taxType                  TaxType              @default(SERVICE)
   rate                     Decimal              @db.Decimal(5, 2)
   calculationMethod        TaxCalculationMethod
+  taxType                  TaxType               @default(SERVICE)
   isActive                 Boolean              @default(true)
   sortOrder                Int                  @default(0)
   createdAt                DateTime             @default(now())

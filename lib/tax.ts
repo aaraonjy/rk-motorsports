@@ -150,3 +150,8 @@ export function getTaxDisplayLabel(input: {
 
   return description || "Tax";
 }
+
+
+export function getTaxTypeLabel(value?: TaxTypeValue | string | null) {
+  return value === "SALES" ? "Sales Tax" : "Service Tax";
+}
