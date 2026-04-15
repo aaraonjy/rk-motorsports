@@ -356,15 +356,15 @@ export function AdminProductMasterClient({ initialProducts, locations }: Props) 
       </form>
 
       <div className="rounded-[2rem] border border-white/10 bg-black/45 p-6 backdrop-blur-md md:p-8">
-        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/45">Product List</p>
             <h2 className="mt-3 text-2xl font-bold text-white">Existing Products</h2>
           </div>
-          <div className="grid gap-3 md:grid-cols-3">
-            <input className="input-rk min-w-[220px]" value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder="Search code / description / brand" />
-            <div className="relative">
-              <select className="input-rk appearance-none pr-12" value={itemTypeFilter} onChange={(e) => setItemTypeFilter(e.target.value as any)}>
+          <div className="grid w-full gap-3 sm:grid-cols-2 xl:w-auto xl:min-w-[640px] xl:grid-cols-[minmax(260px,1.4fr)_minmax(170px,0.8fr)_minmax(170px,0.8fr)]">
+            <input className="input-rk w-full min-w-0" value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder="Search code / description / brand" />
+            <div className="relative min-w-0">
+              <select className="input-rk w-full appearance-none pr-12" value={itemTypeFilter} onChange={(e) => setItemTypeFilter(e.target.value as any)}>
                 <option value="ALL">All Types</option>
                 <option value="STOCK_ITEM">Stock Item</option>
                 <option value="SERVICE_ITEM">Service Item</option>
@@ -372,8 +372,8 @@ export function AdminProductMasterClient({ initialProducts, locations }: Props) 
               </select>
               <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/60">▾</div>
             </div>
-            <div className="relative">
-              <select className="input-rk appearance-none pr-12" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as any)}>
+            <div className="relative min-w-0">
+              <select className="input-rk w-full appearance-none pr-12" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as any)}>
                 <option value="ALL">All Status</option>
                 <option value="ACTIVE">Active</option>
                 <option value="INACTIVE">Inactive</option>

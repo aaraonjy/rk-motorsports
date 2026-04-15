@@ -571,7 +571,7 @@ export function CustomOrderForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="grid gap-8 lg:grid-cols-[1.5fr_0.9fr]">
+    <form onSubmit={handleSubmit} className="grid gap-8 xl:grid-cols-[minmax(0,1.45fr)_minmax(360px,0.95fr)]">
       <div className="rounded-[2rem] border border-white/10 bg-black/45 p-6 backdrop-blur-md md:p-8">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/45">
@@ -752,21 +752,21 @@ export function CustomOrderForm({
                   </button>
                 </div>
 
-                <div className="mt-4 grid gap-4 md:grid-cols-[1.1fr_1.5fr_0.55fr_0.7fr_0.8fr_0.9fr]">
+                <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(220px,1.35fr)_minmax(240px,1.75fr)_minmax(80px,0.55fr)_minmax(100px,0.7fr)_minmax(140px,0.9fr)_minmax(150px,0.95fr)]">
                   <div>
                     <label className="label-rk">Product Code</label>
-                    <div className="input-rk flex items-center justify-between gap-3">
-                      <span className={row.productCodeSnapshot ? "font-semibold text-white" : "text-white/45"}>
+                    <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
+                      <div className={`text-sm ${row.productCodeSnapshot ? "font-semibold text-white" : "text-white/45"}`}>
                         {row.productCodeSnapshot || "Manual line"}
-                      </span>
-                      <div className="flex items-center gap-2">
+                      </div>
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
                         <button
                           type="button"
                           onClick={() => {
                             setProductPickerRowId(row.id);
                             setProductKeyword("");
                           }}
-                          className="rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/10"
+                          className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-semibold text-white transition hover:bg-white/10"
                         >
                           Pick Product
                         </button>
@@ -774,7 +774,7 @@ export function CustomOrderForm({
                           <button
                             type="button"
                             onClick={() => clearProductFromRow(row.id)}
-                            className="rounded-lg border border-red-500/25 bg-red-500/10 px-3 py-1.5 text-xs font-semibold text-red-200 transition hover:bg-red-500/15"
+                            className="rounded-lg border border-red-500/25 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-200 transition hover:bg-red-500/15"
                           >
                             Clear
                           </button>
@@ -1050,78 +1050,6 @@ export function CustomOrderForm({
             </div>
           </div>
 
-          {productPickerRowId ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className="max-h-[85vh] w-full max-w-4xl overflow-hidden rounded-[2rem] border border-white/10 bg-[#0b0b0f] shadow-2xl">
-            <div className="border-b border-white/10 p-6">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.28em] text-white/45">Product Picker</p>
-                  <h3 className="mt-2 text-2xl font-bold text-white">Select Product</h3>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setProductPickerRowId(null);
-                    setProductKeyword("");
-                  }}
-                  className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm text-white transition hover:bg-white/10"
-                >
-                  Close
-                </button>
-              </div>
-              <input
-                className="input-rk mt-5"
-                value={productKeyword}
-                onChange={(e) => setProductKeyword(e.target.value)}
-                placeholder="Search by product code or description"
-              />
-            </div>
-
-            <div className="max-h-[60vh] overflow-y-auto p-6">
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-white/10 text-sm">
-                  <thead>
-                    <tr className="text-left text-white/45">
-                      <th className="px-3 py-3 font-medium">Code</th>
-                      <th className="px-3 py-3 font-medium">Description</th>
-                      <th className="px-3 py-3 font-medium">Type</th>
-                      <th className="px-3 py-3 font-medium">UOM</th>
-                      <th className="px-3 py-3 font-medium">Price</th>
-                      <th className="px-3 py-3 font-medium text-right">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/10">
-                    {filteredProductOptions.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="px-3 py-8 text-center text-white/50">No active product found.</td>
-                      </tr>
-                    ) : filteredProductOptions.map((product) => (
-                      <tr key={product.id} className="align-top text-white/80">
-                        <td className="px-3 py-4 font-semibold text-white">{product.code}</td>
-                        <td className="px-3 py-4">{product.description}</td>
-                        <td className="px-3 py-4">{getItemTypeLabel(product.itemType)}</td>
-                        <td className="px-3 py-4">{product.baseUom}</td>
-                        <td className="px-3 py-4">{formatCurrency(product.sellingPrice)}</td>
-                        <td className="px-3 py-4 text-right">
-                          <button
-                            type="button"
-                            onClick={() => applyProductToRow(productPickerRowId, product)}
-                            className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-200 transition hover:bg-amber-500/15"
-                          >
-                            Select
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
       {submitError ? (
             <div className="mt-6 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
               <div className="font-semibold uppercase tracking-[0.18em] text-red-300/80">
@@ -1151,6 +1079,79 @@ export function CustomOrderForm({
           </p>
         </div>
       </div>
+
+      {productPickerRowId ? (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/75 p-4">
+          <div className="max-h-[88vh] w-full max-w-6xl overflow-hidden rounded-[2rem] border border-white/10 bg-[#0b0b0f] shadow-2xl">
+            <div className="border-b border-white/10 p-6 md:p-8">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.28em] text-white/45">Product Picker</p>
+                  <h3 className="mt-2 text-2xl font-bold text-white">Select Product</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setProductPickerRowId(null);
+                    setProductKeyword("");
+                  }}
+                  className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm text-white transition hover:bg-white/10"
+                >
+                  Close
+                </button>
+              </div>
+              <input
+                className="input-rk mt-5"
+                value={productKeyword}
+                onChange={(e) => setProductKeyword(e.target.value)}
+                placeholder="Search by product code or description"
+              />
+            </div>
+
+            <div className="max-h-[64vh] overflow-y-auto p-6 md:p-8">
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-white/10 text-sm">
+                  <thead>
+                    <tr className="text-left text-white/45">
+                      <th className="px-3 py-3 font-medium">Code</th>
+                      <th className="px-3 py-3 font-medium">Description</th>
+                      <th className="px-3 py-3 font-medium">Type</th>
+                      <th className="px-3 py-3 font-medium">UOM</th>
+                      <th className="px-3 py-3 font-medium">Price</th>
+                      <th className="px-3 py-3 font-medium text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/10">
+                    {filteredProductOptions.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="px-3 py-10 text-center text-white/50">No active product found.</td>
+                      </tr>
+                    ) : filteredProductOptions.map((product) => (
+                      <tr key={product.id} className="align-top text-white/80">
+                        <td className="px-3 py-4 font-semibold text-white">{product.code}</td>
+                        <td className="px-3 py-4">{product.description}</td>
+                        <td className="px-3 py-4">{getItemTypeLabel(product.itemType)}</td>
+                        <td className="px-3 py-4">{product.baseUom}</td>
+                        <td className="px-3 py-4">{formatCurrency(product.sellingPrice)}</td>
+                        <td className="px-3 py-4 text-right">
+                          <button
+                            type="button"
+                            onClick={() => applyProductToRow(productPickerRowId, product)}
+                            className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-xs font-semibold text-amber-200 transition hover:bg-amber-500/15"
+                          >
+                            Select
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
     </form>
   );
 }

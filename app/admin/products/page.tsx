@@ -46,9 +46,6 @@ export default async function AdminProductsPage() {
           </div>
 
           <div className="flex flex-wrap gap-3">
-            <Link href="/admin/settings" className="rounded-xl border border-white/15 bg-black/30 px-4 py-3 text-white transition hover:bg-white/10">
-              Settings Hub
-            </Link>
             <Link href="/admin" className="rounded-xl border border-white/15 bg-black/30 px-4 py-3 text-white transition hover:bg-white/10">
               Back to Admin
             </Link>
