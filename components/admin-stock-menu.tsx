@@ -9,7 +9,7 @@ const activeItems = [
   { label: "Product List", href: "/admin/products" },
   { label: "Product Group", href: "/admin/product-groups" },
   { label: "Product Sub-Group", href: "/admin/product-sub-groups" },
-  { label: "Brand", href: "/admin/brands" },
+  { label: "Product Brand", href: "/admin/brands" },
 ] as const;
 
 const upcomingItems = [
