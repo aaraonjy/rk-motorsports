@@ -756,31 +756,31 @@ export function CustomOrderForm({
                   <div className="grid gap-4 xl:grid-cols-2">
                     <div>
                       <label className="label-rk">Product Code</label>
-                      <div className="input-rk flex min-h-[56px] items-center justify-between gap-3">
-                        <div className={`min-w-0 truncate text-sm ${row.productCodeSnapshot ? "font-semibold text-white" : "text-white/45"}`}>
-                          {row.productCodeSnapshot || ""}
-                        </div>
-                        <div className="flex shrink-0 items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setProductPickerRowId(row.id);
-                              setProductKeyword("");
-                            }}
-                            className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-semibold text-white transition hover:bg-white/10"
-                          >
-                            Select Product
-                          </button>
-                          {row.inventoryProductId ? (
+                      <div className="input-rk flex min-h-[56px] items-center justify-start gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setProductPickerRowId(row.id);
+                            setProductKeyword("");
+                          }}
+                          className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-semibold text-white transition hover:bg-white/10"
+                        >
+                          Select Product
+                        </button>
+                        {row.inventoryProductId ? (
+                          <>
+                            <div className={`min-w-0 truncate text-sm ${row.productCodeSnapshot ? "font-semibold text-white" : "text-white/45"}`}>
+                              {row.productCodeSnapshot || ""}
+                            </div>
                             <button
                               type="button"
                               onClick={() => clearProductFromRow(row.id)}
-                              className="rounded-lg border border-red-500/25 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-200 transition hover:bg-red-500/15"
+                              className="ml-auto rounded-lg border border-red-500/25 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-200 transition hover:bg-red-500/15"
                             >
                               Clear
                             </button>
-                          ) : null}
-                        </div>
+                          </>
+                        ) : null}
                       </div>
                     </div>
 
