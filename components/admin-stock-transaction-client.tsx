@@ -521,23 +521,32 @@ export function AdminStockTransactionClient({
           setAvailableBatches((prev) => ({ ...prev, [index]: rows }));
           if (!outboundBatchFlow) return;
 
-          setLines((prev) =>
-            prev.map((item, itemIndex) => {
-              if (itemIndex !== index) return item;
-              const allowedBatchNos = new Set(rows.map((entry) => entry.batchNo.toUpperCase()));
-              if (!item.batchNo || allowedBatchNos.has(item.batchNo.toUpperCase())) {
-                return item;
-              }
-              return {
-                ...item,
-                batchNo: "",
-                batchMode: "existing",
-                serialNos: [],
-                serialSearch: "",
-                qty: product?.serialNumberTracking ? "0" : item.qty,
-              };
-            })
-          );
+          const allowedBatchNos = new Set(rows.map((entry) => entry.batchNo.toUpperCase()));
+          const currentLine = lines[index];
+          const hasInvalidSelectedBatch =
+            !!currentLine &&
+            !!currentLine.batchNo &&
+            !allowedBatchNos.has(currentLine.batchNo.toUpperCase());
+
+          if (!hasInvalidSelectedBatch) return;
+
+          setLines((prev) => {
+            const item = prev[index];
+            if (!item || !item.batchNo || allowedBatchNos.has(item.batchNo.toUpperCase())) {
+              return prev;
+            }
+
+            const next = [...prev];
+            next[index] = {
+              ...item,
+              batchNo: "",
+              batchMode: "existing",
+              serialNos: [],
+              serialSearch: "",
+              qty: product?.serialNumberTracking ? "0" : item.qty,
+            };
+            return next;
+          });
         })
         .finally(() => {
           setLoadingBatches((prev) => ({ ...prev, [index]: false }));
@@ -580,18 +589,38 @@ export function AdminStockTransactionClient({
         })
         .then((rows: AvailableSerial[]) => {
           setAvailableSerials((prev) => ({ ...prev, [index]: rows }));
-          setLines((prev) =>
-            prev.map((item, itemIndex) => {
-              if (itemIndex !== index) return item;
-              const allowedKeys = new Set(rows.map((entry) => entry.serialNo.toUpperCase()));
-              const nextSerials = item.serialNos.filter((serialNo) => allowedKeys.has(serialNo.toUpperCase()));
-              return {
-                ...item,
-                serialNos: nextSerials,
-                qty: String(nextSerials.length || 0),
-              };
-            })
-          );
+
+          const allowedKeys = new Set(rows.map((entry) => entry.serialNo.toUpperCase()));
+          const currentLine = lines[index];
+          const nextSerials = currentLine
+            ? currentLine.serialNos.filter((serialNo) => allowedKeys.has(serialNo.toUpperCase()))
+            : [];
+          const hasSerialSelectionChanged =
+            !!currentLine &&
+            (nextSerials.length !== currentLine.serialNos.length ||
+              nextSerials.some((serialNo, serialIndex) => serialNo !== currentLine.serialNos[serialIndex]));
+
+          if (!hasSerialSelectionChanged) return;
+
+          setLines((prev) => {
+            const item = prev[index];
+            if (!item) return prev;
+
+            const filteredSerials = item.serialNos.filter((serialNo) => allowedKeys.has(serialNo.toUpperCase()));
+            const changed =
+              filteredSerials.length !== item.serialNos.length ||
+              filteredSerials.some((serialNo, serialIndex) => serialNo !== item.serialNos[serialIndex]);
+
+            if (!changed) return prev;
+
+            const next = [...prev];
+            next[index] = {
+              ...item,
+              serialNos: filteredSerials,
+              qty: String(filteredSerials.length || 0),
+            };
+            return next;
+          });
         })
         .finally(() => {
           setLoadingSerials((prev) => ({ ...prev, [index]: false }));
@@ -957,7 +986,7 @@ export function AdminStockTransactionClient({
                   return (
                     <div key={index} className="rounded-2xl border border-white/10 bg-black/20 p-4">
                       <div className="mb-4 flex items-center justify-between gap-3">
-                        <div className="text-sm font-semibold text-white">Line {index + 1}</div>
+                        <div className="text-sm font-semibold text-white">Product {index + 1}</div>
                         {lines.length > 1 ? (
                           <button type="button" onClick={() => removeLine(index)} className="rounded-lg border border-red-500/25 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-200 transition hover:bg-red-500/15">
                             Remove
@@ -1206,8 +1235,8 @@ export function AdminStockTransactionClient({
                         ) : null}
 
                         <div className="md:col-span-2 xl:col-span-4">
-                          <label className="label-rk">Line Remarks</label>
-                          <input className="input-rk" value={line.remarks} onChange={(e) => updateLine(index, { remarks: e.target.value })} placeholder="Optional line remarks" />
+                          <label className="label-rk">Product Remarks</label>
+                          <input className="input-rk" value={line.remarks} onChange={(e) => updateLine(index, { remarks: e.target.value })} placeholder="Optional product remarks" />
                         </div>
                       </div>
 
