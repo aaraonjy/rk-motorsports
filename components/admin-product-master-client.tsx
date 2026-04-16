@@ -24,6 +24,7 @@ type InventoryProductRecord = {
   sellingPrice: number;
   trackInventory: boolean;
   serialNumberTracking: boolean;
+  batchTracking: boolean;
   isActive: boolean;
   defaultLocationId: string | null;
   defaultLocationLabel: string | null;
@@ -46,6 +47,7 @@ type ProductFormState = {
   sellingPrice: string;
   trackInventory: boolean;
   serialNumberTracking: boolean;
+  batchTracking: boolean;
   isActive: boolean;
 };
 
@@ -88,6 +90,7 @@ function emptyForm(defaultLocationId = ""): ProductFormState {
     sellingPrice: "0.00",
     trackInventory: true,
     serialNumberTracking: false,
+    batchTracking: false,
     isActive: true,
   };
 }
@@ -309,6 +312,7 @@ export function AdminProductMasterClient({
       sellingPrice: product.sellingPrice.toFixed(2),
       trackInventory: product.trackInventory,
       serialNumberTracking: product.serialNumberTracking,
+      batchTracking: product.batchTracking,
       isActive: product.isActive,
     });
     setSubmitError("");
@@ -378,6 +382,7 @@ export function AdminProductMasterClient({
         sellingPrice: Number(normalizeMoneyInput(form.sellingPrice)),
         trackInventory: form.itemType === "STOCK_ITEM" ? form.trackInventory : false,
         serialNumberTracking: form.serialNumberTracking,
+        batchTracking: form.batchTracking,
         isActive: form.isActive,
         defaultLocationId: null,
       };
