@@ -17,6 +17,7 @@ export default async function AdminStockTransferPage() {
         code: true,
         description: true,
         baseUom: true,
+        unitCost: true,
         batchTracking: true,
         serialNumberTracking: true,
       },
@@ -43,7 +44,7 @@ export default async function AdminStockTransferPage() {
             transactionType="ST"
             title="Stock Transfer"
             intro="Use Stock Transfer to move inventory from one active location to another while preserving full stock ledger traceability."
-            initialProducts={products}
+            initialProducts={products.map((product) => ({ ...product, unitCost: Number(product.unitCost ?? 0) }))}
             initialLocations={locations}
           />
         </div>

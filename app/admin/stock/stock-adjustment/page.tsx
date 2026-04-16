@@ -17,6 +17,7 @@ export default async function AdminStockAdjustmentPage() {
         code: true,
         description: true,
         baseUom: true,
+        unitCost: true,
         batchTracking: true,
         serialNumberTracking: true,
       },
@@ -43,7 +44,7 @@ export default async function AdminStockAdjustmentPage() {
             transactionType="SA"
             title="Stock Adjustment"
             intro="Use Stock Adjustment to manually correct inventory discrepancies with an IN or OUT direction at a selected location."
-            initialProducts={products}
+            initialProducts={products.map((product) => ({ ...product, unitCost: Number(product.unitCost ?? 0) }))}
             initialLocations={locations}
           />
         </div>

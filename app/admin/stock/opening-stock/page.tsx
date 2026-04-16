@@ -17,6 +17,7 @@ export default async function AdminOpeningStockPage() {
         code: true,
         description: true,
         baseUom: true,
+        unitCost: true,
         batchTracking: true,
         serialNumberTracking: true,
       },
@@ -43,7 +44,7 @@ export default async function AdminOpeningStockPage() {
             transactionType="OB"
             title="Opening Stock"
             intro="Use Opening Stock to initialize the starting balance for each tracked product and location before normal stock movements begin."
-            initialProducts={products}
+            initialProducts={products.map((product) => ({ ...product, unitCost: Number(product.unitCost ?? 0) }))}
             initialLocations={locations}
           />
         </div>

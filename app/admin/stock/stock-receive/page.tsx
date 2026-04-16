@@ -17,6 +17,7 @@ export default async function AdminStockReceivePage() {
         code: true,
         description: true,
         baseUom: true,
+        unitCost: true,
         batchTracking: true,
         serialNumberTracking: true,
       },
@@ -43,7 +44,7 @@ export default async function AdminStockReceivePage() {
             transactionType="SR"
             title="Stock Receive"
             intro="Use Stock Receive to record incoming stock such as purchases, replenishment, or items returned into a location."
-            initialProducts={products}
+            initialProducts={products.map((product) => ({ ...product, unitCost: Number(product.unitCost ?? 0) }))}
             initialLocations={locations}
           />
         </div>

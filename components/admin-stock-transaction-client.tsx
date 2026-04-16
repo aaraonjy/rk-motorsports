@@ -10,6 +10,7 @@ type InventoryProductOption = {
   code: string;
   description: string;
   baseUom: string;
+  unitCost: number;
   batchTracking: boolean;
   serialNumberTracking: boolean;
 };
@@ -95,6 +96,13 @@ type AvailableSerial = {
   expiryDate?: string | null;
 };
 
+type AvailableBatch = {
+  id: string;
+  batchNo: string;
+  expiryDate?: string | null;
+  balance?: number | null;
+};
+
 function emptyLine(): FormLine {
   return {
     inventoryProductId: "",
@@ -178,6 +186,15 @@ function isInboundSerialFlow(type: StockTransactionTypeValue, direction: "" | Ad
 
 function isOutboundSerialFlow(type: StockTransactionTypeValue, direction: "" | AdjustmentDirectionValue) {
   return type === "SI" || type === "ST" || (type === "SA" && direction === "OUT");
+}
+
+function requiresBatchSelectionBeforeBalance(
+  product: InventoryProductOption | null | undefined,
+  type: StockTransactionTypeValue,
+  direction: "" | AdjustmentDirectionValue
+) {
+  if (!product?.batchTracking) return false;
+  return type === "SI" || type === "ST" || type === "OB" || type === "SR" || (type === "SA" && direction === "OUT") || (type === "SA" && direction === "IN");
 }
 
 function SearchableSelect({
@@ -299,6 +316,8 @@ export function AdminStockTransactionClient({
   const [loadingBalances, setLoadingBalances] = useState<Record<string, boolean>>({});
   const [availableSerials, setAvailableSerials] = useState<Record<number, AvailableSerial[]>>({});
   const [loadingSerials, setLoadingSerials] = useState<Record<number, boolean>>({});
+  const [availableBatches, setAvailableBatches] = useState<Record<number, AvailableBatch[]>>({});
+  const [loadingBatches, setLoadingBatches] = useState<Record<number, boolean>>({});
   const [isLoadingTransactions, setIsLoadingTransactions] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
@@ -401,10 +420,16 @@ export function AdminStockTransactionClient({
 
     for (const line of lines) {
       const product = initialProducts.find((item) => item.id === line.inventoryProductId);
-      const batchNo = product?.batchTracking ? line.batchNo.trim().toUpperCase() : "";
-      if (line.inventoryProductId && line.locationId) needed.add(balanceKey(line.inventoryProductId, line.locationId, batchNo));
-      if (line.inventoryProductId && line.fromLocationId) needed.add(balanceKey(line.inventoryProductId, line.fromLocationId, batchNo));
-      if (line.inventoryProductId && line.toLocationId) needed.add(balanceKey(line.inventoryProductId, line.toLocationId, batchNo));
+      const requiresBatch = requiresBatchSelectionBeforeBalance(product, transactionType, line.adjustmentDirection);
+      const normalizedBatchNo = product?.batchTracking ? line.batchNo.trim().toUpperCase() : "";
+
+      if (requiresBatch && !normalizedBatchNo) {
+        continue;
+      }
+
+      if (line.inventoryProductId && line.locationId) needed.add(balanceKey(line.inventoryProductId, line.locationId, normalizedBatchNo));
+      if (line.inventoryProductId && line.fromLocationId) needed.add(balanceKey(line.inventoryProductId, line.fromLocationId, normalizedBatchNo));
+      if (line.inventoryProductId && line.toLocationId) needed.add(balanceKey(line.inventoryProductId, line.toLocationId, normalizedBatchNo));
     }
 
     const targets = Array.from(needed);
@@ -458,7 +483,65 @@ export function AdminStockTransactionClient({
     return () => {
       cancelled = true;
     };
-  }, [lines, isCreateOpen, initialProducts]);
+  }, [lines, isCreateOpen, initialProducts, transactionType]);
+  useEffect(() => {
+    if (!isCreateOpen) return;
+
+    lines.forEach((line, index) => {
+      const product = initialProducts.find((item) => item.id === line.inventoryProductId);
+      const inboundFlow = isInboundSerialFlow(transactionType, line.adjustmentDirection);
+      const outboundFlow = isOutboundSerialFlow(transactionType, line.adjustmentDirection);
+      const locationId = transactionType === "ST" ? line.fromLocationId : line.locationId;
+      const shouldFetch =
+        !!product?.batchTracking &&
+        !!line.inventoryProductId &&
+        !!locationId;
+
+      if (!shouldFetch) {
+        setAvailableBatches((prev) => ({ ...prev, [index]: [] }));
+        setLoadingBatches((prev) => ({ ...prev, [index]: false }));
+        return;
+      }
+
+      const params = new URLSearchParams({
+        inventoryProductId: line.inventoryProductId,
+        locationId,
+        direction: outboundFlow ? "outbound" : "inbound",
+      });
+
+      setLoadingBatches((prev) => ({ ...prev, [index]: true }));
+      fetch(`/api/admin/stock/batches?${params.toString()}`, { cache: "no-store" })
+        .then(async (response) => {
+          const data = await response.json();
+          if (!response.ok || !data.ok) return [];
+          return Array.isArray(data.items) ? data.items : [];
+        })
+        .then((rows: AvailableBatch[]) => {
+          setAvailableBatches((prev) => ({ ...prev, [index]: rows }));
+          if (!outboundFlow) return;
+
+          setLines((prev) =>
+            prev.map((item, itemIndex) => {
+              if (itemIndex !== index) return item;
+              const allowedBatchNos = new Set(rows.map((entry) => entry.batchNo.toUpperCase()));
+              if (!item.batchNo || allowedBatchNos.has(item.batchNo.toUpperCase())) {
+                return item;
+              }
+              return {
+                ...item,
+                batchNo: "",
+                serialNos: [],
+                serialSearch: "",
+                qty: product?.serialNumberTracking ? "0" : item.qty,
+              };
+            })
+          );
+        })
+        .finally(() => {
+          setLoadingBatches((prev) => ({ ...prev, [index]: false }));
+        });
+    });
+  }, [lines, isCreateOpen, transactionType, initialProducts]);
 
   useEffect(() => {
     if (!isCreateOpen) return;
@@ -525,6 +608,8 @@ export function AdminStockTransactionClient({
     setLoadingBalances({});
     setAvailableSerials({});
     setLoadingSerials({});
+    setAvailableBatches({});
+    setLoadingBatches({});
   }
 
   function openCreateModal() {
@@ -555,6 +640,7 @@ export function AdminStockTransactionClient({
     const product = initialProducts.find((item) => item.id === productId);
     updateLine(index, {
       inventoryProductId: productId,
+      unitCost: product ? product.unitCost.toFixed(2) : "0.00",
       batchNo: "",
       expiryDate: "",
       serialNos: [],
@@ -575,10 +661,24 @@ export function AdminStockTransactionClient({
       delete next[index];
       return next;
     });
+    setAvailableBatches((prev) => {
+      const next = { ...prev };
+      delete next[index];
+      return next;
+    });
   }
 
-  function getBalanceText(productId: string, locationId: string, batchNo?: string) {
+  function getBalanceText(
+    productId: string,
+    locationId: string,
+    batchNo?: string,
+    product?: InventoryProductOption | null,
+    direction: "" | AdjustmentDirectionValue = ""
+  ) {
     if (!productId || !locationId) return "Select product and location to view balance.";
+    if (requiresBatchSelectionBeforeBalance(product, transactionType, direction) && !batchNo?.trim()) {
+      return "Select batch no to view balance.";
+    }
     const key = balanceKey(productId, locationId, batchNo);
     if (loadingBalances[key]) return "Loading current balance...";
     return `Current Balance: ${formatQty(typeof balances[key] === "number" ? balances[key] : 0)}`;
@@ -616,6 +716,28 @@ export function AdminStockTransactionClient({
     updateLine(index, {
       serialNos: nextSerials,
       qty: String(nextSerials.length),
+    });
+  }
+
+  function setInboundBatch(index: number, value: string) {
+    const line = lines[index];
+    const normalized = value.trim().toUpperCase();
+    const matched = (availableBatches[index] || []).find((item) => item.batchNo.toUpperCase() === normalized);
+    updateLine(index, {
+      batchNo: normalized,
+      expiryDate: matched?.expiryDate || line.expiryDate,
+      serialNos: [],
+      serialSearch: "",
+    });
+  }
+
+  function setOutboundBatch(index: number, batchNo: string) {
+    const matched = (availableBatches[index] || []).find((item) => item.batchNo.toUpperCase() === batchNo.toUpperCase()) || null;
+    updateLine(index, {
+      batchNo,
+      expiryDate: matched?.expiryDate || "",
+      serialNos: [],
+      serialSearch: "",
     });
   }
 
@@ -827,7 +949,7 @@ export function AdminStockTransactionClient({
                           />
                           <p className="mt-2 text-xs text-white/45">
                             {selectedProduct
-                              ? `UOM: ${selectedProduct.baseUom}${isBatchTracked ? " • Batch Tracked" : ""}${isSerialTracked ? " • Serial Tracked" : ""}`
+                              ? `UOM: ${selectedProduct.baseUom}${isBatchTracked ? " • Batch Tracked" : ""}${isSerialTracked ? " • Serial Tracked" : ""} • Default Unit Cost: RM ${selectedProduct.unitCost.toFixed(2)}`
                               : "Only active inventory-tracked products are shown."}
                           </p>
                         </div>
@@ -861,7 +983,7 @@ export function AdminStockTransactionClient({
                               value={line.locationId}
                               onChange={(option) => updateLine(index, { locationId: option?.id || "", serialNos: [], serialSearch: "" })}
                             />
-                            <p className="mt-2 text-xs text-white/45">{getBalanceText(line.inventoryProductId, line.locationId, balanceBatchNo)}</p>
+                            <p className="mt-2 text-xs text-white/45">{getBalanceText(line.inventoryProductId, line.locationId, balanceBatchNo, selectedProduct, line.adjustmentDirection)}</p>
                           </div>
                         ) : null}
 
@@ -889,7 +1011,7 @@ export function AdminStockTransactionClient({
                                 value={line.fromLocationId}
                                 onChange={(option) => updateLine(index, { fromLocationId: option?.id || "", serialNos: [], serialSearch: "" })}
                               />
-                              <p className="mt-2 text-xs text-white/45">{getBalanceText(line.inventoryProductId, line.fromLocationId, balanceBatchNo)}</p>
+                              <p className="mt-2 text-xs text-white/45">{getBalanceText(line.inventoryProductId, line.fromLocationId, balanceBatchNo, selectedProduct, line.adjustmentDirection)}</p>
                             </div>
                             <div>
                               <SearchableSelect
@@ -899,23 +1021,60 @@ export function AdminStockTransactionClient({
                                 value={line.toLocationId}
                                 onChange={(option) => updateLine(index, { toLocationId: option?.id || "" })}
                               />
-                              <p className="mt-2 text-xs text-white/45">{getBalanceText(line.inventoryProductId, line.toLocationId, balanceBatchNo)}</p>
+                              <p className="mt-2 text-xs text-white/45">{getBalanceText(line.inventoryProductId, line.toLocationId, balanceBatchNo, selectedProduct, line.adjustmentDirection)}</p>
                             </div>
                           </>
                         ) : null}
 
                         {isBatchTracked ? (
                           <>
-                            <div>
-                              <label className="label-rk">Batch No</label>
-                              <input
-                                className="input-rk"
-                                value={line.batchNo}
-                                onChange={(e) => updateLine(index, { batchNo: e.target.value.toUpperCase(), serialNos: [] })}
-                                placeholder="Enter batch no"
-                                required
-                              />
-                            </div>
+                            {outboundSerialFlow ? (
+                              <div>
+                                <SearchableSelect
+                                  label="Batch No"
+                                  placeholder={loadingBatches[index] ? "Loading available batches..." : "Search or select batch no"}
+                                  options={(availableBatches[index] || []).map((batch) => ({
+                                    id: batch.batchNo,
+                                    label: batch.balance != null ? `${batch.batchNo}${batch.expiryDate ? ` • Exp ${batch.expiryDate}` : ""} • Bal ${formatQty(batch.balance)}` : `${batch.batchNo}${batch.expiryDate ? ` • Exp ${batch.expiryDate}` : ""}`,
+                                    searchText: `${batch.batchNo} ${batch.expiryDate || ""}`.toLowerCase(),
+                                  }))}
+                                  value={line.batchNo}
+                                  disabled={loadingBatches[index]}
+                                  onChange={(option) => setOutboundBatch(index, option?.id || "")}
+                                />
+                                <p className="mt-2 text-xs text-white/45">
+                                  {loadingBatches[index]
+                                    ? "Loading available batch numbers..."
+                                    : (availableBatches[index] || []).length === 0
+                                      ? "No available batch numbers found for the selected product/location."
+                                      : "Only batches with available stock are shown."}
+                                </p>
+                              </div>
+                            ) : (
+                              <div className="md:col-span-2 xl:col-span-2">
+                                <label className="label-rk">Batch No</label>
+                                <input
+                                  list={`batch-suggestions-${index}`}
+                                  className="input-rk"
+                                  value={line.batchNo}
+                                  onChange={(e) => setInboundBatch(index, e.target.value)}
+                                  placeholder="Enter or search batch no"
+                                  required
+                                />
+                                <datalist id={`batch-suggestions-${index}`}>
+                                  {(availableBatches[index] || []).map((batch) => (
+                                    <option key={batch.id} value={batch.batchNo} />
+                                  ))}
+                                </datalist>
+                                <p className="mt-2 text-xs text-white/45">
+                                  {loadingBatches[index]
+                                    ? "Loading existing batch numbers..."
+                                    : (availableBatches[index] || []).length > 0
+                                      ? "You can select an existing batch or enter a new batch no."
+                                      : "No existing batch numbers found. You can enter a new batch no."}
+                                </p>
+                              </div>
+                            )}
                             {inboundSerialFlow || transactionType === "OB" || transactionType === "SR" ? (
                               <div>
                                 <label className="label-rk">Expiry Date</label>

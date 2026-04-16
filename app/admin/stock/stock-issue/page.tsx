@@ -17,6 +17,7 @@ export default async function AdminStockIssuePage() {
         code: true,
         description: true,
         baseUom: true,
+        unitCost: true,
         batchTracking: true,
         serialNumberTracking: true,
       },
@@ -43,7 +44,7 @@ export default async function AdminStockIssuePage() {
             transactionType="SI"
             title="Stock Issue"
             intro="Use Stock Issue to remove stock from a selected location for internal use, wastage, or manual stock-out movement."
-            initialProducts={products}
+            initialProducts={products.map((product) => ({ ...product, unitCost: Number(product.unitCost ?? 0) }))}
             initialLocations={locations}
           />
         </div>

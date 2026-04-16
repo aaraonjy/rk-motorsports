@@ -145,9 +145,9 @@ export function AdminMasterListClient({ title, subtitle, apiBase, initialItems, 
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/45">{subtitle}</p>
             <h2 className="mt-3 text-2xl font-bold text-white">{title}</h2>
           </div>
-          <div className="flex w-full flex-wrap items-center gap-3 xl:w-auto">
+          <div className="grid w-full gap-3 sm:grid-cols-[auto_minmax(260px,1fr)] xl:w-auto xl:min-w-[430px]">
             <button type="button" onClick={openCreate} className="inline-flex items-center justify-center rounded-xl bg-red-500 px-5 py-3 font-semibold text-white transition hover:bg-red-400">Add New</button>
-            <input className="input-rk min-w-[260px]" value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder="Search code / name" />
+            <input className="input-rk min-w-0 w-full" value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder="Search code / name" />
           </div>
         </div>
 
