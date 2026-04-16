@@ -8,10 +8,15 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const inventoryProductId = searchParams.get("inventoryProductId")?.trim() || undefined;
     const locationId = searchParams.get("locationId")?.trim() || undefined;
+    const batchNo = searchParams.get("batchNo")?.trim() || undefined;
 
     if (inventoryProductId && locationId) {
       const aggregate = await db.stockLedger.aggregate({
-        where: { inventoryProductId, locationId },
+        where: {
+          inventoryProductId,
+          locationId,
+          ...(batchNo ? { batchNo } : {}),
+        },
         _sum: { qtyIn: true, qtyOut: true },
       });
 
@@ -22,10 +27,11 @@ export async function GET(req: Request) {
     }
 
     const rows = await db.stockLedger.groupBy({
-      by: ["inventoryProductId", "locationId"],
+      by: ["inventoryProductId", "locationId", "batchNo"],
       where: {
         ...(inventoryProductId ? { inventoryProductId } : {}),
         ...(locationId ? { locationId } : {}),
+        ...(batchNo ? { batchNo } : {}),
       },
       _sum: {
         qtyIn: true,
@@ -60,6 +66,7 @@ export async function GET(req: Request) {
       return {
         inventoryProductId: row.inventoryProductId,
         locationId: row.locationId,
+        batchNo: row.batchNo ?? null,
         productCode: productMap.get(row.inventoryProductId)?.code ?? null,
         productDescription: productMap.get(row.inventoryProductId)?.description ?? null,
         baseUom: productMap.get(row.inventoryProductId)?.baseUom ?? null,

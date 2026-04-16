@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -11,6 +10,8 @@ type InventoryProductOption = {
   code: string;
   description: string;
   baseUom: string;
+  batchTracking: boolean;
+  serialNumberTracking: boolean;
 };
 
 type StockLocationOption = {
@@ -28,6 +29,7 @@ type TransactionLineRecord = {
   adjustmentDirection?: AdjustmentDirectionValue | null;
   batchNo?: string | null;
   expiryDate?: string | null;
+  serialEntries?: Array<{ id: string; serialNo: string }>;
   inventoryProduct: {
     id: string;
     code: string;
@@ -61,6 +63,11 @@ type FormLine = {
   inventoryProductId: string;
   qty: string;
   unitCost: string;
+  batchNo: string;
+  expiryDate: string;
+  serialNos: string[];
+  serialEntryText: string;
+  serialSearch: string;
   remarks: string;
   locationId: string;
   fromLocationId: string;
@@ -81,11 +88,23 @@ type BalanceResponse = {
   error?: string;
 };
 
+type AvailableSerial = {
+  id: string;
+  serialNo: string;
+  batchNo?: string | null;
+  expiryDate?: string | null;
+};
+
 function emptyLine(): FormLine {
   return {
     inventoryProductId: "",
     qty: "1",
     unitCost: "0.00",
+    batchNo: "",
+    expiryDate: "",
+    serialNos: [],
+    serialEntryText: "",
+    serialSearch: "",
     remarks: "",
     locationId: "",
     fromLocationId: "",
@@ -109,10 +128,6 @@ function formatQty(value: string | number | null | undefined) {
   return Number.isFinite(num) ? num.toFixed(2) : "0.00";
 }
 
-function formatLocationLabel(location?: { code: string; name: string } | null) {
-  return location ? `${location.code} — ${location.name}` : "-";
-}
-
 function getTypeLabel(type: StockTransactionTypeValue) {
   switch (type) {
     case "OB":
@@ -130,8 +145,40 @@ function getTypeLabel(type: StockTransactionTypeValue) {
   }
 }
 
-function balanceKey(productId: string, locationId: string) {
-  return `${productId}__${locationId}`;
+function balanceKey(productId: string, locationId: string, batchNo?: string) {
+  return `${productId}__${locationId}__${(batchNo || "").trim().toUpperCase()}`;
+}
+
+function normalizeSerialToken(token: string) {
+  return token.trim();
+}
+
+function parseSerialEntryText(value: string) {
+  return value
+    .split(/[,
+]+/)
+    .map(normalizeSerialToken)
+    .filter(Boolean);
+}
+
+function uniqueSerialNos(values: string[]) {
+  const seen = new Set<string>();
+  const next: string[] = [];
+  for (const value of values) {
+    const key = value.toUpperCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    next.push(value);
+  }
+  return next;
+}
+
+function isInboundSerialFlow(type: StockTransactionTypeValue, direction: "" | AdjustmentDirectionValue) {
+  return type === "OB" || type === "SR" || (type === "SA" && direction === "IN");
+}
+
+function isOutboundSerialFlow(type: StockTransactionTypeValue, direction: "" | AdjustmentDirectionValue) {
+  return type === "SI" || type === "ST" || (type === "SA" && direction === "OUT");
 }
 
 function SearchableSelect({
@@ -251,6 +298,8 @@ export function AdminStockTransactionClient({
   const [transactions, setTransactions] = useState<TransactionRecord[]>([]);
   const [balances, setBalances] = useState<Record<string, number>>({});
   const [loadingBalances, setLoadingBalances] = useState<Record<string, boolean>>({});
+  const [availableSerials, setAvailableSerials] = useState<Record<number, AvailableSerial[]>>({});
+  const [loadingSerials, setLoadingSerials] = useState<Record<number, boolean>>({});
   const [isLoadingTransactions, setIsLoadingTransactions] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
@@ -298,7 +347,9 @@ export function AdminStockTransactionClient({
             line.inventoryProduct.description.toLowerCase().includes(keyword) ||
             (line.location?.code || "").toLowerCase().includes(keyword) ||
             (line.fromLocation?.code || "").toLowerCase().includes(keyword) ||
-            (line.toLocation?.code || "").toLowerCase().includes(keyword)
+            (line.toLocation?.code || "").toLowerCase().includes(keyword) ||
+            (line.batchNo || "").toLowerCase().includes(keyword) ||
+            (line.serialEntries || []).some((entry) => entry.serialNo.toLowerCase().includes(keyword))
         );
 
       const rowDate = formatDateInput(item.transactionDate);
@@ -350,9 +401,11 @@ export function AdminStockTransactionClient({
     const needed = new Set<string>();
 
     for (const line of lines) {
-      if (line.inventoryProductId && line.locationId) needed.add(balanceKey(line.inventoryProductId, line.locationId));
-      if (line.inventoryProductId && line.fromLocationId) needed.add(balanceKey(line.inventoryProductId, line.fromLocationId));
-      if (line.inventoryProductId && line.toLocationId) needed.add(balanceKey(line.inventoryProductId, line.toLocationId));
+      const product = initialProducts.find((item) => item.id === line.inventoryProductId);
+      const batchNo = product?.batchTracking ? line.batchNo.trim().toUpperCase() : "";
+      if (line.inventoryProductId && line.locationId) needed.add(balanceKey(line.inventoryProductId, line.locationId, batchNo));
+      if (line.inventoryProductId && line.fromLocationId) needed.add(balanceKey(line.inventoryProductId, line.fromLocationId, batchNo));
+      if (line.inventoryProductId && line.toLocationId) needed.add(balanceKey(line.inventoryProductId, line.toLocationId, batchNo));
     }
 
     const targets = Array.from(needed);
@@ -367,9 +420,10 @@ export function AdminStockTransactionClient({
     });
 
     async function fetchBalance(key: string) {
-      const [inventoryProductId, locationId] = key.split("__");
+      const [inventoryProductId, locationId, batchNo] = key.split("__");
       try {
         const params = new URLSearchParams({ inventoryProductId, locationId });
+        if (batchNo) params.set("batchNo", batchNo);
         const response = await fetch(`/api/admin/stock/balance?${params.toString()}`, {
           method: "GET",
           cache: "no-store",
@@ -405,7 +459,60 @@ export function AdminStockTransactionClient({
     return () => {
       cancelled = true;
     };
-  }, [lines, isCreateOpen]);
+  }, [lines, isCreateOpen, initialProducts]);
+
+  useEffect(() => {
+    if (!isCreateOpen) return;
+
+    lines.forEach((line, index) => {
+      const product = initialProducts.find((item) => item.id === line.inventoryProductId);
+      const shouldFetch =
+        !!product?.serialNumberTracking &&
+        isOutboundSerialFlow(transactionType, line.adjustmentDirection) &&
+        !!line.inventoryProductId &&
+        !!(transactionType === "ST" ? line.fromLocationId : line.locationId) &&
+        (!product.batchTracking || !!line.batchNo.trim());
+
+      if (!shouldFetch) {
+        setAvailableSerials((prev) => ({ ...prev, [index]: [] }));
+        return;
+      }
+
+      const locationId = transactionType === "ST" ? line.fromLocationId : line.locationId;
+      const params = new URLSearchParams({
+        inventoryProductId: line.inventoryProductId,
+        locationId,
+      });
+      if (product?.batchTracking && line.batchNo.trim()) {
+        params.set("batchNo", line.batchNo.trim().toUpperCase());
+      }
+
+      setLoadingSerials((prev) => ({ ...prev, [index]: true }));
+      fetch(`/api/admin/stock/serials?${params.toString()}`, { cache: "no-store" })
+        .then(async (response) => {
+          const data = await response.json();
+          if (!response.ok || !data.ok) return [];
+          return Array.isArray(data.serials) ? data.serials : [];
+        })
+        .then((rows: AvailableSerial[]) => {
+          setAvailableSerials((prev) => ({ ...prev, [index]: rows }));
+          setLines((prev) =>
+            prev.map((item, itemIndex) => {
+              if (itemIndex !== index) return item;
+              const allowedKeys = new Set(rows.map((entry) => entry.serialNo.toUpperCase()));
+              return {
+                ...item,
+                serialNos: item.serialNos.filter((serialNo) => allowedKeys.has(serialNo.toUpperCase())),
+                qty: String(item.serialNos.filter((serialNo) => allowedKeys.has(serialNo.toUpperCase())).length || 0),
+              };
+            })
+          );
+        })
+        .finally(() => {
+          setLoadingSerials((prev) => ({ ...prev, [index]: false }));
+        });
+    });
+  }, [lines, isCreateOpen, transactionType, initialProducts]);
 
   function resetForm() {
     setTransactionDate(new Date().toISOString().slice(0, 10));
@@ -416,6 +523,8 @@ export function AdminStockTransactionClient({
     setSubmitSuccess("");
     setBalances({});
     setLoadingBalances({});
+    setAvailableSerials({});
+    setLoadingSerials({});
   }
 
   function openCreateModal() {
@@ -429,7 +538,30 @@ export function AdminStockTransactionClient({
   }
 
   function updateLine(index: number, patch: Partial<FormLine>) {
-    setLines((prev) => prev.map((line, i) => (i === index ? { ...line, ...patch } : line)));
+    setLines((prev) =>
+      prev.map((line, i) => {
+        if (i !== index) return line;
+        const next = { ...line, ...patch };
+        const product = initialProducts.find((item) => item.id === next.inventoryProductId);
+        if (product?.serialNumberTracking) {
+          next.qty = String(next.serialNos.length || 0);
+        }
+        return next;
+      })
+    );
+  }
+
+  function handleProductChange(index: number, productId: string) {
+    const product = initialProducts.find((item) => item.id === productId);
+    updateLine(index, {
+      inventoryProductId: productId,
+      batchNo: "",
+      expiryDate: "",
+      serialNos: [],
+      serialEntryText: "",
+      serialSearch: "",
+      qty: product?.serialNumberTracking ? "0" : "1",
+    });
   }
 
   function addLine() {
@@ -438,13 +570,52 @@ export function AdminStockTransactionClient({
 
   function removeLine(index: number) {
     setLines((prev) => (prev.length === 1 ? prev : prev.filter((_, i) => i !== index)));
+    setAvailableSerials((prev) => {
+      const next = { ...prev };
+      delete next[index];
+      return next;
+    });
   }
 
-  function getBalanceText(productId: string, locationId: string) {
+  function getBalanceText(productId: string, locationId: string, batchNo?: string) {
     if (!productId || !locationId) return "Select product and location to view balance.";
-    const key = balanceKey(productId, locationId);
+    const key = balanceKey(productId, locationId, batchNo);
     if (loadingBalances[key]) return "Loading current balance...";
     return `Current Balance: ${formatQty(typeof balances[key] === "number" ? balances[key] : 0)}`;
+  }
+
+  function handleAddSerials(index: number) {
+    const line = lines[index];
+    const product = initialProducts.find((item) => item.id === line.inventoryProductId);
+    if (!product?.serialNumberTracking) return;
+    const parsed = parseSerialEntryText(line.serialEntryText);
+    if (parsed.length === 0) return;
+    const merged = uniqueSerialNos([...line.serialNos, ...parsed]);
+    updateLine(index, {
+      serialNos: merged,
+      serialEntryText: "",
+      qty: String(merged.length),
+    });
+  }
+
+  function toggleSelectedSerial(index: number, serialNo: string) {
+    const line = lines[index];
+    const exists = line.serialNos.some((value) => value.toUpperCase() === serialNo.toUpperCase());
+    const nextSerials = exists
+      ? line.serialNos.filter((value) => value.toUpperCase() !== serialNo.toUpperCase())
+      : [...line.serialNos, serialNo];
+    updateLine(index, {
+      serialNos: uniqueSerialNos(nextSerials),
+      qty: String(uniqueSerialNos(nextSerials).length),
+    });
+  }
+
+  function removeSerial(index: number, serialNo: string) {
+    const nextSerials = lines[index].serialNos.filter((value) => value.toUpperCase() !== serialNo.toUpperCase());
+    updateLine(index, {
+      serialNos: nextSerials,
+      qty: String(nextSerials.length),
+    });
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -463,6 +634,9 @@ export function AdminStockTransactionClient({
           inventoryProductId: line.inventoryProductId || null,
           qty: Number(line.qty || 0),
           unitCost: line.unitCost.trim() ? Number(line.unitCost) : null,
+          batchNo: line.batchNo.trim().toUpperCase() || null,
+          expiryDate: line.expiryDate || null,
+          serialNos: line.serialNos,
           remarks: line.remarks.trim() || null,
           locationId: line.locationId || null,
           fromLocationId: line.fromLocationId || null,
@@ -519,7 +693,7 @@ export function AdminStockTransactionClient({
                 className="input-rk"
                 value={searchKeyword}
                 onChange={(e) => setSearchKeyword(e.target.value)}
-                placeholder="Search doc no / reference / product / location"
+                placeholder="Search doc no / reference / product / location / batch / serial"
               />
             </div>
             <div>
@@ -620,6 +794,17 @@ export function AdminStockTransactionClient({
               <div className="space-y-4">
                 {lines.map((line, index) => {
                   const selectedProduct = initialProducts.find((item) => item.id === line.inventoryProductId) || null;
+                  const isBatchTracked = !!selectedProduct?.batchTracking;
+                  const isSerialTracked = !!selectedProduct?.serialNumberTracking;
+                  const inboundSerialFlow = isInboundSerialFlow(transactionType, line.adjustmentDirection);
+                  const outboundSerialFlow = isOutboundSerialFlow(transactionType, line.adjustmentDirection);
+                  const serialRows = availableSerials[index] || [];
+                  const filteredSerialRows = serialRows.filter((entry) =>
+                    !line.serialSearch.trim() || entry.serialNo.toLowerCase().includes(line.serialSearch.trim().toLowerCase())
+                  );
+                  const sourceLocationId = transactionType === "ST" ? line.fromLocationId : line.locationId;
+                  const balanceBatchNo = isBatchTracked ? line.batchNo.trim().toUpperCase() : "";
+
                   return (
                     <div key={index} className="rounded-2xl border border-white/10 bg-black/20 p-4">
                       <div className="mb-4 flex items-center justify-between gap-3">
@@ -638,18 +823,28 @@ export function AdminStockTransactionClient({
                             placeholder="Search or select product"
                             options={productOptions}
                             value={line.inventoryProductId}
-                            onChange={(option) =>
-                              updateLine(index, {
-                                inventoryProductId: option?.id || "",
-                              })
-                            }
+                            onChange={(option) => handleProductChange(index, option?.id || "")}
                           />
-                          <p className="mt-2 text-xs text-white/45">{selectedProduct ? `UOM: ${selectedProduct.baseUom}` : "Only active inventory-tracked products are shown."}</p>
+                          <p className="mt-2 text-xs text-white/45">
+                            {selectedProduct
+                              ? `UOM: ${selectedProduct.baseUom}${isBatchTracked ? " • Batch Tracked" : ""}${isSerialTracked ? " • Serial Tracked" : ""}`
+                              : "Only active inventory-tracked products are shown."}
+                          </p>
                         </div>
 
                         <div>
                           <label className="label-rk">Qty</label>
-                          <input type="number" min="0.01" step="0.01" className="input-rk" value={line.qty} onChange={(e) => updateLine(index, { qty: e.target.value })} required />
+                          <input
+                            type="number"
+                            min="0.01"
+                            step="0.01"
+                            className="input-rk"
+                            value={line.qty}
+                            disabled={isSerialTracked}
+                            onChange={(e) => updateLine(index, { qty: e.target.value })}
+                            required
+                          />
+                          {isSerialTracked ? <p className="mt-2 text-xs text-white/45">Qty auto-follows selected serial count.</p> : null}
                         </div>
 
                         <div>
@@ -664,9 +859,9 @@ export function AdminStockTransactionClient({
                               placeholder="Search or select location"
                               options={locationOptions}
                               value={line.locationId}
-                              onChange={(option) => updateLine(index, { locationId: option?.id || "" })}
+                              onChange={(option) => updateLine(index, { locationId: option?.id || "", serialNos: [], serialSearch: "" })}
                             />
-                            <p className="mt-2 text-xs text-white/45">{getBalanceText(line.inventoryProductId, line.locationId)}</p>
+                            <p className="mt-2 text-xs text-white/45">{getBalanceText(line.inventoryProductId, line.locationId, balanceBatchNo)}</p>
                           </div>
                         ) : null}
 
@@ -674,7 +869,7 @@ export function AdminStockTransactionClient({
                           <div>
                             <label className="label-rk">Adjustment Direction</label>
                             <div className="relative">
-                              <select className="input-rk appearance-none pr-12" value={line.adjustmentDirection} onChange={(e) => updateLine(index, { adjustmentDirection: e.target.value as "" | AdjustmentDirectionValue })} required>
+                              <select className="input-rk appearance-none pr-12" value={line.adjustmentDirection} onChange={(e) => updateLine(index, { adjustmentDirection: e.target.value as "" | AdjustmentDirectionValue, serialNos: [] })} required>
                                 <option value="">Select direction</option>
                                 <option value="IN">IN</option>
                                 <option value="OUT">OUT</option>
@@ -692,9 +887,9 @@ export function AdminStockTransactionClient({
                                 placeholder="Search or select source location"
                                 options={locationOptions}
                                 value={line.fromLocationId}
-                                onChange={(option) => updateLine(index, { fromLocationId: option?.id || "" })}
+                                onChange={(option) => updateLine(index, { fromLocationId: option?.id || "", serialNos: [], serialSearch: "" })}
                               />
-                              <p className="mt-2 text-xs text-white/45">{getBalanceText(line.inventoryProductId, line.fromLocationId)}</p>
+                              <p className="mt-2 text-xs text-white/45">{getBalanceText(line.inventoryProductId, line.fromLocationId, balanceBatchNo)}</p>
                             </div>
                             <div>
                               <SearchableSelect
@@ -704,9 +899,96 @@ export function AdminStockTransactionClient({
                                 value={line.toLocationId}
                                 onChange={(option) => updateLine(index, { toLocationId: option?.id || "" })}
                               />
-                              <p className="mt-2 text-xs text-white/45">{getBalanceText(line.inventoryProductId, line.toLocationId)}</p>
+                              <p className="mt-2 text-xs text-white/45">{getBalanceText(line.inventoryProductId, line.toLocationId, balanceBatchNo)}</p>
                             </div>
                           </>
+                        ) : null}
+
+                        {isBatchTracked ? (
+                          <>
+                            <div>
+                              <label className="label-rk">Batch No</label>
+                              <input
+                                className="input-rk"
+                                value={line.batchNo}
+                                onChange={(e) => updateLine(index, { batchNo: e.target.value.toUpperCase(), serialNos: [] })}
+                                placeholder="Enter batch no"
+                                required
+                              />
+                            </div>
+                            {inboundSerialFlow || transactionType === "OB" || transactionType === "SR" ? (
+                              <div>
+                                <label className="label-rk">Expiry Date</label>
+                                <input type="date" className="input-rk" value={line.expiryDate} onChange={(e) => updateLine(index, { expiryDate: e.target.value })} />
+                              </div>
+                            ) : null}
+                          </>
+                        ) : null}
+
+                        {isSerialTracked && inboundSerialFlow ? (
+                          <div className="md:col-span-2 xl:col-span-4 rounded-2xl border border-white/10 bg-black/20 p-4">
+                            <div className="grid gap-4 xl:grid-cols-[1fr_auto]">
+                              <div>
+                                <label className="label-rk">Serial No Input</label>
+                                <textarea
+                                  className="input-rk min-h-[120px]"
+                                  value={line.serialEntryText}
+                                  onChange={(e) => updateLine(index, { serialEntryText: e.target.value })}
+                                  placeholder="Enter one serial per line, or paste comma/new-line separated serials"
+                                />
+                              </div>
+                              <div className="flex items-end">
+                                <button type="button" onClick={() => handleAddSerials(index)} className="inline-flex items-center justify-center rounded-xl bg-white/10 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/15">
+                                  Add Serial(s)
+                                </button>
+                              </div>
+                            </div>
+                            <div className="mt-4 flex flex-wrap gap-2">
+                              {line.serialNos.length === 0 ? (
+                                <div className="text-sm text-white/45">No serial numbers added yet.</div>
+                              ) : (
+                                line.serialNos.map((serialNo) => (
+                                  <button key={serialNo} type="button" onClick={() => removeSerial(index, serialNo)} className="rounded-full border border-white/15 bg-white/5 px-3 py-2 text-xs text-white/80 hover:bg-white/10">
+                                    {serialNo} ✕
+                                  </button>
+                                ))
+                              )}
+                            </div>
+                          </div>
+                        ) : null}
+
+                        {isSerialTracked && outboundSerialFlow ? (
+                          <div className="md:col-span-2 xl:col-span-4 rounded-2xl border border-white/10 bg-black/20 p-4">
+                            <div className="grid gap-4 md:grid-cols-[minmax(220px,0.8fr)_1fr]">
+                              <div>
+                                <label className="label-rk">Search Serial No</label>
+                                <input className="input-rk" value={line.serialSearch} onChange={(e) => updateLine(index, { serialSearch: e.target.value })} placeholder="Filter available serial numbers" />
+                              </div>
+                              <div className="flex items-end text-sm text-white/55">
+                                {loadingSerials[index] ? "Loading available serial numbers..." : `${line.serialNos.length} serial(s) selected`}
+                              </div>
+                            </div>
+                            <div className="mt-4 max-h-64 overflow-y-auto rounded-2xl border border-white/10 bg-black/20 p-2">
+                              {loadingSerials[index] ? (
+                                <div className="px-3 py-3 text-sm text-white/45">Loading available serial numbers...</div>
+                              ) : filteredSerialRows.length === 0 ? (
+                                <div className="px-3 py-3 text-sm text-white/45">No available serial numbers found for the selected product/location{isBatchTracked ? "/batch" : ""}.</div>
+                              ) : (
+                                filteredSerialRows.map((serial) => {
+                                  const checked = line.serialNos.some((value) => value.toUpperCase() === serial.serialNo.toUpperCase());
+                                  return (
+                                    <label key={serial.id} className="flex cursor-pointer items-center justify-between gap-3 rounded-xl px-3 py-3 text-sm text-white/85 transition hover:bg-white/5">
+                                      <div>
+                                        <div className="font-medium text-white">{serial.serialNo}</div>
+                                        {serial.batchNo ? <div className="mt-1 text-xs text-white/45">Batch: {serial.batchNo}</div> : null}
+                                      </div>
+                                      <input type="checkbox" checked={checked} onChange={() => toggleSelectedSerial(index, serial.serialNo)} />
+                                    </label>
+                                  );
+                                })
+                              )}
+                            </div>
+                          </div>
                         ) : null}
 
                         <div className="md:col-span-2 xl:col-span-4">

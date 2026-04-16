@@ -2,6 +2,10 @@ import { Prisma, StockAdjustmentDirection, StockTransactionType } from "@prisma/
 
 const DECIMAL_ZERO = new Prisma.Decimal(0);
 
+type StockBalanceOptions = {
+  batchNo?: string | null;
+};
+
 export function toDecimal(value: string | number | Prisma.Decimal) {
   if (value instanceof Prisma.Decimal) return value;
   return new Prisma.Decimal(value);
@@ -32,12 +36,14 @@ export function assertPositiveQty(value: unknown, label = "Quantity") {
 export async function getStockBalance(
   tx: any,
   inventoryProductId: string,
-  locationId: string
+  locationId: string,
+  options?: StockBalanceOptions
 ) {
   const aggregate = await tx.stockLedger.aggregate({
     where: {
       inventoryProductId,
       locationId,
+      ...(options?.batchNo ? { batchNo: options.batchNo } : {}),
     },
     _sum: {
       qtyIn: true,

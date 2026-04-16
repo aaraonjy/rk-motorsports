@@ -115,6 +115,11 @@ enum StockAdjustmentDirection {
   OUT
 }
 
+enum InventorySerialStatus {
+  IN_STOCK
+  OUT_OF_STOCK
+}
+
 
 model User {
   id                     String              @id @default(cuid())
@@ -253,6 +258,7 @@ model StockLocation {
   transferFromLines            StockTransactionLine[] @relation("StockTransactionLineFromLocation")
   transferToLines              StockTransactionLine[] @relation("StockTransactionLineToLocation")
   ledgerEntries                StockLedger[]          @relation("StockLedgerLocation")
+  inventorySerials             InventorySerial[]      @relation("InventorySerialCurrentLocation")
 }
 
 
@@ -284,7 +290,8 @@ model InventoryProduct {
   customOrderItems     CustomOrderItem[]
   stockTransactionLines StockTransactionLine[]
   stockLedgerEntries   StockLedger[]
-  batches InventoryBatch[]
+  batches              InventoryBatch[]
+  serials              InventorySerial[]
 
   @@index([isActive, code])
   @@index([itemType, isActive])
@@ -303,6 +310,8 @@ model InventoryBatch {
   createdAt          DateTime @default(now())
 
   inventoryProduct InventoryProduct @relation(fields: [inventoryProductId], references: [id], onDelete: Cascade)
+  serials          InventorySerial[]
+  lineSerials      StockTransactionLineSerial[]
 
   @@unique([inventoryProductId, batchNo])
   @@index([inventoryProductId])
@@ -644,6 +653,7 @@ model StockTransactionLine {
   fromLocation        StockLocation?           @relation("StockTransactionLineFromLocation", fields: [fromLocationId], references: [id], onDelete: SetNull)
   toLocation          StockLocation?           @relation("StockTransactionLineToLocation", fields: [toLocationId], references: [id], onDelete: SetNull)
   ledgerEntries       StockLedger[]
+  serialEntries       StockTransactionLineSerial[]
 
   @@index([transactionId])
   @@index([inventoryProductId])
@@ -660,6 +670,7 @@ model StockLedger {
   qty               Decimal                @db.Decimal(12, 2)
   qtyIn             Decimal                @default(0) @db.Decimal(12, 2)
   qtyOut            Decimal                @default(0) @db.Decimal(12, 2)
+  batchNo            String?
   inventoryProductId String
   locationId        String
   transactionId     String?
@@ -675,9 +686,49 @@ model StockLedger {
   transaction       StockTransaction?      @relation(fields: [transactionId], references: [id], onDelete: SetNull)
   transactionLine   StockTransactionLine?  @relation(fields: [transactionLineId], references: [id], onDelete: SetNull)
 
-  @@index([inventoryProductId, locationId, movementDate])
+  @@index([inventoryProductId, locationId, batchNo, movementDate])
   @@index([transactionId])
   @@index([transactionLineId])
   @@index([movementType, movementDate])
   @@index([locationId, movementDate])
+}
+
+model InventorySerial {
+  id                 String               @id @default(cuid())
+  inventoryProductId String
+  inventoryBatchId   String?
+  serialNo           String
+  currentLocationId  String?
+  status             InventorySerialStatus @default(IN_STOCK)
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  inventoryProduct   InventoryProduct     @relation(fields: [inventoryProductId], references: [id], onDelete: Cascade)
+  inventoryBatch     InventoryBatch?      @relation(fields: [inventoryBatchId], references: [id], onDelete: SetNull)
+  currentLocation    StockLocation?       @relation("InventorySerialCurrentLocation", fields: [currentLocationId], references: [id], onDelete: SetNull)
+  transactionEntries StockTransactionLineSerial[]
+
+  @@unique([inventoryProductId, serialNo])
+  @@index([inventoryProductId, currentLocationId, status])
+  @@index([inventoryBatchId])
+}
+
+model StockTransactionLineSerial {
+  id                 String               @id @default(cuid())
+  transactionLineId  String
+  inventoryProductId String
+  inventorySerialId  String?
+  inventoryBatchId   String?
+  serialNo           String
+  createdAt          DateTime             @default(now())
+
+  transactionLine    StockTransactionLine @relation(fields: [transactionLineId], references: [id], onDelete: Cascade)
+  inventoryProduct   InventoryProduct     @relation(fields: [inventoryProductId], references: [id], onDelete: Restrict)
+  inventorySerial    InventorySerial?     @relation(fields: [inventorySerialId], references: [id], onDelete: SetNull)
+  inventoryBatch     InventoryBatch?      @relation(fields: [inventoryBatchId], references: [id], onDelete: SetNull)
+
+  @@unique([transactionLineId, serialNo])
+  @@index([inventoryProductId, serialNo])
+  @@index([inventorySerialId])
+  @@index([inventoryBatchId])
 }

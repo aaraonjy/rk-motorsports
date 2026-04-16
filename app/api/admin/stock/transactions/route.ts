@@ -8,6 +8,8 @@ import {
   buildLedgerValues,
   generateStockTransactionNumber,
   getStockBalance,
+  isInboundTransaction,
+  isOutboundTransaction,
   normalizeStockDate,
 } from "@/lib/stock";
 
@@ -17,6 +19,7 @@ type StockLinePayload = {
   unitCost?: number | null;
   batchNo?: string | null;
   expiryDate?: string | null;
+  serialNos?: string[] | null;
   remarks?: string | null;
   locationId?: string | null;
   fromLocationId?: string | null;
@@ -42,6 +45,45 @@ function normalizeNonNegativeNumber(value: unknown, label = "Value") {
     throw new Error(`${label} must be 0 or greater.`);
   }
   return Math.round((parsed + Number.EPSILON) * 100) / 100;
+}
+
+function normalizeSerialNumbers(value: unknown) {
+  const items = Array.isArray(value) ? value : [];
+  const normalized = items
+    .map((item) => (typeof item === "string" ? item.trim() : ""))
+    .filter(Boolean);
+
+  const seen = new Set<string>();
+  const unique: string[] = [];
+  for (const serialNo of normalized) {
+    const key = serialNo.toUpperCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(serialNo);
+  }
+  return unique;
+}
+
+function transactionUsesOutboundLocation(
+  transactionType: StockTransactionType,
+  adjustmentDirection: StockAdjustmentDirection | null,
+  line: { locationId: string | null; fromLocationId: string | null }
+) {
+  if (transactionType === "ST") return line.fromLocationId;
+  if (transactionType === "SI") return line.locationId;
+  if (transactionType === "SA" && adjustmentDirection === "OUT") return line.locationId;
+  return null;
+}
+
+function transactionUsesInboundLocation(
+  transactionType: StockTransactionType,
+  adjustmentDirection: StockAdjustmentDirection | null,
+  line: { locationId: string | null; toLocationId: string | null }
+) {
+  if (transactionType === "ST") return line.toLocationId;
+  if (transactionType === "OB" || transactionType === "SR") return line.locationId;
+  if (transactionType === "SA" && adjustmentDirection === "IN") return line.locationId;
+  return null;
 }
 
 export async function GET(req: Request) {
@@ -73,6 +115,13 @@ export async function GET(req: Request) {
             location: { select: { id: true, code: true, name: true } },
             fromLocation: { select: { id: true, code: true, name: true } },
             toLocation: { select: { id: true, code: true, name: true } },
+            serialEntries: {
+              orderBy: [{ serialNo: "asc" }],
+              select: {
+                id: true,
+                serialNo: true,
+              },
+            },
           },
         },
       },
@@ -118,7 +167,10 @@ export async function POST(req: Request) {
     );
 
     const [products, locations] = await Promise.all([
-      db.inventoryProduct.findMany({ where: { id: { in: inventoryProductIds } }, select: { id: true, isActive: true, trackInventory: true, batchTracking: true } }),
+      db.inventoryProduct.findMany({
+        where: { id: { in: inventoryProductIds } },
+        select: { id: true, isActive: true, trackInventory: true, batchTracking: true, serialNumberTracking: true },
+      }),
       db.stockLocation.findMany({ where: { id: { in: locationIds } } }),
     ]);
 
@@ -136,6 +188,7 @@ export async function POST(req: Request) {
       const unitCost = line.unitCost == null ? null : normalizeNonNegativeNumber(line.unitCost, "Unit cost");
       const batchNo = typeof line.batchNo === "string" ? line.batchNo.trim().toUpperCase() || null : null;
       const expiryDate = typeof line.expiryDate === "string" && line.expiryDate.trim() ? new Date(line.expiryDate) : null;
+      const serialNos = normalizeSerialNumbers(line.serialNos);
       const adjustmentDirection = normalizeAdjustmentDirection(line.adjustmentDirection);
       const locationId = String(line.locationId || "").trim() || null;
       const fromLocationId = String(line.fromLocationId || "").trim() || null;
@@ -164,6 +217,15 @@ export async function POST(req: Request) {
         throw new Error("Adjustment direction is only allowed for Stock Adjustment.");
       }
 
+      if (product.serialNumberTracking) {
+        if (serialNos.length === 0) {
+          throw new Error(`Serial No is required for serial-tracked product.`);
+        }
+        if (Math.round((qty + Number.EPSILON) * 100) / 100 !== serialNos.length) {
+          throw new Error("Serial-tracked lines require quantity to match the number of serial numbers.");
+        }
+      }
+
       for (const locationRef of [locationId, fromLocationId, toLocationId]) {
         if (!locationRef) continue;
         const location = locationMap.get(locationRef);
@@ -178,33 +240,50 @@ export async function POST(req: Request) {
         unitCost,
         batchNo,
         expiryDate,
+        serialNos,
         remarks: typeof line.remarks === "string" ? line.remarks.trim() || null : null,
         locationId,
         fromLocationId,
         toLocationId,
         adjustmentDirection,
+        product,
       };
     });
 
     const created = await db.$transaction(async (tx) => {
+      const batchKeyMap = new Map<string, string | null>();
+
       if (!config.allowNegativeStock) {
         for (const line of normalizedLines) {
-          if (transactionType === "SI") {
-            const balance = await getStockBalance(tx, line.inventoryProductId, line.locationId!);
-            if (balance < line.qty) {
-              throw new Error("Insufficient stock for Stock Issue.");
-            }
-          }
-          if (transactionType === "ST") {
-            const balance = await getStockBalance(tx, line.inventoryProductId, line.fromLocationId!);
-            if (balance < line.qty) {
-              throw new Error("Insufficient stock for Stock Transfer.");
-            }
-          }
-          if (transactionType === "SA" && line.adjustmentDirection === "OUT") {
-            const balance = await getStockBalance(tx, line.inventoryProductId, line.locationId!);
-            if (balance < line.qty) {
-              throw new Error("Insufficient stock for Stock Adjustment OUT.");
+          const usesOutbound = isOutboundTransaction(transactionType, line.adjustmentDirection);
+          if (usesOutbound) {
+            const outboundLocationId = transactionUsesOutboundLocation(transactionType, line.adjustmentDirection, line)!;
+
+            if (line.product.serialNumberTracking) {
+              const availableCount = await tx.inventorySerial.count({
+                where: {
+                  inventoryProductId: line.inventoryProductId,
+                  currentLocationId: outboundLocationId,
+                  status: "IN_STOCK",
+                  serialNo: { in: line.serialNos },
+                  ...(line.batchNo
+                    ? {
+                        inventoryBatch: {
+                          is: { batchNo: line.batchNo },
+                        },
+                      }
+                    : {}),
+                },
+              });
+
+              if (availableCount !== line.serialNos.length) {
+                throw new Error("One or more selected serial numbers are unavailable at the selected location.");
+              }
+            } else {
+              const balance = await getStockBalance(tx, line.inventoryProductId, outboundLocationId, { batchNo: line.batchNo });
+              if (balance < line.qty) {
+                throw new Error(`Insufficient stock for ${transactionType === "SI" ? "Stock Issue" : transactionType === "ST" ? "Stock Transfer" : "Stock Adjustment OUT"}.`);
+              }
             }
           }
         }
@@ -232,15 +311,30 @@ export async function POST(req: Request) {
               fromLocationId: line.fromLocationId,
               toLocationId: line.toLocationId,
               adjustmentDirection: line.adjustmentDirection,
+              serialEntries: line.serialNos.length
+                ? {
+                    create: line.serialNos.map((serialNo) => ({
+                      inventoryProductId: line.inventoryProductId,
+                      serialNo,
+                    })),
+                  }
+                : undefined,
             })),
           },
         },
-        include: { lines: true },
+        include: {
+          lines: {
+            include: {
+              serialEntries: true,
+            },
+          },
+        },
       });
 
       for (const line of transaction.lines) {
+        let batchId: string | null = null;
         if (line.batchNo) {
-          await tx.inventoryBatch.upsert({
+          const batch = await tx.inventoryBatch.upsert({
             where: {
               inventoryProductId_batchNo: {
                 inventoryProductId: line.inventoryProductId,
@@ -256,9 +350,17 @@ export async function POST(req: Request) {
               expiryDate: line.expiryDate ?? undefined,
             },
           });
+          batchId = batch.id;
+          batchKeyMap.set(`${line.inventoryProductId}__${line.batchNo}`, batch.id);
         }
 
         const qty = new Prisma.Decimal(Number(line.qty).toFixed(2));
+        const direction =
+          transactionType === "ST"
+            ? null
+            : transactionType === "OB" || transactionType === "SR" || (transactionType === "SA" && line.adjustmentDirection === "IN")
+              ? "IN"
+              : "OUT";
 
         if (transactionType === "ST") {
           const outValues = buildLedgerValues(qty, "OUT");
@@ -270,6 +372,7 @@ export async function POST(req: Request) {
               movementType: transaction.transactionType,
               movementDirection: "OUT",
               ...outValues,
+              batchNo: line.batchNo,
               inventoryProductId: line.inventoryProductId,
               locationId: line.fromLocationId!,
               transactionId: transaction.id,
@@ -288,6 +391,7 @@ export async function POST(req: Request) {
               movementType: transaction.transactionType,
               movementDirection: "IN",
               ...inValues,
+              batchNo: line.batchNo,
               inventoryProductId: line.inventoryProductId,
               locationId: line.toLocationId!,
               transactionId: transaction.id,
@@ -299,33 +403,147 @@ export async function POST(req: Request) {
               remarks: line.remarks ?? transaction.remarks,
             },
           });
-
-          continue;
+        } else {
+          const values = buildLedgerValues(qty, direction!);
+          await tx.stockLedger.create({
+            data: {
+              movementDate: transaction.transactionDate,
+              movementType: transaction.transactionType,
+              movementDirection: direction!,
+              ...values,
+              batchNo: line.batchNo,
+              inventoryProductId: line.inventoryProductId,
+              locationId: line.locationId!,
+              transactionId: transaction.id,
+              transactionLineId: line.id,
+              referenceNo: transaction.transactionNo,
+              referenceText: transaction.reference,
+              sourceType: "MANUAL_STOCK_TRANSACTION",
+              sourceId: transaction.id,
+              remarks: line.remarks ?? transaction.remarks,
+            },
+          });
         }
 
-        const direction =
-          transactionType === "OB" || transactionType === "SR" || (transactionType === "SA" && line.adjustmentDirection === "IN")
-            ? "IN"
-            : "OUT";
-
-        const values = buildLedgerValues(qty, direction);
-        await tx.stockLedger.create({
-          data: {
-            movementDate: transaction.transactionDate,
-            movementType: transaction.transactionType,
-            movementDirection: direction,
-            ...values,
-            inventoryProductId: line.inventoryProductId,
-            locationId: line.locationId!,
-            transactionId: transaction.id,
-            transactionLineId: line.id,
-            referenceNo: transaction.transactionNo,
-            referenceText: transaction.reference,
-            sourceType: "MANUAL_STOCK_TRANSACTION",
-            sourceId: transaction.id,
-            remarks: line.remarks ?? transaction.remarks,
-          },
+        const serialEntries = await tx.stockTransactionLineSerial.findMany({
+          where: { transactionLineId: line.id },
+          orderBy: [{ serialNo: "asc" }],
         });
+
+        if (serialEntries.length > 0) {
+          if (transactionType === "OB" || transactionType === "SR" || (transactionType === "SA" && line.adjustmentDirection === "IN")) {
+            for (const serialEntry of serialEntries) {
+              const existing = await tx.inventorySerial.findUnique({
+                where: {
+                  inventoryProductId_serialNo: {
+                    inventoryProductId: line.inventoryProductId,
+                    serialNo: serialEntry.serialNo,
+                  },
+                },
+              });
+
+              let serialRecord;
+              if (existing) {
+                if (existing.status === "IN_STOCK") {
+                  throw new Error(`Serial No ${serialEntry.serialNo} is already in stock for this product.`);
+                }
+                serialRecord = await tx.inventorySerial.update({
+                  where: { id: existing.id },
+                  data: {
+                    inventoryBatchId: batchId,
+                    currentLocationId: line.locationId!,
+                    status: "IN_STOCK",
+                  },
+                });
+              } else {
+                serialRecord = await tx.inventorySerial.create({
+                  data: {
+                    inventoryProductId: line.inventoryProductId,
+                    inventoryBatchId: batchId,
+                    serialNo: serialEntry.serialNo,
+                    currentLocationId: line.locationId!,
+                    status: "IN_STOCK",
+                  },
+                });
+              }
+
+              await tx.stockTransactionLineSerial.update({
+                where: { id: serialEntry.id },
+                data: {
+                  inventorySerialId: serialRecord.id,
+                  inventoryBatchId: batchId,
+                },
+              });
+            }
+          }
+
+          if (transactionType === "SI" || (transactionType === "SA" && line.adjustmentDirection === "OUT")) {
+            for (const serialEntry of serialEntries) {
+              const serialRecord = await tx.inventorySerial.findUnique({
+                where: {
+                  inventoryProductId_serialNo: {
+                    inventoryProductId: line.inventoryProductId,
+                    serialNo: serialEntry.serialNo,
+                  },
+                },
+              });
+
+              if (!serialRecord || serialRecord.status !== "IN_STOCK" || serialRecord.currentLocationId !== line.locationId) {
+                throw new Error(`Serial No ${serialEntry.serialNo} is not available at the selected location.`);
+              }
+
+              await tx.inventorySerial.update({
+                where: { id: serialRecord.id },
+                data: {
+                  status: "OUT_OF_STOCK",
+                  currentLocationId: null,
+                },
+              });
+
+              await tx.stockTransactionLineSerial.update({
+                where: { id: serialEntry.id },
+                data: {
+                  inventorySerialId: serialRecord.id,
+                  inventoryBatchId: serialRecord.inventoryBatchId,
+                },
+              });
+            }
+          }
+
+          if (transactionType === "ST") {
+            for (const serialEntry of serialEntries) {
+              const serialRecord = await tx.inventorySerial.findUnique({
+                where: {
+                  inventoryProductId_serialNo: {
+                    inventoryProductId: line.inventoryProductId,
+                    serialNo: serialEntry.serialNo,
+                  },
+                },
+              });
+
+              if (!serialRecord || serialRecord.status !== "IN_STOCK" || serialRecord.currentLocationId !== line.fromLocationId) {
+                throw new Error(`Serial No ${serialEntry.serialNo} is not available at the selected source location.`);
+              }
+
+              await tx.inventorySerial.update({
+                where: { id: serialRecord.id },
+                data: {
+                  currentLocationId: line.toLocationId!,
+                  inventoryBatchId: batchId ?? serialRecord.inventoryBatchId,
+                  status: "IN_STOCK",
+                },
+              });
+
+              await tx.stockTransactionLineSerial.update({
+                where: { id: serialEntry.id },
+                data: {
+                  inventorySerialId: serialRecord.id,
+                  inventoryBatchId: batchId ?? serialRecord.inventoryBatchId,
+                },
+              });
+            }
+          }
+        }
       }
 
       return tx.stockTransaction.findUnique({
@@ -338,6 +556,12 @@ export async function POST(req: Request) {
               location: { select: { id: true, code: true, name: true } },
               fromLocation: { select: { id: true, code: true, name: true } },
               toLocation: { select: { id: true, code: true, name: true } },
+              serialEntries: {
+                orderBy: [{ serialNo: "asc" }],
+                include: {
+                  inventorySerial: { select: { id: true, serialNo: true, status: true } },
+                },
+              },
             },
           },
         },

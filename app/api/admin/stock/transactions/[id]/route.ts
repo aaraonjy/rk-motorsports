@@ -19,6 +19,13 @@ export async function GET(_req: Request, context: Params) {
             location: { select: { id: true, code: true, name: true } },
             fromLocation: { select: { id: true, code: true, name: true } },
             toLocation: { select: { id: true, code: true, name: true } },
+            serialEntries: {
+              orderBy: [{ serialNo: "asc" }],
+              include: {
+                inventorySerial: { select: { id: true, serialNo: true, status: true } },
+                inventoryBatch: { select: { id: true, batchNo: true, expiryDate: true } },
+              },
+            },
             ledgerEntries: {
               orderBy: [{ createdAt: "asc" }],
               include: {
