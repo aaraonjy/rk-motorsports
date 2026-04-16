@@ -12,7 +12,15 @@ export default async function AdminStockIssuePage() {
     db.inventoryProduct.findMany({
       where: { isActive: true, trackInventory: true },
       orderBy: [{ code: "asc" }],
-      select: { id: true, code: true, description: true, baseUom: true, batchTracking: true, serialNumberTracking: true },
+      select: {
+        id: true,
+        code: true,
+        description: true,
+        baseUom: true,
+        unitCost: true,
+        batchTracking: true,
+        serialNumberTracking: true,
+      },
     }),
     db.stockLocation.findMany({
       orderBy: [{ isActive: "desc" }, { code: "asc" }],
@@ -36,7 +44,15 @@ export default async function AdminStockIssuePage() {
             transactionType="SI"
             title="Stock Issue"
             intro="Use Stock Issue to remove stock from a selected location for internal use, wastage, or manual stock-out movement."
-            initialProducts={products}
+            initialProducts={products.map((product) => ({
+              id: product.id,
+              code: product.code,
+              description: product.description,
+              baseUom: product.baseUom,
+              unitCost: Number(product.unitCost ?? 0),
+              batchTracking: product.batchTracking,
+              serialNumberTracking: product.serialNumberTracking,
+            }))}
             initialLocations={locations}
           />
         </div>

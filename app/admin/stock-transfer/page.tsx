@@ -12,7 +12,15 @@ export default async function AdminStockTransferPage() {
     db.inventoryProduct.findMany({
       where: { isActive: true, trackInventory: true },
       orderBy: [{ code: "asc" }],
-      select: { id: true, code: true, description: true, baseUom: true, batchTracking: true, serialNumberTracking: true },
+      select: {
+        id: true,
+        code: true,
+        description: true,
+        baseUom: true,
+        unitCost: true,
+        batchTracking: true,
+        serialNumberTracking: true,
+      },
     }),
     db.stockLocation.findMany({
       orderBy: [{ isActive: "desc" }, { code: "asc" }],
@@ -36,7 +44,15 @@ export default async function AdminStockTransferPage() {
             transactionType="ST"
             title="Stock Transfer"
             intro="Use Stock Transfer to move inventory from one active location to another while preserving full stock ledger traceability."
-            initialProducts={products}
+            initialProducts={products.map((product) => ({
+              id: product.id,
+              code: product.code,
+              description: product.description,
+              baseUom: product.baseUom,
+              unitCost: Number(product.unitCost ?? 0),
+              batchTracking: product.batchTracking,
+              serialNumberTracking: product.serialNumberTracking,
+            }))}
             initialLocations={locations}
           />
         </div>
