@@ -316,14 +316,20 @@ export function AdminStockTransactionClient({
       }
     }
 
-    const targets = Array.from(needed).filter((key) => balances[key] == null && !loadingBalances[key]);
+    const targets = Array.from(needed);
     if (targets.length === 0) return;
 
     let cancelled = false;
 
+    setLoadingBalances((prev) => {
+      const next = { ...prev };
+      for (const key of targets) next[key] = true;
+      return next;
+    });
+
     async function fetchBalance(key: string) {
       const [inventoryProductId, locationId] = key.split("__");
-      setLoadingBalances((prev) => ({ ...prev, [key]: true }));
+
       try {
         const params = new URLSearchParams({ inventoryProductId, locationId });
         const response = await fetch(`/api/admin/stock/balance?${params.toString()}`, {
@@ -332,19 +338,19 @@ export function AdminStockTransactionClient({
         });
         const data = (await response.json()) as BalanceResponse;
 
-        if (!cancelled) {
-          let resolvedBalance = 0;
+        if (cancelled) return;
 
-          if (response.ok && data.ok) {
-            if (typeof data.balance === "number") {
-              resolvedBalance = Number(data.balance);
-            } else if (Array.isArray(data.balances) && data.balances.length > 0) {
-              resolvedBalance = Number(data.balances[0]?.balance ?? 0);
-            }
+        let resolvedBalance = 0;
+
+        if (response.ok && data.ok) {
+          if (typeof data.balance === "number") {
+            resolvedBalance = Number(data.balance);
+          } else if (Array.isArray(data.balances) && data.balances.length > 0) {
+            resolvedBalance = Number(data.balances[0]?.balance ?? 0);
           }
-
-          setBalances((prev) => ({ ...prev, [key]: resolvedBalance }));
         }
+
+        setBalances((prev) => ({ ...prev, [key]: resolvedBalance }));
       } catch {
         if (!cancelled) {
           setBalances((prev) => ({ ...prev, [key]: 0 }));
@@ -363,7 +369,7 @@ export function AdminStockTransactionClient({
     return () => {
       cancelled = true;
     };
-  }, [lines, balances, loadingBalances]);
+  }, [lines]);
 
   function updateLine(index: number, patch: Partial<FormLine>) {
     setLines((prev) => prev.map((line, i) => (i === index ? { ...line, ...patch } : line)));
