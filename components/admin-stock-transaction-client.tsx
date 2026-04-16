@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 type StockTransactionTypeValue = "OB" | "SR" | "SI" | "SA" | "ST";
 type AdjustmentDirectionValue = "IN" | "OUT";
@@ -65,6 +65,17 @@ type FormLine = {
   adjustmentDirection: "" | AdjustmentDirectionValue;
 };
 
+type SearchableSelectOption = {
+  id: string;
+  label: string;
+  searchText: string;
+};
+
+type BalanceResponse = {
+  ok: boolean;
+  balance?: number;
+};
+
 function emptyLine(): FormLine {
   return {
     inventoryProductId: "",
@@ -76,10 +87,6 @@ function emptyLine(): FormLine {
     toLocationId: "",
     adjustmentDirection: "",
   };
-}
-
-function requiresUnitCost(type: StockTransactionTypeValue) {
-  return type === "OB" || type === "SR";
 }
 
 function requiresSingleLocation(type: StockTransactionTypeValue) {
@@ -118,6 +125,113 @@ function getTypeLabel(type: StockTransactionTypeValue) {
   }
 }
 
+function balanceKey(productId: string, locationId: string) {
+  return `${productId}__${locationId}`;
+}
+
+function SearchableSelect({
+  label,
+  placeholder,
+  options,
+  value,
+  disabled = false,
+  onChange,
+}: {
+  label: string;
+  placeholder: string;
+  options: SearchableSelectOption[];
+  value: string;
+  disabled?: boolean;
+  onChange: (option: SearchableSelectOption | null) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  const selectedOption = useMemo(() => options.find((item) => item.id === value) || null, [options, value]);
+
+  useEffect(() => {
+    setSearch(selectedOption?.label || "");
+  }, [selectedOption?.label]);
+
+  useEffect(() => {
+    function handleOutsideClick(event: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, []);
+
+  const filteredOptions = useMemo(() => {
+    const keyword = search.trim().toLowerCase();
+    if (!keyword) return options;
+    return options.filter((item) => item.searchText.includes(keyword));
+  }, [options, search]);
+
+  return (
+    <div ref={containerRef} className="relative">
+      <label className="label-rk">{label}</label>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => {
+          if (disabled) return;
+          setIsOpen((prev) => !prev);
+          setSearch(selectedOption?.label || "");
+        }}
+        className={`input-rk flex items-center justify-between gap-3 text-left ${disabled ? "cursor-not-allowed opacity-60" : ""}`}
+      >
+        <span className={selectedOption ? "truncate text-white" : "truncate text-white/45"}>
+          {selectedOption ? selectedOption.label : placeholder}
+        </span>
+        <span className="shrink-0 text-white/60">▾</span>
+      </button>
+
+      {isOpen ? (
+        <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-[120] overflow-hidden rounded-2xl border border-white/10 bg-[#0b0b0f] shadow-2xl">
+          <div className="border-b border-white/10 p-3">
+            <input
+              autoFocus
+              className="input-rk"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={`Search ${label.toLowerCase()}`}
+            />
+          </div>
+
+          <div className="max-h-56 overflow-y-auto p-2">
+            {filteredOptions.length === 0 ? (
+              <div className="rounded-xl px-3 py-3 text-sm text-white/45">No matching {label.toLowerCase()} found.</div>
+            ) : (
+              filteredOptions.map((option) => {
+                const isSelected = selectedOption?.id === option.id;
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => {
+                      onChange(option);
+                      setSearch(option.label);
+                      setIsOpen(false);
+                    }}
+                    className={`flex w-full items-center rounded-xl px-3 py-3 text-left text-sm transition ${
+                      isSelected ? "bg-white/10 text-white" : "text-white/85 hover:bg-white/10 hover:text-white"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function AdminStockTransactionClient({
   transactionType,
   title,
@@ -130,12 +244,34 @@ export function AdminStockTransactionClient({
   const [remarks, setRemarks] = useState("");
   const [lines, setLines] = useState<FormLine[]>([emptyLine()]);
   const [transactions, setTransactions] = useState<TransactionRecord[]>([]);
+  const [balances, setBalances] = useState<Record<string, number>>({});
+  const [loadingBalances, setLoadingBalances] = useState<Record<string, boolean>>({});
   const [isLoadingTransactions, setIsLoadingTransactions] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [submitSuccess, setSubmitSuccess] = useState("");
 
   const activeLocations = useMemo(() => initialLocations.filter((item) => item.isActive), [initialLocations]);
+
+  const productOptions = useMemo<SearchableSelectOption[]>(
+    () =>
+      initialProducts.map((product) => ({
+        id: product.id,
+        label: `${product.code} — ${product.description}`,
+        searchText: `${product.code} ${product.description} ${product.baseUom}`.toLowerCase(),
+      })),
+    [initialProducts]
+  );
+
+  const locationOptions = useMemo<SearchableSelectOption[]>(
+    () =>
+      activeLocations.map((location) => ({
+        id: location.id,
+        label: `${location.code} — ${location.name}`,
+        searchText: `${location.code} ${location.name}`.toLowerCase(),
+      })),
+    [activeLocations]
+  );
 
   useEffect(() => {
     let isMounted = true;
@@ -163,6 +299,52 @@ export function AdminStockTransactionClient({
     };
   }, [transactionType]);
 
+  useEffect(() => {
+    const needed = new Set<string>();
+
+    for (const line of lines) {
+      if (line.inventoryProductId && line.locationId) {
+        needed.add(balanceKey(line.inventoryProductId, line.locationId));
+      }
+      if (line.inventoryProductId && line.fromLocationId) {
+        needed.add(balanceKey(line.inventoryProductId, line.fromLocationId));
+      }
+      if (line.inventoryProductId && line.toLocationId) {
+        needed.add(balanceKey(line.inventoryProductId, line.toLocationId));
+      }
+    }
+
+    const targets = Array.from(needed).filter((key) => balances[key] == null && !loadingBalances[key]);
+    if (targets.length === 0) return;
+
+    let cancelled = false;
+
+    async function fetchBalance(key: string) {
+      const [inventoryProductId, locationId] = key.split("__");
+      setLoadingBalances((prev) => ({ ...prev, [key]: true }));
+      try {
+        const params = new URLSearchParams({ inventoryProductId, locationId });
+        const response = await fetch(`/api/admin/stock/balance?${params.toString()}`);
+        const data = (await response.json()) as BalanceResponse;
+        if (!cancelled && response.ok && data.ok) {
+          setBalances((prev) => ({ ...prev, [key]: Number(data.balance ?? 0) }));
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingBalances((prev) => ({ ...prev, [key]: false }));
+        }
+      }
+    }
+
+    targets.forEach((key) => {
+      void fetchBalance(key);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [lines, balances, loadingBalances]);
+
   function updateLine(index: number, patch: Partial<FormLine>) {
     setLines((prev) => prev.map((line, i) => (i === index ? { ...line, ...patch } : line)));
   }
@@ -173,6 +355,13 @@ export function AdminStockTransactionClient({
 
   function removeLine(index: number) {
     setLines((prev) => (prev.length === 1 ? prev : prev.filter((_, i) => i !== index)));
+  }
+
+  function getBalanceText(productId: string, locationId: string) {
+    if (!productId || !locationId) return "Select product and location to view balance.";
+    const key = balanceKey(productId, locationId);
+    if (loadingBalances[key]) return "Loading current balance...";
+    return `Current Balance: ${formatQty(balances[key] ?? 0)}`;
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -268,16 +457,20 @@ export function AdminStockTransactionClient({
 
                   <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                     <div className="xl:col-span-2">
-                      <label className="label-rk">Product</label>
-                      <div className="relative">
-                        <select className="input-rk appearance-none pr-12" value={line.inventoryProductId} onChange={(e) => updateLine(index, { inventoryProductId: e.target.value })} required>
-                          <option value="">Select product</option>
-                          {initialProducts.map((product) => (
-                            <option key={product.id} value={product.id}>{product.code} — {product.description}</option>
-                          ))}
-                        </select>
-                        <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/60">▾</div>
-                      </div>
+                      <SearchableSelect
+                        label="Product"
+                        placeholder="Search or select product"
+                        options={productOptions}
+                        value={line.inventoryProductId}
+                        onChange={(option) =>
+                          updateLine(index, {
+                            inventoryProductId: option?.id || "",
+                            locationId: transactionType === "ST" ? line.locationId : line.locationId,
+                            fromLocationId: line.fromLocationId,
+                            toLocationId: line.toLocationId,
+                          })
+                        }
+                      />
                       <p className="mt-2 text-xs text-white/45">{selectedProduct ? `UOM: ${selectedProduct.baseUom}` : "Only active inventory-tracked products are shown."}</p>
                     </div>
 
@@ -286,25 +479,21 @@ export function AdminStockTransactionClient({
                       <input type="number" min="0.01" step="0.01" className="input-rk" value={line.qty} onChange={(e) => updateLine(index, { qty: e.target.value })} required />
                     </div>
 
-                    {requiresUnitCost(transactionType) ? (
-                      <div>
-                        <label className="label-rk">Unit Cost</label>
-                        <input type="number" min="0.01" step="0.01" className="input-rk" value={line.unitCost} onChange={(e) => updateLine(index, { unitCost: e.target.value })} required />
-                      </div>
-                    ) : null}
+                    <div>
+                      <label className="label-rk">Unit Cost</label>
+                      <input type="number" min="0" step="0.01" className="input-rk" value={line.unitCost} onChange={(e) => updateLine(index, { unitCost: e.target.value })} placeholder="Optional / 0.00 allowed" />
+                    </div>
 
                     {requiresSingleLocation(transactionType) ? (
-                      <div className={requiresUnitCost(transactionType) ? "md:col-span-2 xl:col-span-2" : ""}>
-                        <label className="label-rk">Location</label>
-                        <div className="relative">
-                          <select className="input-rk appearance-none pr-12" value={line.locationId} onChange={(e) => updateLine(index, { locationId: e.target.value })} required>
-                            <option value="">Select location</option>
-                            {activeLocations.map((location) => (
-                              <option key={location.id} value={location.id}>{location.code} — {location.name}</option>
-                            ))}
-                          </select>
-                          <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/60">▾</div>
-                        </div>
+                      <div className="md:col-span-2 xl:col-span-2">
+                        <SearchableSelect
+                          label="Location"
+                          placeholder="Search or select location"
+                          options={locationOptions}
+                          value={line.locationId}
+                          onChange={(option) => updateLine(index, { locationId: option?.id || "" })}
+                        />
+                        <p className="mt-2 text-xs text-white/45">{getBalanceText(line.inventoryProductId, line.locationId)}</p>
                       </div>
                     ) : null}
 
@@ -325,33 +514,29 @@ export function AdminStockTransactionClient({
                     {transactionType === "ST" ? (
                       <>
                         <div>
-                          <label className="label-rk">From Location</label>
-                          <div className="relative">
-                            <select className="input-rk appearance-none pr-12" value={line.fromLocationId} onChange={(e) => updateLine(index, { fromLocationId: e.target.value })} required>
-                              <option value="">Select source location</option>
-                              {activeLocations.map((location) => (
-                                <option key={location.id} value={location.id}>{location.code} — {location.name}</option>
-                              ))}
-                            </select>
-                            <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/60">▾</div>
-                          </div>
+                          <SearchableSelect
+                            label="From Location"
+                            placeholder="Search or select source location"
+                            options={locationOptions}
+                            value={line.fromLocationId}
+                            onChange={(option) => updateLine(index, { fromLocationId: option?.id || "" })}
+                          />
+                          <p className="mt-2 text-xs text-white/45">{getBalanceText(line.inventoryProductId, line.fromLocationId)}</p>
                         </div>
                         <div>
-                          <label className="label-rk">To Location</label>
-                          <div className="relative">
-                            <select className="input-rk appearance-none pr-12" value={line.toLocationId} onChange={(e) => updateLine(index, { toLocationId: e.target.value })} required>
-                              <option value="">Select destination location</option>
-                              {activeLocations.map((location) => (
-                                <option key={location.id} value={location.id}>{location.code} — {location.name}</option>
-                              ))}
-                            </select>
-                            <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/60">▾</div>
-                          </div>
+                          <SearchableSelect
+                            label="To Location"
+                            placeholder="Search or select destination location"
+                            options={locationOptions}
+                            value={line.toLocationId}
+                            onChange={(option) => updateLine(index, { toLocationId: option?.id || "" })}
+                          />
+                          <p className="mt-2 text-xs text-white/45">{getBalanceText(line.inventoryProductId, line.toLocationId)}</p>
                         </div>
                       </>
                     ) : null}
 
-                    <div className={transactionType === "ST" ? "md:col-span-2 xl:col-span-4" : "md:col-span-2 xl:col-span-4"}>
+                    <div className="md:col-span-2 xl:col-span-4">
                       <label className="label-rk">Line Remarks</label>
                       <input className="input-rk" value={line.remarks} onChange={(e) => updateLine(index, { remarks: e.target.value })} placeholder="Optional line remarks" />
                     </div>
@@ -415,7 +600,7 @@ export function AdminStockTransactionClient({
                             <div className="mt-1">Location: {formatLocationLabel(line.location)}</div>
                           )}
                           {transactionType === "SA" ? <div className="mt-1">Direction: {line.adjustmentDirection || "-"}</div> : null}
-                          {requiresUnitCost(transactionType) ? <div className="mt-1">Unit Cost: {formatQty(line.unitCost)}</div> : null}
+                          <div className="mt-1">Unit Cost: {formatQty(line.unitCost)}</div>
                         </div>
                       ))}
                     </div>

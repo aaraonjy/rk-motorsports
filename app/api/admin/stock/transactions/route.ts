@@ -34,6 +34,15 @@ function normalizeAdjustmentDirection(value: unknown) {
   return null;
 }
 
+function normalizeUnitCost(value: unknown) {
+  if (value == null || value === "") return null;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    throw new Error("Unit cost must be 0 or greater.");
+  }
+  return Math.round((parsed + Number.EPSILON) * 100) / 100;
+}
+
 export async function GET(req: Request) {
   try {
     await requireAdmin();
@@ -123,7 +132,7 @@ export async function POST(req: Request) {
       }
 
       const qty = assertPositiveQty(line.qty);
-      const unitCost = line.unitCost == null ? null : assertPositiveQty(line.unitCost, "Unit cost");
+      const unitCost = normalizeUnitCost(line.unitCost);
       const adjustmentDirection = normalizeAdjustmentDirection(line.adjustmentDirection);
       const locationId = String(line.locationId || "").trim() || null;
       const fromLocationId = String(line.fromLocationId || "").trim() || null;
