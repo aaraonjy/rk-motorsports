@@ -292,6 +292,7 @@ model InventoryProduct {
   stockLedgerEntries   StockLedger[]
   batches              InventoryBatch[]
   serials              InventorySerial[]
+  serialTransactionEntries StockTransactionLineSerial[]
 
   @@index([isActive, code])
   @@index([itemType, isActive])
