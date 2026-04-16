@@ -197,6 +197,14 @@ function requiresBatchSelectionBeforeBalance(
   return type === "SI" || type === "ST" || type === "OB" || type === "SR" || (type === "SA" && direction === "OUT") || (type === "SA" && direction === "IN");
 }
 
+function isOutboundBatchFlow(type: StockTransactionTypeValue, direction: "" | AdjustmentDirectionValue) {
+  return type === "SI" || type === "ST" || (type === "SA" && direction === "OUT");
+}
+
+function isInboundBatchFlow(type: StockTransactionTypeValue, direction: "" | AdjustmentDirectionValue) {
+  return type === "OB" || type === "SR" || (type === "SA" && direction === "IN");
+}
+
 function SearchableSelect({
   label,
   placeholder,
@@ -489,8 +497,7 @@ export function AdminStockTransactionClient({
 
     lines.forEach((line, index) => {
       const product = initialProducts.find((item) => item.id === line.inventoryProductId);
-      const inboundFlow = isInboundSerialFlow(transactionType, line.adjustmentDirection);
-      const outboundFlow = isOutboundSerialFlow(transactionType, line.adjustmentDirection);
+      const outboundBatchFlow = isOutboundBatchFlow(transactionType, line.adjustmentDirection);
       const locationId = transactionType === "ST" ? line.fromLocationId : line.locationId;
       const shouldFetch =
         !!product?.batchTracking &&
@@ -506,10 +513,14 @@ export function AdminStockTransactionClient({
       const params = new URLSearchParams({
         inventoryProductId: line.inventoryProductId,
         locationId,
-        direction: outboundFlow ? "outbound" : "inbound",
+        direction: outboundBatchFlow ? "outbound" : "inbound",
       });
 
-      setLoadingBatches((prev) => ({ ...prev, [index]: true }));
+      setLoadingBatches((prev) => {
+        if (prev[index]) return prev;
+        return { ...prev, [index]: true };
+      });
+
       fetch(`/api/admin/stock/batches?${params.toString()}`, { cache: "no-store" })
         .then(async (response) => {
           const data = await response.json();
@@ -518,15 +529,17 @@ export function AdminStockTransactionClient({
         })
         .then((rows: AvailableBatch[]) => {
           setAvailableBatches((prev) => ({ ...prev, [index]: rows }));
-          if (!outboundFlow) return;
+          if (!outboundBatchFlow) return;
 
-          setLines((prev) =>
-            prev.map((item, itemIndex) => {
+          setLines((prev) => {
+            let changed = false;
+            const next = prev.map((item, itemIndex) => {
               if (itemIndex !== index) return item;
               const allowedBatchNos = new Set(rows.map((entry) => entry.batchNo.toUpperCase()));
               if (!item.batchNo || allowedBatchNos.has(item.batchNo.toUpperCase())) {
                 return item;
               }
+              changed = true;
               return {
                 ...item,
                 batchNo: "",
@@ -534,8 +547,9 @@ export function AdminStockTransactionClient({
                 serialSearch: "",
                 qty: product?.serialNumberTracking ? "0" : item.qty,
               };
-            })
-          );
+            });
+            return changed ? next : prev;
+          });
         })
         .finally(() => {
           setLoadingBatches((prev) => ({ ...prev, [index]: false }));
@@ -1028,7 +1042,7 @@ export function AdminStockTransactionClient({
 
                         {isBatchTracked ? (
                           <>
-                            {outboundSerialFlow ? (
+                            {isOutboundBatchFlow(transactionType, line.adjustmentDirection) ? (
                               <div>
                                 <SearchableSelect
                                   label="Batch No"
@@ -1051,31 +1065,41 @@ export function AdminStockTransactionClient({
                                 </p>
                               </div>
                             ) : (
-                              <div className="md:col-span-2 xl:col-span-2">
-                                <label className="label-rk">Batch No</label>
-                                <input
-                                  list={`batch-suggestions-${index}`}
-                                  className="input-rk"
-                                  value={line.batchNo}
-                                  onChange={(e) => setInboundBatch(index, e.target.value)}
-                                  placeholder="Enter or search batch no"
-                                  required
-                                />
-                                <datalist id={`batch-suggestions-${index}`}>
-                                  {(availableBatches[index] || []).map((batch) => (
-                                    <option key={batch.id} value={batch.batchNo} />
-                                  ))}
-                                </datalist>
-                                <p className="mt-2 text-xs text-white/45">
+                              <div className="md:col-span-2 xl:col-span-2 space-y-4">
+                                <div>
+                                  <SearchableSelect
+                                    label="Batch No"
+                                    placeholder={loadingBatches[index] ? "Loading existing batches..." : "Search or select existing batch"}
+                                    options={(availableBatches[index] || []).map((batch) => ({
+                                      id: batch.batchNo,
+                                      label: `${batch.batchNo}${batch.expiryDate ? ` • Exp ${batch.expiryDate}` : ""}`,
+                                      searchText: `${batch.batchNo} ${batch.expiryDate || ""}`.toLowerCase(),
+                                    }))}
+                                    value={(availableBatches[index] || []).some((batch) => batch.batchNo.toUpperCase() === line.batchNo.toUpperCase()) ? line.batchNo : ""}
+                                    disabled={loadingBatches[index]}
+                                    onChange={(option) => setInboundBatch(index, option?.id || "")}
+                                  />
+                                </div>
+                                <div>
+                                  <label className="label-rk">Or Enter New Batch No</label>
+                                  <input
+                                    className="input-rk"
+                                    value={line.batchNo}
+                                    onChange={(e) => setInboundBatch(index, e.target.value)}
+                                    placeholder="Enter new batch no"
+                                    required
+                                  />
+                                </div>
+                                <p className="text-xs text-white/45">
                                   {loadingBatches[index]
                                     ? "Loading existing batch numbers..."
                                     : (availableBatches[index] || []).length > 0
-                                      ? "You can select an existing batch or enter a new batch no."
+                                      ? "You can select an existing batch from the dropdown or enter a new batch no."
                                       : "No existing batch numbers found. You can enter a new batch no."}
                                 </p>
                               </div>
                             )}
-                            {inboundSerialFlow || transactionType === "OB" || transactionType === "SR" ? (
+                            {isInboundBatchFlow(transactionType, line.adjustmentDirection) ? (
                               <div>
                                 <label className="label-rk">Expiry Date</label>
                                 <input type="date" className="input-rk" value={line.expiryDate} onChange={(e) => updateLine(index, { expiryDate: e.target.value })} />
