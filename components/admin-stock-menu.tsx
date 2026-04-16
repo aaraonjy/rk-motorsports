@@ -10,15 +10,14 @@ const activeItems = [
   { label: "Product Sub-Group", href: "/admin/product-sub-groups" },
   { label: "Product Brand", href: "/admin/brands" },
   { label: "Stock Location", href: "/admin/stock/locations" },
+  { label: "Opening Stock", href: "/admin/stock/opening-stock" },
+  { label: "Stock Receive", href: "/admin/stock/stock-receive" },
+  { label: "Stock Issue", href: "/admin/stock/stock-issue" },
+  { label: "Stock Adjustment", href: "/admin/stock/stock-adjustment" },
+  { label: "Stock Transfer", href: "/admin/stock/stock-transfer" },
 ] as const;
 
-const upcomingItems = [
-  "Serial No",
-  "Opening Stock",
-  "Stock Receive",
-  "Stock Issue",
-  "Stock Adjustment",
-] as const;
+const upcomingItems = ["Serial No"] as const;
 
 export function AdminStockMenu() {
   const pathname = usePathname();
@@ -37,12 +36,7 @@ export function AdminStockMenu() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const isActive =
-    pathname.startsWith("/admin/products") ||
-    pathname.startsWith("/admin/product-groups") ||
-    pathname.startsWith("/admin/product-sub-groups") ||
-    pathname.startsWith("/admin/brands") ||
-    pathname.startsWith("/admin/stock/locations");
+  const isActive = activeItems.some((item) => pathname.startsWith(item.href));
 
   return (
     <div ref={dropdownRef} className="relative">
@@ -55,7 +49,7 @@ export function AdminStockMenu() {
 
       {isOpen ? (
         <div className="absolute left-0 top-[calc(100%+12px)] z-[70] min-w-[250px] overflow-hidden rounded-2xl border border-white/10 bg-[#0b0b0c]/95 shadow-2xl backdrop-blur-xl">
-          <div className="border-b border-white/10 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.24em] text-white/40">Batch A</div>
+          <div className="border-b border-white/10 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.24em] text-white/40">Batch B</div>
           {activeItems.map((item) => {
             const active = pathname === item.href;
             return (
