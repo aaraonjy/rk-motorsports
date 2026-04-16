@@ -65,6 +65,7 @@ type FormLine = {
   qty: string;
   unitCost: string;
   batchNo: string;
+  batchMode: "existing" | "new";
   expiryDate: string;
   serialNos: string[];
   serialEntryText: string;
@@ -109,6 +110,7 @@ function emptyLine(): FormLine {
     qty: "1",
     unitCost: "0.00",
     batchNo: "",
+    batchMode: "existing",
     expiryDate: "",
     serialNos: [],
     serialEntryText: "",
@@ -195,14 +197,6 @@ function requiresBatchSelectionBeforeBalance(
 ) {
   if (!product?.batchTracking) return false;
   return type === "SI" || type === "ST" || type === "OB" || type === "SR" || (type === "SA" && direction === "OUT") || (type === "SA" && direction === "IN");
-}
-
-function isOutboundBatchFlow(type: StockTransactionTypeValue, direction: "" | AdjustmentDirectionValue) {
-  return type === "SI" || type === "ST" || (type === "SA" && direction === "OUT");
-}
-
-function isInboundBatchFlow(type: StockTransactionTypeValue, direction: "" | AdjustmentDirectionValue) {
-  return type === "OB" || type === "SR" || (type === "SA" && direction === "IN");
 }
 
 function SearchableSelect({
@@ -497,7 +491,7 @@ export function AdminStockTransactionClient({
 
     lines.forEach((line, index) => {
       const product = initialProducts.find((item) => item.id === line.inventoryProductId);
-      const outboundBatchFlow = isOutboundBatchFlow(transactionType, line.adjustmentDirection);
+      const outboundBatchFlow = transactionType === "SI" || transactionType === "ST" || (transactionType === "SA" && line.adjustmentDirection === "OUT");
       const locationId = transactionType === "ST" ? line.fromLocationId : line.locationId;
       const shouldFetch =
         !!product?.batchTracking &&
@@ -516,11 +510,7 @@ export function AdminStockTransactionClient({
         direction: outboundBatchFlow ? "outbound" : "inbound",
       });
 
-      setLoadingBatches((prev) => {
-        if (prev[index]) return prev;
-        return { ...prev, [index]: true };
-      });
-
+      setLoadingBatches((prev) => ({ ...prev, [index]: true }));
       fetch(`/api/admin/stock/batches?${params.toString()}`, { cache: "no-store" })
         .then(async (response) => {
           const data = await response.json();
@@ -531,25 +521,23 @@ export function AdminStockTransactionClient({
           setAvailableBatches((prev) => ({ ...prev, [index]: rows }));
           if (!outboundBatchFlow) return;
 
-          setLines((prev) => {
-            let changed = false;
-            const next = prev.map((item, itemIndex) => {
+          setLines((prev) =>
+            prev.map((item, itemIndex) => {
               if (itemIndex !== index) return item;
               const allowedBatchNos = new Set(rows.map((entry) => entry.batchNo.toUpperCase()));
               if (!item.batchNo || allowedBatchNos.has(item.batchNo.toUpperCase())) {
                 return item;
               }
-              changed = true;
               return {
                 ...item,
                 batchNo: "",
+                batchMode: "existing",
                 serialNos: [],
                 serialSearch: "",
                 qty: product?.serialNumberTracking ? "0" : item.qty,
               };
-            });
-            return changed ? next : prev;
-          });
+            })
+          );
         })
         .finally(() => {
           setLoadingBatches((prev) => ({ ...prev, [index]: false }));
@@ -656,6 +644,7 @@ export function AdminStockTransactionClient({
       inventoryProductId: productId,
       unitCost: product ? product.unitCost.toFixed(2) : "0.00",
       batchNo: "",
+      batchMode: "existing",
       expiryDate: "",
       serialNos: [],
       serialEntryText: "",
@@ -736,10 +725,30 @@ export function AdminStockTransactionClient({
   function setInboundBatch(index: number, value: string) {
     const line = lines[index];
     const normalized = value.trim().toUpperCase();
-    const matched = (availableBatches[index] || []).find((item) => item.batchNo.toUpperCase() === normalized);
+    if (normalized === "__NEW__") {
+      updateLine(index, {
+        batchMode: "new",
+        batchNo: "",
+        expiryDate: "",
+        serialNos: [],
+        serialSearch: "",
+      });
+      return;
+    }
+    const matched = (availableBatches[index] || []).find((item) => item.batchNo.toUpperCase() === normalized) || null;
     updateLine(index, {
-      batchNo: normalized,
+      batchMode: "existing",
+      batchNo: matched?.batchNo || normalized,
       expiryDate: matched?.expiryDate || line.expiryDate,
+      serialNos: [],
+      serialSearch: "",
+    });
+  }
+
+  function setInboundNewBatchValue(index: number, value: string) {
+    updateLine(index, {
+      batchMode: "new",
+      batchNo: value.trim().toUpperCase(),
       serialNos: [],
       serialSearch: "",
     });
@@ -748,12 +757,14 @@ export function AdminStockTransactionClient({
   function setOutboundBatch(index: number, batchNo: string) {
     const matched = (availableBatches[index] || []).find((item) => item.batchNo.toUpperCase() === batchNo.toUpperCase()) || null;
     updateLine(index, {
+      batchMode: "existing",
       batchNo,
       expiryDate: matched?.expiryDate || "",
       serialNos: [],
       serialSearch: "",
     });
   }
+
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -935,6 +946,8 @@ export function AdminStockTransactionClient({
                   const isSerialTracked = !!selectedProduct?.serialNumberTracking;
                   const inboundSerialFlow = isInboundSerialFlow(transactionType, line.adjustmentDirection);
                   const outboundSerialFlow = isOutboundSerialFlow(transactionType, line.adjustmentDirection);
+                  const inboundBatchFlow = transactionType === "OB" || transactionType === "SR" || (transactionType === "SA" && line.adjustmentDirection === "IN");
+                  const outboundBatchFlow = transactionType === "SI" || transactionType === "ST" || (transactionType === "SA" && line.adjustmentDirection === "OUT");
                   const serialRows = availableSerials[index] || [];
                   const filteredSerialRows = serialRows.filter((entry) =>
                     !line.serialSearch.trim() || entry.serialNo.toLowerCase().includes(line.serialSearch.trim().toLowerCase())
@@ -995,7 +1008,7 @@ export function AdminStockTransactionClient({
                               placeholder="Search or select location"
                               options={locationOptions}
                               value={line.locationId}
-                              onChange={(option) => updateLine(index, { locationId: option?.id || "", serialNos: [], serialSearch: "" })}
+                              onChange={(option) => updateLine(index, { locationId: option?.id || "", batchNo: "", batchMode: "existing", expiryDate: "", serialNos: [], serialSearch: "" })}
                             />
                             <p className="mt-2 text-xs text-white/45">{getBalanceText(line.inventoryProductId, line.locationId, balanceBatchNo, selectedProduct, line.adjustmentDirection)}</p>
                           </div>
@@ -1023,7 +1036,7 @@ export function AdminStockTransactionClient({
                                 placeholder="Search or select source location"
                                 options={locationOptions}
                                 value={line.fromLocationId}
-                                onChange={(option) => updateLine(index, { fromLocationId: option?.id || "", serialNos: [], serialSearch: "" })}
+                                onChange={(option) => updateLine(index, { fromLocationId: option?.id || "", batchNo: "", batchMode: "existing", expiryDate: "", serialNos: [], serialSearch: "" })}
                               />
                               <p className="mt-2 text-xs text-white/45">{getBalanceText(line.inventoryProductId, line.fromLocationId, balanceBatchNo, selectedProduct, line.adjustmentDirection)}</p>
                             </div>
@@ -1042,67 +1055,85 @@ export function AdminStockTransactionClient({
 
                         {isBatchTracked ? (
                           <>
-                            {isOutboundBatchFlow(transactionType, line.adjustmentDirection) ? (
-                              <div>
-                                <SearchableSelect
-                                  label="Batch No"
-                                  placeholder={loadingBatches[index] ? "Loading available batches..." : "Search or select batch no"}
-                                  options={(availableBatches[index] || []).map((batch) => ({
-                                    id: batch.batchNo,
-                                    label: batch.balance != null ? `${batch.batchNo}${batch.expiryDate ? ` • Exp ${batch.expiryDate}` : ""} • Bal ${formatQty(batch.balance)}` : `${batch.batchNo}${batch.expiryDate ? ` • Exp ${batch.expiryDate}` : ""}`,
-                                    searchText: `${batch.batchNo} ${batch.expiryDate || ""}`.toLowerCase(),
-                                  }))}
-                                  value={line.batchNo}
-                                  disabled={loadingBatches[index]}
-                                  onChange={(option) => setOutboundBatch(index, option?.id || "")}
-                                />
-                                <p className="mt-2 text-xs text-white/45">
-                                  {loadingBatches[index]
+                            <div className="md:col-span-2 xl:col-span-2">
+                              <SearchableSelect
+                                label="Batch No"
+                                placeholder={
+                                  loadingBatches[index]
+                                    ? (outboundBatchFlow ? "Loading available batches..." : "Loading existing batches...")
+                                    : outboundBatchFlow
+                                      ? "Search or select batch no"
+                                      : "Select existing batch or create new"
+                                }
+                                options={
+                                  outboundBatchFlow
+                                    ? (availableBatches[index] || []).map((batch) => ({
+                                        id: batch.batchNo,
+                                        label:
+                                          batch.balance != null
+                                            ? `${batch.batchNo}${batch.expiryDate ? ` • Exp ${batch.expiryDate}` : ""} • Bal ${formatQty(batch.balance)}`
+                                            : `${batch.batchNo}${batch.expiryDate ? ` • Exp ${batch.expiryDate}` : ""}`,
+                                        searchText: `${batch.batchNo} ${batch.expiryDate || ""}`.toLowerCase(),
+                                      }))
+                                    : [
+                                        {
+                                          id: "__NEW__",
+                                          label: "+ Create New Batch",
+                                          searchText: "create new batch new",
+                                        },
+                                        ...(availableBatches[index] || []).map((batch) => ({
+                                          id: batch.batchNo,
+                                          label: `${batch.batchNo}${batch.expiryDate ? ` • Exp ${batch.expiryDate}` : ""}`,
+                                          searchText: `${batch.batchNo} ${batch.expiryDate || ""}`.toLowerCase(),
+                                        })),
+                                      ]
+                                }
+                                value={inboundBatchFlow && line.batchMode === "new" ? "__NEW__" : line.batchNo}
+                                disabled={loadingBatches[index]}
+                                onChange={(option) =>
+                                  outboundBatchFlow
+                                    ? setOutboundBatch(index, option?.id || "")
+                                    : setInboundBatch(index, option?.id || "")
+                                }
+                              />
+                              <p className="mt-2 text-xs text-white/45">
+                                {loadingBatches[index]
+                                  ? outboundBatchFlow
                                     ? "Loading available batch numbers..."
-                                    : (availableBatches[index] || []).length === 0
+                                    : "Loading existing batch numbers..."
+                                  : outboundBatchFlow
+                                    ? (availableBatches[index] || []).length === 0
                                       ? "No available batch numbers found for the selected product/location."
-                                      : "Only batches with available stock are shown."}
-                                </p>
+                                      : "Only batches with available stock are shown."
+                                    : line.batchMode === "new"
+                                      ? "Create a new batch no for this inbound transaction."
+                                      : (availableBatches[index] || []).length > 0
+                                        ? "Select an existing batch or choose “Create New Batch”."
+                                        : "No existing batch numbers found. Choose “Create New Batch” to continue."}
+                              </p>
+                            </div>
+
+                            {inboundBatchFlow && line.batchMode === "new" ? (
+                              <div>
+                                <label className="label-rk">New Batch No</label>
+                                <input
+                                  className="input-rk"
+                                  value={line.batchNo}
+                                  onChange={(e) => setInboundNewBatchValue(index, e.target.value)}
+                                  placeholder="Enter new batch no"
+                                />
                               </div>
-                            ) : (
-                              <div className="md:col-span-2 xl:col-span-2 space-y-4">
-                                <div>
-                                  <SearchableSelect
-                                    label="Batch No"
-                                    placeholder={loadingBatches[index] ? "Loading existing batches..." : "Search or select existing batch"}
-                                    options={(availableBatches[index] || []).map((batch) => ({
-                                      id: batch.batchNo,
-                                      label: `${batch.batchNo}${batch.expiryDate ? ` • Exp ${batch.expiryDate}` : ""}`,
-                                      searchText: `${batch.batchNo} ${batch.expiryDate || ""}`.toLowerCase(),
-                                    }))}
-                                    value={(availableBatches[index] || []).some((batch) => batch.batchNo.toUpperCase() === line.batchNo.toUpperCase()) ? line.batchNo : ""}
-                                    disabled={loadingBatches[index]}
-                                    onChange={(option) => setInboundBatch(index, option?.id || "")}
-                                  />
-                                </div>
-                                <div>
-                                  <label className="label-rk">Or Enter New Batch No</label>
-                                  <input
-                                    className="input-rk"
-                                    value={line.batchNo}
-                                    onChange={(e) => setInboundBatch(index, e.target.value)}
-                                    placeholder="Enter new batch no"
-                                    required
-                                  />
-                                </div>
-                                <p className="text-xs text-white/45">
-                                  {loadingBatches[index]
-                                    ? "Loading existing batch numbers..."
-                                    : (availableBatches[index] || []).length > 0
-                                      ? "You can select an existing batch from the dropdown or enter a new batch no."
-                                      : "No existing batch numbers found. You can enter a new batch no."}
-                                </p>
-                              </div>
-                            )}
-                            {isInboundBatchFlow(transactionType, line.adjustmentDirection) ? (
+                            ) : null}
+
+                            {inboundBatchFlow ? (
                               <div>
                                 <label className="label-rk">Expiry Date</label>
-                                <input type="date" className="input-rk" value={line.expiryDate} onChange={(e) => updateLine(index, { expiryDate: e.target.value })} />
+                                <input
+                                  type="date"
+                                  className="input-rk"
+                                  value={line.expiryDate}
+                                  onChange={(e) => updateLine(index, { expiryDate: e.target.value })}
+                                />
                               </div>
                             ) : null}
                           </>
