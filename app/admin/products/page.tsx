@@ -65,6 +65,7 @@ export default async function AdminProductsPage() {
               sellingPrice: Number(product.sellingPrice ?? 0),
               trackInventory: product.trackInventory,
               serialNumberTracking: product.serialNumberTracking,
+              batchTracking: product.batchTracking,
               isActive: product.isActive,
               defaultLocationId: product.defaultLocationId,
               defaultLocationLabel: product.defaultLocation ? `${product.defaultLocation.code} — ${product.defaultLocation.name}` : null,
