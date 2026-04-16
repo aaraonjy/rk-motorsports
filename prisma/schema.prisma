@@ -284,6 +284,7 @@ model InventoryProduct {
   customOrderItems     CustomOrderItem[]
   stockTransactionLines StockTransactionLine[]
   stockLedgerEntries   StockLedger[]
+  batches InventoryBatch[]
 
   @@index([isActive, code])
   @@index([itemType, isActive])
