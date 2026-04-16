@@ -15,6 +15,8 @@ type StockLinePayload = {
   inventoryProductId?: string;
   qty?: number;
   unitCost?: number | null;
+  batchNo?: string | null;
+  expiryDate?: string | null;
   remarks?: string | null;
   locationId?: string | null;
   fromLocationId?: string | null;
@@ -34,11 +36,10 @@ function normalizeAdjustmentDirection(value: unknown) {
   return null;
 }
 
-function normalizeUnitCost(value: unknown) {
-  if (value == null || value === "") return null;
+function normalizeNonNegativeNumber(value: unknown, label = "Value") {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed < 0) {
-    throw new Error("Unit cost must be 0 or greater.");
+    throw new Error(`${label} must be 0 or greater.`);
   }
   return Math.round((parsed + Number.EPSILON) * 100) / 100;
 }
@@ -117,7 +118,7 @@ export async function POST(req: Request) {
     );
 
     const [products, locations] = await Promise.all([
-      db.inventoryProduct.findMany({ where: { id: { in: inventoryProductIds } } }),
+      db.inventoryProduct.findMany({ where: { id: { in: inventoryProductIds } }, select: { id: true, isActive: true, trackInventory: true, batchTracking: true } }),
       db.stockLocation.findMany({ where: { id: { in: locationIds } } }),
     ]);
 
@@ -132,7 +133,9 @@ export async function POST(req: Request) {
       }
 
       const qty = assertPositiveQty(line.qty);
-      const unitCost = normalizeUnitCost(line.unitCost);
+      const unitCost = line.unitCost == null ? null : normalizeNonNegativeNumber(line.unitCost, "Unit cost");
+      const batchNo = typeof line.batchNo === "string" ? line.batchNo.trim().toUpperCase() || null : null;
+      const expiryDate = typeof line.expiryDate === "string" && line.expiryDate.trim() ? new Date(line.expiryDate) : null;
       const adjustmentDirection = normalizeAdjustmentDirection(line.adjustmentDirection);
       const locationId = String(line.locationId || "").trim() || null;
       const fromLocationId = String(line.fromLocationId || "").trim() || null;
@@ -143,6 +146,14 @@ export async function POST(req: Request) {
         if (fromLocationId === toLocationId) throw new Error("Stock Transfer source and destination cannot be the same.");
       } else {
         if (!locationId) throw new Error("This stock transaction requires a location.");
+      }
+
+      if (product.batchTracking && !batchNo) {
+        throw new Error("Batch No is required for batch-tracked products.");
+      }
+
+      if (expiryDate && Number.isNaN(expiryDate.getTime())) {
+        throw new Error("Expiry Date is invalid.");
       }
 
       if (transactionType === "SA" && !adjustmentDirection) {
@@ -165,6 +176,8 @@ export async function POST(req: Request) {
         inventoryProductId,
         qty,
         unitCost,
+        batchNo,
+        expiryDate,
         remarks: typeof line.remarks === "string" ? line.remarks.trim() || null : null,
         locationId,
         fromLocationId,
@@ -212,6 +225,8 @@ export async function POST(req: Request) {
               inventoryProductId: line.inventoryProductId,
               qty: new Prisma.Decimal(line.qty.toFixed(2)),
               unitCost: line.unitCost == null ? null : new Prisma.Decimal(line.unitCost.toFixed(2)),
+              batchNo: line.batchNo,
+              expiryDate: line.expiryDate,
               remarks: line.remarks,
               locationId: line.locationId,
               fromLocationId: line.fromLocationId,
@@ -224,6 +239,25 @@ export async function POST(req: Request) {
       });
 
       for (const line of transaction.lines) {
+        if (line.batchNo) {
+          await tx.inventoryBatch.upsert({
+            where: {
+              inventoryProductId_batchNo: {
+                inventoryProductId: line.inventoryProductId,
+                batchNo: line.batchNo,
+              },
+            },
+            update: {
+              expiryDate: line.expiryDate ?? undefined,
+            },
+            create: {
+              inventoryProductId: line.inventoryProductId,
+              batchNo: line.batchNo,
+              expiryDate: line.expiryDate ?? undefined,
+            },
+          });
+        }
+
         const qty = new Prisma.Decimal(Number(line.qty).toFixed(2));
 
         if (transactionType === "ST") {

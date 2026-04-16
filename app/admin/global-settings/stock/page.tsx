@@ -43,6 +43,7 @@ export default async function AdminStockSettingsPage() {
               costingMethod: config?.costingMethod ?? "AVERAGE",
               multiUomEnabled: config?.multiUomEnabled ?? false,
               serialTrackingEnabled: config?.serialTrackingEnabled ?? false,
+              batchTrackingEnabled: (config as any)?.batchTrackingEnabled ?? false,
               defaultLocationId: config?.defaultLocationId ?? "",
             }}
             locations={locations}

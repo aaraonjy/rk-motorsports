@@ -39,6 +39,7 @@ function mapProduct(product: any) {
     sellingPrice: Number(product.sellingPrice ?? 0),
     trackInventory: product.trackInventory,
     serialNumberTracking: product.serialNumberTracking,
+    batchTracking: (product as any).batchTracking,
     isActive: product.isActive,
     defaultLocationId: product.defaultLocationId,
     defaultLocationLabel: null,
@@ -67,6 +68,7 @@ export async function PATCH(req: Request, context: Params) {
     const sellingPrice = normalizeMoney(body.sellingPrice);
     const trackInventory = itemType === "STOCK_ITEM" ? Boolean(body.trackInventory) : false;
     const serialNumberTracking = Boolean(body.serialNumberTracking);
+    const batchTracking = Boolean(body.batchTracking);
     const isActive = Boolean(body.isActive);
     const defaultLocationId = typeof body.defaultLocationId === "string" && body.defaultLocationId.trim() ? body.defaultLocationId.trim() : null;
 
@@ -113,6 +115,7 @@ export async function PATCH(req: Request, context: Params) {
         sellingPrice: new Prisma.Decimal(sellingPrice.toFixed(2)),
         trackInventory,
         serialNumberTracking,
+        batchTracking,
         isActive,
         defaultLocationId,
       },
@@ -127,8 +130,8 @@ export async function PATCH(req: Request, context: Params) {
       entityId: updated.id,
       entityCode: updated.code,
       description: `${admin.name} updated product ${updated.code}.`,
-      oldValues: { code: existing.code, description: existing.description, itemType: existing.itemType, baseUom: existing.baseUom, unitCost: Number(existing.unitCost), sellingPrice: Number(existing.sellingPrice), trackInventory: existing.trackInventory, serialNumberTracking: existing.serialNumberTracking, isActive: existing.isActive },
-      newValues: { code: updated.code, description: updated.description, itemType: updated.itemType, baseUom: updated.baseUom, unitCost: Number(updated.unitCost), sellingPrice: Number(updated.sellingPrice), trackInventory: updated.trackInventory, serialNumberTracking: updated.serialNumberTracking, isActive: updated.isActive },
+      oldValues: { code: existing.code, description: existing.description, itemType: existing.itemType, baseUom: existing.baseUom, unitCost: Number(existing.unitCost), sellingPrice: Number(existing.sellingPrice), trackInventory: existing.trackInventory, serialNumberTracking: existing.serialNumberTracking, batchTracking: (existing as any).batchTracking, isActive: existing.isActive },
+      newValues: { code: updated.code, description: updated.description, itemType: updated.itemType, baseUom: updated.baseUom, unitCost: Number(updated.unitCost), sellingPrice: Number(updated.sellingPrice), trackInventory: updated.trackInventory, serialNumberTracking: updated.serialNumberTracking, batchTracking: (updated as any).batchTracking, isActive: updated.isActive },
       status: "SUCCESS",
     });
 

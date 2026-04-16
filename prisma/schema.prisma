@@ -231,6 +231,7 @@ model StockConfiguration {
   costingMethod         StockCostingMethod @default(AVERAGE)
   multiUomEnabled       Boolean            @default(false)
   serialTrackingEnabled Boolean            @default(false)
+  batchTrackingEnabled  Boolean            @default(false)
   defaultLocationId     String?
   createdAt             DateTime           @default(now())
   updatedAt             DateTime           @updatedAt
@@ -271,6 +272,7 @@ model InventoryProduct {
   sellingPrice         Decimal                @default(0) @db.Decimal(12, 2)
   trackInventory       Boolean                @default(false)
   serialNumberTracking Boolean                @default(false)
+  batchTracking        Boolean                @default(false)
   isActive             Boolean                @default(true)
   defaultLocationId    String?
   createdAt            DateTime               @default(now())
@@ -292,6 +294,18 @@ model InventoryProduct {
 }
 
 
+model InventoryBatch {
+  id                 String   @id @default(cuid())
+  inventoryProductId String
+  batchNo            String
+  expiryDate         DateTime?
+  createdAt          DateTime @default(now())
+
+  inventoryProduct InventoryProduct @relation(fields: [inventoryProductId], references: [id], onDelete: Cascade)
+
+  @@unique([inventoryProductId, batchNo])
+  @@index([inventoryProductId])
+}
 
 model ProductGroup {
   id          String            @id @default(cuid())
@@ -614,6 +628,8 @@ model StockTransactionLine {
   inventoryProductId  String
   qty                 Decimal                  @db.Decimal(12, 2)
   unitCost            Decimal?                 @db.Decimal(12, 2)
+  batchNo             String?
+  expiryDate          DateTime?
   remarks             String?
   locationId          String?
   fromLocationId      String?

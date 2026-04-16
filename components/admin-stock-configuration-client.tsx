@@ -17,6 +17,7 @@ type Props = {
     costingMethod: "AVERAGE";
     multiUomEnabled: boolean;
     serialTrackingEnabled: boolean;
+    batchTrackingEnabled: boolean;
     defaultLocationId: string;
   };
   locations: StockLocationOption[];
@@ -56,6 +57,7 @@ export function AdminStockConfigurationClient({ initialConfig, locations }: Prop
             allowNegativeStock: false,
             multiUomEnabled: false,
             serialTrackingEnabled: false,
+            batchTrackingEnabled: false,
             defaultLocationId: "",
           };
 
@@ -104,6 +106,7 @@ export function AdminStockConfigurationClient({ initialConfig, locations }: Prop
                     allowNegativeStock: e.target.checked ? prev.allowNegativeStock : false,
                     multiUomEnabled: e.target.checked ? prev.multiUomEnabled : false,
                     serialTrackingEnabled: e.target.checked ? prev.serialTrackingEnabled : false,
+                    batchTrackingEnabled: e.target.checked ? prev.batchTrackingEnabled : false,
                     defaultLocationId: e.target.checked ? prev.defaultLocationId : "",
                   }))
                 }
@@ -145,6 +148,15 @@ export function AdminStockConfigurationClient({ initialConfig, locations }: Prop
                 onChange={(e) => setForm((prev) => ({ ...prev, serialTrackingEnabled: e.target.checked }))}
               />
               <span>Enable Serial Tracking</span>
+            </label>
+            <label className={`flex items-center gap-3 ${stockControlEnabled ? "" : "opacity-50"}`}>
+              <input
+                type="checkbox"
+                checked={form.batchTrackingEnabled}
+                disabled={!stockControlEnabled}
+                onChange={(e) => setForm((prev) => ({ ...prev, batchTrackingEnabled: e.target.checked }))}
+              />
+              <span>Enable Batch Tracking</span>
             </label>
           </div>
 

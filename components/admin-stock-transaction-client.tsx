@@ -10,6 +10,7 @@ type InventoryProductOption = {
   code: string;
   description: string;
   baseUom: string;
+  batchTracking?: boolean;
 };
 
 type StockLocationOption = {
@@ -25,6 +26,8 @@ type TransactionLineRecord = {
   unitCost?: string | number | null;
   remarks?: string | null;
   adjustmentDirection?: AdjustmentDirectionValue | null;
+  batchNo?: string | null;
+  expiryDate?: string | null;
   inventoryProduct: {
     id: string;
     code: string;
@@ -58,6 +61,8 @@ type FormLine = {
   inventoryProductId: string;
   qty: string;
   unitCost: string;
+  batchNo: string;
+  expiryDate: string;
   remarks: string;
   locationId: string;
   fromLocationId: string;
@@ -76,11 +81,20 @@ type BalanceResponse = {
   balance?: number;
 };
 
+type InventoryBatchOption = {
+  id: string;
+  inventoryProductId: string;
+  batchNo: string;
+  expiryDate?: string | null;
+};
+
 function emptyLine(): FormLine {
   return {
     inventoryProductId: "",
     qty: "1",
-    unitCost: "",
+    unitCost: "0.00",
+    batchNo: "",
+    expiryDate: "",
     remarks: "",
     locationId: "",
     fromLocationId: "",
@@ -244,6 +258,7 @@ export function AdminStockTransactionClient({
   const [remarks, setRemarks] = useState("");
   const [lines, setLines] = useState<FormLine[]>([emptyLine()]);
   const [transactions, setTransactions] = useState<TransactionRecord[]>([]);
+  const [batches, setBatches] = useState<InventoryBatchOption[]>([]);
   const [balances, setBalances] = useState<Record<string, number>>({});
   const [loadingBalances, setLoadingBalances] = useState<Record<string, boolean>>({});
   const [isLoadingTransactions, setIsLoadingTransactions] = useState(true);
@@ -345,6 +360,26 @@ export function AdminStockTransactionClient({
     };
   }, [lines, balances, loadingBalances]);
 
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadBatches() {
+      try {
+        const response = await fetch("/api/admin/stock/batches");
+        const data = await response.json();
+        if (isMounted && response.ok && data.ok) {
+          setBatches(Array.isArray(data.items) ? data.items : []);
+        }
+      } catch {}
+    }
+
+    loadBatches();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   function updateLine(index: number, patch: Partial<FormLine>) {
     setLines((prev) => prev.map((line, i) => (i === index ? { ...line, ...patch } : line)));
   }
@@ -379,7 +414,9 @@ export function AdminStockTransactionClient({
         lines: lines.map((line) => ({
           inventoryProductId: line.inventoryProductId || null,
           qty: Number(line.qty || 0),
-          unitCost: line.unitCost.trim() ? Number(line.unitCost) : null,
+          unitCost: line.unitCost.trim() ? Number(line.unitCost) : 0,
+          batchNo: line.batchNo.trim() || null,
+          expiryDate: line.expiryDate.trim() || null,
           remarks: line.remarks.trim() || null,
           locationId: line.locationId || null,
           fromLocationId: line.fromLocationId || null,
@@ -481,7 +518,7 @@ export function AdminStockTransactionClient({
 
                     <div>
                       <label className="label-rk">Unit Cost</label>
-                      <input type="number" min="0" step="0.01" className="input-rk" value={line.unitCost} onChange={(e) => updateLine(index, { unitCost: e.target.value })} placeholder="Optional / 0.00 allowed" />
+                      <input type="number" min="0" step="0.01" className="input-rk" value={line.unitCost} onChange={(e) => updateLine(index, { unitCost: e.target.value })}  />
                     </div>
 
                     {requiresSingleLocation(transactionType) ? (
@@ -532,6 +569,39 @@ export function AdminStockTransactionClient({
                             onChange={(option) => updateLine(index, { toLocationId: option?.id || "" })}
                           />
                           <p className="mt-2 text-xs text-white/45">{getBalanceText(line.inventoryProductId, line.toLocationId)}</p>
+                        </div>
+                      </>
+                    ) : null}
+
+
+                    {selectedProduct?.batchTracking ? (
+                      <>
+                        <div>
+                          <label className="label-rk">Batch No</label>
+                          <input
+                            className="input-rk"
+                            value={line.batchNo}
+                            onChange={(e) => updateLine(index, { batchNo: e.target.value.toUpperCase() })}
+                            placeholder="Enter batch no"
+                            required
+                            list={`batch-options-${index}`}
+                          />
+                          <datalist id={`batch-options-${index}`}>
+                            {batches
+                              .filter((item) => item.inventoryProductId === line.inventoryProductId)
+                              .map((item) => (
+                                <option key={item.id} value={item.batchNo} />
+                              ))}
+                          </datalist>
+                        </div>
+                        <div>
+                          <label className="label-rk">Expiry Date</label>
+                          <input
+                            type="date"
+                            className="input-rk"
+                            value={line.expiryDate}
+                            onChange={(e) => updateLine(index, { expiryDate: e.target.value })}
+                          />
                         </div>
                       </>
                     ) : null}
@@ -601,6 +671,7 @@ export function AdminStockTransactionClient({
                           )}
                           {transactionType === "SA" ? <div className="mt-1">Direction: {line.adjustmentDirection || "-"}</div> : null}
                           <div className="mt-1">Unit Cost: {formatQty(line.unitCost)}</div>
+                          {(line as any).batchNo ? <div className="mt-1">Batch No: {(line as any).batchNo}{(line as any).expiryDate ? ` • Expiry: ${formatDateInput((line as any).expiryDate)}` : ""}</div> : null}
                         </div>
                       ))}
                     </div>

@@ -37,6 +37,7 @@ function mapProduct(product: any) {
     sellingPrice: Number(product.sellingPrice ?? 0),
     trackInventory: product.trackInventory,
     serialNumberTracking: product.serialNumberTracking,
+    batchTracking: (product as any).batchTracking,
     isActive: product.isActive,
     defaultLocationId: product.defaultLocationId,
     defaultLocationLabel: null,
@@ -61,6 +62,7 @@ export async function POST(req: Request) {
     const sellingPrice = normalizeMoney(body.sellingPrice);
     const trackInventory = itemType === "STOCK_ITEM" ? Boolean(body.trackInventory) : false;
     const serialNumberTracking = Boolean(body.serialNumberTracking);
+    const batchTracking = Boolean(body.batchTracking);
     const isActive = Boolean(body.isActive);
     const defaultLocationId = typeof body.defaultLocationId === "string" && body.defaultLocationId.trim() ? body.defaultLocationId.trim() : null;
 
@@ -106,6 +108,7 @@ export async function POST(req: Request) {
         sellingPrice: new Prisma.Decimal(sellingPrice.toFixed(2)),
         trackInventory,
         serialNumberTracking,
+        batchTracking,
         isActive,
         defaultLocationId,
       },
@@ -120,7 +123,7 @@ export async function POST(req: Request) {
       entityId: created.id,
       entityCode: created.code,
       description: `${admin.name} created product ${created.code}.`,
-      newValues: { code: created.code, description: created.description, itemType: created.itemType, baseUom: created.baseUom, unitCost: Number(created.unitCost), sellingPrice: Number(created.sellingPrice), trackInventory: created.trackInventory, serialNumberTracking: created.serialNumberTracking, isActive: created.isActive },
+      newValues: { code: created.code, description: created.description, itemType: created.itemType, baseUom: created.baseUom, unitCost: Number(created.unitCost), sellingPrice: Number(created.sellingPrice), trackInventory: created.trackInventory, serialNumberTracking: created.serialNumberTracking, batchTracking: (created as any).batchTracking, isActive: created.isActive },
       status: "SUCCESS",
     });
 

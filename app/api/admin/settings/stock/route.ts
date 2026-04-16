@@ -21,6 +21,7 @@ export async function POST(req: Request) {
     const costingMethod = normalizeCostingMethod(body.costingMethod);
     const multiUomEnabled = stockModuleEnabled ? Boolean(body.multiUomEnabled) : false;
     const serialTrackingEnabled = stockModuleEnabled ? Boolean(body.serialTrackingEnabled) : false;
+    const batchTrackingEnabled = stockModuleEnabled ? Boolean(body.batchTrackingEnabled) : false;
     const defaultLocationId =
       typeof body.defaultLocationId === "string" && body.defaultLocationId.trim()
         ? body.defaultLocationId.trim()
@@ -60,6 +61,7 @@ export async function POST(req: Request) {
         costingMethod,
         multiUomEnabled,
         serialTrackingEnabled,
+        batchTrackingEnabled,
         defaultLocationId: stockModuleEnabled ? defaultLocationId : null,
       },
       create: {
@@ -70,6 +72,7 @@ export async function POST(req: Request) {
         costingMethod,
         multiUomEnabled,
         serialTrackingEnabled,
+        batchTrackingEnabled,
         defaultLocationId: stockModuleEnabled ? defaultLocationId : null,
       },
     });
@@ -91,6 +94,7 @@ export async function POST(req: Request) {
             costingMethod: existing.costingMethod,
             multiUomEnabled: existing.multiUomEnabled,
             serialTrackingEnabled: existing.serialTrackingEnabled,
+            batchTrackingEnabled: (existing as any).batchTrackingEnabled,
             defaultLocationId: existing.defaultLocationId,
           }
         : null,
@@ -101,6 +105,7 @@ export async function POST(req: Request) {
         costingMethod: saved.costingMethod,
         multiUomEnabled: saved.multiUomEnabled,
         serialTrackingEnabled: saved.serialTrackingEnabled,
+        batchTrackingEnabled: (saved as any).batchTrackingEnabled,
         defaultLocationId: saved.defaultLocationId,
       },
       status: "SUCCESS",
