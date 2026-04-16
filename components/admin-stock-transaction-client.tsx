@@ -10,7 +10,6 @@ type InventoryProductOption = {
   code: string;
   description: string;
   baseUom: string;
-  batchTracking?: boolean;
 };
 
 type StockLocationOption = {
@@ -26,8 +25,6 @@ type TransactionLineRecord = {
   unitCost?: string | number | null;
   remarks?: string | null;
   adjustmentDirection?: AdjustmentDirectionValue | null;
-  batchNo?: string | null;
-  expiryDate?: string | null;
   inventoryProduct: {
     id: string;
     code: string;
@@ -61,8 +58,6 @@ type FormLine = {
   inventoryProductId: string;
   qty: string;
   unitCost: string;
-  batchNo: string;
-  expiryDate: string;
   remarks: string;
   locationId: string;
   fromLocationId: string;
@@ -79,13 +74,8 @@ type SearchableSelectOption = {
 type BalanceResponse = {
   ok: boolean;
   balance?: number;
-};
-
-type InventoryBatchOption = {
-  id: string;
-  inventoryProductId: string;
-  batchNo: string;
-  expiryDate?: string | null;
+  balances?: Array<{ balance: number }>;
+  error?: string;
 };
 
 function emptyLine(): FormLine {
@@ -93,8 +83,6 @@ function emptyLine(): FormLine {
     inventoryProductId: "",
     qty: "1",
     unitCost: "0.00",
-    batchNo: "",
-    expiryDate: "",
     remarks: "",
     locationId: "",
     fromLocationId: "",
@@ -258,7 +246,6 @@ export function AdminStockTransactionClient({
   const [remarks, setRemarks] = useState("");
   const [lines, setLines] = useState<FormLine[]>([emptyLine()]);
   const [transactions, setTransactions] = useState<TransactionRecord[]>([]);
-  const [batches, setBatches] = useState<InventoryBatchOption[]>([]);
   const [balances, setBalances] = useState<Record<string, number>>({});
   const [loadingBalances, setLoadingBalances] = useState<Record<string, boolean>>({});
   const [isLoadingTransactions, setIsLoadingTransactions] = useState(true);
@@ -339,10 +326,28 @@ export function AdminStockTransactionClient({
       setLoadingBalances((prev) => ({ ...prev, [key]: true }));
       try {
         const params = new URLSearchParams({ inventoryProductId, locationId });
-        const response = await fetch(`/api/admin/stock/balance?${params.toString()}`);
+        const response = await fetch(`/api/admin/stock/balance?${params.toString()}`, {
+          method: "GET",
+          cache: "no-store",
+        });
         const data = (await response.json()) as BalanceResponse;
-        if (!cancelled && response.ok && data.ok) {
-          setBalances((prev) => ({ ...prev, [key]: Number(data.balance ?? 0) }));
+
+        if (!cancelled) {
+          let resolvedBalance = 0;
+
+          if (response.ok && data.ok) {
+            if (typeof data.balance === "number") {
+              resolvedBalance = Number(data.balance);
+            } else if (Array.isArray(data.balances) && data.balances.length > 0) {
+              resolvedBalance = Number(data.balances[0]?.balance ?? 0);
+            }
+          }
+
+          setBalances((prev) => ({ ...prev, [key]: resolvedBalance }));
+        }
+      } catch {
+        if (!cancelled) {
+          setBalances((prev) => ({ ...prev, [key]: 0 }));
         }
       } finally {
         if (!cancelled) {
@@ -360,26 +365,6 @@ export function AdminStockTransactionClient({
     };
   }, [lines, balances, loadingBalances]);
 
-
-  useEffect(() => {
-    let isMounted = true;
-
-    async function loadBatches() {
-      try {
-        const response = await fetch("/api/admin/stock/batches");
-        const data = await response.json();
-        if (isMounted && response.ok && data.ok) {
-          setBatches(Array.isArray(data.items) ? data.items : []);
-        }
-      } catch {}
-    }
-
-    loadBatches();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
   function updateLine(index: number, patch: Partial<FormLine>) {
     setLines((prev) => prev.map((line, i) => (i === index ? { ...line, ...patch } : line)));
   }
@@ -396,7 +381,7 @@ export function AdminStockTransactionClient({
     if (!productId || !locationId) return "Select product and location to view balance.";
     const key = balanceKey(productId, locationId);
     if (loadingBalances[key]) return "Loading current balance...";
-    return `Current Balance: ${formatQty(balances[key] ?? 0)}`;
+    return `Current Balance: ${formatQty(typeof balances[key] === "number" ? balances[key] : 0)}`;
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -414,9 +399,7 @@ export function AdminStockTransactionClient({
         lines: lines.map((line) => ({
           inventoryProductId: line.inventoryProductId || null,
           qty: Number(line.qty || 0),
-          unitCost: line.unitCost.trim() ? Number(line.unitCost) : 0,
-          batchNo: line.batchNo.trim() || null,
-          expiryDate: line.expiryDate.trim() || null,
+          unitCost: line.unitCost.trim() ? Number(line.unitCost) : null,
           remarks: line.remarks.trim() || null,
           locationId: line.locationId || null,
           fromLocationId: line.fromLocationId || null,
@@ -518,7 +501,7 @@ export function AdminStockTransactionClient({
 
                     <div>
                       <label className="label-rk">Unit Cost</label>
-                      <input type="number" min="0" step="0.01" className="input-rk" value={line.unitCost} onChange={(e) => updateLine(index, { unitCost: e.target.value })}  />
+                      <input type="number" min="0" step="0.01" className="input-rk" value={line.unitCost} onChange={(e) => updateLine(index, { unitCost: e.target.value })} placeholder="Optional / 0.00 allowed" />
                     </div>
 
                     {requiresSingleLocation(transactionType) ? (
@@ -569,39 +552,6 @@ export function AdminStockTransactionClient({
                             onChange={(option) => updateLine(index, { toLocationId: option?.id || "" })}
                           />
                           <p className="mt-2 text-xs text-white/45">{getBalanceText(line.inventoryProductId, line.toLocationId)}</p>
-                        </div>
-                      </>
-                    ) : null}
-
-
-                    {selectedProduct?.batchTracking ? (
-                      <>
-                        <div>
-                          <label className="label-rk">Batch No</label>
-                          <input
-                            className="input-rk"
-                            value={line.batchNo}
-                            onChange={(e) => updateLine(index, { batchNo: e.target.value.toUpperCase() })}
-                            placeholder="Enter batch no"
-                            required
-                            list={`batch-options-${index}`}
-                          />
-                          <datalist id={`batch-options-${index}`}>
-                            {batches
-                              .filter((item) => item.inventoryProductId === line.inventoryProductId)
-                              .map((item) => (
-                                <option key={item.id} value={item.batchNo} />
-                              ))}
-                          </datalist>
-                        </div>
-                        <div>
-                          <label className="label-rk">Expiry Date</label>
-                          <input
-                            type="date"
-                            className="input-rk"
-                            value={line.expiryDate}
-                            onChange={(e) => updateLine(index, { expiryDate: e.target.value })}
-                          />
                         </div>
                       </>
                     ) : null}
@@ -671,7 +621,6 @@ export function AdminStockTransactionClient({
                           )}
                           {transactionType === "SA" ? <div className="mt-1">Direction: {line.adjustmentDirection || "-"}</div> : null}
                           <div className="mt-1">Unit Cost: {formatQty(line.unitCost)}</div>
-                          {(line as any).batchNo ? <div className="mt-1">Batch No: {(line as any).batchNo}{(line as any).expiryDate ? ` • Expiry: ${formatDateInput((line as any).expiryDate)}` : ""}</div> : null}
                         </div>
                       ))}
                     </div>
