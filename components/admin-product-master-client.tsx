@@ -596,9 +596,10 @@ export function AdminProductMasterClient({
                 <div><label className="label-rk">Selling Price (RM)</label><input type="number" min="0" step="0.01" className="input-rk" value={form.sellingPrice} onChange={(e) => setForm((prev) => ({ ...prev, sellingPrice: e.target.value }))} /></div>
               </div>
 
-              <div className="grid gap-3 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-white/75 md:grid-cols-3">
+              <div className="grid gap-3 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-white/75 md:grid-cols-4">
                 <label className="flex items-center gap-3"><input type="checkbox" checked={form.trackInventory} disabled={form.itemType !== "STOCK_ITEM"} onChange={(e) => setForm((prev) => ({ ...prev, trackInventory: e.target.checked }))} /><span>Track Inventory</span></label>
                 <label className="flex items-center gap-3"><input type="checkbox" checked={form.serialNumberTracking} onChange={(e) => setForm((prev) => ({ ...prev, serialNumberTracking: e.target.checked }))} /><span>Serial Number Tracking</span></label>
+                <label className="flex items-center gap-3"><input type="checkbox" checked={form.batchTracking} onChange={(e) => setForm((prev) => ({ ...prev, batchTracking: e.target.checked }))} /><span>Batch Tracking</span></label>
                 <label className="flex items-center gap-3"><input type="checkbox" checked={form.isActive} onChange={(e) => setForm((prev) => ({ ...prev, isActive: e.target.checked }))} /><span>Active</span></label>
               </div>
 

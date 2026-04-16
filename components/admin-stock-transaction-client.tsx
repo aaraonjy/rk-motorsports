@@ -539,21 +539,7 @@ export function AdminStockTransactionClient({
                     <td className="px-3 py-4">{formatDateInput(item.transactionDate)}</td>
                     <td className="px-3 py-4">{item.reference || "-"}</td>
                     <td className="px-3 py-4">
-                      <div className="space-y-2">
-                        {item.lines.map((line) => (
-                          <div key={line.id} className="rounded-xl border border-white/10 bg-black/20 px-3 py-3 text-xs text-white/75">
-                            <div className="font-semibold text-white">{line.inventoryProduct.code} — {line.inventoryProduct.description}</div>
-                            <div className="mt-1">Qty: {formatQty(line.qty)} {line.inventoryProduct.baseUom}</div>
-                            {transactionType === "ST" ? (
-                              <div className="mt-1">From: {formatLocationLabel(line.fromLocation)} → To: {formatLocationLabel(line.toLocation)}</div>
-                            ) : (
-                              <div className="mt-1">Location: {formatLocationLabel(line.location)}</div>
-                            )}
-                            {transactionType === "SA" ? <div className="mt-1">Direction: {line.adjustmentDirection || "-"}</div> : null}
-                            <div className="mt-1">Unit Cost: {formatQty(line.unitCost)}</div>
-                          </div>
-                        ))}
-                      </div>
+                      <div className="text-sm text-white/80">{item.lines.length} line{item.lines.length === 1 ? "" : "s"}</div>
                     </td>
                   </tr>
                 ))
@@ -566,19 +552,10 @@ export function AdminStockTransactionClient({
       {isCreateOpen ? (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4">
           <div className="max-h-[90vh] w-full max-w-6xl overflow-y-auto rounded-[2rem] border border-white/10 bg-[#0b0b0f] p-6 shadow-2xl md:p-8">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/45">{getTypeLabel(transactionType)}</p>
-                <h3 className="mt-3 text-2xl font-bold text-white">Create {title}</h3>
-                <p className="mt-3 max-w-3xl text-sm leading-6 text-white/65">{intro}</p>
-              </div>
-              <button
-                type="button"
-                onClick={closeCreateModal}
-                className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/80 transition hover:bg-white/10"
-              >
-                Close
-              </button>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/45">{getTypeLabel(transactionType)}</p>
+              <h3 className="mt-3 text-2xl font-bold text-white">Create {title}</h3>
+              <p className="mt-3 max-w-3xl text-sm leading-6 text-white/65">{intro}</p>
             </div>
 
             <form onSubmit={handleSubmit} className="mt-8 space-y-6">
@@ -706,8 +683,12 @@ export function AdminStockTransactionClient({
               </div>
 
               <div className="flex flex-wrap items-center gap-3">
-                <button type="button" onClick={addLine} className="rounded-xl border border-white/15 bg-white/5 px-5 py-3 text-sm text-white/80 transition hover:bg-white/10">
-                  Add Line
+                <button
+                  type="button"
+                  onClick={closeCreateModal}
+                  className="rounded-xl border border-white/15 bg-white/5 px-5 py-3 text-sm text-white/80 transition hover:bg-white/10"
+                >
+                  Cancel
                 </button>
                 <button disabled={isSubmitting} className="inline-flex min-w-[190px] items-center justify-center rounded-xl bg-red-500 px-5 py-3 font-semibold text-white transition hover:bg-red-400 disabled:cursor-not-allowed disabled:opacity-60">
                   {isSubmitting ? "Saving..." : `Create ${title}`}
