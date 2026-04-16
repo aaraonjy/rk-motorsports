@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from "next/link";
@@ -10,10 +9,10 @@ const activeItems = [
   { label: "Product Group", href: "/admin/product-groups" },
   { label: "Product Sub-Group", href: "/admin/product-sub-groups" },
   { label: "Product Brand", href: "/admin/brands" },
+  { label: "Stock Location", href: "/admin/stock/locations" },
 ] as const;
 
 const upcomingItems = [
-  "Stock Location",
   "Serial No",
   "Opening Stock",
   "Stock Receive",
@@ -38,7 +37,12 @@ export function AdminStockMenu() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const isActive = pathname.startsWith("/admin/products") || pathname.startsWith("/admin/product-groups") || pathname.startsWith("/admin/product-sub-groups") || pathname.startsWith("/admin/brands");
+  const isActive =
+    pathname.startsWith("/admin/products") ||
+    pathname.startsWith("/admin/product-groups") ||
+    pathname.startsWith("/admin/product-sub-groups") ||
+    pathname.startsWith("/admin/brands") ||
+    pathname.startsWith("/admin/stock/locations");
 
   return (
     <div ref={dropdownRef} className="relative">

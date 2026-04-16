@@ -16,33 +16,35 @@ export async function POST(req: Request) {
     const body = await req.json().catch(() => ({}));
 
     const stockModuleEnabled = Boolean(body.stockModuleEnabled);
-    const multiLocationEnabled = Boolean(body.multiLocationEnabled);
-    const allowNegativeStock = Boolean(body.allowNegativeStock);
+    const multiLocationEnabled = stockModuleEnabled ? Boolean(body.multiLocationEnabled) : false;
+    const allowNegativeStock = stockModuleEnabled ? Boolean(body.allowNegativeStock) : false;
     const costingMethod = normalizeCostingMethod(body.costingMethod);
-    const multiUomEnabled = Boolean(body.multiUomEnabled);
-    const serialTrackingEnabled = Boolean(body.serialTrackingEnabled);
+    const multiUomEnabled = stockModuleEnabled ? Boolean(body.multiUomEnabled) : false;
+    const serialTrackingEnabled = stockModuleEnabled ? Boolean(body.serialTrackingEnabled) : false;
     const defaultLocationId =
       typeof body.defaultLocationId === "string" && body.defaultLocationId.trim()
         ? body.defaultLocationId.trim()
         : null;
 
-    if (!defaultLocationId) {
+    if (stockModuleEnabled && !defaultLocationId) {
       return NextResponse.json(
-        { ok: false, error: "Default stock location is required." },
+        { ok: false, error: "Default stock location is required when Stock Control is enabled." },
         { status: 400 }
       );
     }
 
-    const location = await db.stockLocation.findUnique({
-      where: { id: defaultLocationId },
-      select: { id: true, code: true, isActive: true },
-    });
+    if (stockModuleEnabled && defaultLocationId) {
+      const location = await db.stockLocation.findUnique({
+        where: { id: defaultLocationId },
+        select: { id: true, code: true, isActive: true },
+      });
 
-    if (!location || !location.isActive) {
-      return NextResponse.json(
-        { ok: false, error: "Selected default stock location is invalid." },
-        { status: 400 }
-      );
+      if (!location || !location.isActive) {
+        return NextResponse.json(
+          { ok: false, error: "Selected default stock location is invalid." },
+          { status: 400 }
+        );
+      }
     }
 
     const existing = await db.stockConfiguration.findUnique({
@@ -58,7 +60,7 @@ export async function POST(req: Request) {
         costingMethod,
         multiUomEnabled,
         serialTrackingEnabled,
-        defaultLocationId,
+        defaultLocationId: stockModuleEnabled ? defaultLocationId : null,
       },
       create: {
         id: "default",
@@ -68,7 +70,7 @@ export async function POST(req: Request) {
         costingMethod,
         multiUomEnabled,
         serialTrackingEnabled,
-        defaultLocationId,
+        defaultLocationId: stockModuleEnabled ? defaultLocationId : null,
       },
     });
 

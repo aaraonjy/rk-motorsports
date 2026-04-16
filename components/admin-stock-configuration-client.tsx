@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 type StockLocationOption = {
   id: string;
@@ -28,19 +28,43 @@ export function AdminStockConfigurationClient({ initialConfig, locations }: Prop
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
+  const activeLocations = useMemo(
+    () => locations.filter((item) => item.isActive),
+    [locations]
+  );
+
+  const stockControlEnabled = form.stockModuleEnabled;
+
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setIsSaving(true);
     setError("");
     setSuccess("");
 
+    if (stockControlEnabled && !form.defaultLocationId) {
+      setError("Default stock location is required when Stock Control is enabled.");
+      setIsSaving(false);
+      return;
+    }
+
     try {
+      const payload = stockControlEnabled
+        ? form
+        : {
+            ...form,
+            multiLocationEnabled: false,
+            allowNegativeStock: false,
+            multiUomEnabled: false,
+            serialTrackingEnabled: false,
+            defaultLocationId: "",
+          };
+
       const response = await fetch("/api/admin/settings/stock", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
       });
 
       const data = await response.json();
@@ -69,23 +93,57 @@ export function AdminStockConfigurationClient({ initialConfig, locations }: Prop
         <div className="mt-8 space-y-5">
           <div className="grid gap-3 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-white/75">
             <label className="flex items-center gap-3">
-              <input type="checkbox" checked={form.stockModuleEnabled} onChange={(e) => setForm((prev) => ({ ...prev, stockModuleEnabled: e.target.checked }))} />
+              <input
+                type="checkbox"
+                checked={form.stockModuleEnabled}
+                onChange={(e) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    stockModuleEnabled: e.target.checked,
+                    multiLocationEnabled: e.target.checked ? prev.multiLocationEnabled : false,
+                    allowNegativeStock: e.target.checked ? prev.allowNegativeStock : false,
+                    multiUomEnabled: e.target.checked ? prev.multiUomEnabled : false,
+                    serialTrackingEnabled: e.target.checked ? prev.serialTrackingEnabled : false,
+                    defaultLocationId: e.target.checked ? prev.defaultLocationId : "",
+                  }))
+                }
+              />
               <span>Enable Stock Control</span>
             </label>
-            <label className="flex items-center gap-3">
-              <input type="checkbox" checked={form.multiLocationEnabled} onChange={(e) => setForm((prev) => ({ ...prev, multiLocationEnabled: e.target.checked }))} />
+            <label className={`flex items-center gap-3 ${stockControlEnabled ? "" : "opacity-50"}`}>
+              <input
+                type="checkbox"
+                checked={form.multiLocationEnabled}
+                disabled={!stockControlEnabled}
+                onChange={(e) => setForm((prev) => ({ ...prev, multiLocationEnabled: e.target.checked }))}
+              />
               <span>Enable Multi Location</span>
             </label>
-            <label className="flex items-center gap-3">
-              <input type="checkbox" checked={form.allowNegativeStock} onChange={(e) => setForm((prev) => ({ ...prev, allowNegativeStock: e.target.checked }))} />
+            <label className={`flex items-center gap-3 ${stockControlEnabled ? "" : "opacity-50"}`}>
+              <input
+                type="checkbox"
+                checked={form.allowNegativeStock}
+                disabled={!stockControlEnabled}
+                onChange={(e) => setForm((prev) => ({ ...prev, allowNegativeStock: e.target.checked }))}
+              />
               <span>Allow Negative Stock</span>
             </label>
-            <label className="flex items-center gap-3">
-              <input type="checkbox" checked={form.multiUomEnabled} onChange={(e) => setForm((prev) => ({ ...prev, multiUomEnabled: e.target.checked }))} />
+            <label className={`flex items-center gap-3 ${stockControlEnabled ? "" : "opacity-50"}`}>
+              <input
+                type="checkbox"
+                checked={form.multiUomEnabled}
+                disabled={!stockControlEnabled}
+                onChange={(e) => setForm((prev) => ({ ...prev, multiUomEnabled: e.target.checked }))}
+              />
               <span>Enable Multi-UOM</span>
             </label>
-            <label className="flex items-center gap-3">
-              <input type="checkbox" checked={form.serialTrackingEnabled} onChange={(e) => setForm((prev) => ({ ...prev, serialTrackingEnabled: e.target.checked }))} />
+            <label className={`flex items-center gap-3 ${stockControlEnabled ? "" : "opacity-50"}`}>
+              <input
+                type="checkbox"
+                checked={form.serialTrackingEnabled}
+                disabled={!stockControlEnabled}
+                onChange={(e) => setForm((prev) => ({ ...prev, serialTrackingEnabled: e.target.checked }))}
+              />
               <span>Enable Serial Tracking</span>
             </label>
           </div>
@@ -104,14 +162,22 @@ export function AdminStockConfigurationClient({ initialConfig, locations }: Prop
             <div>
               <label className="label-rk">Default Stock Location</label>
               <div className="relative">
-                <select className="input-rk appearance-none pr-12" value={form.defaultLocationId} onChange={(e) => setForm((prev) => ({ ...prev, defaultLocationId: e.target.value }))}>
+                <select
+                  className={`input-rk appearance-none pr-12 ${stockControlEnabled ? "" : "cursor-not-allowed opacity-60"}`}
+                  value={form.defaultLocationId}
+                  disabled={!stockControlEnabled}
+                  onChange={(e) => setForm((prev) => ({ ...prev, defaultLocationId: e.target.value }))}
+                >
                   <option value="">Select location</option>
-                  {locations.filter((item) => item.isActive).map((location) => (
+                  {activeLocations.map((location) => (
                     <option key={location.id} value={location.id}>{location.code} — {location.name}</option>
                   ))}
                 </select>
                 <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/60">▾</div>
               </div>
+              {!stockControlEnabled ? (
+                <p className="mt-2 text-xs text-white/45">Default location is only required when Stock Control is enabled.</p>
+              ) : null}
             </div>
           </div>
 
@@ -131,7 +197,7 @@ export function AdminStockConfigurationClient({ initialConfig, locations }: Prop
           <div className="mt-6 space-y-4 text-sm leading-6 text-white/70">
             <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
               <div className="font-semibold text-white">When stock module is OFF</div>
-              <div className="mt-2">Product List and product picker stay usable, but no stock movement, stock transaction, or stock report logic is triggered.</div>
+              <div className="mt-2">Product List and product picker stay usable, but no stock movement, stock transaction, or stock report logic is triggered. Stock Location master data should still remain accessible.</div>
             </div>
             <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
               <div className="font-semibold text-white">When stock module is ON</div>
