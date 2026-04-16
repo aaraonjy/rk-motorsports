@@ -12,7 +12,14 @@ export default async function AdminStockIssuePage() {
     db.inventoryProduct.findMany({
       where: { isActive: true, trackInventory: true },
       orderBy: [{ code: "asc" }],
-      select: { id: true, code: true, description: true, baseUom: true },
+      select: {
+        id: true,
+        code: true,
+        description: true,
+        baseUom: true,
+        batchTracking: true,
+        serialNumberTracking: true,
+      },
     }),
     db.stockLocation.findMany({
       orderBy: [{ isActive: "desc" }, { code: "asc" }],
