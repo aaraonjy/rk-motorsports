@@ -72,7 +72,7 @@ function normalizeMoneyInput(value: string) {
   return parsed.toFixed(2);
 }
 
-function emptyForm(): ProductFormState {
+function emptyForm(defaultLocationId = ""): ProductFormState {
   return {
     code: "",
     description: "",
@@ -242,7 +242,7 @@ export function AdminProductMasterClient({
   productSubGroups,
   productBrands,
 }: Props) {
-  const [products, setProducts] = useState(initialProducts);
+    const [products, setProducts] = useState(initialProducts);
   const [keyword, setKeyword] = useState("");
   const [itemTypeFilter, setItemTypeFilter] = useState<"ALL" | InventoryItemTypeValue>("ALL");
   const [statusFilter, setStatusFilter] = useState<"ALL" | "ACTIVE" | "INACTIVE">("ALL");
@@ -379,6 +379,7 @@ export function AdminProductMasterClient({
         trackInventory: form.itemType === "STOCK_ITEM" ? form.trackInventory : false,
         serialNumberTracking: form.serialNumberTracking,
         isActive: form.isActive,
+        defaultLocationId: null,
       };
 
       const response = await fetch(editingId ? `/api/admin/products/${editingId}` : "/api/admin/products", {
@@ -567,7 +568,8 @@ export function AdminProductMasterClient({
                   }
                 />
               </div>
-              <div className="grid gap-4 md:grid-cols-1">
+
+              <div className="grid gap-4 md:grid-cols-2">
                 <div>
                   <label className="label-rk">Item Type</label>
                   <div className="relative">
