@@ -123,7 +123,7 @@ export async function POST(req: Request) {
       }
 
       const qty = assertPositiveQty(line.qty);
-      const unitCost = line.unitCost == null || line.unitCost === "" ? null : assertPositiveQty(line.unitCost, "Unit cost");
+      const unitCost = line.unitCost == null ? null : assertPositiveQty(line.unitCost, "Unit cost");
       const adjustmentDirection = normalizeAdjustmentDirection(line.adjustmentDirection);
       const locationId = String(line.locationId || "").trim() || null;
       const fromLocationId = String(line.fromLocationId || "").trim() || null;
