@@ -12,15 +12,9 @@ export default async function AdminStockAdjustmentPage() {
     db.inventoryProduct.findMany({
       where: { isActive: true, trackInventory: true },
       orderBy: [{ code: "asc" }],
-      select: {
-        id: true,
-        code: true,
-        description: true,
-        baseUom: true,
+      select: { id: true, code: true, description: true, baseUom: true,
         unitCost: true,
-        batchTracking: true,
-        serialNumberTracking: true,
-      },
+        batchTracking: true, serialNumberTracking: true },
     }),
     db.stockLocation.findMany({
       orderBy: [{ isActive: "desc" }, { code: "asc" }],
@@ -44,7 +38,7 @@ export default async function AdminStockAdjustmentPage() {
             transactionType="SA"
             title="Stock Adjustment"
             intro="Use Stock Adjustment to manually correct inventory discrepancies with an IN or OUT direction at a selected location."
-            initialProducts={products.map((product) => ({ ...product, unitCost: Number(product.unitCost ?? 0) }))}
+            initialProducts={products}
             initialLocations={locations}
           />
         </div>
