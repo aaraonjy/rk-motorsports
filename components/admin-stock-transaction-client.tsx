@@ -155,8 +155,7 @@ function normalizeSerialToken(token: string) {
 
 function parseSerialEntryText(value: string) {
   return value
-    .split(/[,
-]+/)
+    .split(/[\n,]+/)
     .map(normalizeSerialToken)
     .filter(Boolean);
 }
@@ -500,10 +499,11 @@ export function AdminStockTransactionClient({
             prev.map((item, itemIndex) => {
               if (itemIndex !== index) return item;
               const allowedKeys = new Set(rows.map((entry) => entry.serialNo.toUpperCase()));
+              const nextSerials = item.serialNos.filter((serialNo) => allowedKeys.has(serialNo.toUpperCase()));
               return {
                 ...item,
-                serialNos: item.serialNos.filter((serialNo) => allowedKeys.has(serialNo.toUpperCase())),
-                qty: String(item.serialNos.filter((serialNo) => allowedKeys.has(serialNo.toUpperCase())).length || 0),
+                serialNos: nextSerials,
+                qty: String(nextSerials.length || 0),
               };
             })
           );
@@ -604,9 +604,10 @@ export function AdminStockTransactionClient({
     const nextSerials = exists
       ? line.serialNos.filter((value) => value.toUpperCase() !== serialNo.toUpperCase())
       : [...line.serialNos, serialNo];
+    const uniqueNext = uniqueSerialNos(nextSerials);
     updateLine(index, {
-      serialNos: uniqueSerialNos(nextSerials),
-      qty: String(uniqueSerialNos(nextSerials).length),
+      serialNos: uniqueNext,
+      qty: String(uniqueNext.length),
     });
   }
 
@@ -802,7 +803,6 @@ export function AdminStockTransactionClient({
                   const filteredSerialRows = serialRows.filter((entry) =>
                     !line.serialSearch.trim() || entry.serialNo.toLowerCase().includes(line.serialSearch.trim().toLowerCase())
                   );
-                  const sourceLocationId = transactionType === "ST" ? line.fromLocationId : line.locationId;
                   const balanceBatchNo = isBatchTracked ? line.batchNo.trim().toUpperCase() : "";
 
                   return (
