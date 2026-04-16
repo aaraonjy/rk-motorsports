@@ -255,6 +255,8 @@ export function AdminProductMasterClient({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [submitSuccess, setSubmitSuccess] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
 
   const activeGroups = useMemo(() => productGroups.filter((item) => item.isActive), [productGroups]);
   const activeBrands = useMemo(() => productBrands.filter((item) => item.isActive), [productBrands]);
@@ -279,6 +281,20 @@ export function AdminProductMasterClient({
       return matchesKeyword && matchesType && matchesStatus;
     });
   }, [products, keyword, itemTypeFilter, statusFilter]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [keyword, itemTypeFilter, statusFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredProducts.length / pageSize));
+  const paginatedProducts = useMemo(
+    () => filteredProducts.slice((currentPage - 1) * pageSize, currentPage * pageSize),
+    [filteredProducts, currentPage]
+  );
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [currentPage, totalPages]);
 
   function closeModal() {
     setIsModalOpen(false);
@@ -485,7 +501,7 @@ export function AdminProductMasterClient({
             <tbody className="divide-y divide-white/10">
               {filteredProducts.length === 0 ? (
                 <tr><td colSpan={7} className="px-3 py-8 text-center text-white/50">No products found.</td></tr>
-              ) : filteredProducts.map((product) => (
+              ) : paginatedProducts.map((product) => (
                 <tr key={product.id} className="align-top text-white/80">
                   <td className="px-3 py-4 font-semibold text-white">{product.code}</td>
                   <td className="px-3 py-4">
@@ -513,6 +529,35 @@ export function AdminProductMasterClient({
             </tbody>
           </table>
         </div>
+
+        {filteredProducts.length > 0 ? (
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4">
+            <div className="text-sm text-white/55">
+              Showing {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, filteredProducts.length)} of {filteredProducts.length} products
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/80 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Prev
+              </button>
+              <div className="rounded-xl border border-white/10 bg-black/20 px-4 py-2 text-sm text-white/80">
+                Page {currentPage} / {totalPages}
+              </div>
+              <button
+                type="button"
+                onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                disabled={currentPage >= totalPages}
+                className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/80 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {isModalOpen ? (

@@ -259,6 +259,8 @@ export function AdminStockTransactionClient({
   const [searchKeyword, setSearchKeyword] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
 
   const activeLocations = useMemo(() => initialLocations.filter((item) => item.isActive), [initialLocations]);
 
@@ -306,6 +308,20 @@ export function AdminStockTransactionClient({
       return matchesKeyword && matchesFrom && matchesTo;
     });
   }, [transactions, searchKeyword, dateFrom, dateTo]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchKeyword, dateFrom, dateTo, transactionType]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredTransactions.length / pageSize));
+  const paginatedTransactions = useMemo(
+    () => filteredTransactions.slice((currentPage - 1) * pageSize, currentPage * pageSize),
+    [filteredTransactions, currentPage]
+  );
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [currentPage, totalPages]);
 
   async function loadTransactions() {
     setIsLoadingTransactions(true);
@@ -524,7 +540,7 @@ export function AdminStockTransactionClient({
                 <th className="px-3 py-3 font-medium">Doc No</th>
                 <th className="px-3 py-3 font-medium">Date</th>
                 <th className="px-3 py-3 font-medium">Reference</th>
-                <th className="px-3 py-3 font-medium">Lines</th>
+                <th className="px-3 py-3 font-medium">Remarks</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/10">
@@ -533,20 +549,47 @@ export function AdminStockTransactionClient({
               ) : filteredTransactions.length === 0 ? (
                 <tr><td colSpan={4} className="px-3 py-8 text-center text-white/50">No transactions found.</td></tr>
               ) : (
-                filteredTransactions.map((item) => (
+                paginatedTransactions.map((item) => (
                   <tr key={item.id} className="align-top text-white/80">
                     <td className="px-3 py-4 font-semibold text-white">{item.transactionNo}</td>
                     <td className="px-3 py-4">{formatDateInput(item.transactionDate)}</td>
                     <td className="px-3 py-4">{item.reference || "-"}</td>
-                    <td className="px-3 py-4">
-                      <div className="text-sm text-white/80">{item.lines.length} line{item.lines.length === 1 ? "" : "s"}</div>
-                    </td>
+                    <td className="px-3 py-4">{item.remarks || "-"}</td>
                   </tr>
                 ))
               )}
             </tbody>
           </table>
         </div>
+
+        {filteredTransactions.length > 0 ? (
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4">
+            <div className="text-sm text-white/55">
+              Showing {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, filteredTransactions.length)} of {filteredTransactions.length} records
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/80 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Prev
+              </button>
+              <div className="rounded-xl border border-white/10 bg-black/20 px-4 py-2 text-sm text-white/80">
+                Page {currentPage} / {totalPages}
+              </div>
+              <button
+                type="button"
+                onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                disabled={currentPage >= totalPages}
+                className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/80 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {isCreateOpen ? (
