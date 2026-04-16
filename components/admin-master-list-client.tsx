@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type Item = { id: string; code: string; name: string; isActive: boolean; groupId?: string; groupLabel?: string | null };
 type GroupOption = { id: string; code: string; name: string; isActive: boolean };
@@ -15,8 +15,13 @@ type Props = {
   groups?: GroupOption[];
 };
 
+
+function sortItemsByCode(items: Item[]) {
+  return [...items].sort((a, b) => a.code.localeCompare(b.code));
+}
+
 export function AdminMasterListClient({ title, subtitle, apiBase, initialItems, requireGroup = false, groups = [] }: Props) {
-  const [items, setItems] = useState(initialItems);
+  const [items, setItems] = useState(sortItemsByCode(initialItems));
   const [keyword, setKeyword] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
@@ -27,6 +32,8 @@ export function AdminMasterListClient({ title, subtitle, apiBase, initialItems, 
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
 
   const filteredItems = useMemo(() => {
     const q = keyword.trim().toLowerCase();
@@ -37,6 +44,20 @@ export function AdminMasterListClient({ title, subtitle, apiBase, initialItems, 
       (item.groupLabel || "").toLowerCase().includes(q)
     );
   }, [items, keyword]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredItems.length / pageSize));
+  const paginatedItems = useMemo(
+    () => filteredItems.slice((currentPage - 1) * pageSize, currentPage * pageSize),
+    [filteredItems, currentPage]
+  );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [keyword]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [currentPage, totalPages]);
 
   function openCreate() {
     setEditingId(null);
@@ -88,7 +109,7 @@ export function AdminMasterListClient({ title, subtitle, apiBase, initialItems, 
         return;
       }
       const saved = data.item as Item;
-      setItems((prev) => editingId ? prev.map((item) => item.id === saved.id ? saved : item) : [saved, ...prev]);
+      setItems((prev) => sortItemsByCode(editingId ? prev.map((item) => item.id === saved.id ? saved : item) : [...prev, saved]));
       setSuccess(editingId ? "Updated successfully." : "Created successfully.");
       closeModal();
     } catch {
@@ -109,7 +130,7 @@ export function AdminMasterListClient({ title, subtitle, apiBase, initialItems, 
         setError(data.error || "Unable to delete record.");
         return;
       }
-      setItems((prev) => prev.filter((row) => row.id !== item.id));
+      setItems((prev) => sortItemsByCode(prev.filter((row) => row.id !== item.id)));
       setSuccess("Deleted successfully.");
     } catch {
       setError("Unable to delete record right now.");
@@ -151,7 +172,7 @@ export function AdminMasterListClient({ title, subtitle, apiBase, initialItems, 
             <tbody className="divide-y divide-white/10">
               {filteredItems.length === 0 ? (
                 <tr><td colSpan={requireGroup ? 5 : 4} className="px-3 py-8 text-center text-white/50">No records found.</td></tr>
-              ) : filteredItems.map((item) => (
+              ) : paginatedItems.map((item) => (
                 <tr key={item.id}>
                   <td className="px-3 py-4 font-semibold text-white">{item.code}</td>
                   <td className="px-3 py-4 text-white/80">{item.name}</td>
@@ -168,6 +189,35 @@ export function AdminMasterListClient({ title, subtitle, apiBase, initialItems, 
             </tbody>
           </table>
         </div>
+
+        {filteredItems.length > 0 ? (
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4">
+            <div className="text-sm text-white/55">
+              Showing {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, filteredItems.length)} of {filteredItems.length} records
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/80 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Prev
+              </button>
+              <div className="rounded-xl border border-white/10 bg-black/20 px-4 py-2 text-sm text-white/80">
+                Page {currentPage} / {totalPages}
+              </div>
+              <button
+                type="button"
+                onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                disabled={currentPage >= totalPages}
+                className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/80 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {isOpen ? (

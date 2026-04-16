@@ -109,6 +109,11 @@ function getItemTypeLabel(value: InventoryItemTypeValue) {
 }
 
 
+function sortProductsByCode(items: InventoryProductRecord[]) {
+  return [...items].sort((a, b) => a.code.localeCompare(b.code));
+}
+
+
 type SearchableSelectOption = {
   id: string;
   code: string;
@@ -416,7 +421,9 @@ export function AdminProductMasterClient({
       }
 
       const saved = data.product as InventoryProductRecord;
-      setProducts((prev) => (editingId ? prev.map((item) => (item.id === saved.id ? saved : item)) : [saved, ...prev]));
+      setProducts((prev) =>
+        sortProductsByCode(editingId ? prev.map((item) => (item.id === saved.id ? saved : item)) : [...prev, saved])
+      );
       setSubmitSuccess(editingId ? "Product updated successfully." : "Product created successfully.");
       closeModal();
     } catch {
@@ -438,7 +445,7 @@ export function AdminProductMasterClient({
         setSubmitError(data.error || "Unable to delete product.");
         return;
       }
-      setProducts((prev) => prev.filter((item) => item.id !== product.id));
+      setProducts((prev) => sortProductsByCode(prev.filter((item) => item.id !== product.id)));
       setSubmitSuccess("Product deleted successfully.");
     } catch {
       setSubmitError("Unable to delete product right now.");
