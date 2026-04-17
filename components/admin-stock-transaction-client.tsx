@@ -332,6 +332,13 @@ export function AdminStockTransactionClient({
   const [loadingSerials, setLoadingSerials] = useState<Record<number, boolean>>({});
   const [availableBatches, setAvailableBatches] = useState<Record<number, AvailableBatch[]>>({});
   const [loadingBatches, setLoadingBatches] = useState<Record<number, boolean>>({});
+  const [stockSettings, setStockSettings] = useState<StockSettingsResponse["config"]>({
+    stockModuleEnabled: false,
+    multiLocationEnabled: true,
+    allowNegativeStock: false,
+    costingMethod: "AVERAGE",
+    defaultLocationId: "",
+  });
   const [isLoadingTransactions, setIsLoadingTransactions] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
@@ -364,6 +371,13 @@ export function AdminStockTransactionClient({
       })),
     [activeLocations]
   );
+
+  const singleLocationMode =
+    stockSettings.stockModuleEnabled &&
+    !stockSettings.multiLocationEnabled &&
+    !!stockSettings.defaultLocationId;
+
+  const lockedLocationId = singleLocationMode ? stockSettings.defaultLocationId : "";
 
   const filteredTransactions = useMemo(() => {
     const keyword = searchKeyword.trim().toLowerCase();
