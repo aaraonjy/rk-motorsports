@@ -157,8 +157,10 @@ function normalizeSerialToken(token: string) {
 }
 
 function parseSerialEntryText(value: string) {
-  return value.split(/[
-,]+/).map(normalizeSerialToken).filter(Boolean);
+  return value
+    .split(/[\n,]+/)
+    .map(normalizeSerialToken)
+    .filter(Boolean);
 }
 
 function isInboundSerialFlow(type: StockTransactionTypeValue, direction: "" | AdjustmentDirectionValue) {
