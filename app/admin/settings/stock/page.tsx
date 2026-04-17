@@ -41,9 +41,6 @@ export default async function AdminStockSettingsPage() {
               multiLocationEnabled: config?.multiLocationEnabled ?? false,
               allowNegativeStock: config?.allowNegativeStock ?? false,
               costingMethod: config?.costingMethod ?? "AVERAGE",
-              multiUomEnabled: config?.multiUomEnabled ?? false,
-              serialTrackingEnabled: config?.serialTrackingEnabled ?? false,
-              batchTrackingEnabled: config?.batchTrackingEnabled ?? false,
               defaultLocationId: config?.defaultLocationId ?? "",
             }}
             locations={locations}
