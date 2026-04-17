@@ -120,6 +120,10 @@ function sortUomConversions(items: Array<{ id?: string; uomCode: string; convers
   return [...items].sort((a, b) => a.uomCode.localeCompare(b.uomCode));
 }
 
+function formatUomPreviewLine(uomCode: string, conversionRate: string, baseUom: string) {
+  return `1 ${uomCode} = ${conversionRate} ${baseUom}`;
+}
+
 function getItemTypeLabel(value: InventoryItemTypeValue) {
   switch (value) {
     case "STOCK_ITEM":
@@ -432,6 +436,7 @@ export function AdminProductMasterClient({
     setUomCodeInput("");
     setUomRateInput("1");
     setUomError("");
+    setIsUomModalOpen(false);
   }
 
   function editUomConversion(uomCode: string, conversionRate: string) {
