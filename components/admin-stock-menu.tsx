@@ -10,14 +10,14 @@ const activeItems = [
   { label: "Product Sub-Group", href: "/admin/product-sub-groups" },
   { label: "Product Brand", href: "/admin/brands" },
   { label: "Stock Location", href: "/admin/stock/locations" },
+  { label: "Batch No", href: "/admin/stock/batch-no" },
+  { label: "Serial No", href: "/admin/stock/serial-no" },
   { label: "Opening Stock", href: "/admin/stock/opening-stock" },
   { label: "Stock Receive", href: "/admin/stock/stock-receive" },
   { label: "Stock Issue", href: "/admin/stock/stock-issue" },
   { label: "Stock Adjustment", href: "/admin/stock/stock-adjustment" },
   { label: "Stock Transfer", href: "/admin/stock/stock-transfer", requiresMultiLocation: true },
 ] as const;
-
-const upcomingItems = ["Serial No"] as const;
 
 export function AdminStockMenu() {
   const pathname = usePathname();
@@ -93,10 +93,6 @@ export function AdminStockMenu() {
               </Link>
             );
           })}
-          <div className="border-t border-white/10 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.24em] text-white/35">Coming Soon</div>
-          <div className="grid gap-1 px-2 py-2">
-            {upcomingItems.map((label) => <div key={label} className="rounded-xl px-3 py-2 text-sm text-white/35">{label}</div>)}
-          </div>
         </div>
       ) : null}
     </div>

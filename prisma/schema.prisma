@@ -325,7 +325,11 @@ model InventoryBatch {
   inventoryProductId String
   batchNo            String
   expiryDate         DateTime?
+  isArchived         Boolean  @default(false)
+  archivedAt         DateTime?
+  archivedByAdminId  String?
   createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   inventoryProduct InventoryProduct @relation(fields: [inventoryProductId], references: [id], onDelete: Cascade)
   serials          InventorySerial[]
@@ -333,6 +337,7 @@ model InventoryBatch {
 
   @@unique([inventoryProductId, batchNo])
   @@index([inventoryProductId])
+  @@index([isArchived, inventoryProductId])
 }
 
 model ProductGroup {
