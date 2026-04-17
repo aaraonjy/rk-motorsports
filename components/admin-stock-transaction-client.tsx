@@ -1322,7 +1322,7 @@ export function AdminStockTransactionClient({
 
                       <div className="mt-4 flex flex-wrap items-center gap-3">
                         <button type="button" onClick={addLine} className="rounded-xl border border-white/15 bg-white/5 px-5 py-3 text-sm text-white/80 transition hover:bg-white/10">
-                          Add Line
+                          Add Product
                         </button>
                       </div>
                     </div>
