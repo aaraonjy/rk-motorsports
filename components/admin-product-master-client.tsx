@@ -802,71 +802,7 @@ export function AdminProductMasterClient({
               </div>
 
 
-              {isUomModalOpen ? (
-                <div className="rounded-2xl border border-white/10 bg-black/30 p-5">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <div className="text-sm font-semibold text-white">Multi UOM Setup</div>
-                      <div className="mt-1 text-xs text-white/45">
-                        Define additional UOM conversion against Base UOM {form.baseUom || "PCS"}.
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsUomModalOpen(false);
-                        setUomCodeInput("");
-                        setUomRateInput("1");
-                        setUomError("");
-                      }}
-                      className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/80 transition hover:bg-white/10"
-                    >
-                      Close
-                    </button>
-                  </div>
-
-                  <div className="mt-4 grid gap-4 md:grid-cols-2">
-                    <div>
-                      <label className="label-rk">UOM Code</label>
-                      <input
-                        className="input-rk"
-                        value={uomCodeInput}
-                        onChange={(e) => setUomCodeInput(normalizeUomCode(e.target.value))}
-                        placeholder="e.g. BOX"
-                      />
-                    </div>
-                    <div>
-                      <label className="label-rk">Conversion Rate</label>
-                      <input
-                        type="number"
-                        min="0.0001"
-                        step="0.0001"
-                        className="input-rk"
-                        value={uomRateInput}
-                        onChange={(e) => setUomRateInput(e.target.value)}
-                        placeholder={`1 ${uomCodeInput || "BOX"} = ? ${form.baseUom || "PCS"}`}
-                      />
-                    </div>
-                  </div>
-
-                  <p className="mt-3 text-xs text-white/45">
-                    Example: if 1 BOX = 12 PCS, enter UOM Code BOX and Conversion Rate 12.
-                  </p>
-
-                  {uomError ? <div className="mt-4 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{uomError}</div> : null}
-
-                  <div className="mt-4 flex flex-wrap gap-3">
-                    <button
-                      type="button"
-                      onClick={addOrUpdateUomConversion}
-                      className="rounded-xl bg-red-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-red-400"
-                    >
-                      Save UOM Conversion
-                    </button>
-                  </div>
-                </div>
-              ) : null}
-
+              
               {submitError ? <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{submitError}</div> : null}
 
               <div className="flex flex-wrap items-center gap-3 pt-2">
@@ -879,6 +815,79 @@ export function AdminProductMasterClient({
           </div>
         </div>
       ) : null}
+
+      {isUomModalOpen ? (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/75 p-4">
+          <div className="w-full max-w-2xl rounded-[2rem] border border-white/10 bg-[#0b0b0f] p-6 shadow-2xl md:p-8">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/45">Multi UOM</p>
+                <h3 className="mt-3 text-2xl font-bold text-white">Multi UOM Setup</h3>
+                <p className="mt-3 text-sm text-white/60">
+                  Define additional UOM conversion against Base UOM {form.baseUom || "PCS"}.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsUomModalOpen(false);
+                  setUomCodeInput("");
+                  setUomRateInput("1");
+                  setUomError("");
+                }}
+                className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/80 transition hover:bg-white/10"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="mt-6 grid gap-4 md:grid-cols-2">
+              <div>
+                <label className="label-rk">UOM Code</label>
+                <input
+                  className="input-rk"
+                  value={uomCodeInput}
+                  onChange={(e) => setUomCodeInput(normalizeUomCode(e.target.value))}
+                  placeholder="e.g. BOX"
+                />
+              </div>
+              <div>
+                <label className="label-rk">Conversion Rate</label>
+                <input
+                  type="number"
+                  min="0.0001"
+                  step="0.0001"
+                  className="input-rk"
+                  value={uomRateInput}
+                  onChange={(e) => setUomRateInput(e.target.value)}
+                  placeholder={`1 ${uomCodeInput || "BOX"} = ? ${form.baseUom || "PCS"}`}
+                />
+              </div>
+            </div>
+
+            <p className="mt-3 text-xs text-white/45">
+              Example: if 1 BOX = 12 PCS, enter UOM Code BOX and Conversion Rate 12.
+            </p>
+
+            {uomError ? (
+              <div className="mt-4 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+                {uomError}
+              </div>
+            ) : null}
+
+            <div className="mt-4 flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={addOrUpdateUomConversion}
+                className="rounded-xl bg-red-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-red-400"
+              >
+                Save UOM Conversion
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
     </>
   );
 }

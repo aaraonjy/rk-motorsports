@@ -1292,83 +1292,83 @@ export function AdminStockTransactionClient({
                         ) : null}
 
                         {isSerialTracked && inboundSerialFlow ? (
-                          <div className="md:col-span-2 xl:col-span-4 rounded-2xl border border-white/10 bg-black/20 p-4">
-                            <div className="grid gap-4 md:grid-cols-2">
-                              <div className="md:col-span-2 xl:col-span-2">
-                                <SearchableSelect
-                                  label="Serial No"
-                                  placeholder="Select existing serial or create new"
-                                  options={[
-                                    {
-                                      id: "__NEW__",
-                                      label: "+ Create New Serial",
-                                      searchText: "create new serial",
-                                    },
-                                    ...line.serialNos.map((serialNo) => ({
-                                      id: serialNo,
-                                      label: serialNo,
-                                      searchText: serialNo.toLowerCase(),
-                                    })),
-                                  ]}
-                                  value={line.serialSearch === "__NEW__" ? "__NEW__" : ""}
-                                  onChange={(option) => {
-                                    if (!option) return;
-                                    if (option.id === "__NEW__") {
-                                      updateLine(index, { serialSearch: "__NEW__", serialEntryText: "" });
-                                      return;
-                                    }
-                                    addInboundSerial(index, option.id);
-                                    updateLine(index, { serialSearch: "" });
-                                  }}
-                                />
-                                <p className="mt-2 text-xs text-white/45">
-                                  Add each serial no one by one. Qty follows the selected serial count.
-                                </p>
-                              </div>
-
-                              {line.serialSearch === "__NEW__" ? (
-                                <div>
-                                  <label className="label-rk">New Serial No</label>
-                                  <div className="flex gap-3">
-                                    <input
-                                      className="input-rk"
-                                      value={line.serialEntryText}
-                                      onChange={(e) => updateLine(index, { serialEntryText: e.target.value })}
-                                      placeholder="Enter new serial no"
-                                    />
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        if (!line.serialEntryText.trim()) return;
-                                        addInboundSerial(index, line.serialEntryText);
-                                        updateLine(index, { serialEntryText: "", serialSearch: "" });
-                                      }}
-                                      className="inline-flex items-center justify-center rounded-xl bg-white/10 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/15"
-                                    >
-                                      Add
-                                    </button>
-                                  </div>
-                                </div>
-                              ) : null}
+                          <>
+                            <div className="md:col-span-2 xl:col-span-2">
+                              <SearchableSelect
+                                label="Serial No"
+                                placeholder="Select existing serial or create new"
+                                options={[
+                                  {
+                                    id: "__NEW__",
+                                    label: "+ Create New Serial",
+                                    searchText: "create new serial",
+                                  },
+                                  ...line.serialNos.map((serialNo) => ({
+                                    id: serialNo,
+                                    label: serialNo,
+                                    searchText: serialNo.toLowerCase(),
+                                  })),
+                                ]}
+                                value={line.serialSearch === "__NEW__" ? "__NEW__" : ""}
+                                onChange={(option) => {
+                                  if (!option) return;
+                                  if (option.id === "__NEW__") {
+                                    updateLine(index, { serialSearch: "__NEW__", serialEntryText: "" });
+                                    return;
+                                  }
+                                  addInboundSerial(index, option.id);
+                                  updateLine(index, { serialSearch: "" });
+                                }}
+                              />
+                              <p className="mt-2 text-xs text-white/45">
+                                Add each serial no one by one. Qty follows the selected serial count.
+                              </p>
                             </div>
 
-                            <div className="mt-4 flex flex-wrap gap-2">
-                              {line.serialNos.length === 0 ? (
-                                <div className="text-sm text-white/45">No serial numbers added yet.</div>
-                              ) : (
-                                line.serialNos.map((serialNo) => (
+                            {line.serialSearch === "__NEW__" ? (
+                              <div>
+                                <label className="label-rk">New Serial No</label>
+                                <div className="flex gap-3">
+                                  <input
+                                    className="input-rk"
+                                    value={line.serialEntryText}
+                                    onChange={(e) => updateLine(index, { serialEntryText: e.target.value })}
+                                    placeholder="Enter new serial no"
+                                  />
                                   <button
-                                    key={serialNo}
                                     type="button"
-                                    onClick={() => removeInboundSerial(index, serialNo)}
-                                    className="rounded-full border border-white/15 bg-white/5 px-3 py-2 text-xs text-white/80 hover:bg-white/10"
+                                    onClick={() => {
+                                      if (!line.serialEntryText.trim()) return;
+                                      addInboundSerial(index, line.serialEntryText);
+                                      updateLine(index, { serialEntryText: "", serialSearch: "" });
+                                    }}
+                                    className="inline-flex items-center justify-center rounded-xl bg-white/10 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/15"
                                   >
-                                    {serialNo} ✕
+                                    Add
                                   </button>
-                                ))
-                              )}
+                                </div>
+                              </div>
+                            ) : null}
+
+                            <div className="md:col-span-2 xl:col-span-4">
+                              <div className="mt-1 flex flex-wrap gap-2">
+                                {line.serialNos.length === 0 ? (
+                                  <div className="text-sm text-white/45">No serial numbers added yet.</div>
+                                ) : (
+                                  line.serialNos.map((serialNo) => (
+                                    <button
+                                      key={serialNo}
+                                      type="button"
+                                      onClick={() => removeInboundSerial(index, serialNo)}
+                                      className="rounded-full border border-white/15 bg-white/5 px-3 py-2 text-xs text-white/80 hover:bg-white/10"
+                                    >
+                                      {serialNo} ✕
+                                    </button>
+                                  ))
+                                )}
+                              </div>
                             </div>
-                          </div>
+                          </>
                         ) : null}
 
                         {isSerialTracked && outboundSerialFlow ? (
