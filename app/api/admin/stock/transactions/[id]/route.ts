@@ -13,6 +13,7 @@ export async function GET(_req: Request, context: Params) {
       where: { id },
       include: {
         createdByAdmin: { select: { id: true, name: true, email: true } },
+        cancelledByAdmin: { select: { id: true, name: true, email: true } },
         lines: {
           include: {
             inventoryProduct: { select: { id: true, code: true, description: true, baseUom: true } },

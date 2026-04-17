@@ -1,6 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 
 type StockTransactionTypeValue = "OB" | "SR" | "SI" | "SA" | "ST";
 type AdjustmentDirectionValue = "IN" | "OUT";
@@ -49,6 +51,9 @@ type TransactionRecord = {
   transactionDate: string;
   reference?: string | null;
   remarks?: string | null;
+  status: "POSTED" | "CANCELLED";
+  cancelReason?: string | null;
+  cancelledAt?: string | null;
   lines: TransactionLineRecord[];
 };
 
@@ -167,6 +172,12 @@ function getTypeLabel(type: StockTransactionTypeValue) {
     default:
       return type;
   }
+}
+
+function getStatusBadgeClass(status: "POSTED" | "CANCELLED") {
+  return status === "CANCELLED"
+    ? "inline-flex rounded-full border border-red-500/25 bg-red-500/10 px-3 py-1 text-xs font-semibold text-red-200"
+    : "inline-flex rounded-full border border-emerald-500/25 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-200";
 }
 
 function balanceKey(productId: string, locationId: string, batchNo?: string) {
@@ -323,6 +334,8 @@ export function AdminStockTransactionClient({
   initialProducts,
   initialLocations,
 }: Props) {
+  const router = useRouter();
+  const pathname = usePathname();
   const [transactionDate, setTransactionDate] = useState(new Date().toISOString().slice(0, 10));
   const [reference, setReference] = useState("");
   const [remarks, setRemarks] = useState("");
@@ -346,6 +359,9 @@ export function AdminStockTransactionClient({
   const [submitError, setSubmitError] = useState("");
   const [submitSuccess, setSubmitSuccess] = useState("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [cancelTarget, setCancelTarget] = useState<TransactionRecord | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
+  const [isCancelling, setIsCancelling] = useState(false);
   const [searchKeyword, setSearchKeyword] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -913,6 +929,44 @@ export function AdminStockTransactionClient({
   }
 
 
+  function openView(id: string) {
+    router.push(`/admin/stock/transactions/${id}`);
+  }
+
+  function openEdit(id: string) {
+    router.push(`/admin/stock/transactions/${id}/edit`);
+  }
+
+  async function handleCancelConfirm() {
+    if (!cancelTarget) return;
+    setIsCancelling(true);
+    setSubmitError("");
+    setSubmitSuccess("");
+    try {
+      const response = await fetch(`/api/admin/stock/transactions/${cancelTarget.id}/cancel`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: cancelReason.trim() || null }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.ok) {
+        setSubmitError(data.error || "Unable to cancel transaction.");
+        return;
+      }
+      setSubmitSuccess(`${cancelTarget.transactionNo} cancelled successfully.`);
+      setCancelTarget(null);
+      setCancelReason("");
+      await loadTransactions();
+      if (pathname.startsWith(`/admin/stock/transactions/${cancelTarget.id}`)) {
+        router.push(`/admin/stock/transactions/${cancelTarget.id}`);
+      }
+    } catch {
+      setSubmitError("Unable to cancel transaction right now.");
+    } finally {
+      setIsCancelling(false);
+    }
+  }
+
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setIsSubmitting(true);
@@ -1014,20 +1068,56 @@ export function AdminStockTransactionClient({
                 <th className="px-3 py-3 font-medium">Date</th>
                 <th className="px-3 py-3 font-medium">Reference</th>
                 <th className="px-3 py-3 font-medium">Remarks</th>
+                <th className="px-3 py-3 font-medium">Status</th>
+                <th className="px-3 py-3 font-medium text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/10">
               {isLoadingTransactions ? (
-                <tr><td colSpan={4} className="px-3 py-8 text-center text-white/50">Loading transactions...</td></tr>
+                <tr><td colSpan={6} className="px-3 py-8 text-center text-white/50">Loading transactions...</td></tr>
               ) : filteredTransactions.length === 0 ? (
-                <tr><td colSpan={4} className="px-3 py-8 text-center text-white/50">No transactions found.</td></tr>
+                <tr><td colSpan={6} className="px-3 py-8 text-center text-white/50">No transactions found.</td></tr>
               ) : (
                 paginatedTransactions.map((item) => (
-                  <tr key={item.id} className="align-top text-white/80">
+                  <tr
+                    key={item.id}
+                    className={`cursor-pointer align-top text-white/80 transition hover:bg-white/5 ${item.status === "CANCELLED" ? "bg-red-500/5" : ""}`}
+                    onClick={() => openView(item.id)}
+                  >
                     <td className="px-3 py-4 font-semibold text-white">{item.transactionNo}</td>
                     <td className="px-3 py-4">{formatDateInput(item.transactionDate)}</td>
                     <td className="px-3 py-4">{item.reference || "-"}</td>
                     <td className="px-3 py-4">{item.remarks || "-"}</td>
+                    <td className="px-3 py-4">
+                      <span className={getStatusBadgeClass(item.status)}>{item.status === "CANCELLED" ? "Cancelled" : "Posted"}</span>
+                    </td>
+                    <td className="px-3 py-4">
+                      <div className="flex justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            openEdit(item.id);
+                          }}
+                          disabled={item.status === "CANCELLED"}
+                          className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-semibold text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setCancelTarget(item);
+                            setCancelReason("");
+                          }}
+                          disabled={item.status === "CANCELLED"}
+                          className="rounded-lg border border-red-500/25 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-200 transition hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))
               )}
@@ -1064,6 +1154,46 @@ export function AdminStockTransactionClient({
           </div>
         ) : null}
       </div>
+
+      {cancelTarget ? (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 p-4">
+          <div className="w-full max-w-xl rounded-[2rem] border border-white/10 bg-[#0b0b0f] p-6 shadow-2xl md:p-8">
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/45">Cancel Transaction</p>
+            <h3 className="mt-3 text-2xl font-bold text-white">{cancelTarget.transactionNo}</h3>
+            <p className="mt-3 text-sm text-white/65">This will keep the original transaction record, create reversal stock effects, and mark the transaction as Cancelled.</p>
+            <div className="mt-6">
+              <label className="label-rk">Cancel Reason</label>
+              <textarea
+                className="input-rk min-h-[120px]"
+                value={cancelReason}
+                onChange={(event) => setCancelReason(event.target.value)}
+                placeholder="Optional reason for cancellation"
+              />
+            </div>
+            <div className="mt-6 flex flex-wrap justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  if (isCancelling) return;
+                  setCancelTarget(null);
+                  setCancelReason("");
+                }}
+                className="rounded-xl border border-white/15 bg-white/5 px-5 py-3 text-sm text-white/80 transition hover:bg-white/10"
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                disabled={isCancelling}
+                onClick={() => void handleCancelConfirm()}
+                className="rounded-xl border border-red-500/25 bg-red-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-red-400 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isCancelling ? "Cancelling..." : "Confirm Cancel"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {isCreateOpen ? (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4">

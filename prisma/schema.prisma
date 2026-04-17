@@ -102,7 +102,7 @@ enum StockTransactionType {
 
 enum StockTransactionStatus {
   POSTED
-  VOID
+  CANCELLED
 }
 
 enum StockMovementDirection {
@@ -138,8 +138,9 @@ model User {
   adminCreatedOrders     Order[]             @relation("AdminCreatedOrders")
   creditNotes            CreditNote[]        @relation("CustomerCreditNotes")
   adminCreatedCreditNotes CreditNote[]       @relation("AdminCreatedCreditNotes")
-  notifications          Notification[]
+  notifications           Notification[]
   createdStockTransactions StockTransaction[] @relation("CreatedStockTransactions")
+  cancelledStockTransactions StockTransaction[] @relation("CancelledStockTransactions")
 }
 
 model VehicleBrand {
@@ -636,23 +637,29 @@ model AuditLog {
 
 
 model StockTransaction {
-  id               String                 @id @default(cuid())
-  transactionNo    String                 @unique
-  transactionType  StockTransactionType
-  transactionDate  DateTime
-  reference        String?
-  remarks          String?
-  status           StockTransactionStatus @default(POSTED)
-  createdByAdminId String
-  createdAt        DateTime               @default(now())
-  updatedAt        DateTime               @updatedAt
-  createdByAdmin   User                   @relation("CreatedStockTransactions", fields: [createdByAdminId], references: [id], onDelete: Restrict)
-  lines            StockTransactionLine[]
-  ledgerEntries    StockLedger[]
+  id                 String                 @id @default(cuid())
+  transactionNo      String                 @unique
+  transactionType    StockTransactionType
+  transactionDate    DateTime
+  reference          String?
+  remarks            String?
+  status             StockTransactionStatus @default(POSTED)
+  createdByAdminId   String
+  cancelledByAdminId String?
+  cancelReason       String?
+  cancelledAt        DateTime?
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+  createdByAdmin     User                   @relation("CreatedStockTransactions", fields: [createdByAdminId], references: [id], onDelete: Restrict)
+  cancelledByAdmin   User?                  @relation("CancelledStockTransactions", fields: [cancelledByAdminId], references: [id], onDelete: SetNull)
+  lines              StockTransactionLine[]
+  ledgerEntries      StockLedger[]
 
   @@index([transactionType, transactionDate])
   @@index([createdByAdminId, createdAt])
   @@index([status, transactionDate])
+  @@index([cancelledByAdminId])
+  @@index([status, cancelledAt])
 }
 
 model StockTransactionLine {
