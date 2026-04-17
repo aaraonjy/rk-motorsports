@@ -37,14 +37,11 @@ export default async function AdminStockSettingsPage() {
         <div className="mt-10">
           <AdminStockConfigurationClient
             initialConfig={{
-              stockModuleEnabled: config?.stockModuleEnabled ?? false,
-              multiLocationEnabled: config?.multiLocationEnabled ?? false,
-              allowNegativeStock: config?.allowNegativeStock ?? false,
-              costingMethod: config?.costingMethod ?? "AVERAGE",
-              multiUomEnabled: config?.multiUomEnabled ?? false,
-              serialTrackingEnabled: config?.serialTrackingEnabled ?? false,
-              batchTrackingEnabled: (config as any)?.batchTrackingEnabled ?? false,
-              defaultLocationId: config?.defaultLocationId ?? "",
+                stockModuleEnabled: config?.stockModuleEnabled ?? false,
+                multiLocationEnabled: config?.multiLocationEnabled ?? false,
+                allowNegativeStock: config?.allowNegativeStock ?? false,
+                costingMethod: config?.costingMethod ?? "AVERAGE",
+                defaultLocationId: config?.defaultLocationId ?? "",
             }}
             locations={locations}
           />
