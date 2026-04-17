@@ -1293,8 +1293,8 @@ export function AdminStockTransactionClient({
 
                         {isSerialTracked && inboundSerialFlow ? (
                           <div className="md:col-span-2 xl:col-span-4 rounded-2xl border border-white/10 bg-black/20 p-4">
-                            <div className="grid gap-4 md:grid-cols-[minmax(260px,1fr)_auto]">
-                              <div>
+                            <div className="grid gap-4 md:grid-cols-2">
+                              <div className="md:col-span-2 xl:col-span-2">
                                 <SearchableSelect
                                   label="Serial No"
                                   placeholder="Select existing serial or create new"
@@ -1310,33 +1310,46 @@ export function AdminStockTransactionClient({
                                       searchText: serialNo.toLowerCase(),
                                     })),
                                   ]}
-                                  value=""
+                                  value={line.serialSearch === "__NEW__" ? "__NEW__" : ""}
                                   onChange={(option) => {
                                     if (!option) return;
                                     if (option.id === "__NEW__") {
-                                      const entered = window.prompt("Enter new serial no");
-                                      if (entered) addInboundSerial(index, entered);
+                                      updateLine(index, { serialSearch: "__NEW__", serialEntryText: "" });
                                       return;
                                     }
                                     addInboundSerial(index, option.id);
+                                    updateLine(index, { serialSearch: "" });
                                   }}
                                 />
                                 <p className="mt-2 text-xs text-white/45">
                                   Add each serial no one by one. Qty follows the selected serial count.
                                 </p>
                               </div>
-                              <div className="flex items-end">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const entered = window.prompt("Enter new serial no");
-                                    if (entered) addInboundSerial(index, entered);
-                                  }}
-                                  className="inline-flex items-center justify-center rounded-xl bg-white/10 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/15"
-                                >
-                                  Create New Serial
-                                </button>
-                              </div>
+
+                              {line.serialSearch === "__NEW__" ? (
+                                <div>
+                                  <label className="label-rk">New Serial No</label>
+                                  <div className="flex gap-3">
+                                    <input
+                                      className="input-rk"
+                                      value={line.serialEntryText}
+                                      onChange={(e) => updateLine(index, { serialEntryText: e.target.value })}
+                                      placeholder="Enter new serial no"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (!line.serialEntryText.trim()) return;
+                                        addInboundSerial(index, line.serialEntryText);
+                                        updateLine(index, { serialEntryText: "", serialSearch: "" });
+                                      }}
+                                      className="inline-flex items-center justify-center rounded-xl bg-white/10 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/15"
+                                    >
+                                      Add
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : null}
                             </div>
 
                             <div className="mt-4 flex flex-wrap gap-2">
@@ -1400,7 +1413,7 @@ export function AdminStockTransactionClient({
 
                       <div className="mt-4 flex flex-wrap items-center gap-3">
                         <button type="button" onClick={addLine} className="rounded-xl border border-white/15 bg-white/5 px-5 py-3 text-sm text-white/80 transition hover:bg-white/10">
-                          Add Line
+                          Add Product
                         </button>
                       </div>
                     </div>

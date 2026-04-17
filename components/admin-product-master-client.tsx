@@ -794,54 +794,7 @@ export function AdminProductMasterClient({
                 <div><label className="label-rk">Selling Price (RM)</label><input type="number" min="0" step="0.01" className="input-rk" value={form.sellingPrice} onChange={(e) => setForm((prev) => ({ ...prev, sellingPrice: e.target.value }))} /></div>
               </div>
 
-              <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <div className="text-sm font-semibold text-white">Multi UOM</div>
-                    <div className="mt-1 text-xs text-white/45">
-                      Base UOM: {form.baseUom || "PCS"}. Define additional UOM conversions here.
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setUomCodeInput("");
-                      setUomRateInput("1");
-                      setUomError("");
-                      setIsUomModalOpen(true);
-                    }}
-                    className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
-                  >
-                    Manage Multi UOM
-                  </button>
-                </div>
-
-                <div className="mt-4 space-y-2">
-                  {form.uomConversions.length === 0 ? (
-                    <div className="text-sm text-white/45">No Multi UOM conversion added yet.</div>
-                  ) : (
-                    form.uomConversions.map((item) => (
-                      <div key={item.uomCode} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm">
-                        <div className="text-white/85">
-                          <span className="font-semibold text-white">{item.uomCode}</span>
-                          <span className="text-white/50"> = </span>
-                          <span>{normalizeConversionRate(item.conversionRate)} {form.baseUom || "PCS"}</span>
-                        </div>
-                        <div className="flex gap-2">
-                          <button type="button" onClick={() => editUomConversion(item.uomCode, item.conversionRate)} className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-semibold text-white transition hover:bg-white/10">
-                            Edit
-                          </button>
-                          <button type="button" onClick={() => removeUomConversion(item.uomCode)} className="rounded-lg border border-red-500/25 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-200 transition hover:bg-red-500/15">
-                            Remove
-                          </button>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-
-              <div className="grid gap-3 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-white/75 md:grid-cols-4">
+                            <div className="grid gap-3 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-white/75 md:grid-cols-4">
                 <label className="flex items-center gap-3"><input type="checkbox" checked={form.trackInventory} disabled={form.itemType !== "STOCK_ITEM"} onChange={(e) => setForm((prev) => ({ ...prev, trackInventory: e.target.checked }))} /><span>Track Inventory</span></label>
                 <label className="flex items-center gap-3"><input type="checkbox" checked={form.serialNumberTracking} onChange={(e) => setForm((prev) => ({ ...prev, serialNumberTracking: e.target.checked }))} /><span>Serial Number Tracking</span></label>
                 <label className="flex items-center gap-3"><input type="checkbox" checked={form.batchTracking} onChange={(e) => setForm((prev) => ({ ...prev, batchTracking: e.target.checked }))} /><span>Batch Tracking</span></label>
