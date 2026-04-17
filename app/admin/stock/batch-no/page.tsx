@@ -7,6 +7,24 @@ function formatDate(value: Date | null | undefined) {
   return value ? value.toISOString() : null;
 }
 
+type BatchRow = {
+  id: string;
+  inventoryProductId: string;
+  productCode: string;
+  productDescription: string;
+  batchNo: string;
+  expiryDate: string | null;
+  balance: number;
+  locationSummary: string;
+  linkedSerialCount: number;
+  usageCount: number;
+  isArchived: boolean;
+  archivedAt: string | null;
+  status: "ACTIVE" | "ZERO_BALANCE" | "ARCHIVED";
+  createdAt: string | null;
+  updatedAt: string | null;
+};
+
 export default async function AdminBatchNoPage() {
   const user = await getSessionUser();
   if (!user) redirect("/login");
@@ -80,7 +98,7 @@ export default async function AdminBatchNoPage() {
   const usageCountMap = new Map(usageCounts.map((row) => [row.inventoryBatchId || "", row._count._all]));
   const locationMap = new Map(locations.map((item) => [item.id, `${item.code} — ${item.name}`]));
 
-  const initialRows = batches.map((item) => {
+  const initialRows: BatchRow[] = batches.map((item) => {
     const balanceInfo = balanceMap.get(`${item.inventoryProductId}__${item.batchNo}`);
     const totalBalance = balanceInfo?.total ?? 0;
     const linkedSerialCount = serialCountMap.get(item.id) ?? 0;
@@ -89,6 +107,12 @@ export default async function AdminBatchNoPage() {
       .filter(([, balance]) => balance > 0)
       .map(([locationId]) => locationMap.get(locationId) || "Unknown")
       .sort((a, b) => a.localeCompare(b));
+
+    const status: BatchRow["status"] = item.isArchived
+      ? "ARCHIVED"
+      : totalBalance <= 0
+        ? "ZERO_BALANCE"
+        : "ACTIVE";
 
     return {
       id: item.id,
@@ -103,7 +127,7 @@ export default async function AdminBatchNoPage() {
       usageCount,
       isArchived: item.isArchived,
       archivedAt: formatDate(item.archivedAt),
-      status: item.isArchived ? "ARCHIVED" : totalBalance <= 0 ? "ZERO_BALANCE" : "ACTIVE",
+      status,
       createdAt: formatDate(item.createdAt),
       updatedAt: formatDate(item.updatedAt),
     };
