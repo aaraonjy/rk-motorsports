@@ -17,6 +17,12 @@ function normalizeMoney(value: unknown) {
   return Math.round((parsed + Number.EPSILON) * 100) / 100;
 }
 
+function normalizeRate(value: unknown) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+  return Math.round((parsed + Number.EPSILON) * 10000) / 10000;
+}
+
 function normalizeItemType(value: unknown) {
   if (value === "SERVICE_ITEM" || value === "NON_STOCK_ITEM") return value;
   return "STOCK_ITEM";
@@ -43,9 +49,39 @@ function mapProduct(product: any) {
     isActive: product.isActive,
     defaultLocationId: product.defaultLocationId,
     defaultLocationLabel: null,
+    uomConversions: Array.isArray(product.uomConversions)
+      ? product.uomConversions.map((item: any) => ({
+          id: item.id,
+          uomCode: item.uomCode,
+          conversionRate: Number(item.conversionRate ?? 0),
+        }))
+      : [],
     createdAt: product.createdAt.toISOString(),
     updatedAt: product.updatedAt.toISOString(),
   };
+}
+
+
+export async function GET(req: Request, context: Params) {
+  try {
+    await requireAdmin();
+    const { id } = await context.params;
+
+    const product = await db.inventoryProduct.findUnique({
+      where: { id },
+      include: {
+        uomConversions: {
+          orderBy: [{ uomCode: "asc" }],
+        },
+      },
+    });
+
+    if (!product) return NextResponse.json({ ok: false, error: "Product not found." }, { status: 404 });
+
+    return NextResponse.json({ ok: true, product: mapProduct(product) });
+  } catch (error) {
+    return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : "Unable to load product." }, { status: error instanceof Error && error.message === "FORBIDDEN" ? 403 : 500 });
+  }
 }
 
 export async function PATCH(req: Request, context: Params) {
@@ -54,7 +90,14 @@ export async function PATCH(req: Request, context: Params) {
     const { id } = await context.params;
     const body = await req.json().catch(() => ({}));
 
-    const existing = await db.inventoryProduct.findUnique({ where: { id } });
+    const existing = await db.inventoryProduct.findUnique({
+      where: { id },
+      include: {
+        uomConversions: {
+          orderBy: [{ uomCode: "asc" }],
+        },
+      },
+    });
     if (!existing) return NextResponse.json({ ok: false, error: "Product not found." }, { status: 404 });
 
     const code = normalizeCode(body.code);
@@ -71,12 +114,31 @@ export async function PATCH(req: Request, context: Params) {
     const batchTracking = Boolean(body.batchTracking);
     const isActive = Boolean(body.isActive);
     const defaultLocationId = typeof body.defaultLocationId === "string" && body.defaultLocationId.trim() ? body.defaultLocationId.trim() : null;
+    const uomConversions = Array.isArray(body.uomConversions)
+      ? body.uomConversions
+          .map((item: any) => ({
+            uomCode: normalizeCode(item?.uomCode),
+            conversionRate: normalizeRate(item?.conversionRate),
+          }))
+          .filter((item) => item.uomCode && item.conversionRate != null)
+      : [];
 
     if (!code) return NextResponse.json({ ok: false, error: "Product code is required." }, { status: 400 });
     if (!description) return NextResponse.json({ ok: false, error: "Product description is required." }, { status: 400 });
     if (!baseUom) return NextResponse.json({ ok: false, error: "Base UOM is required." }, { status: 400 });
     if (unitCost == null || sellingPrice == null) {
       return NextResponse.json({ ok: false, error: "Unit cost and selling price must be valid positive numbers." }, { status: 400 });
+    }
+
+    const duplicateUom = new Set<string>();
+    for (const item of uomConversions) {
+      if (item.uomCode === baseUom) {
+        return NextResponse.json({ ok: false, error: "Multi UOM code cannot be the same as Base UOM." }, { status: 400 });
+      }
+      if (duplicateUom.has(item.uomCode)) {
+        return NextResponse.json({ ok: false, error: `Duplicate Multi UOM code ${item.uomCode}.` }, { status: 400 });
+      }
+      duplicateUom.add(item.uomCode);
     }
 
     const duplicate = await db.inventoryProduct.findFirst({ where: { code, NOT: { id } }, select: { id: true } });
@@ -118,6 +180,18 @@ export async function PATCH(req: Request, context: Params) {
         batchTracking,
         isActive,
         defaultLocationId,
+        uomConversions: {
+          deleteMany: {},
+          create: uomConversions.map((item) => ({
+            uomCode: item.uomCode,
+            conversionRate: new Prisma.Decimal(item.conversionRate!.toFixed(4)),
+          })),
+        },
+      },
+      include: {
+        uomConversions: {
+          orderBy: [{ uomCode: "asc" }],
+        },
       },
     });
 
@@ -130,8 +204,8 @@ export async function PATCH(req: Request, context: Params) {
       entityId: updated.id,
       entityCode: updated.code,
       description: `${admin.name} updated product ${updated.code}.`,
-      oldValues: { code: existing.code, description: existing.description, itemType: existing.itemType, baseUom: existing.baseUom, unitCost: Number(existing.unitCost), sellingPrice: Number(existing.sellingPrice), trackInventory: existing.trackInventory, serialNumberTracking: existing.serialNumberTracking, batchTracking: (existing as any).batchTracking, isActive: existing.isActive },
-      newValues: { code: updated.code, description: updated.description, itemType: updated.itemType, baseUom: updated.baseUom, unitCost: Number(updated.unitCost), sellingPrice: Number(updated.sellingPrice), trackInventory: updated.trackInventory, serialNumberTracking: updated.serialNumberTracking, batchTracking: (updated as any).batchTracking, isActive: updated.isActive },
+      oldValues: { code: existing.code, description: existing.description, itemType: existing.itemType, baseUom: existing.baseUom, unitCost: Number(existing.unitCost), sellingPrice: Number(existing.sellingPrice), trackInventory: existing.trackInventory, serialNumberTracking: existing.serialNumberTracking, batchTracking: (existing as any).batchTracking, isActive: existing.isActive, uomConversions: existing.uomConversions.map((item: any) => ({ uomCode: item.uomCode, conversionRate: Number(item.conversionRate) })) },
+      newValues: { code: updated.code, description: updated.description, itemType: updated.itemType, baseUom: updated.baseUom, unitCost: Number(updated.unitCost), sellingPrice: Number(updated.sellingPrice), trackInventory: updated.trackInventory, serialNumberTracking: updated.serialNumberTracking, batchTracking: (updated as any).batchTracking, isActive: updated.isActive, uomConversions: updated.uomConversions.map((item: any) => ({ uomCode: item.uomCode, conversionRate: Number(item.conversionRate) })) },
       status: "SUCCESS",
     });
 

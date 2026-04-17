@@ -8,6 +8,12 @@ type MasterOption = { id: string; code: string; name: string; isActive: boolean 
 type SubGroupOption = MasterOption & { groupId: string };
 type StockLocationOption = { id: string; code: string; name: string; isActive: boolean };
 
+type InventoryProductUomRecord = {
+  id: string;
+  uomCode: string;
+  conversionRate: number;
+};
+
 type InventoryProductRecord = {
   id: string;
   code: string;
@@ -28,6 +34,7 @@ type InventoryProductRecord = {
   isActive: boolean;
   defaultLocationId: string | null;
   defaultLocationLabel: string | null;
+  uomConversions?: InventoryProductUomRecord[];
   createdAt: string;
   updatedAt: string;
 };
@@ -48,6 +55,7 @@ type ProductFormState = {
   trackInventory: boolean;
   serialNumberTracking: boolean;
   batchTracking: boolean;
+  uomConversions: Array<{ id?: string; uomCode: string; conversionRate: string }>;
   isActive: boolean;
 };
 
@@ -74,7 +82,7 @@ function normalizeMoneyInput(value: string) {
   return parsed.toFixed(2);
 }
 
-function emptyForm(defaultLocationId = ""): ProductFormState {
+function emptyForm(): ProductFormState {
   return {
     code: "",
     description: "",
@@ -91,8 +99,25 @@ function emptyForm(defaultLocationId = ""): ProductFormState {
     trackInventory: true,
     serialNumberTracking: false,
     batchTracking: false,
+    uomConversions: [],
     isActive: true,
   };
+}
+
+
+function normalizeUomCode(value: string) {
+  return value.trim().toUpperCase();
+}
+
+function normalizeConversionRate(value: string) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return "1";
+  const fixed = parsed.toFixed(4);
+  return fixed.replace(/\.0+$/, "").replace(/(\.\d*?)0+$/, "$1");
+}
+
+function sortUomConversions(items: Array<{ id?: string; uomCode: string; conversionRate: string }>) {
+  return [...items].sort((a, b) => a.uomCode.localeCompare(b.uomCode));
 }
 
 function getItemTypeLabel(value: InventoryItemTypeValue) {
@@ -257,6 +282,10 @@ export function AdminProductMasterClient({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [form, setForm] = useState<ProductFormState>(emptyForm());
+  const [isUomModalOpen, setIsUomModalOpen] = useState(false);
+  const [uomCodeInput, setUomCodeInput] = useState("");
+  const [uomRateInput, setUomRateInput] = useState("1");
+  const [uomError, setUomError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [submitSuccess, setSubmitSuccess] = useState("");
@@ -305,40 +334,118 @@ export function AdminProductMasterClient({
     setIsModalOpen(false);
     setEditingId(null);
     setForm(emptyForm());
+    setIsUomModalOpen(false);
+    setUomCodeInput("");
+    setUomRateInput("1");
+    setUomError("");
     setSubmitError("");
   }
 
   function openAddModal() {
     setEditingId(null);
     setForm(emptyForm());
+    setIsUomModalOpen(false);
+    setUomCodeInput("");
+    setUomRateInput("1");
+    setUomError("");
     setSubmitError("");
     setSubmitSuccess("");
+    setUomError("");
     setIsModalOpen(true);
   }
 
-  function startEdit(product: InventoryProductRecord) {
-    setEditingId(product.id);
+  async function startEdit(product: InventoryProductRecord) {
+    let detailedProduct = product;
+
+    try {
+      const response = await fetch(`/api/admin/products/${product.id}`, { cache: "no-store" });
+      const data = await response.json();
+      if (response.ok && data.ok && data.product) {
+        detailedProduct = data.product as InventoryProductRecord;
+      }
+    } catch {}
+
+    setEditingId(detailedProduct.id);
     setForm({
-      code: product.code,
-      description: product.description,
-      groupId: product.groupId || "",
-      subGroupId: product.subGroupId || "",
-      brandId: product.brandId || "",
-      groupSearch: product.group || "",
-      subGroupSearch: product.subGroup || "",
-      brandSearch: product.brand || "",
-      itemType: product.itemType,
-      baseUom: product.baseUom,
-      unitCost: product.unitCost.toFixed(2),
-      sellingPrice: product.sellingPrice.toFixed(2),
-      trackInventory: product.trackInventory,
-      serialNumberTracking: product.serialNumberTracking,
-      batchTracking: product.batchTracking,
-      isActive: product.isActive,
+      code: detailedProduct.code,
+      description: detailedProduct.description,
+      groupId: detailedProduct.groupId || "",
+      subGroupId: detailedProduct.subGroupId || "",
+      brandId: detailedProduct.brandId || "",
+      groupSearch: detailedProduct.group || "",
+      subGroupSearch: detailedProduct.subGroup || "",
+      brandSearch: detailedProduct.brand || "",
+      itemType: detailedProduct.itemType,
+      baseUom: detailedProduct.baseUom,
+      unitCost: detailedProduct.unitCost.toFixed(2),
+      sellingPrice: detailedProduct.sellingPrice.toFixed(2),
+      trackInventory: detailedProduct.trackInventory,
+      serialNumberTracking: detailedProduct.serialNumberTracking,
+      batchTracking: detailedProduct.batchTracking,
+      uomConversions: (detailedProduct.uomConversions || []).map((item) => ({
+        id: item.id,
+        uomCode: item.uomCode,
+        conversionRate: normalizeConversionRate(String(item.conversionRate)),
+      })),
+      isActive: detailedProduct.isActive,
     });
+    setIsUomModalOpen(false);
+    setUomCodeInput("");
+    setUomRateInput("1");
+    setUomError("");
     setSubmitError("");
     setSubmitSuccess("");
+    setUomError("");
     setIsModalOpen(true);
+  }
+
+
+  function addOrUpdateUomConversion() {
+    const normalizedCode = normalizeUomCode(uomCodeInput);
+    const normalizedBase = normalizeUomCode(form.baseUom);
+
+    if (!normalizedCode) {
+      setUomError("UOM code is required.");
+      return;
+    }
+    if (normalizedCode === normalizedBase) {
+      setUomError("Multi UOM code cannot be the same as Base UOM.");
+      return;
+    }
+
+    const parsedRate = Number(uomRateInput);
+    if (!Number.isFinite(parsedRate) || parsedRate <= 0) {
+      setUomError("Conversion rate must be greater than 0.");
+      return;
+    }
+
+    setForm((prev) => ({
+      ...prev,
+      uomConversions: sortUomConversions([
+        ...prev.uomConversions.filter((item) => item.uomCode !== normalizedCode),
+        {
+          uomCode: normalizedCode,
+          conversionRate: normalizeConversionRate(uomRateInput),
+        },
+      ]),
+    }));
+    setUomCodeInput("");
+    setUomRateInput("1");
+    setUomError("");
+  }
+
+  function editUomConversion(uomCode: string, conversionRate: string) {
+    setUomCodeInput(uomCode);
+    setUomRateInput(conversionRate);
+    setUomError("");
+    setIsUomModalOpen(true);
+  }
+
+  function removeUomConversion(uomCode: string) {
+    setForm((prev) => ({
+      ...prev,
+      uomConversions: prev.uomConversions.filter((item) => item.uomCode !== uomCode),
+    }));
   }
 
   function resolveMasterSelection(
@@ -364,6 +471,7 @@ export function AdminProductMasterClient({
     setIsSubmitting(true);
     setSubmitError("");
     setSubmitSuccess("");
+    setUomError("");
 
     const groupResolved = resolveMasterSelection(form.groupSearch, activeGroups, "Group");
     if (groupResolved.error) {
@@ -398,6 +506,10 @@ export function AdminProductMasterClient({
         subGroupId: subGroupResolved.id || form.subGroupId || null,
         brandId: brandResolved.id || form.brandId || null,
         baseUom: form.baseUom.trim().toUpperCase(),
+        uomConversions: form.uomConversions.map((item) => ({
+          uomCode: normalizeUomCode(item.uomCode),
+          conversionRate: Number(normalizeConversionRate(item.conversionRate)),
+        })),
         itemType: form.itemType,
         unitCost: Number(normalizeMoneyInput(form.unitCost)),
         sellingPrice: Number(normalizeMoneyInput(form.sellingPrice)),
@@ -438,6 +550,7 @@ export function AdminProductMasterClient({
     if (!confirmed) return;
     setSubmitError("");
     setSubmitSuccess("");
+    setUomError("");
     try {
       const response = await fetch(`/api/admin/products/${product.id}`, { method: "DELETE" });
       const data = await response.json();
@@ -527,7 +640,7 @@ export function AdminProductMasterClient({
                   </td>
                   <td className="px-3 py-4">
                     <div className="flex justify-end gap-2">
-                      <button type="button" onClick={() => startEdit(product)} className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-semibold text-white transition hover:bg-white/10">Edit Product</button>
+                      <button type="button" onClick={() => void startEdit(product)} className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-semibold text-white transition hover:bg-white/10">Edit Product</button>
                       <button type="button" onClick={() => handleDelete(product)} className="rounded-lg border border-red-500/25 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-200 transition hover:bg-red-500/15">Delete</button>
                     </div>
                   </td>
@@ -575,7 +688,40 @@ export function AdminProductMasterClient({
             <form onSubmit={handleSubmit} className="mt-6 space-y-5">
               <div className="grid gap-4 md:grid-cols-2">
                 <div><label className="label-rk">Product Code</label><input className="input-rk" value={form.code} onChange={(e) => setForm((prev) => ({ ...prev, code: e.target.value.toUpperCase() }))} placeholder="e.g. BP-BREMBO-M4" required /></div>
-                <div><label className="label-rk">Base UOM</label><input className="input-rk" value={form.baseUom} onChange={(e) => setForm((prev) => ({ ...prev, baseUom: e.target.value.toUpperCase() }))} placeholder="PCS" required /></div>
+                <div>
+                  <label className="label-rk">Base UOM</label>
+                  <div className="flex gap-2">
+                    <input
+                      className="input-rk flex-1"
+                      value={form.baseUom}
+                      onChange={(e) => {
+                        const nextBaseUom = normalizeUomCode(e.target.value);
+                        setForm((prev) => ({
+                          ...prev,
+                          baseUom: nextBaseUom,
+                          uomConversions: prev.uomConversions.filter((item) => item.uomCode !== nextBaseUom),
+                        }));
+                      }}
+                      placeholder="PCS"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setUomCodeInput("");
+                        setUomRateInput("1");
+                        setUomError("");
+                        setIsUomModalOpen(true);
+                      }}
+                      className="rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
+                    >
+                      ▾
+                    </button>
+                  </div>
+                  <p className="mt-2 text-xs text-white/45">
+                    Base UOM is the main stock unit. Use the arrow button to set Multi UOM conversions.
+                  </p>
+                </div>
               </div>
 
               <div><label className="label-rk">Description</label><input className="input-rk" value={form.description} onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))} placeholder="e.g. Brake Pad (Brembo M4)" required /></div>
@@ -648,12 +794,125 @@ export function AdminProductMasterClient({
                 <div><label className="label-rk">Selling Price (RM)</label><input type="number" min="0" step="0.01" className="input-rk" value={form.sellingPrice} onChange={(e) => setForm((prev) => ({ ...prev, sellingPrice: e.target.value }))} /></div>
               </div>
 
+              <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-semibold text-white">Multi UOM</div>
+                    <div className="mt-1 text-xs text-white/45">
+                      Base UOM: {form.baseUom || "PCS"}. Define additional UOM conversions here.
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUomCodeInput("");
+                      setUomRateInput("1");
+                      setUomError("");
+                      setIsUomModalOpen(true);
+                    }}
+                    className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
+                  >
+                    Manage Multi UOM
+                  </button>
+                </div>
+
+                <div className="mt-4 space-y-2">
+                  {form.uomConversions.length === 0 ? (
+                    <div className="text-sm text-white/45">No Multi UOM conversion added yet.</div>
+                  ) : (
+                    form.uomConversions.map((item) => (
+                      <div key={item.uomCode} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm">
+                        <div className="text-white/85">
+                          <span className="font-semibold text-white">{item.uomCode}</span>
+                          <span className="text-white/50"> = </span>
+                          <span>{normalizeConversionRate(item.conversionRate)} {form.baseUom || "PCS"}</span>
+                        </div>
+                        <div className="flex gap-2">
+                          <button type="button" onClick={() => editUomConversion(item.uomCode, item.conversionRate)} className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-semibold text-white transition hover:bg-white/10">
+                            Edit
+                          </button>
+                          <button type="button" onClick={() => removeUomConversion(item.uomCode)} className="rounded-lg border border-red-500/25 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-200 transition hover:bg-red-500/15">
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
               <div className="grid gap-3 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-white/75 md:grid-cols-4">
                 <label className="flex items-center gap-3"><input type="checkbox" checked={form.trackInventory} disabled={form.itemType !== "STOCK_ITEM"} onChange={(e) => setForm((prev) => ({ ...prev, trackInventory: e.target.checked }))} /><span>Track Inventory</span></label>
                 <label className="flex items-center gap-3"><input type="checkbox" checked={form.serialNumberTracking} onChange={(e) => setForm((prev) => ({ ...prev, serialNumberTracking: e.target.checked }))} /><span>Serial Number Tracking</span></label>
                 <label className="flex items-center gap-3"><input type="checkbox" checked={form.batchTracking} onChange={(e) => setForm((prev) => ({ ...prev, batchTracking: e.target.checked }))} /><span>Batch Tracking</span></label>
                 <label className="flex items-center gap-3"><input type="checkbox" checked={form.isActive} onChange={(e) => setForm((prev) => ({ ...prev, isActive: e.target.checked }))} /><span>Active</span></label>
               </div>
+
+
+              {isUomModalOpen ? (
+                <div className="rounded-2xl border border-white/10 bg-black/30 p-5">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-semibold text-white">Multi UOM Setup</div>
+                      <div className="mt-1 text-xs text-white/45">
+                        Define additional UOM conversion against Base UOM {form.baseUom || "PCS"}.
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsUomModalOpen(false);
+                        setUomCodeInput("");
+                        setUomRateInput("1");
+                        setUomError("");
+                      }}
+                      className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/80 transition hover:bg-white/10"
+                    >
+                      Close
+                    </button>
+                  </div>
+
+                  <div className="mt-4 grid gap-4 md:grid-cols-2">
+                    <div>
+                      <label className="label-rk">UOM Code</label>
+                      <input
+                        className="input-rk"
+                        value={uomCodeInput}
+                        onChange={(e) => setUomCodeInput(normalizeUomCode(e.target.value))}
+                        placeholder="e.g. BOX"
+                      />
+                    </div>
+                    <div>
+                      <label className="label-rk">Conversion Rate</label>
+                      <input
+                        type="number"
+                        min="0.0001"
+                        step="0.0001"
+                        className="input-rk"
+                        value={uomRateInput}
+                        onChange={(e) => setUomRateInput(e.target.value)}
+                        placeholder={`1 ${uomCodeInput || "BOX"} = ? ${form.baseUom || "PCS"}`}
+                      />
+                    </div>
+                  </div>
+
+                  <p className="mt-3 text-xs text-white/45">
+                    Example: if 1 BOX = 12 PCS, enter UOM Code BOX and Conversion Rate 12.
+                  </p>
+
+                  {uomError ? <div className="mt-4 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{uomError}</div> : null}
+
+                  <div className="mt-4 flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      onClick={addOrUpdateUomConversion}
+                      className="rounded-xl bg-red-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-red-400"
+                    >
+                      Save UOM Conversion
+                    </button>
+                  </div>
+                </div>
+              ) : null}
 
               {submitError ? <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{submitError}</div> : null}
 

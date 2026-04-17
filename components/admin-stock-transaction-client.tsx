@@ -893,6 +893,25 @@ export function AdminStockTransactionClient({
     });
   }
 
+  function addInboundSerial(index: number, serialNo: string) {
+    const normalized = serialNo.trim().toUpperCase();
+    if (!normalized) return;
+    const nextSerials = uniqueSerialNos([...(lines[index]?.serialNos || []), normalized]);
+    updateLine(index, {
+      serialNos: nextSerials,
+      serialEntryText: "",
+      qty: String(nextSerials.length),
+    });
+  }
+
+  function removeInboundSerial(index: number, serialNo: string) {
+    const nextSerials = lines[index].serialNos.filter((value) => value.toUpperCase() !== serialNo.toUpperCase());
+    updateLine(index, {
+      serialNos: nextSerials,
+      qty: String(nextSerials.length),
+    });
+  }
+
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1274,28 +1293,63 @@ export function AdminStockTransactionClient({
 
                         {isSerialTracked && inboundSerialFlow ? (
                           <div className="md:col-span-2 xl:col-span-4 rounded-2xl border border-white/10 bg-black/20 p-4">
-                            <div className="grid gap-4 xl:grid-cols-[1fr_auto]">
+                            <div className="grid gap-4 md:grid-cols-[minmax(260px,1fr)_auto]">
                               <div>
-                                <label className="label-rk">Serial No Input</label>
-                                <textarea
-                                  className="input-rk min-h-[120px]"
-                                  value={line.serialEntryText}
-                                  onChange={(e) => updateLine(index, { serialEntryText: e.target.value })}
-                                  placeholder="Enter one serial per line, or paste comma/new-line separated serials"
+                                <SearchableSelect
+                                  label="Serial No"
+                                  placeholder="Select existing serial or create new"
+                                  options={[
+                                    {
+                                      id: "__NEW__",
+                                      label: "+ Create New Serial",
+                                      searchText: "create new serial",
+                                    },
+                                    ...line.serialNos.map((serialNo) => ({
+                                      id: serialNo,
+                                      label: serialNo,
+                                      searchText: serialNo.toLowerCase(),
+                                    })),
+                                  ]}
+                                  value=""
+                                  onChange={(option) => {
+                                    if (!option) return;
+                                    if (option.id === "__NEW__") {
+                                      const entered = window.prompt("Enter new serial no");
+                                      if (entered) addInboundSerial(index, entered);
+                                      return;
+                                    }
+                                    addInboundSerial(index, option.id);
+                                  }}
                                 />
+                                <p className="mt-2 text-xs text-white/45">
+                                  Add each serial no one by one. Qty follows the selected serial count.
+                                </p>
                               </div>
                               <div className="flex items-end">
-                                <button type="button" onClick={() => handleAddSerials(index)} className="inline-flex items-center justify-center rounded-xl bg-white/10 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/15">
-                                  Add Serial(s)
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const entered = window.prompt("Enter new serial no");
+                                    if (entered) addInboundSerial(index, entered);
+                                  }}
+                                  className="inline-flex items-center justify-center rounded-xl bg-white/10 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/15"
+                                >
+                                  Create New Serial
                                 </button>
                               </div>
                             </div>
+
                             <div className="mt-4 flex flex-wrap gap-2">
                               {line.serialNos.length === 0 ? (
                                 <div className="text-sm text-white/45">No serial numbers added yet.</div>
                               ) : (
                                 line.serialNos.map((serialNo) => (
-                                  <button key={serialNo} type="button" onClick={() => removeSerial(index, serialNo)} className="rounded-full border border-white/15 bg-white/5 px-3 py-2 text-xs text-white/80 hover:bg-white/10">
+                                  <button
+                                    key={serialNo}
+                                    type="button"
+                                    onClick={() => removeInboundSerial(index, serialNo)}
+                                    className="rounded-full border border-white/15 bg-white/5 px-3 py-2 text-xs text-white/80 hover:bg-white/10"
+                                  >
                                     {serialNo} ✕
                                   </button>
                                 ))

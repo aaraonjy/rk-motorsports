@@ -15,6 +15,12 @@ function normalizeMoney(value: unknown) {
   return Math.round((parsed + Number.EPSILON) * 100) / 100;
 }
 
+function normalizeRate(value: unknown) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+  return Math.round((parsed + Number.EPSILON) * 10000) / 10000;
+}
+
 function normalizeItemType(value: unknown) {
   if (value === "SERVICE_ITEM" || value === "NON_STOCK_ITEM") return value;
   return "STOCK_ITEM";
@@ -41,6 +47,13 @@ function mapProduct(product: any) {
     isActive: product.isActive,
     defaultLocationId: product.defaultLocationId,
     defaultLocationLabel: null,
+    uomConversions: Array.isArray(product.uomConversions)
+      ? product.uomConversions.map((item: any) => ({
+          id: item.id,
+          uomCode: item.uomCode,
+          conversionRate: Number(item.conversionRate ?? 0),
+        }))
+      : [],
     createdAt: product.createdAt.toISOString(),
     updatedAt: product.updatedAt.toISOString(),
   };
@@ -65,12 +78,31 @@ export async function POST(req: Request) {
     const batchTracking = Boolean(body.batchTracking);
     const isActive = Boolean(body.isActive);
     const defaultLocationId = typeof body.defaultLocationId === "string" && body.defaultLocationId.trim() ? body.defaultLocationId.trim() : null;
+    const uomConversions = Array.isArray(body.uomConversions)
+      ? body.uomConversions
+          .map((item: any) => ({
+            uomCode: normalizeCode(item?.uomCode),
+            conversionRate: normalizeRate(item?.conversionRate),
+          }))
+          .filter((item) => item.uomCode && item.conversionRate != null)
+      : [];
 
     if (!code) return NextResponse.json({ ok: false, error: "Product code is required." }, { status: 400 });
     if (!description) return NextResponse.json({ ok: false, error: "Product description is required." }, { status: 400 });
     if (!baseUom) return NextResponse.json({ ok: false, error: "Base UOM is required." }, { status: 400 });
     if (unitCost == null || sellingPrice == null) {
       return NextResponse.json({ ok: false, error: "Unit cost and selling price must be valid positive numbers." }, { status: 400 });
+    }
+
+    const duplicateUom = new Set<string>();
+    for (const item of uomConversions) {
+      if (item.uomCode === baseUom) {
+        return NextResponse.json({ ok: false, error: "Multi UOM code cannot be the same as Base UOM." }, { status: 400 });
+      }
+      if (duplicateUom.has(item.uomCode)) {
+        return NextResponse.json({ ok: false, error: `Duplicate Multi UOM code ${item.uomCode}.` }, { status: 400 });
+      }
+      duplicateUom.add(item.uomCode);
     }
 
     const [group, subGroup, brand] = await Promise.all([
@@ -111,6 +143,19 @@ export async function POST(req: Request) {
         batchTracking,
         isActive,
         defaultLocationId,
+        uomConversions: uomConversions.length
+          ? {
+              create: uomConversions.map((item) => ({
+                uomCode: item.uomCode,
+                conversionRate: new Prisma.Decimal(item.conversionRate!.toFixed(4)),
+              })),
+            }
+          : undefined,
+      },
+      include: {
+        uomConversions: {
+          orderBy: [{ uomCode: "asc" }],
+        },
       },
     });
 
@@ -123,7 +168,7 @@ export async function POST(req: Request) {
       entityId: created.id,
       entityCode: created.code,
       description: `${admin.name} created product ${created.code}.`,
-      newValues: { code: created.code, description: created.description, itemType: created.itemType, baseUom: created.baseUom, unitCost: Number(created.unitCost), sellingPrice: Number(created.sellingPrice), trackInventory: created.trackInventory, serialNumberTracking: created.serialNumberTracking, batchTracking: (created as any).batchTracking, isActive: created.isActive },
+      newValues: { code: created.code, description: created.description, itemType: created.itemType, baseUom: created.baseUom, unitCost: Number(created.unitCost), sellingPrice: Number(created.sellingPrice), trackInventory: created.trackInventory, serialNumberTracking: created.serialNumberTracking, batchTracking: (created as any).batchTracking, isActive: created.isActive, uomConversions: created.uomConversions.map((item: any) => ({ uomCode: item.uomCode, conversionRate: Number(item.conversionRate) })) },
       status: "SUCCESS",
     });
 

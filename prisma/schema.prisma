@@ -293,6 +293,7 @@ model InventoryProduct {
   batches              InventoryBatch[]
   serials              InventorySerial[]
   serialTransactionEntries StockTransactionLineSerial[]
+  uomConversions       InventoryProductUomConversion[]
 
   @@index([isActive, code])
   @@index([itemType, isActive])
@@ -302,6 +303,22 @@ model InventoryProduct {
   @@index([brandId])
 }
 
+
+
+
+model InventoryProductUomConversion {
+  id                 String            @id @default(cuid())
+  inventoryProductId String
+  uomCode            String
+  conversionRate     Decimal           @db.Decimal(12, 4)
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  inventoryProduct   InventoryProduct  @relation(fields: [inventoryProductId], references: [id], onDelete: Cascade)
+
+  @@unique([inventoryProductId, uomCode])
+  @@index([inventoryProductId])
+}
 
 model InventoryBatch {
   id                 String   @id @default(cuid())
