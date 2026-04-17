@@ -58,14 +58,14 @@ export default async function AdminStockTransactionDetailPage({ params }: Params
         </div>
 
         <div className="grid gap-4 md:grid-cols-4">
-          <div className="rounded-2xl border border-white/10 bg-black/20 p-4"><p className="text-xs uppercase tracking-[0.24em] text-white/40">Status</p><p className="mt-3 text-lg font-bold text-white">{transaction.status === "CANCELLED" ? "Cancelled" : "Posted"}</p></div>
-          <div className="rounded-2xl border border-white/10 bg-black/20 p-4"><p className="text-xs uppercase tracking-[0.24em] text-white/40">Date</p><p className="mt-3 text-lg font-bold text-white">{formatDate(transaction.transactionDate)}</p></div>
-          <div className="rounded-2xl border border-white/10 bg-black/20 p-4"><p className="text-xs uppercase tracking-[0.24em] text-white/40">Reference</p><p className="mt-3 text-lg font-bold text-white">{transaction.reference || "-"}</p></div>
-          <div className="rounded-2xl border border-white/10 bg-black/20 p-4"><p className="text-xs uppercase tracking-[0.24em] text-white/40">Created By</p><p className="mt-3 text-lg font-bold text-white">{transaction.createdByAdmin?.name || "-"}</p></div>
+          <div className="rounded-2xl border border-white/10 bg-neutral-900 p-4"><p className="text-xs uppercase tracking-[0.24em] text-white/40">Status</p><p className="mt-3 text-lg font-bold text-white">{transaction.status === "CANCELLED" ? "Cancelled" : "Posted"}</p></div>
+          <div className="rounded-2xl border border-white/10 bg-neutral-900 p-4"><p className="text-xs uppercase tracking-[0.24em] text-white/40">Date</p><p className="mt-3 text-lg font-bold text-white">{formatDate(transaction.transactionDate)}</p></div>
+          <div className="rounded-2xl border border-white/10 bg-neutral-900 p-4"><p className="text-xs uppercase tracking-[0.24em] text-white/40">Reference</p><p className="mt-3 text-lg font-bold text-white">{transaction.reference || "-"}</p></div>
+          <div className="rounded-2xl border border-white/10 bg-neutral-900 p-4"><p className="text-xs uppercase tracking-[0.24em] text-white/40">Created By</p><p className="mt-3 text-lg font-bold text-white">{transaction.createdByAdmin?.name || "-"}</p></div>
         </div>
 
         {transaction.status === "CANCELLED" ? (
-          <div className="rounded-2xl border border-red-500/25 bg-red-500/10 p-5 text-sm text-red-100">
+          <div className="rounded-2xl border border-red-500/25 bg-red-900/30 p-5 text-sm text-red-100">
             <div className="font-semibold">This transaction has been cancelled.</div>
             <div className="mt-2">Cancelled At: {formatDate(transaction.cancelledAt)}</div>
             <div className="mt-1">Cancelled By: {transaction.cancelledByAdmin?.name || "-"}</div>
@@ -73,7 +73,7 @@ export default async function AdminStockTransactionDetailPage({ params }: Params
           </div>
         ) : null}
 
-        <div className="rounded-[2rem] border border-white/10 bg-black/20 p-5">
+        <div className="rounded-[2rem] border border-white/10 bg-neutral-900 p-5">
           <h2 className="text-xl font-semibold text-white">Lines</h2>
           <div className="mt-4 overflow-x-auto">
             <table className="min-w-full divide-y divide-white/10 text-sm">
