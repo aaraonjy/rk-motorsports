@@ -90,15 +90,17 @@ type BalanceResponse = {
   error?: string;
 };
 
+type StockSettingsConfig = {
+  stockModuleEnabled: boolean;
+  multiLocationEnabled: boolean;
+  allowNegativeStock: boolean;
+  costingMethod: "AVERAGE";
+  defaultLocationId: string;
+};
+
 type StockSettingsResponse = {
   ok: boolean;
-  config?: {
-    stockModuleEnabled: boolean;
-    multiLocationEnabled: boolean;
-    allowNegativeStock: boolean;
-    costingMethod: "AVERAGE";
-    defaultLocationId: string;
-  };
+  config?: StockSettingsConfig;
   error?: string;
 };
 
@@ -332,7 +334,7 @@ export function AdminStockTransactionClient({
   const [loadingSerials, setLoadingSerials] = useState<Record<number, boolean>>({});
   const [availableBatches, setAvailableBatches] = useState<Record<number, AvailableBatch[]>>({});
   const [loadingBatches, setLoadingBatches] = useState<Record<number, boolean>>({});
-  const [stockSettings, setStockSettings] = useState<StockSettingsResponse["config"]>({
+  const [stockSettings, setStockSettings] = useState<StockSettingsConfig>({
     stockModuleEnabled: false,
     multiLocationEnabled: true,
     allowNegativeStock: false,
