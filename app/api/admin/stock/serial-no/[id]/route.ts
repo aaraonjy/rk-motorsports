@@ -2,10 +2,14 @@ import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 
-export async function GET(_: Request, context: { params: { id: string } }) {
+type RouteContext = {
+  params: Promise<{ id: string }>;
+};
+
+export async function GET(_: Request, context: RouteContext) {
   try {
     await requireAdmin();
-    const { id } = context.params;
+    const { id } = await context.params;
     const item = await db.inventorySerial.findUnique({
       where: { id },
       include: {

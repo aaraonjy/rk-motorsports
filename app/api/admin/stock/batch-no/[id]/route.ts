@@ -70,10 +70,14 @@ async function buildBatchState(batchId: string) {
   };
 }
 
-export async function GET(_: Request, context: { params: { id: string } }) {
+type RouteContext = {
+  params: Promise<{ id: string }>;
+};
+
+export async function GET(_: Request, context: RouteContext) {
   try {
     await requireAdmin();
-    const { id } = context.params;
+    const { id } = await context.params;
     const state = await buildBatchState(id);
     return NextResponse.json({ ok: true, detail: { batch: state.row, locations: state.locations, serials: state.serials, history: state.history } });
   } catch (error) {
@@ -81,10 +85,10 @@ export async function GET(_: Request, context: { params: { id: string } }) {
   }
 }
 
-export async function PATCH(req: Request, context: { params: { id: string } }) {
+export async function PATCH(req: Request, context: RouteContext) {
   try {
     const admin = await requireAdmin();
-    const { id } = context.params;
+    const { id } = await context.params;
     const body = await req.json().catch(() => ({}));
     const action = body?.action === "restore" ? "restore" : body?.action === "archive" ? "archive" : null;
     if (!action) {
