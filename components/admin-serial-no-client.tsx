@@ -90,7 +90,7 @@ export function AdminSerialNoClient({ initialRows, products, locations }: Props)
     setError("");
     setLoadingDetailId(id);
     try {
-      const response = await fetch(`/api/stock/serial-no/${id}`, { cache: "no-store" });
+      const response = await fetch(`/api/admin/stock/serial-no/${id}`, { cache: "no-store" });
       const data = await response.json();
       if (!response.ok || !data.ok) {
         setError(data.error || "Unable to load serial detail.");

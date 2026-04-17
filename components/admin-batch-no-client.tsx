@@ -108,7 +108,7 @@ export function AdminBatchNoClient({ initialRows, products, locations }: Props) 
     setSubmitError("");
     setLoadingDetailId(id);
     try {
-      const response = await fetch(`/api/stock/batch-no/${id}`, { cache: "no-store" });
+      const response = await fetch(`/api/admin/stock/batch-no/${id}`, { cache: "no-store" });
       const data = await response.json();
       if (!response.ok || !data.ok) {
         setSubmitError(data.error || "Unable to load batch detail.");
@@ -127,7 +127,7 @@ export function AdminBatchNoClient({ initialRows, products, locations }: Props) 
     setSubmitError("");
     setSubmitSuccess("");
     try {
-      const response = await fetch(`/api/stock/batch-no/${id}`, {
+      const response = await fetch(`/api/admin/stock/batch-no/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action }),
