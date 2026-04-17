@@ -329,7 +329,7 @@ model InventoryBatch {
   archivedAt         DateTime?
   archivedByAdminId  String?
   createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  updatedAt          DateTime @default(now()) @updatedAt
 
   inventoryProduct InventoryProduct @relation(fields: [inventoryProductId], references: [id], onDelete: Cascade)
   serials          InventorySerial[]
