@@ -290,6 +290,7 @@ export function AdminProductMasterClient({
   const [uomCodeInput, setUomCodeInput] = useState("");
   const [uomRateInput, setUomRateInput] = useState("1");
   const [uomError, setUomError] = useState("");
+  const [uomSuccess, setUomSuccess] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [submitSuccess, setSubmitSuccess] = useState("");
@@ -342,6 +343,7 @@ export function AdminProductMasterClient({
     setUomCodeInput("");
     setUomRateInput("1");
     setUomError("");
+    setUomSuccess("");
     setSubmitError("");
   }
 
@@ -352,6 +354,7 @@ export function AdminProductMasterClient({
     setUomCodeInput("");
     setUomRateInput("1");
     setUomError("");
+    setUomSuccess("");
     setSubmitError("");
     setSubmitSuccess("");
     setUomError("");
@@ -397,6 +400,7 @@ export function AdminProductMasterClient({
     setUomCodeInput("");
     setUomRateInput("1");
     setUomError("");
+    setUomSuccess("");
     setSubmitError("");
     setSubmitSuccess("");
     setUomError("");
@@ -410,18 +414,23 @@ export function AdminProductMasterClient({
 
     if (!normalizedCode) {
       setUomError("UOM code is required.");
+      setUomSuccess("");
       return;
     }
     if (normalizedCode === normalizedBase) {
       setUomError("Multi UOM code cannot be the same as Base UOM.");
+      setUomSuccess("");
       return;
     }
 
     const parsedRate = Number(uomRateInput);
     if (!Number.isFinite(parsedRate) || parsedRate <= 0) {
       setUomError("Conversion rate must be greater than 0.");
+      setUomSuccess("");
       return;
     }
+
+    const normalizedRate = normalizeConversionRate(uomRateInput);
 
     setForm((prev) => ({
       ...prev,
@@ -429,14 +438,14 @@ export function AdminProductMasterClient({
         ...prev.uomConversions.filter((item) => item.uomCode !== normalizedCode),
         {
           uomCode: normalizedCode,
-          conversionRate: normalizeConversionRate(uomRateInput),
+          conversionRate: normalizedRate,
         },
       ]),
     }));
     setUomCodeInput("");
     setUomRateInput("1");
     setUomError("");
-    setIsUomModalOpen(false);
+    setUomSuccess(`Saved: 1 ${normalizedCode} = ${normalizedRate} ${normalizedBase || "PCS"}`);
   }
 
   function editUomConversion(uomCode: string, conversionRate: string) {
@@ -729,6 +738,57 @@ export function AdminProductMasterClient({
                 </div>
               </div>
 
+              <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-white">Multi UOM Preview</p>
+                    <p className="mt-1 text-xs text-white/45">
+                      Saved additional UOM conversions against Base UOM {form.baseUom || "PCS"}.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-4 space-y-2">
+                  {form.uomConversions.length === 0 ? (
+                    <div className="rounded-xl border border-white/10 bg-black/20 px-3 py-3 text-sm text-white/45">
+                      No Multi UOM conversion added yet.
+                    </div>
+                  ) : (
+                    form.uomConversions.map((item) => (
+                      <div
+                        key={item.uomCode}
+                        className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 bg-black/20 px-3 py-3"
+                      >
+                        <div>
+                          <div className="text-sm font-medium text-white">
+                            {formatUomPreviewLine(item.uomCode, item.conversionRate, form.baseUom || "PCS")}
+                          </div>
+                          <div className="mt-1 text-xs text-white/45">
+                            UOM Code: {item.uomCode} • Conversion Rate: {item.conversionRate}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => editUomConversion(item.uomCode, item.conversionRate)}
+                            className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-semibold text-white transition hover:bg-white/10"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => removeUomConversion(item.uomCode)}
+                            className="rounded-lg border border-red-500/25 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-200 transition hover:bg-red-500/15"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
               <div><label className="label-rk">Description</label><input className="input-rk" value={form.description} onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))} placeholder="e.g. Brake Pad (Brembo M4)" required /></div>
 
               
@@ -879,6 +939,55 @@ export function AdminProductMasterClient({
                 {uomError}
               </div>
             ) : null}
+
+            {uomSuccess ? (
+              <div className="mt-4 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+                {uomSuccess}
+              </div>
+            ) : null}
+
+            <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 p-4">
+              <p className="text-sm font-semibold text-white">Saved Multi UOM</p>
+              <div className="mt-3 space-y-2">
+                {form.uomConversions.length === 0 ? (
+                  <div className="rounded-xl border border-white/10 bg-black/20 px-3 py-3 text-sm text-white/45">
+                    No Multi UOM conversion added yet.
+                  </div>
+                ) : (
+                  form.uomConversions.map((item) => (
+                    <div
+                      key={item.uomCode}
+                      className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 bg-black/20 px-3 py-3"
+                    >
+                      <div>
+                        <div className="text-sm font-medium text-white">
+                          {formatUomPreviewLine(item.uomCode, item.conversionRate, form.baseUom || "PCS")}
+                        </div>
+                        <div className="mt-1 text-xs text-white/45">
+                          UOM Code: {item.uomCode} • Conversion Rate: {item.conversionRate}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => editUomConversion(item.uomCode, item.conversionRate)}
+                          className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-semibold text-white transition hover:bg-white/10"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => removeUomConversion(item.uomCode)}
+                          className="rounded-lg border border-red-500/25 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-200 transition hover:bg-red-500/15"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
 
             <div className="mt-4 flex flex-wrap gap-3">
               <button
