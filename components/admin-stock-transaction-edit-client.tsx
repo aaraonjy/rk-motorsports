@@ -136,6 +136,24 @@ function formatQty(value: string | number | null | undefined) {
   return Number.isFinite(num) ? num.toFixed(2) : "0.00";
 }
 
+
+function getTypeLabel(type: StockTransactionTypeValue) {
+  switch (type) {
+    case "OB":
+      return "Opening Stock";
+    case "SR":
+      return "Stock Receive";
+    case "SI":
+      return "Stock Issue";
+    case "SA":
+      return "Stock Adjustment";
+    case "ST":
+      return "Stock Transfer";
+    default:
+      return type;
+  }
+}
+
 function balanceKey(productId: string, locationId: string, batchNo?: string) {
   return `${productId}__${locationId}__${(batchNo || "").trim().toUpperCase()}`;
 }
