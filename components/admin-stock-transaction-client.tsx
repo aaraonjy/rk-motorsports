@@ -1092,31 +1092,33 @@ export function AdminStockTransactionClient({
                       <span className={getStatusBadgeClass(item.status)}>{item.status === "CANCELLED" ? "Cancelled" : "Posted"}</span>
                     </td>
                     <td className="px-3 py-4">
-                      <div className="flex justify-end gap-2">
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            openEdit(item.id);
-                          }}
-                          disabled={item.status === "CANCELLED"}
-                          className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-semibold text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            setCancelTarget(item);
-                            setCancelReason("");
-                          }}
-                          disabled={item.status === "CANCELLED"}
-                          className="rounded-lg border border-red-500/25 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-200 transition hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          Cancel
-                        </button>
-                      </div>
+                      {item.status === "POSTED" ? (
+                        <div className="flex justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              openEdit(item.id);
+                            }}
+                            className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-semibold text-white transition hover:bg-white/10"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setCancelTarget(item);
+                              setCancelReason("");
+                            }}
+                            className="rounded-lg border border-red-500/25 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-200 transition hover:bg-red-500/15"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="text-right text-xs text-white/35">—</div>
+                      )}
                     </td>
                   </tr>
                 ))
