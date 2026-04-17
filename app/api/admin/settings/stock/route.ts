@@ -10,6 +10,49 @@ function normalizeCostingMethod(value: unknown): StockCostingMethod {
     : StockCostingMethod.AVERAGE;
 }
 
+
+export async function GET() {
+  try {
+    await requireAdmin();
+
+    const config = await db.stockConfiguration.findUnique({
+      where: { id: "default" },
+      select: {
+        stockModuleEnabled: true,
+        multiLocationEnabled: true,
+        allowNegativeStock: true,
+        costingMethod: true,
+        defaultLocationId: true,
+      },
+    });
+
+    return NextResponse.json({
+      ok: true,
+      config: {
+        stockModuleEnabled: config?.stockModuleEnabled ?? false,
+        multiLocationEnabled: config?.multiLocationEnabled ?? false,
+        allowNegativeStock: config?.allowNegativeStock ?? false,
+        costingMethod: config?.costingMethod ?? StockCostingMethod.AVERAGE,
+        defaultLocationId: config?.defaultLocationId ?? "",
+      },
+    });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Unable to load stock settings.",
+      },
+      {
+        status:
+          error instanceof Error && error.message === "FORBIDDEN" ? 403 : 500,
+      }
+    );
+  }
+}
+
 export async function POST(req: Request) {
   try {
     const admin = await requireAdmin();
@@ -19,9 +62,6 @@ export async function POST(req: Request) {
     const multiLocationEnabled = stockModuleEnabled ? Boolean(body.multiLocationEnabled) : false;
     const allowNegativeStock = stockModuleEnabled ? Boolean(body.allowNegativeStock) : false;
     const costingMethod = normalizeCostingMethod(body.costingMethod);
-    const multiUomEnabled = stockModuleEnabled ? Boolean(body.multiUomEnabled) : false;
-    const serialTrackingEnabled = stockModuleEnabled ? Boolean(body.serialTrackingEnabled) : false;
-    const batchTrackingEnabled = stockModuleEnabled ? Boolean(body.batchTrackingEnabled) : false;
     const defaultLocationId =
       typeof body.defaultLocationId === "string" && body.defaultLocationId.trim()
         ? body.defaultLocationId.trim()
@@ -59,9 +99,6 @@ export async function POST(req: Request) {
         multiLocationEnabled,
         allowNegativeStock,
         costingMethod,
-        multiUomEnabled,
-        serialTrackingEnabled,
-        batchTrackingEnabled,
         defaultLocationId: stockModuleEnabled ? defaultLocationId : null,
       },
       create: {
@@ -70,9 +107,6 @@ export async function POST(req: Request) {
         multiLocationEnabled,
         allowNegativeStock,
         costingMethod,
-        multiUomEnabled,
-        serialTrackingEnabled,
-        batchTrackingEnabled,
         defaultLocationId: stockModuleEnabled ? defaultLocationId : null,
       },
     });
@@ -92,9 +126,6 @@ export async function POST(req: Request) {
             multiLocationEnabled: existing.multiLocationEnabled,
             allowNegativeStock: existing.allowNegativeStock,
             costingMethod: existing.costingMethod,
-            multiUomEnabled: existing.multiUomEnabled,
-            serialTrackingEnabled: existing.serialTrackingEnabled,
-            batchTrackingEnabled: (existing as any).batchTrackingEnabled,
             defaultLocationId: existing.defaultLocationId,
           }
         : null,
@@ -103,9 +134,6 @@ export async function POST(req: Request) {
         multiLocationEnabled: saved.multiLocationEnabled,
         allowNegativeStock: saved.allowNegativeStock,
         costingMethod: saved.costingMethod,
-        multiUomEnabled: saved.multiUomEnabled,
-        serialTrackingEnabled: saved.serialTrackingEnabled,
-        batchTrackingEnabled: (saved as any).batchTrackingEnabled,
         defaultLocationId: saved.defaultLocationId,
       },
       status: "SUCCESS",

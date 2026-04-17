@@ -14,7 +14,7 @@ const activeItems = [
   { label: "Stock Receive", href: "/admin/stock/stock-receive" },
   { label: "Stock Issue", href: "/admin/stock/stock-issue" },
   { label: "Stock Adjustment", href: "/admin/stock/stock-adjustment" },
-  { label: "Stock Transfer", href: "/admin/stock/stock-transfer" },
+  { label: "Stock Transfer", href: "/admin/stock/stock-transfer", requiresMultiLocation: true },
 ] as const;
 
 const upcomingItems = ["Serial No"] as const;
@@ -22,6 +22,7 @@ const upcomingItems = ["Serial No"] as const;
 export function AdminStockMenu() {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
+  const [multiLocationEnabled, setMultiLocationEnabled] = useState(true);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -34,6 +35,26 @@ export function AdminStockMenu() {
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadStockSettings() {
+      try {
+        const response = await fetch("/api/admin/settings/stock", { cache: "no-store" });
+        const data = await response.json();
+        if (!response.ok || !data.ok || cancelled) return;
+        setMultiLocationEnabled(Boolean(data.config?.multiLocationEnabled));
+      } catch {
+        if (!cancelled) setMultiLocationEnabled(true);
+      }
+    }
+
+    void loadStockSettings();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const isActive = activeItems.some((item) => pathname.startsWith(item.href));
@@ -52,6 +73,20 @@ export function AdminStockMenu() {
           <div className="border-b border-white/10 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.24em] text-white/40">Batch B</div>
           {activeItems.map((item) => {
             const active = pathname === item.href;
+            const disabled = Boolean((item as any).requiresMultiLocation) && !multiLocationEnabled;
+
+            if (disabled) {
+              return (
+                <div
+                  key={item.href}
+                  className="block cursor-not-allowed px-4 py-4 text-sm text-white/35"
+                  title="Enable Multi Location in Stock Settings to use Stock Transfer."
+                >
+                  {item.label}
+                </div>
+              );
+            }
+
             return (
               <Link key={item.href} href={item.href} className={`block px-4 py-4 text-sm transition hover:bg-white/10 hover:text-white ${active ? "bg-white/10 text-white" : "text-white/85"}`} onClick={() => setIsOpen(false)}>
                 {item.label}

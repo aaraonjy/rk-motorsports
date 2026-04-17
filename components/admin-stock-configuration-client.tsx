@@ -15,9 +15,6 @@ type Props = {
     multiLocationEnabled: boolean;
     allowNegativeStock: boolean;
     costingMethod: "AVERAGE";
-    multiUomEnabled: boolean;
-    serialTrackingEnabled: boolean;
-    batchTrackingEnabled: boolean;
     defaultLocationId: string;
   };
   locations: StockLocationOption[];
@@ -55,9 +52,6 @@ export function AdminStockConfigurationClient({ initialConfig, locations }: Prop
             ...form,
             multiLocationEnabled: false,
             allowNegativeStock: false,
-            multiUomEnabled: false,
-            serialTrackingEnabled: false,
-            batchTrackingEnabled: false,
             defaultLocationId: "",
           };
 
@@ -104,9 +98,6 @@ export function AdminStockConfigurationClient({ initialConfig, locations }: Prop
                     stockModuleEnabled: e.target.checked,
                     multiLocationEnabled: e.target.checked ? prev.multiLocationEnabled : false,
                     allowNegativeStock: e.target.checked ? prev.allowNegativeStock : false,
-                    multiUomEnabled: e.target.checked ? prev.multiUomEnabled : false,
-                    serialTrackingEnabled: e.target.checked ? prev.serialTrackingEnabled : false,
-                    batchTrackingEnabled: e.target.checked ? prev.batchTrackingEnabled : false,
                     defaultLocationId: e.target.checked ? prev.defaultLocationId : "",
                   }))
                 }
@@ -130,33 +121,6 @@ export function AdminStockConfigurationClient({ initialConfig, locations }: Prop
                 onChange={(e) => setForm((prev) => ({ ...prev, allowNegativeStock: e.target.checked }))}
               />
               <span>Allow Negative Stock</span>
-            </label>
-            <label className={`flex items-center gap-3 ${stockControlEnabled ? "" : "opacity-50"}`}>
-              <input
-                type="checkbox"
-                checked={form.multiUomEnabled}
-                disabled={!stockControlEnabled}
-                onChange={(e) => setForm((prev) => ({ ...prev, multiUomEnabled: e.target.checked }))}
-              />
-              <span>Enable Multi-UOM</span>
-            </label>
-            <label className={`flex items-center gap-3 ${stockControlEnabled ? "" : "opacity-50"}`}>
-              <input
-                type="checkbox"
-                checked={form.serialTrackingEnabled}
-                disabled={!stockControlEnabled}
-                onChange={(e) => setForm((prev) => ({ ...prev, serialTrackingEnabled: e.target.checked }))}
-              />
-              <span>Enable Serial Tracking</span>
-            </label>
-            <label className={`flex items-center gap-3 ${stockControlEnabled ? "" : "opacity-50"}`}>
-              <input
-                type="checkbox"
-                checked={form.batchTrackingEnabled}
-                disabled={!stockControlEnabled}
-                onChange={(e) => setForm((prev) => ({ ...prev, batchTrackingEnabled: e.target.checked }))}
-              />
-              <span>Enable Batch Tracking</span>
             </label>
           </div>
 
@@ -213,11 +177,11 @@ export function AdminStockConfigurationClient({ initialConfig, locations }: Prop
             </div>
             <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
               <div className="font-semibold text-white">When stock module is ON</div>
-              <div className="mt-2">Batch A still does not deduct stock yet. It only prepares configuration, product tagging, and order line snapshot fields for future batches.</div>
+              <div className="mt-2">Stock settings only prepare configuration. Product-level Serial Tracking and Batch Tracking are maintained in Product Master.</div>
             </div>
             <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
               <div className="font-semibold text-white">Default location</div>
-              <div className="mt-2">Used as the product master default and future stock posting base when Batch B and Batch C are implemented.</div>
+              <div className="mt-2">Used as the auto-filled posting location when Multi Location is disabled, and as the fallback stock posting base.</div>
             </div>
           </div>
         </div>

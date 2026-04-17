@@ -90,18 +90,24 @@ type BalanceResponse = {
   error?: string;
 };
 
+type StockSettingsResponse = {
+  ok: boolean;
+  config?: {
+    stockModuleEnabled: boolean;
+    multiLocationEnabled: boolean;
+    allowNegativeStock: boolean;
+    costingMethod: "AVERAGE";
+    defaultLocationId: string;
+  };
+  error?: string;
+};
+
 type AvailableSerial = {
   id: string;
   serialNo: string;
   batchNo?: string | null;
   expiryDate?: string | null;
 };
-
-function buildSerialOptionLabel(serial: AvailableSerial) {
-  const expiryPart = serial.expiryDate ? ` • Exp ${formatDateInput(serial.expiryDate)}` : "";
-  const batchPart = serial.batchNo ? ` • Batch ${serial.batchNo}` : "";
-  return `${serial.serialNo}${batchPart}${expiryPart}`;
-}
 
 type AvailableBatch = {
   id: string;
@@ -359,14 +365,6 @@ export function AdminStockTransactionClient({
     [activeLocations]
   );
 
-  function getFromLocationOptions(line: FormLine) {
-    return locationOptions.filter((option) => option.id !== line.toLocationId);
-  }
-
-  function getToLocationOptions(line: FormLine) {
-    return locationOptions.filter((option) => option.id !== line.fromLocationId);
-  }
-
   const filteredTransactions = useMemo(() => {
     const keyword = searchKeyword.trim().toLowerCase();
     return transactions.filter((item) => {
@@ -430,6 +428,57 @@ export function AdminStockTransactionClient({
   useEffect(() => {
     void loadTransactions();
   }, [transactionType]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadStockSettings() {
+      try {
+        const response = await fetch("/api/admin/settings/stock", { cache: "no-store" });
+        const data = (await response.json()) as StockSettingsResponse;
+        if (!response.ok || !data.ok || cancelled) return;
+        setStockSettings(
+          data.config || {
+            stockModuleEnabled: false,
+            multiLocationEnabled: true,
+            allowNegativeStock: false,
+            costingMethod: "AVERAGE",
+            defaultLocationId: "",
+          }
+        );
+      } catch {
+        if (!cancelled) {
+          setStockSettings({
+            stockModuleEnabled: false,
+            multiLocationEnabled: true,
+            allowNegativeStock: false,
+            costingMethod: "AVERAGE",
+            defaultLocationId: "",
+          });
+        }
+      }
+    }
+
+    void loadStockSettings();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!singleLocationMode || !lockedLocationId) return;
+
+    setLines((prev) =>
+      prev.map((line) => {
+        if (transactionType === "ST") return line;
+        if (line.locationId === lockedLocationId) return line;
+        return {
+          ...line,
+          locationId: lockedLocationId,
+        };
+      })
+    );
+  }, [singleLocationMode, lockedLocationId, transactionType]);
 
   useEffect(() => {
     const needed = new Set<string>();
@@ -646,7 +695,14 @@ export function AdminStockTransactionClient({
     setTransactionDate(new Date().toISOString().slice(0, 10));
     setReference("");
     setRemarks("");
-    setLines([emptyLine()]);
+    setLines([
+      singleLocationMode && lockedLocationId
+        ? {
+            ...emptyLine(),
+            locationId: lockedLocationId,
+          }
+        : emptyLine(),
+    ]);
     setSubmitError("");
     setSubmitSuccess("");
     setBalances({});
@@ -658,6 +714,10 @@ export function AdminStockTransactionClient({
   }
 
   function openCreateModal() {
+    if (transactionType === "ST" && singleLocationMode) {
+      setSubmitError("Stock Transfer is disabled when Multi Location is turned off.");
+      return;
+    }
     resetForm();
     setIsCreateOpen(true);
   }
@@ -692,12 +752,21 @@ export function AdminStockTransactionClient({
       serialNos: [],
       serialEntryText: "",
       serialSearch: "",
+      locationId: singleLocationMode && lockedLocationId ? lockedLocationId : lines[index]?.locationId || "",
       qty: product?.serialNumberTracking ? "0" : "1",
     });
   }
 
   function addLine() {
-    setLines((prev) => [...prev, emptyLine()]);
+    setLines((prev) => [
+      ...prev,
+      singleLocationMode && lockedLocationId
+        ? {
+            ...emptyLine(),
+            locationId: lockedLocationId,
+          }
+        : emptyLine(),
+    ]);
   }
 
   function removeLine(index: number) {
@@ -808,25 +877,6 @@ export function AdminStockTransactionClient({
     });
   }
 
-  function addInboundSerial(index: number, serialNo: string) {
-    const normalized = serialNo.trim().toUpperCase();
-    if (!normalized) return;
-    const line = lines[index];
-    const nextSerials = uniqueSerialNos([...(line?.serialNos || []), normalized]);
-    updateLine(index, {
-      serialNos: nextSerials,
-      serialSearch: "",
-      qty: String(nextSerials.length),
-    });
-  }
-
-  function removeInboundSerial(index: number, serialNo: string) {
-    const nextSerials = lines[index].serialNos.filter((value) => value.toUpperCase() !== serialNo.toUpperCase());
-    updateLine(index, {
-      serialNos: nextSerials,
-      qty: String(nextSerials.length),
-    });
-  }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -835,16 +885,6 @@ export function AdminStockTransactionClient({
     setSubmitSuccess("");
 
     try {
-      if (transactionType === "ST") {
-        const hasSameTransferLocation = lines.some(
-          (line) => !!line.fromLocationId && !!line.toLocationId && line.fromLocationId === line.toLocationId
-        );
-        if (hasSameTransferLocation) {
-          setSubmitError("From Location and To Location cannot be the same for Stock Transfer.");
-          return;
-        }
-      }
-
       const payload = {
         transactionType,
         transactionDate,
@@ -895,11 +935,15 @@ export function AdminStockTransactionClient({
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/45">{getTypeLabel(transactionType)}</p>
             <h2 className="mt-3 text-2xl font-bold text-white">Existing {title} Records</h2>
             <p className="mt-4 max-w-3xl text-sm leading-6 text-white/65">{intro}</p>
+            {transactionType === "ST" && singleLocationMode ? (
+              <p className="mt-3 text-sm text-amber-300">Stock Transfer is disabled while Multi Location is turned off in Stock Settings.</p>
+            ) : null}
           </div>
           <button
             type="button"
             onClick={openCreateModal}
-            className="inline-flex items-center justify-center rounded-xl bg-red-500 px-5 py-3 font-semibold text-white transition hover:bg-red-400"
+            disabled={transactionType === "ST" && singleLocationMode}
+            className="inline-flex items-center justify-center rounded-xl bg-red-500 px-5 py-3 font-semibold text-white transition hover:bg-red-400 disabled:cursor-not-allowed disabled:opacity-60"
           >
             Create {title}
           </button>
@@ -1079,7 +1123,8 @@ export function AdminStockTransactionClient({
                               label="Location"
                               placeholder="Search or select location"
                               options={locationOptions}
-                              value={line.locationId}
+                              value={singleLocationMode && lockedLocationId ? lockedLocationId : line.locationId}
+                              disabled={singleLocationMode}
                               onChange={(option) => updateLine(index, { locationId: option?.id || "", batchNo: "", batchMode: "existing", expiryDate: "", serialNos: [], serialSearch: "" })}
                             />
                             <p className="mt-2 text-xs text-white/45">{getBalanceText(line.inventoryProductId, line.locationId, balanceBatchNo, selectedProduct, line.adjustmentDirection)}</p>
@@ -1106,7 +1151,7 @@ export function AdminStockTransactionClient({
                               <SearchableSelect
                                 label="From Location"
                                 placeholder="Search or select source location"
-                                options={getFromLocationOptions(line)}
+                                options={locationOptions}
                                 value={line.fromLocationId}
                                 onChange={(option) => updateLine(index, { fromLocationId: option?.id || "", batchNo: "", batchMode: "existing", expiryDate: "", serialNos: [], serialSearch: "" })}
                               />
@@ -1116,15 +1161,11 @@ export function AdminStockTransactionClient({
                               <SearchableSelect
                                 label="To Location"
                                 placeholder="Search or select destination location"
-                                options={getToLocationOptions(line)}
+                                options={locationOptions}
                                 value={line.toLocationId}
                                 onChange={(option) => updateLine(index, { toLocationId: option?.id || "" })}
                               />
-                              <p className="mt-2 text-xs text-white/45">
-                                {line.fromLocationId && line.toLocationId && line.fromLocationId === line.toLocationId
-                                  ? "From Location and To Location cannot be the same."
-                                  : getBalanceText(line.inventoryProductId, line.toLocationId, balanceBatchNo, selectedProduct, line.adjustmentDirection)}
-                              </p>
+                              <p className="mt-2 text-xs text-white/45">{getBalanceText(line.inventoryProductId, line.toLocationId, balanceBatchNo, selectedProduct, line.adjustmentDirection)}</p>
                             </div>
                           </>
                         ) : null}
@@ -1217,61 +1258,28 @@ export function AdminStockTransactionClient({
 
                         {isSerialTracked && inboundSerialFlow ? (
                           <div className="md:col-span-2 xl:col-span-4 rounded-2xl border border-white/10 bg-black/20 p-4">
-                            <div className="grid gap-4 md:grid-cols-[minmax(260px,1fr)_auto]">
+                            <div className="grid gap-4 xl:grid-cols-[1fr_auto]">
                               <div>
-                                <SearchableSelect
-                                  label="Serial No"
-                                  placeholder="Select existing serial or create new"
-                                  options={[
-                                    {
-                                      id: "__NEW__",
-                                      label: "+ Create New Serial",
-                                      searchText: "create new serial new",
-                                    },
-                                    ...line.serialNos.map((serialNo) => ({
-                                      id: serialNo,
-                                      label: serialNo,
-                                      searchText: serialNo.toLowerCase(),
-                                    })),
-                                  ]}
-                                  value=""
-                                  onChange={(option) => {
-                                    if (!option) return;
-                                    if (option.id === "__NEW__") {
-                                      const entered = window.prompt("Enter new serial no");
-                                      if (entered) addInboundSerial(index, entered);
-                                      return;
-                                    }
-                                    addInboundSerial(index, option.id);
-                                  }}
+                                <label className="label-rk">Serial No Input</label>
+                                <textarea
+                                  className="input-rk min-h-[120px]"
+                                  value={line.serialEntryText}
+                                  onChange={(e) => updateLine(index, { serialEntryText: e.target.value })}
+                                  placeholder="Enter one serial per line, or paste comma/new-line separated serials"
                                 />
-                                <p className="mt-2 text-xs text-white/45">Add each serial no one by one. Qty follows the selected serial count.</p>
                               </div>
                               <div className="flex items-end">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const entered = window.prompt("Enter new serial no");
-                                    if (entered) addInboundSerial(index, entered);
-                                  }}
-                                  className="inline-flex items-center justify-center rounded-xl bg-white/10 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/15"
-                                >
-                                  Create New Serial
+                                <button type="button" onClick={() => handleAddSerials(index)} className="inline-flex items-center justify-center rounded-xl bg-white/10 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/15">
+                                  Add Serial(s)
                                 </button>
                               </div>
                             </div>
-
                             <div className="mt-4 flex flex-wrap gap-2">
                               {line.serialNos.length === 0 ? (
                                 <div className="text-sm text-white/45">No serial numbers added yet.</div>
                               ) : (
                                 line.serialNos.map((serialNo) => (
-                                  <button
-                                    key={serialNo}
-                                    type="button"
-                                    onClick={() => removeInboundSerial(index, serialNo)}
-                                    className="rounded-full border border-white/15 bg-white/5 px-3 py-2 text-xs text-white/80 hover:bg-white/10"
-                                  >
+                                  <button key={serialNo} type="button" onClick={() => removeSerial(index, serialNo)} className="rounded-full border border-white/15 bg-white/5 px-3 py-2 text-xs text-white/80 hover:bg-white/10">
                                     {serialNo} ✕
                                   </button>
                                 ))
@@ -1322,7 +1330,7 @@ export function AdminStockTransactionClient({
 
                       <div className="mt-4 flex flex-wrap items-center gap-3">
                         <button type="button" onClick={addLine} className="rounded-xl border border-white/15 bg-white/5 px-5 py-3 text-sm text-white/80 transition hover:bg-white/10">
-                          Add Product
+                          Add Line
                         </button>
                       </div>
                     </div>
