@@ -26,6 +26,11 @@ function normalizeItemType(value: unknown) {
   return "STOCK_ITEM";
 }
 
+type UomInput = {
+  uomCode: string;
+  conversionRate: number | null;
+};
+
 function mapProduct(product: any) {
   return {
     id: product.id,
@@ -78,13 +83,13 @@ export async function POST(req: Request) {
     const batchTracking = Boolean(body.batchTracking);
     const isActive = Boolean(body.isActive);
     const defaultLocationId = typeof body.defaultLocationId === "string" && body.defaultLocationId.trim() ? body.defaultLocationId.trim() : null;
-    const uomConversions = Array.isArray(body.uomConversions)
+    const uomConversions: UomInput[] = Array.isArray(body.uomConversions)
       ? body.uomConversions
-          .map((item: any) => ({
+          .map((item: any): UomInput => ({
             uomCode: normalizeCode(item?.uomCode),
             conversionRate: normalizeRate(item?.conversionRate),
           }))
-          .filter((item) => item.uomCode && item.conversionRate != null)
+          .filter((item: UomInput) => item.uomCode && item.conversionRate != null)
       : [];
 
     if (!code) return NextResponse.json({ ok: false, error: "Product code is required." }, { status: 400 });
