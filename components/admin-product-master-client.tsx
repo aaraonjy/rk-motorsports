@@ -892,18 +892,6 @@ export function AdminProductMasterClient({
                   Define additional UOM conversion against Base UOM {form.baseUom || "PCS"}.
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsUomModalOpen(false);
-                  setUomCodeInput("");
-                  setUomRateInput("1");
-                  setUomError("");
-                }}
-                className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/80 transition hover:bg-white/10"
-              >
-                Close
-              </button>
             </div>
 
             <div className="mt-6 grid gap-4 md:grid-cols-2">
@@ -989,7 +977,20 @@ export function AdminProductMasterClient({
               </div>
             </div>
 
-            <div className="mt-4 flex flex-wrap gap-3">
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsUomModalOpen(false);
+                  setUomCodeInput("");
+                  setUomRateInput("1");
+                  setUomError("");
+                  setUomSuccess("");
+                }}
+                className="rounded-xl border border-white/15 bg-white/5 px-5 py-3 text-sm text-white/80 transition hover:bg-white/10"
+              >
+                Close
+              </button>
               <button
                 type="button"
                 onClick={addOrUpdateUomConversion}
