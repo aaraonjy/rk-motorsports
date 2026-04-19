@@ -83,7 +83,7 @@ export function AdminStockConfigurationClient({ initialConfig, locations }: Prop
         <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/45">Global Settings</p>
         <h2 className="mt-3 text-2xl font-bold text-white">Stock Module Settings</h2>
         <p className="mt-4 max-w-3xl text-sm leading-6 text-white/65">
-          Batch A only prepares the stock configuration foundation. Product Master remains usable even when stock control is disabled.
+          Configure the stock control foundation. Product Master remains usable even when stock control is disabled.
         </p>
 
         <div className="mt-8 space-y-5">
@@ -133,7 +133,7 @@ export function AdminStockConfigurationClient({ initialConfig, locations }: Prop
                 </select>
                 <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/60">▾</div>
               </div>
-              <p className="mt-2 text-xs text-white/45">Batch A locks costing method to Average only.</p>
+              <p className="mt-2 text-xs text-white/45">Costing method is currently fixed to Average.</p>
             </div>
             <div>
               <label className="label-rk">Default Stock Location</label>
@@ -169,19 +169,19 @@ export function AdminStockConfigurationClient({ initialConfig, locations }: Prop
       <div className="space-y-6">
         <div className="rounded-[2rem] border border-white/10 bg-black/45 p-6 backdrop-blur-md md:p-8">
           <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/45">Behavior</p>
-          <h3 className="mt-3 text-xl font-bold text-white">Batch A Rules</h3>
+          <h3 className="mt-3 text-xl font-bold text-white">Stock Rules</h3>
           <div className="mt-6 space-y-4 text-sm leading-6 text-white/70">
             <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
               <div className="font-semibold text-white">When stock module is OFF</div>
-              <div className="mt-2">Product List and product picker stay usable, but no stock movement, stock transaction, or stock report logic is triggered. Stock Location master data should still remain accessible.</div>
+              <div className="mt-2">Product List and product picker stay usable, but no stock movement, stock transaction, or stock report logic is triggered. Stock Location master data remains accessible.</div>
             </div>
             <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
               <div className="font-semibold text-white">When stock module is ON</div>
-              <div className="mt-2">Stock settings only prepare configuration. Product-level Serial Tracking and Batch Tracking are maintained in Product Master.</div>
+              <div className="mt-2">Stock settings prepare the stock control foundation. Product-level Serial Tracking and Batch Tracking are maintained in Product Master.</div>
             </div>
             <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
               <div className="font-semibold text-white">Default location</div>
-              <div className="mt-2">Used as the auto-filled posting location when Multi Location is disabled, and as the fallback stock posting base.</div>
+              <div className="mt-2">Used as the default posting location for Opening Stock, Stock Receive, Stock Issue, and Stock Adjustment. When Multi Location is enabled, users can still change it.</div>
             </div>
           </div>
         </div>
