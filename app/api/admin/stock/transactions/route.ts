@@ -109,8 +109,6 @@ export async function GET(req: Request) {
       take: 100,
       include: {
         createdByAdmin: { select: { id: true, name: true, email: true } },
-        revisedFrom: { select: { id: true, transactionNo: true } },
-        revisions: { select: { id: true } },
         lines: {
           include: {
             inventoryProduct: { select: { id: true, code: true, description: true, baseUom: true } },

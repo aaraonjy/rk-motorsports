@@ -379,6 +379,7 @@ export function AdminStockTransactionEditClient({
 
   const singleLocationMode = stockSettings.stockModuleEnabled && !stockSettings.multiLocationEnabled && !!stockSettings.defaultLocationId;
   const lockedLocationId = singleLocationMode ? stockSettings.defaultLocationId : "";
+
   const defaultCreateLocationId = transactionType !== "ST" ? stockSettings.defaultLocationId || "" : "";
 
   useEffect(() => {
@@ -537,13 +538,13 @@ export function AdminStockTransactionEditClient({
       serialNos: [],
       serialEntryText: "",
       serialSearch: "",
-      locationId: defaultCreateLocationId || (singleLocationMode && lockedLocationId ? lockedLocationId : lines[index]?.locationId || ""),
+      locationId: defaultCreateLocationId || lines[index]?.locationId || "",
       qty: product?.serialNumberTracking ? "0" : "1",
     });
   }
 
   function addLine() {
-    setLines((prev) => [...prev, { inventoryProductId: "", qty: "1", unitCost: "0.00", batchNo: "", batchMode: "existing", expiryDate: "", serialNos: [], serialEntryText: "", serialSearch: "", remarks: "", locationId: defaultCreateLocationId || (singleLocationMode && lockedLocationId ? lockedLocationId : ""), fromLocationId: "", toLocationId: "", adjustmentDirection: "" }]);
+    setLines((prev) => [...prev, { inventoryProductId: "", qty: "1", unitCost: "0.00", batchNo: "", batchMode: "existing", expiryDate: "", serialNos: [], serialEntryText: "", serialSearch: "", remarks: "", locationId: defaultCreateLocationId || "", fromLocationId: "", toLocationId: "", adjustmentDirection: "" }]);
   }
 
   function removeLine(index: number) {
