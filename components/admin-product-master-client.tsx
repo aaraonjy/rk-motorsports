@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from "next/link";
@@ -108,7 +107,6 @@ function emptyForm(): ProductFormState {
   };
 }
 
-
 function normalizeUomCode(value: string) {
   return value.trim().toUpperCase();
 }
@@ -140,7 +138,6 @@ function getItemTypeLabel(value: InventoryItemTypeValue) {
       return value;
   }
 }
-
 
 function sortProductsByCode(items: InventoryProductRecord[]) {
   return [...items].sort((a, b) => a.code.localeCompare(b.code));
@@ -290,7 +287,7 @@ export function AdminProductMasterClient({
   productSubGroups,
   productBrands,
 }: Props) {
-    const [products, setProducts] = useState(initialProducts);
+  const [products, setProducts] = useState(initialProducts);
   const [keyword, setKeyword] = useState("");
   const [itemTypeFilter, setItemTypeFilter] = useState<"ALL" | InventoryItemTypeValue>("ALL");
   const [statusFilter, setStatusFilter] = useState<"ALL" | "ACTIVE" | "INACTIVE">("ALL");
@@ -298,6 +295,7 @@ export function AdminProductMasterClient({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [form, setForm] = useState<ProductFormState>(emptyForm());
   const [isUomModalOpen, setIsUomModalOpen] = useState(false);
+  const [showUomPreview, setShowUomPreview] = useState(false);
   const [uomCodeInput, setUomCodeInput] = useState("");
   const [uomRateInput, setUomRateInput] = useState("1");
   const [uomError, setUomError] = useState("");
@@ -351,6 +349,7 @@ export function AdminProductMasterClient({
     setEditingId(null);
     setForm(emptyForm());
     setIsUomModalOpen(false);
+    setShowUomPreview(false);
     setUomCodeInput("");
     setUomRateInput("1");
     setUomError("");
@@ -362,6 +361,7 @@ export function AdminProductMasterClient({
     setEditingId(null);
     setForm(emptyForm());
     setIsUomModalOpen(false);
+    setShowUomPreview(false);
     setUomCodeInput("");
     setUomRateInput("1");
     setUomError("");
@@ -409,6 +409,7 @@ export function AdminProductMasterClient({
       isActive: detailedProduct.isActive,
     });
     setIsUomModalOpen(false);
+    setShowUomPreview((detailedProduct.uomConversions || []).length > 0);
     setUomCodeInput("");
     setUomRateInput("1");
     setUomError("");
@@ -418,7 +419,6 @@ export function AdminProductMasterClient({
     setUomError("");
     setIsModalOpen(true);
   }
-
 
   function addOrUpdateUomConversion() {
     const normalizedCode = normalizeUomCode(uomCodeInput);
@@ -454,6 +454,7 @@ export function AdminProductMasterClient({
         },
       ]),
     }));
+    setShowUomPreview(true);
     setUomCodeInput("");
     setUomRateInput("1");
     setUomError("");
@@ -464,14 +465,21 @@ export function AdminProductMasterClient({
     setUomCodeInput(uomCode);
     setUomRateInput(conversionRate);
     setUomError("");
+    setShowUomPreview(true);
     setIsUomModalOpen(true);
   }
 
   function removeUomConversion(uomCode: string) {
-    setForm((prev) => ({
-      ...prev,
-      uomConversions: prev.uomConversions.filter((item) => item.uomCode !== uomCode),
-    }));
+    setForm((prev) => {
+      const nextUomConversions = prev.uomConversions.filter((item) => item.uomCode !== uomCode);
+      if (nextUomConversions.length === 0 && !isUomModalOpen) {
+        setShowUomPreview(false);
+      }
+      return {
+        ...prev,
+        uomConversions: nextUomConversions,
+      };
+    });
   }
 
   function resolveMasterSelection(
@@ -591,6 +599,8 @@ export function AdminProductMasterClient({
       setSubmitError("Unable to delete product right now.");
     }
   }
+
+  const shouldShowUomPreview = showUomPreview || form.uomConversions.length > 0;
 
   return (
     <>
@@ -749,6 +759,7 @@ export function AdminProductMasterClient({
                         setUomCodeInput("");
                         setUomRateInput("1");
                         setUomError("");
+                        setShowUomPreview(true);
                         setIsUomModalOpen(true);
                       }}
                       className="rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
@@ -762,61 +773,62 @@ export function AdminProductMasterClient({
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-semibold text-white">Multi UOM Preview</p>
-                    <p className="mt-1 text-xs text-white/45">
-                      Saved additional UOM conversions against Base UOM {form.baseUom || "PCS"}.
-                    </p>
+              {shouldShowUomPreview ? (
+                <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-white">Multi UOM Preview</p>
+                      <p className="mt-1 text-xs text-white/45">
+                        Saved additional UOM conversions against Base UOM {form.baseUom || "PCS"}.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 space-y-2">
+                    {form.uomConversions.length === 0 ? (
+                      <div className="rounded-xl border border-white/10 bg-black/20 px-3 py-3 text-sm text-white/45">
+                        No Multi UOM conversion added yet.
+                      </div>
+                    ) : (
+                      form.uomConversions.map((item) => (
+                        <div
+                          key={item.uomCode}
+                          className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 bg-black/20 px-3 py-3"
+                        >
+                          <div>
+                            <div className="text-sm font-medium text-white">
+                              {formatUomPreviewLine(item.uomCode, item.conversionRate, form.baseUom || "PCS")}
+                            </div>
+                            <div className="mt-1 text-xs text-white/45">
+                              UOM Code: {item.uomCode} • Conversion Rate: {item.conversionRate}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => editUomConversion(item.uomCode, item.conversionRate)}
+                              className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-semibold text-white transition hover:bg-white/10"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => removeUomConversion(item.uomCode)}
+                              className="rounded-lg border border-red-500/25 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-200 transition hover:bg-red-500/15"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
-
-                <div className="mt-4 space-y-2">
-                  {form.uomConversions.length === 0 ? (
-                    <div className="rounded-xl border border-white/10 bg-black/20 px-3 py-3 text-sm text-white/45">
-                      No Multi UOM conversion added yet.
-                    </div>
-                  ) : (
-                    form.uomConversions.map((item) => (
-                      <div
-                        key={item.uomCode}
-                        className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 bg-black/20 px-3 py-3"
-                      >
-                        <div>
-                          <div className="text-sm font-medium text-white">
-                            {formatUomPreviewLine(item.uomCode, item.conversionRate, form.baseUom || "PCS")}
-                          </div>
-                          <div className="mt-1 text-xs text-white/45">
-                            UOM Code: {item.uomCode} • Conversion Rate: {item.conversionRate}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => editUomConversion(item.uomCode, item.conversionRate)}
-                            className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-semibold text-white transition hover:bg-white/10"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => removeUomConversion(item.uomCode)}
-                            className="rounded-lg border border-red-500/25 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-200 transition hover:bg-red-500/15"
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
+              ) : null}
 
               <div><label className="label-rk">Description</label><input className="input-rk" value={form.description} onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))} placeholder="e.g. Brake Pad (Brembo M4)" required /></div>
 
-              
-<div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-4 md:grid-cols-3">
                 <SearchableSelect
                   label="Group"
                   placeholder="Search or select group"
@@ -891,7 +903,7 @@ export function AdminProductMasterClient({
                 <div><label className="label-rk">Selling Price (RM)</label><input type="number" min="0" step="0.01" className="input-rk" value={form.sellingPrice} onChange={(e) => setForm((prev) => ({ ...prev, sellingPrice: e.target.value }))} /></div>
               </div>
 
-                            <div className="grid gap-3 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-white/75 md:grid-cols-5">
+              <div className="grid gap-3 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-white/75 md:grid-cols-5">
                 <label className="flex items-center gap-3"><input type="checkbox" checked={form.trackInventory} disabled={form.itemType !== "STOCK_ITEM"} onChange={(e) => setForm((prev) => ({ ...prev, trackInventory: e.target.checked, isAssemblyItem: canUseAssemblyItem(prev.itemType, e.target.checked) ? prev.isAssemblyItem : false }))} /><span>Track Inventory</span></label>
                 <label className="flex items-center gap-3"><input type="checkbox" checked={form.serialNumberTracking} onChange={(e) => setForm((prev) => ({ ...prev, serialNumberTracking: e.target.checked }))} /><span>Serial Number Tracking</span></label>
                 <label className="flex items-center gap-3"><input type="checkbox" checked={form.batchTracking} onChange={(e) => setForm((prev) => ({ ...prev, batchTracking: e.target.checked }))} /><span>Batch Tracking</span></label>
@@ -924,7 +936,6 @@ export function AdminProductMasterClient({
                 </div>
               ) : null}
 
-              
               {submitError ? <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{submitError}</div> : null}
 
               <div className="flex flex-wrap items-center gap-3 pt-2">
@@ -1059,7 +1070,6 @@ export function AdminProductMasterClient({
           </div>
         </div>
       ) : null}
-
     </>
   );
 }
