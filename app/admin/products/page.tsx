@@ -1,4 +1,3 @@
-
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -66,6 +65,7 @@ export default async function AdminProductsPage() {
               trackInventory: product.trackInventory,
               serialNumberTracking: product.serialNumberTracking,
               batchTracking: product.batchTracking,
+              isAssemblyItem: product.isAssemblyItem ?? false,
               isActive: product.isActive,
               defaultLocationId: product.defaultLocationId,
               defaultLocationLabel: product.defaultLocation ? `${product.defaultLocation.code} — ${product.defaultLocation.name}` : null,
