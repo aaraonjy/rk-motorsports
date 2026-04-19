@@ -159,13 +159,13 @@ function getBackHref(type: StockTransactionTypeValue) {
     case "OB":
       return "/admin/stock/opening-stock";
     case "SR":
-      return "/admin/stock/receive";
+      return "/admin/stock/stock-receive";
     case "SI":
-      return "/admin/stock/issue";
+      return "/admin/stock/stock-issue";
     case "SA":
-      return "/admin/stock/adjustment";
+      return "/admin/stock/stock-adjustment";
     case "ST":
-      return "/admin/stock/transfer";
+      return "/admin/stock/stock-transfer";
     default:
       return "/admin/stock/opening-stock";
   }

@@ -54,6 +54,8 @@ type TransactionRecord = {
   status: "POSTED" | "CANCELLED";
   cancelReason?: string | null;
   cancelledAt?: string | null;
+  revisedFrom?: { id: string; transactionNo: string } | null;
+  revisions?: Array<{ id: string }>;
   lines: TransactionLineRecord[];
 };
 
@@ -123,7 +125,7 @@ type AvailableBatch = {
   balance?: number | null;
 };
 
-function emptyLine(): FormLine {
+function emptyLine(defaultLocationId = "", transactionType?: StockTransactionTypeValue): FormLine {
   return {
     inventoryProductId: "",
     qty: "1",
@@ -135,7 +137,7 @@ function emptyLine(): FormLine {
     serialEntryText: "",
     serialSearch: "",
     remarks: "",
-    locationId: "",
+    locationId: transactionType !== "ST" ? defaultLocationId : "",
     fromLocationId: "",
     toLocationId: "",
     adjustmentDirection: "",
@@ -402,9 +404,13 @@ export function AdminStockTransactionClient({
   const filteredTransactions = useMemo(() => {
     const keyword = searchKeyword.trim().toLowerCase();
     return transactions.filter((item) => {
+      const hasRevisionChildren = Array.isArray(item.revisions) && item.revisions.length > 0;
+      if (hasRevisionChildren) return false;
+
       const matchesKeyword =
         !keyword ||
         item.transactionNo.toLowerCase().includes(keyword) ||
+        (item.revisedFrom?.transactionNo || "").toLowerCase().includes(keyword) ||
         (item.reference || "").toLowerCase().includes(keyword) ||
         (item.remarks || "").toLowerCase().includes(keyword) ||
         item.lines.some(
@@ -729,14 +735,7 @@ export function AdminStockTransactionClient({
     setTransactionDate(new Date().toISOString().slice(0, 10));
     setReference("");
     setRemarks("");
-    setLines([
-      defaultCreateLocationId
-        ? {
-            ...emptyLine(),
-            locationId: defaultCreateLocationId,
-          }
-        : emptyLine(),
-    ]);
+    setLines([emptyLine(defaultCreateLocationId, transactionType)]);
     setSubmitError("");
     setSubmitSuccess("");
     setBalances({});
@@ -792,15 +791,7 @@ export function AdminStockTransactionClient({
   }
 
   function addLine() {
-    setLines((prev) => [
-      ...prev,
-      defaultCreateLocationId
-        ? {
-            ...emptyLine(),
-            locationId: defaultCreateLocationId,
-          }
-        : emptyLine(),
-    ]);
+    setLines((prev) => [...prev, emptyLine(defaultCreateLocationId, transactionType)]);
   }
 
   function removeLine(index: number) {
