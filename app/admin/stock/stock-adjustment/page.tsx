@@ -33,7 +33,6 @@ export default async function AdminStockAdjustmentPage() {
       <div className="container-rk max-w-7xl">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-red-400/80">Batch B</p>
             <h1 className="mt-3 text-4xl font-bold">Stock Adjustment</h1>
             <p className="mt-4 max-w-3xl text-white/70">Create stock adjustment IN or OUT to correct quantity differences by location.</p>
           </div>

@@ -68,10 +68,9 @@ export default async function AdminSerialNoPage() {
     <section className="section-pad">
       <div className="container-rk max-w-7xl">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.24em] text-red-400/80">Batch B</p>
           <h1 className="mt-3 text-4xl font-bold">Serial Number Tracking</h1>
           <p className="mt-4 max-w-3xl text-white/70">
-            Trace serial movement, current location, last transaction, and full movement timeline without allowing manual edit or delete in V1.
+            View serial traceability, current location, latest transaction, and movement history for tracked items.
           </p>
         </div>
 
