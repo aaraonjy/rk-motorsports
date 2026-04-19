@@ -1,4 +1,3 @@
-
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -13,6 +12,7 @@ function getTypeLabel(type: string) {
     case "SI": return "Stock Issue";
     case "SA": return "Stock Adjustment";
     case "ST": return "Stock Transfer";
+    case "AS": return "Stock Assembly";
     default: return "Stock Transaction";
   }
 }

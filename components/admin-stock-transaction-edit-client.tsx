@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
-type StockTransactionTypeValue = "OB" | "SR" | "SI" | "SA" | "ST";
+type StockTransactionTypeValue = "OB" | "SR" | "SI" | "SA" | "ST" | "AS";
 type AdjustmentDirectionValue = "IN" | "OUT";
 
 type InventoryProductOption = {
@@ -122,7 +122,7 @@ type AvailableBatch = {
 };
 
 function requiresSingleLocation(type: StockTransactionTypeValue) {
-  return type === "OB" || type === "SR" || type === "SI" || type === "SA";
+  return type === "OB" || type === "SR" || type === "SI" || type === "SA" || type === "AS";
 }
 
 function formatDateInput(value: string | null | undefined) {
@@ -149,6 +149,8 @@ function getTypeLabel(type: StockTransactionTypeValue) {
       return "Stock Adjustment";
     case "ST":
       return "Stock Transfer";
+    case "AS":
+      return "Stock Assembly";
     default:
       return type;
   }
@@ -166,6 +168,8 @@ function getBackHref(type: StockTransactionTypeValue) {
       return "/admin/stock/stock-adjustment";
     case "ST":
       return "/admin/stock/stock-transfer";
+    case "AS":
+      return "/admin/stock/stock-assembly";
     default:
       return "/admin/stock/opening-stock";
   }
@@ -200,11 +204,11 @@ function parseSerialEntryText(value: string) {
 }
 
 function isInboundSerialFlow(type: StockTransactionTypeValue, direction: "" | AdjustmentDirectionValue) {
-  return type === "OB" || type === "SR" || (type === "SA" && direction === "IN");
+  return type === "OB" || type === "SR" || (type === "SA" && direction === "IN") || (type === "AS" && direction === "IN");
 }
 
 function isOutboundSerialFlow(type: StockTransactionTypeValue, direction: "" | AdjustmentDirectionValue) {
-  return type === "SI" || type === "ST" || (type === "SA" && direction === "OUT");
+  return type === "SI" || type === "ST" || (type === "SA" && direction === "OUT") || (type === "AS" && direction === "OUT");
 }
 
 function requiresBatchSelectionBeforeBalance(
@@ -213,7 +217,7 @@ function requiresBatchSelectionBeforeBalance(
   direction: "" | AdjustmentDirectionValue
 ) {
   if (!product?.batchTracking) return false;
-  return type === "SI" || type === "ST" || type === "OB" || type === "SR" || (type === "SA" && direction === "OUT") || (type === "SA" && direction === "IN");
+  return type === "SI" || type === "ST" || type === "OB" || type === "SR" || (type === "SA" && direction === "OUT") || (type === "SA" && direction === "IN") || (type === "AS" && direction === "OUT") || (type === "AS" && direction === "IN");
 }
 
 function SearchableSelect({
