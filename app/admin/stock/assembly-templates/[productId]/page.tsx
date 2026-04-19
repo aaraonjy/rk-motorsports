@@ -2,9 +2,10 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { AdminAssemblyTemplateClient } from "@/components/admin-assembly-template-client";
 
 type Params = {
-  params: Promise<{ productId: string }> ;
+  params: Promise<{ productId: string }>;
 };
 
 export default async function AdminAssemblyTemplatePage({ params }: Params) {
@@ -14,25 +15,55 @@ export default async function AdminAssemblyTemplatePage({ params }: Params) {
 
   const { productId } = await params;
 
-  const product = await db.inventoryProduct.findUnique({
-    where: { id: productId },
-    select: {
-      id: true,
-      code: true,
-      description: true,
-      itemType: true,
-      trackInventory: true,
-      batchTracking: true,
-      serialNumberTracking: true,
-      isAssemblyItem: true,
-    },
-  });
+  const [product, template, componentOptions] = await Promise.all([
+    db.inventoryProduct.findUnique({
+      where: { id: productId },
+      select: {
+        id: true,
+        code: true,
+        description: true,
+        itemType: true,
+        trackInventory: true,
+        batchTracking: true,
+        serialNumberTracking: true,
+        isAssemblyItem: true,
+      },
+    }),
+    db.assemblyTemplate.findUnique({
+      where: { finishedGoodProductId: productId },
+      include: {
+        lines: {
+          orderBy: [{ lineNo: "asc" }],
+          include: {
+            componentProduct: {
+              select: { id: true, code: true, description: true },
+            },
+          },
+        },
+      },
+    }),
+    db.inventoryProduct.findMany({
+      where: {
+        isActive: true,
+        trackInventory: true,
+        itemType: "STOCK_ITEM",
+        NOT: { id: productId },
+      },
+      orderBy: [{ code: "asc" }],
+      select: {
+        id: true,
+        code: true,
+        description: true,
+        baseUom: true,
+      },
+    }),
+  ]);
 
   if (!product) notFound();
 
   return (
     <section className="section-pad">
-      <div className="container-rk max-w-5xl">
+      <div className="container-rk max-w-6xl">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/45">Stock Assembly</p>
@@ -64,18 +95,23 @@ export default async function AdminAssemblyTemplatePage({ params }: Params) {
             </div>
           </div>
 
-          {!product.isAssemblyItem ? (
-            <div className="mt-6 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-4 text-sm text-amber-200">
-              This product is not marked as an Assembly Item. Please go back to Product Master and enable Assembly Item first.
-            </div>
-          ) : (
-            <div className="mt-6 rounded-2xl border border-sky-500/25 bg-sky-500/10 p-5 text-sm text-sky-100">
-              <p className="font-semibold">Assembly Template foundation is ready.</p>
-              <p className="mt-2 text-sky-100/80">
-                This page is prepared as the separate entry point for the next step: adding BOM template lines such as component item, qty, UOM, required flag, and allow override.
-              </p>
-            </div>
-          )}
+          <AdminAssemblyTemplateClient
+            product={product}
+            componentOptions={componentOptions}
+            initialRemarks={template?.remarks || ""}
+            initialLines={(template?.lines || []).map((line) => ({
+              id: line.id,
+              lineNo: line.lineNo,
+              componentProductId: line.componentProductId,
+              componentProductCode: line.componentProduct.code,
+              componentProductDescription: line.componentProduct.description,
+              qty: Number(line.qty),
+              uom: line.uom,
+              isRequired: line.isRequired,
+              allowOverride: line.allowOverride,
+              remarks: line.remarks,
+            }))}
+          />
         </div>
       </div>
     </section>

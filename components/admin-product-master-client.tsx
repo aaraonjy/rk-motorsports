@@ -650,7 +650,7 @@ export function AdminProductMasterClient({
                 <th className="px-3 py-3 font-medium">Description</th>
                 <th className="px-3 py-3 font-medium">Type</th>
                 <th className="px-3 py-3 font-medium">UOM</th>
-                <th className="px-3 py-3 font-medium">Assembly</th>
+                <th className="px-3 py-3 font-medium text-center">Assembly</th>
                 <th className="px-3 py-3 font-medium">Selling Price</th>
                 <th className="px-3 py-3 font-medium">Status</th>
                 <th className="px-3 py-3 font-medium text-right">Action</th>
@@ -670,10 +670,12 @@ export function AdminProductMasterClient({
                   </td>
                   <td className="px-3 py-4">{getItemTypeLabel(product.itemType)}</td>
                   <td className="px-3 py-4">{product.baseUom}</td>
-                  <td className="px-3 py-4">
-                    <span className={product.isAssemblyItem ? "inline-flex rounded-full border border-sky-500/30 bg-sky-500/15 px-3 py-1 text-xs font-semibold text-sky-300" : "text-white/45"}>
-                      {getAssemblyStatusLabel(product)}
-                    </span>
+                  <td className="px-3 py-4 text-center">
+                    <div className="flex justify-center">
+                      <span className={product.isAssemblyItem ? "inline-flex rounded-full border border-sky-500/30 bg-sky-500/15 px-3 py-1 text-xs font-semibold text-sky-300" : "text-white/45"}>
+                        {getAssemblyStatusLabel(product)}
+                      </span>
+                    </div>
                   </td>
                   <td className="px-3 py-4">{formatCurrency(product.sellingPrice)}</td>
                   <td className="px-3 py-4">
@@ -684,11 +686,6 @@ export function AdminProductMasterClient({
                   <td className="px-3 py-4">
                     <div className="flex justify-end gap-2">
                       <button type="button" onClick={() => void startEdit(product)} className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-semibold text-white transition hover:bg-white/10">Edit Product</button>
-                      {product.isAssemblyItem ? (
-                        <Link href={`/admin/stock/assembly-templates/${product.id}`} className="rounded-lg border border-sky-500/25 bg-sky-500/10 px-3 py-2 text-xs font-semibold text-sky-200 transition hover:bg-sky-500/15">
-                          Configure Template
-                        </Link>
-                      ) : null}
                       <button type="button" onClick={() => handleDelete(product)} className="rounded-lg border border-red-500/25 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-200 transition hover:bg-red-500/15">Delete</button>
                     </div>
                   </td>
