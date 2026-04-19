@@ -1095,7 +1095,18 @@ export function AdminStockTransactionClient({
                     <td className="px-3 py-4 font-semibold text-white">
                       <div className="flex flex-col gap-1">
                         <span>{item.transactionNo}</span>
-                        {item.revisedFrom ? <span className="text-xs font-medium text-white/45">↳ Revision of {item.revisedFrom.transactionNo}</span> : null}
+                        {item.revisedFrom ? (
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              openView(item.revisedFrom!.id);
+                            }}
+                            className="w-fit text-left text-xs font-medium text-white/45 underline-offset-2 transition hover:text-white/70 hover:underline"
+                          >
+                            ↳ Revision of {item.revisedFrom.transactionNo}
+                          </button>
+                        ) : null}
                       </div>
                     </td>
                     <td className="px-3 py-4">{formatDateInput(item.transactionDate)}</td>
