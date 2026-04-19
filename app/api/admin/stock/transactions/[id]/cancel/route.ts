@@ -54,13 +54,13 @@ export async function POST(req: Request, context: Params) {
               throw new Error(`Serial No ${serialEntry.serialNo} cannot be found for cancellation.`);
             }
 
-            if (transaction.transactionType === "OB" || transaction.transactionType === "SR" || (transaction.transactionType === "SA" && line.adjustmentDirection === "IN")) {
+            if (transaction.transactionType === "OB" || transaction.transactionType === "SR" || ((transaction.transactionType === "SA" || transaction.transactionType === "AS") && line.adjustmentDirection === "IN")) {
               if (serial.status !== "IN_STOCK" || serial.currentLocationId !== line.locationId) {
                 throw new Error(`Serial No ${serialEntry.serialNo} cannot be cancelled because later stock activity already changed it.`);
               }
             }
 
-            if (transaction.transactionType === "SI" || (transaction.transactionType === "SA" && line.adjustmentDirection === "OUT")) {
+            if (transaction.transactionType === "SI" || ((transaction.transactionType === "SA" || transaction.transactionType === "AS") && line.adjustmentDirection === "OUT")) {
               if (serial.status !== "OUT_OF_STOCK") {
                 throw new Error(`Serial No ${serialEntry.serialNo} cannot be cancelled because it is no longer in outbound state.`);
               }
@@ -73,7 +73,7 @@ export async function POST(req: Request, context: Params) {
             }
           }
         } else {
-          if (transaction.transactionType === "OB" || transaction.transactionType === "SR" || (transaction.transactionType === "SA" && line.adjustmentDirection === "IN")) {
+          if (transaction.transactionType === "OB" || transaction.transactionType === "SR" || ((transaction.transactionType === "SA" || transaction.transactionType === "AS") && line.adjustmentDirection === "IN")) {
             const balance = await getStockBalance(tx, line.inventoryProductId, line.locationId!, { batchNo });
             if (balance < qty) {
               throw new Error(`Transaction ${transaction.transactionNo} cannot be cancelled because the current stock balance is no longer sufficient to reverse it.`);
@@ -135,7 +135,7 @@ export async function POST(req: Request, context: Params) {
             },
           });
         } else {
-          const reverseDirection = transaction.transactionType === "SI" || (transaction.transactionType === "SA" && line.adjustmentDirection === "OUT") ? "IN" : "OUT";
+          const reverseDirection = transaction.transactionType === "SI" || ((transaction.transactionType === "SA" || transaction.transactionType === "AS") && line.adjustmentDirection === "OUT") ? "IN" : "OUT";
           const ledgerValues = buildLedgerValues(qty, reverseDirection);
           await tx.stockLedger.create({
             data: {
@@ -172,7 +172,7 @@ export async function POST(req: Request, context: Params) {
 
             if (!serial) continue;
 
-            if (transaction.transactionType === "OB" || transaction.transactionType === "SR" || (transaction.transactionType === "SA" && line.adjustmentDirection === "IN")) {
+            if (transaction.transactionType === "OB" || transaction.transactionType === "SR" || ((transaction.transactionType === "SA" || transaction.transactionType === "AS") && line.adjustmentDirection === "IN")) {
               await tx.inventorySerial.update({
                 where: { id: serial.id },
                 data: {
@@ -180,7 +180,7 @@ export async function POST(req: Request, context: Params) {
                   currentLocationId: null,
                 },
               });
-            } else if (transaction.transactionType === "SI" || (transaction.transactionType === "SA" && line.adjustmentDirection === "OUT")) {
+            } else if (transaction.transactionType === "SI" || ((transaction.transactionType === "SA" || transaction.transactionType === "AS") && line.adjustmentDirection === "OUT")) {
               await tx.inventorySerial.update({
                 where: { id: serial.id },
                 data: {

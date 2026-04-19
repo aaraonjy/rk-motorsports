@@ -28,7 +28,7 @@ type StockLinePayload = {
 };
 
 function normalizeType(value: unknown) {
-  if (value === "OB" || value === "SR" || value === "SI" || value === "SA" || value === "ST") {
+  if (value === "OB" || value === "SR" || value === "SI" || value === "SA" || value === "ST" || value === "AS") {
     return value as StockTransactionType;
   }
   throw new Error("Invalid stock transaction type.");
@@ -71,7 +71,7 @@ function transactionUsesOutboundLocation(
 ) {
   if (transactionType === "ST") return line.fromLocationId;
   if (transactionType === "SI") return line.locationId;
-  if (transactionType === "SA" && adjustmentDirection === "OUT") return line.locationId;
+  if ((transactionType === "SA" || transactionType === "AS") && adjustmentDirection === "OUT") return line.locationId;
   return null;
 }
 
@@ -82,7 +82,7 @@ function transactionUsesInboundLocation(
 ) {
   if (transactionType === "ST") return line.toLocationId;
   if (transactionType === "OB" || transactionType === "SR") return line.locationId;
-  if (transactionType === "SA" && adjustmentDirection === "IN") return line.locationId;
+  if ((transactionType === "SA" || transactionType === "AS") && adjustmentDirection === "IN") return line.locationId;
   return null;
 }
 
@@ -211,12 +211,12 @@ export async function POST(req: Request) {
         throw new Error("Expiry Date is invalid.");
       }
 
-      if (transactionType === "SA" && !adjustmentDirection) {
-        throw new Error("Stock Adjustment requires adjustment direction IN or OUT.");
+      if ((transactionType === "SA" || transactionType === "AS") && !adjustmentDirection) {
+        throw new Error(`${transactionType === "AS" ? "Stock Assembly" : "Stock Adjustment"} requires adjustment direction IN or OUT.`);
       }
 
-      if (transactionType !== "SA" && adjustmentDirection) {
-        throw new Error("Adjustment direction is only allowed for Stock Adjustment.");
+      if (transactionType !== "SA" && transactionType !== "AS" && adjustmentDirection) {
+        throw new Error("Adjustment direction is only allowed for Stock Adjustment or Stock Assembly.");
       }
 
       if (product.serialNumberTracking) {
@@ -284,7 +284,7 @@ export async function POST(req: Request) {
             } else {
               const balance = await getStockBalance(tx, line.inventoryProductId, outboundLocationId, { batchNo: line.batchNo });
               if (balance < line.qty) {
-                throw new Error(`Insufficient stock for ${transactionType === "SI" ? "Stock Issue" : transactionType === "ST" ? "Stock Transfer" : "Stock Adjustment OUT"}.`);
+                throw new Error(`Insufficient stock for ${transactionType === "SI" ? "Stock Issue" : transactionType === "ST" ? "Stock Transfer" : transactionType === "AS" ? "Stock Assembly OUT" : "Stock Adjustment OUT"}.`);
               }
             }
           }
@@ -360,7 +360,7 @@ export async function POST(req: Request) {
         const direction =
           transactionType === "ST"
             ? null
-            : transactionType === "OB" || transactionType === "SR" || (transactionType === "SA" && line.adjustmentDirection === "IN")
+            : transactionType === "OB" || transactionType === "SR" || ((transactionType === "SA" || transactionType === "AS") && line.adjustmentDirection === "IN")
               ? "IN"
               : "OUT";
 
@@ -433,7 +433,7 @@ export async function POST(req: Request) {
         });
 
         if (serialEntries.length > 0) {
-          if (transactionType === "OB" || transactionType === "SR" || (transactionType === "SA" && line.adjustmentDirection === "IN")) {
+          if (transactionType === "OB" || transactionType === "SR" || ((transactionType === "SA" || transactionType === "AS") && line.adjustmentDirection === "IN")) {
             for (const serialEntry of serialEntries) {
               const existing = await tx.inventorySerial.findUnique({
                 where: {

@@ -98,6 +98,7 @@ enum StockTransactionType {
   SI
   SA
   ST
+  AS
 }
 
 enum StockTransactionStatus {

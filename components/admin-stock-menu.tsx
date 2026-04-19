@@ -33,6 +33,7 @@ const sections: readonly MenuSection[] = [
       { label: "Stock Receive", href: "/admin/stock/stock-receive" },
       { label: "Stock Issue", href: "/admin/stock/stock-issue" },
       { label: "Stock Adjustment", href: "/admin/stock/stock-adjustment" },
+      { label: "Stock Assembly", href: "/admin/stock/stock-assembly" },
       { label: "Stock Transfer", href: "/admin/stock/stock-transfer", requiresMultiLocation: true },
     ],
   },

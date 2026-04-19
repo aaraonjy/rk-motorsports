@@ -79,13 +79,13 @@ export async function generateStockTransactionNumber(
 
 export function isInboundTransaction(type: StockTransactionType, adjustmentDirection?: StockAdjustmentDirection | null) {
   if (type === "OB" || type === "SR") return true;
-  if (type === "SA" && adjustmentDirection === "IN") return true;
+  if ((type === "SA" || type === "AS") && adjustmentDirection === "IN") return true;
   return false;
 }
 
 export function isOutboundTransaction(type: StockTransactionType, adjustmentDirection?: StockAdjustmentDirection | null) {
   if (type === "SI") return true;
-  if (type === "SA" && adjustmentDirection === "OUT") return true;
+  if ((type === "SA" || type === "AS") && adjustmentDirection === "OUT") return true;
   return false;
 }
 
