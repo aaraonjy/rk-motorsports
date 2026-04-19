@@ -646,12 +646,15 @@ model StockTransaction {
   status             StockTransactionStatus @default(POSTED)
   createdByAdminId   String
   cancelledByAdminId String?
+  revisedFromId      String?
   cancelReason       String?
   cancelledAt        DateTime?
   createdAt          DateTime               @default(now())
   updatedAt          DateTime               @updatedAt
   createdByAdmin     User                   @relation("CreatedStockTransactions", fields: [createdByAdminId], references: [id], onDelete: Restrict)
   cancelledByAdmin   User?                  @relation("CancelledStockTransactions", fields: [cancelledByAdminId], references: [id], onDelete: SetNull)
+  revisedFrom        StockTransaction?      @relation("StockTransactionRevisions", fields: [revisedFromId], references: [id], onDelete: SetNull)
+  revisions          StockTransaction[]     @relation("StockTransactionRevisions")
   lines              StockTransactionLine[]
   ledgerEntries      StockLedger[]
 
@@ -659,6 +662,7 @@ model StockTransaction {
   @@index([createdByAdminId, createdAt])
   @@index([status, transactionDate])
   @@index([cancelledByAdminId])
+  @@index([revisedFromId])
   @@index([status, cancelledAt])
 }
 
