@@ -82,8 +82,6 @@ export async function GET(_req: Request, context: Params) {
       include: {
         createdByAdmin: { select: { id: true, name: true, email: true } },
         cancelledByAdmin: { select: { id: true, name: true, email: true } },
-        revisedFrom: { select: { id: true, transactionNo: true } },
-        revisions: { select: { id: true, transactionNo: true } },
         lines: {
           include: {
             inventoryProduct: { select: { id: true, code: true, description: true, baseUom: true } },
@@ -367,8 +365,6 @@ export async function PUT(req: Request, context: Params) {
         where: { id: transaction.id },
         include: {
           createdByAdmin: { select: { id: true, name: true, email: true } },
-          revisedFrom: { select: { id: true, transactionNo: true } },
-          revisions: { select: { id: true } },
           lines: {
             include: {
               inventoryProduct: { select: { id: true, code: true, description: true, baseUom: true } },
