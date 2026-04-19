@@ -280,6 +280,7 @@ model InventoryProduct {
   trackInventory       Boolean                @default(false)
   serialNumberTracking Boolean                @default(false)
   batchTracking        Boolean                @default(false)
+  isAssemblyItem       Boolean                @default(false)
   isActive             Boolean                @default(true)
   defaultLocationId    String?
   createdAt            DateTime               @default(now())
@@ -295,9 +296,12 @@ model InventoryProduct {
   serials              InventorySerial[]
   serialTransactionEntries StockTransactionLineSerial[]
   uomConversions       InventoryProductUomConversion[]
+  assemblyTemplates    AssemblyTemplate[]    @relation("AssemblyTemplateFinishedGood")
+  assemblyComponentLines AssemblyTemplateLine[] @relation("AssemblyTemplateComponentProduct")
 
   @@index([isActive, code])
   @@index([itemType, isActive])
+  @@index([isAssemblyItem])
   @@index([defaultLocationId])
   @@index([groupId])
   @@index([subGroupId])
@@ -306,6 +310,41 @@ model InventoryProduct {
 
 
 
+
+model AssemblyTemplate {
+  id                    String                 @id @default(cuid())
+  finishedGoodProductId String                 @unique
+  isActive              Boolean                @default(true)
+  remarks               String?
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+
+  finishedGoodProduct   InventoryProduct       @relation("AssemblyTemplateFinishedGood", fields: [finishedGoodProductId], references: [id], onDelete: Cascade)
+  lines                 AssemblyTemplateLine[]
+
+  @@index([isActive])
+}
+
+model AssemblyTemplateLine {
+  id                  String            @id @default(cuid())
+  assemblyTemplateId  String
+  lineNo              Int
+  componentProductId  String
+  qty                 Decimal           @db.Decimal(12, 4)
+  uom                 String
+  isRequired          Boolean           @default(true)
+  allowOverride       Boolean           @default(false)
+  remarks             String?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  assemblyTemplate    AssemblyTemplate  @relation(fields: [assemblyTemplateId], references: [id], onDelete: Cascade)
+  componentProduct    InventoryProduct  @relation("AssemblyTemplateComponentProduct", fields: [componentProductId], references: [id], onDelete: Restrict)
+
+  @@unique([assemblyTemplateId, lineNo])
+  @@index([assemblyTemplateId])
+  @@index([componentProductId])
+}
 
 model InventoryProductUomConversion {
   id                 String            @id @default(cuid())

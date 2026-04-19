@@ -1,6 +1,7 @@
 
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 type InventoryItemTypeValue = "STOCK_ITEM" | "SERVICE_ITEM" | "NON_STOCK_ITEM";
@@ -31,6 +32,7 @@ type InventoryProductRecord = {
   trackInventory: boolean;
   serialNumberTracking: boolean;
   batchTracking: boolean;
+  isAssemblyItem: boolean;
   isActive: boolean;
   defaultLocationId: string | null;
   defaultLocationLabel: string | null;
@@ -55,6 +57,7 @@ type ProductFormState = {
   trackInventory: boolean;
   serialNumberTracking: boolean;
   batchTracking: boolean;
+  isAssemblyItem: boolean;
   uomConversions: Array<{ id?: string; uomCode: string; conversionRate: string }>;
   isActive: boolean;
 };
@@ -99,6 +102,7 @@ function emptyForm(): ProductFormState {
     trackInventory: true,
     serialNumberTracking: false,
     batchTracking: false,
+    isAssemblyItem: false,
     uomConversions: [],
     isActive: true,
   };
@@ -142,6 +146,13 @@ function sortProductsByCode(items: InventoryProductRecord[]) {
   return [...items].sort((a, b) => a.code.localeCompare(b.code));
 }
 
+function canUseAssemblyItem(itemType: InventoryItemTypeValue, trackInventory: boolean) {
+  return itemType === "STOCK_ITEM" && trackInventory;
+}
+
+function getAssemblyStatusLabel(product: InventoryProductRecord) {
+  return product.isAssemblyItem ? "Assembly Item" : "-";
+}
 
 type SearchableSelectOption = {
   id: string;
@@ -389,6 +400,7 @@ export function AdminProductMasterClient({
       trackInventory: detailedProduct.trackInventory,
       serialNumberTracking: detailedProduct.serialNumberTracking,
       batchTracking: detailedProduct.batchTracking,
+      isAssemblyItem: detailedProduct.isAssemblyItem,
       uomConversions: (detailedProduct.uomConversions || []).map((item) => ({
         id: item.id,
         uomCode: item.uomCode,
@@ -530,6 +542,7 @@ export function AdminProductMasterClient({
         trackInventory: form.itemType === "STOCK_ITEM" ? form.trackInventory : false,
         serialNumberTracking: form.serialNumberTracking,
         batchTracking: form.batchTracking,
+        isAssemblyItem: canUseAssemblyItem(form.itemType, form.trackInventory) ? form.isAssemblyItem : false,
         isActive: form.isActive,
         defaultLocationId: null,
       };
@@ -627,6 +640,7 @@ export function AdminProductMasterClient({
                 <th className="px-3 py-3 font-medium">Description</th>
                 <th className="px-3 py-3 font-medium">Type</th>
                 <th className="px-3 py-3 font-medium">UOM</th>
+                <th className="px-3 py-3 font-medium">Assembly</th>
                 <th className="px-3 py-3 font-medium">Selling Price</th>
                 <th className="px-3 py-3 font-medium">Status</th>
                 <th className="px-3 py-3 font-medium text-right">Action</th>
@@ -634,7 +648,7 @@ export function AdminProductMasterClient({
             </thead>
             <tbody className="divide-y divide-white/10">
               {filteredProducts.length === 0 ? (
-                <tr><td colSpan={7} className="px-3 py-8 text-center text-white/50">No products found.</td></tr>
+                <tr><td colSpan={8} className="px-3 py-8 text-center text-white/50">No products found.</td></tr>
               ) : paginatedProducts.map((product) => (
                 <tr key={product.id} className="align-top text-white/80">
                   <td className="px-3 py-4 font-semibold text-white">{product.code}</td>
@@ -646,6 +660,11 @@ export function AdminProductMasterClient({
                   </td>
                   <td className="px-3 py-4">{getItemTypeLabel(product.itemType)}</td>
                   <td className="px-3 py-4">{product.baseUom}</td>
+                  <td className="px-3 py-4">
+                    <span className={product.isAssemblyItem ? "inline-flex rounded-full border border-sky-500/30 bg-sky-500/15 px-3 py-1 text-xs font-semibold text-sky-300" : "text-white/45"}>
+                      {getAssemblyStatusLabel(product)}
+                    </span>
+                  </td>
                   <td className="px-3 py-4">{formatCurrency(product.sellingPrice)}</td>
                   <td className="px-3 py-4">
                     <span className={product.isActive ? "inline-flex rounded-full border border-emerald-500/30 bg-emerald-500/15 px-3 py-1 text-xs font-semibold text-emerald-300" : "inline-flex rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold text-white/65"}>
@@ -655,6 +674,11 @@ export function AdminProductMasterClient({
                   <td className="px-3 py-4">
                     <div className="flex justify-end gap-2">
                       <button type="button" onClick={() => void startEdit(product)} className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-semibold text-white transition hover:bg-white/10">Edit Product</button>
+                      {product.isAssemblyItem ? (
+                        <Link href={`/admin/stock/assembly-templates/${product.id}`} className="rounded-lg border border-sky-500/25 bg-sky-500/10 px-3 py-2 text-xs font-semibold text-sky-200 transition hover:bg-sky-500/15">
+                          Configure Template
+                        </Link>
+                      ) : null}
                       <button type="button" onClick={() => handleDelete(product)} className="rounded-lg border border-red-500/25 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-200 transition hover:bg-red-500/15">Delete</button>
                     </div>
                   </td>
@@ -738,58 +762,56 @@ export function AdminProductMasterClient({
                 </div>
               </div>
 
-              {(isUomModalOpen || form.uomConversions.length > 0) ? (
-                <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-white">Multi UOM Preview</p>
-                      <p className="mt-1 text-xs text-white/45">
-                        Saved additional UOM conversions against Base UOM {form.baseUom || "PCS"}.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 space-y-2">
-                    {form.uomConversions.length === 0 ? (
-                      <div className="rounded-xl border border-white/10 bg-black/20 px-3 py-3 text-sm text-white/45">
-                        No Multi UOM conversion added yet.
-                      </div>
-                    ) : (
-                      form.uomConversions.map((item) => (
-                        <div
-                          key={item.uomCode}
-                          className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 bg-black/20 px-3 py-3"
-                        >
-                          <div>
-                            <div className="text-sm font-medium text-white">
-                              {formatUomPreviewLine(item.uomCode, item.conversionRate, form.baseUom || "PCS")}
-                            </div>
-                            <div className="mt-1 text-xs text-white/45">
-                              UOM Code: {item.uomCode} • Conversion Rate: {item.conversionRate}
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => editUomConversion(item.uomCode, item.conversionRate)}
-                              className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-semibold text-white transition hover:bg-white/10"
-                            >
-                              Edit
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => removeUomConversion(item.uomCode)}
-                              className="rounded-lg border border-red-500/25 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-200 transition hover:bg-red-500/15"
-                            >
-                              Remove
-                            </button>
-                          </div>
-                        </div>
-                      ))
-                    )}
+              <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-white">Multi UOM Preview</p>
+                    <p className="mt-1 text-xs text-white/45">
+                      Saved additional UOM conversions against Base UOM {form.baseUom || "PCS"}.
+                    </p>
                   </div>
                 </div>
-              ) : null}
+
+                <div className="mt-4 space-y-2">
+                  {form.uomConversions.length === 0 ? (
+                    <div className="rounded-xl border border-white/10 bg-black/20 px-3 py-3 text-sm text-white/45">
+                      No Multi UOM conversion added yet.
+                    </div>
+                  ) : (
+                    form.uomConversions.map((item) => (
+                      <div
+                        key={item.uomCode}
+                        className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 bg-black/20 px-3 py-3"
+                      >
+                        <div>
+                          <div className="text-sm font-medium text-white">
+                            {formatUomPreviewLine(item.uomCode, item.conversionRate, form.baseUom || "PCS")}
+                          </div>
+                          <div className="mt-1 text-xs text-white/45">
+                            UOM Code: {item.uomCode} • Conversion Rate: {item.conversionRate}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => editUomConversion(item.uomCode, item.conversionRate)}
+                            className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-semibold text-white transition hover:bg-white/10"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => removeUomConversion(item.uomCode)}
+                            className="rounded-lg border border-red-500/25 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-200 transition hover:bg-red-500/15"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
 
               <div><label className="label-rk">Description</label><input className="input-rk" value={form.description} onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))} placeholder="e.g. Brake Pad (Brembo M4)" required /></div>
 
@@ -845,7 +867,15 @@ export function AdminProductMasterClient({
                   <div className="relative">
                     <select className="input-rk appearance-none pr-12" value={form.itemType} onChange={(e) => {
                       const itemType = e.target.value as InventoryItemTypeValue;
-                      setForm((prev) => ({ ...prev, itemType, trackInventory: itemType === "STOCK_ITEM" }));
+                      setForm((prev) => {
+                        const nextTrackInventory = itemType === "STOCK_ITEM";
+                        return {
+                          ...prev,
+                          itemType,
+                          trackInventory: nextTrackInventory,
+                          isAssemblyItem: itemType === "STOCK_ITEM" && nextTrackInventory ? prev.isAssemblyItem : false,
+                        };
+                      });
                     }}>
                       <option value="STOCK_ITEM">Stock Item</option>
                       <option value="SERVICE_ITEM">Service Item</option>
@@ -861,13 +891,38 @@ export function AdminProductMasterClient({
                 <div><label className="label-rk">Selling Price (RM)</label><input type="number" min="0" step="0.01" className="input-rk" value={form.sellingPrice} onChange={(e) => setForm((prev) => ({ ...prev, sellingPrice: e.target.value }))} /></div>
               </div>
 
-                            <div className="grid gap-3 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-white/75 md:grid-cols-4">
-                <label className="flex items-center gap-3"><input type="checkbox" checked={form.trackInventory} disabled={form.itemType !== "STOCK_ITEM"} onChange={(e) => setForm((prev) => ({ ...prev, trackInventory: e.target.checked }))} /><span>Track Inventory</span></label>
+                            <div className="grid gap-3 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-white/75 md:grid-cols-5">
+                <label className="flex items-center gap-3"><input type="checkbox" checked={form.trackInventory} disabled={form.itemType !== "STOCK_ITEM"} onChange={(e) => setForm((prev) => ({ ...prev, trackInventory: e.target.checked, isAssemblyItem: canUseAssemblyItem(prev.itemType, e.target.checked) ? prev.isAssemblyItem : false }))} /><span>Track Inventory</span></label>
                 <label className="flex items-center gap-3"><input type="checkbox" checked={form.serialNumberTracking} onChange={(e) => setForm((prev) => ({ ...prev, serialNumberTracking: e.target.checked }))} /><span>Serial Number Tracking</span></label>
                 <label className="flex items-center gap-3"><input type="checkbox" checked={form.batchTracking} onChange={(e) => setForm((prev) => ({ ...prev, batchTracking: e.target.checked }))} /><span>Batch Tracking</span></label>
+                <label className="flex items-center gap-3"><input type="checkbox" checked={form.isAssemblyItem} disabled={!canUseAssemblyItem(form.itemType, form.trackInventory)} onChange={(e) => setForm((prev) => ({ ...prev, isAssemblyItem: e.target.checked }))} /><span>Assembly Item</span></label>
                 <label className="flex items-center gap-3"><input type="checkbox" checked={form.isActive} onChange={(e) => setForm((prev) => ({ ...prev, isActive: e.target.checked }))} /><span>Active</span></label>
               </div>
 
+              {form.isAssemblyItem ? (
+                <div className="rounded-2xl border border-sky-500/20 bg-sky-500/5 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-white">Assembly Template</p>
+                      <p className="mt-1 text-xs text-white/55">
+                        Configure the default BOM / component recipe for this finished good on a separate page.
+                      </p>
+                    </div>
+                    {editingId ? (
+                      <Link
+                        href={`/admin/stock/assembly-templates/${editingId}`}
+                        className="inline-flex items-center justify-center rounded-xl border border-sky-500/25 bg-sky-500/10 px-4 py-3 text-sm font-semibold text-sky-200 transition hover:bg-sky-500/15"
+                      >
+                        Configure Template
+                      </Link>
+                    ) : (
+                      <div className="rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-xs text-white/55">
+                        Save product first to configure template.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : null}
 
               
               {submitError ? <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{submitError}</div> : null}

@@ -49,6 +49,7 @@ function mapProduct(product: any) {
     trackInventory: product.trackInventory,
     serialNumberTracking: product.serialNumberTracking,
     batchTracking: (product as any).batchTracking,
+    isAssemblyItem: Boolean((product as any).isAssemblyItem),
     isActive: product.isActive,
     defaultLocationId: product.defaultLocationId,
     defaultLocationLabel: null,
@@ -81,6 +82,8 @@ export async function POST(req: Request) {
     const trackInventory = itemType === "STOCK_ITEM" ? Boolean(body.trackInventory) : false;
     const serialNumberTracking = Boolean(body.serialNumberTracking);
     const batchTracking = Boolean(body.batchTracking);
+    const requestedAssemblyItem = Boolean(body.isAssemblyItem);
+    const isAssemblyItem = itemType === "STOCK_ITEM" && trackInventory ? requestedAssemblyItem : false;
     const isActive = Boolean(body.isActive);
     const defaultLocationId = typeof body.defaultLocationId === "string" && body.defaultLocationId.trim() ? body.defaultLocationId.trim() : null;
     const uomConversions: UomInput[] = Array.isArray(body.uomConversions)
@@ -146,6 +149,7 @@ export async function POST(req: Request) {
         trackInventory,
         serialNumberTracking,
         batchTracking,
+        isAssemblyItem,
         isActive,
         defaultLocationId,
         uomConversions: uomConversions.length
@@ -173,7 +177,7 @@ export async function POST(req: Request) {
       entityId: created.id,
       entityCode: created.code,
       description: `${admin.name} created product ${created.code}.`,
-      newValues: { code: created.code, description: created.description, itemType: created.itemType, baseUom: created.baseUom, unitCost: Number(created.unitCost), sellingPrice: Number(created.sellingPrice), trackInventory: created.trackInventory, serialNumberTracking: created.serialNumberTracking, batchTracking: (created as any).batchTracking, isActive: created.isActive, uomConversions: created.uomConversions.map((item: any) => ({ uomCode: item.uomCode, conversionRate: Number(item.conversionRate) })) },
+      newValues: { code: created.code, description: created.description, itemType: created.itemType, baseUom: created.baseUom, unitCost: Number(created.unitCost), sellingPrice: Number(created.sellingPrice), trackInventory: created.trackInventory, serialNumberTracking: created.serialNumberTracking, batchTracking: (created as any).batchTracking, isAssemblyItem: Boolean((created as any).isAssemblyItem), isActive: created.isActive, uomConversions: created.uomConversions.map((item: any) => ({ uomCode: item.uomCode, conversionRate: Number(item.conversionRate) })) },
       status: "SUCCESS",
     });
 

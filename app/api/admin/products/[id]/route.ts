@@ -51,6 +51,7 @@ function mapProduct(product: any) {
     trackInventory: product.trackInventory,
     serialNumberTracking: product.serialNumberTracking,
     batchTracking: (product as any).batchTracking,
+    isAssemblyItem: Boolean((product as any).isAssemblyItem),
     isActive: product.isActive,
     defaultLocationId: product.defaultLocationId,
     defaultLocationLabel: null,
@@ -117,6 +118,8 @@ export async function PATCH(req: Request, context: Params) {
     const trackInventory = itemType === "STOCK_ITEM" ? Boolean(body.trackInventory) : false;
     const serialNumberTracking = Boolean(body.serialNumberTracking);
     const batchTracking = Boolean(body.batchTracking);
+    const requestedAssemblyItem = Boolean(body.isAssemblyItem);
+    const isAssemblyItem = itemType === "STOCK_ITEM" && trackInventory ? requestedAssemblyItem : false;
     const isActive = Boolean(body.isActive);
     const defaultLocationId = typeof body.defaultLocationId === "string" && body.defaultLocationId.trim() ? body.defaultLocationId.trim() : null;
     const uomConversions: UomInput[] = Array.isArray(body.uomConversions)
@@ -183,6 +186,7 @@ export async function PATCH(req: Request, context: Params) {
         trackInventory,
         serialNumberTracking,
         batchTracking,
+        isAssemblyItem,
         isActive,
         defaultLocationId,
         uomConversions: {
@@ -209,8 +213,8 @@ export async function PATCH(req: Request, context: Params) {
       entityId: updated.id,
       entityCode: updated.code,
       description: `${admin.name} updated product ${updated.code}.`,
-      oldValues: { code: existing.code, description: existing.description, itemType: existing.itemType, baseUom: existing.baseUom, unitCost: Number(existing.unitCost), sellingPrice: Number(existing.sellingPrice), trackInventory: existing.trackInventory, serialNumberTracking: existing.serialNumberTracking, batchTracking: (existing as any).batchTracking, isActive: existing.isActive, uomConversions: existing.uomConversions.map((item: any) => ({ uomCode: item.uomCode, conversionRate: Number(item.conversionRate) })) },
-      newValues: { code: updated.code, description: updated.description, itemType: updated.itemType, baseUom: updated.baseUom, unitCost: Number(updated.unitCost), sellingPrice: Number(updated.sellingPrice), trackInventory: updated.trackInventory, serialNumberTracking: updated.serialNumberTracking, batchTracking: (updated as any).batchTracking, isActive: updated.isActive, uomConversions: updated.uomConversions.map((item: any) => ({ uomCode: item.uomCode, conversionRate: Number(item.conversionRate) })) },
+      oldValues: { code: existing.code, description: existing.description, itemType: existing.itemType, baseUom: existing.baseUom, unitCost: Number(existing.unitCost), sellingPrice: Number(existing.sellingPrice), trackInventory: existing.trackInventory, serialNumberTracking: existing.serialNumberTracking, batchTracking: (existing as any).batchTracking, isAssemblyItem: Boolean((existing as any).isAssemblyItem), isActive: existing.isActive, uomConversions: existing.uomConversions.map((item: any) => ({ uomCode: item.uomCode, conversionRate: Number(item.conversionRate) })) },
+      newValues: { code: updated.code, description: updated.description, itemType: updated.itemType, baseUom: updated.baseUom, unitCost: Number(updated.unitCost), sellingPrice: Number(updated.sellingPrice), trackInventory: updated.trackInventory, serialNumberTracking: updated.serialNumberTracking, batchTracking: (updated as any).batchTracking, isAssemblyItem: Boolean((updated as any).isAssemblyItem), isActive: updated.isActive, uomConversions: updated.uomConversions.map((item: any) => ({ uomCode: item.uomCode, conversionRate: Number(item.conversionRate) })) },
       status: "SUCCESS",
     });
 
