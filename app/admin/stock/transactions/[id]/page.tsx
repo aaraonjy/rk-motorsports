@@ -12,7 +12,7 @@ function formatDate(value: Date | string | null | undefined) {
   return date.toISOString().slice(0, 10);
 }
 
-function getBackHref(type: "OB" | "SR" | "SI" | "SA" | "ST") {
+function getBackHref(type: "OB" | "SR" | "SI" | "SA" | "ST" | "AS") {
   switch (type) {
     case "OB":
       return "/admin/stock/opening-stock";
@@ -24,6 +24,8 @@ function getBackHref(type: "OB" | "SR" | "SI" | "SA" | "ST") {
       return "/admin/stock/stock-adjustment";
     case "ST":
       return "/admin/stock/stock-transfer";
+    case "AS":
+      return "/admin/stock/stock-assembly";
     default:
       return "/admin/stock/opening-stock";
   }
