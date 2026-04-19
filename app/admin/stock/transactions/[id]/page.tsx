@@ -12,23 +12,22 @@ function formatDate(value: Date | string | null | undefined) {
   return date.toISOString().slice(0, 10);
 }
 
-function getBackHref(type: string) {
+function getBackHref(type: "OB" | "SR" | "SI" | "SA" | "ST") {
   switch (type) {
     case "OB":
       return "/admin/stock/opening-stock";
     case "SR":
-      return "/admin/stock/receive";
+      return "/admin/stock/stock-receive";
     case "SI":
-      return "/admin/stock/issue";
+      return "/admin/stock/stock-issue";
     case "SA":
-      return "/admin/stock/adjustment";
+      return "/admin/stock/stock-adjustment";
     case "ST":
-      return "/admin/stock/transfer";
+      return "/admin/stock/stock-transfer";
     default:
       return "/admin/stock/opening-stock";
   }
 }
-
 
 export default async function AdminStockTransactionDetailPage({ params }: Params) {
   const user = await getSessionUser();
@@ -41,6 +40,7 @@ export default async function AdminStockTransactionDetailPage({ params }: Params
     include: {
       createdByAdmin: { select: { id: true, name: true, email: true } },
       cancelledByAdmin: { select: { id: true, name: true, email: true } },
+      revisedFrom: { select: { id: true, transactionNo: true } },
       lines: {
         include: {
           inventoryProduct: { select: { id: true, code: true, description: true, baseUom: true } },
@@ -68,11 +68,21 @@ export default async function AdminStockTransactionDetailPage({ params }: Params
             <p className="text-sm font-semibold uppercase tracking-[0.24em] text-red-400/80">Stock Transaction</p>
             <h1 className="mt-3 text-4xl font-bold">{transaction.transactionNo}</h1>
             <p className="mt-4 text-white/70">View stock transaction detail, line items, serials, and ledger impact.</p>
+            {transaction.revisedFrom ? (
+              <p className="mt-3 text-sm text-white/50">↳ Revision of {transaction.revisedFrom.transactionNo}</p>
+            ) : null}
           </div>
           <div className="flex flex-wrap gap-3">
             <Link href={getBackHref(transaction.transactionType)} className="rounded-xl border border-white/15 bg-white/5 px-5 py-3 text-sm text-white/80 transition hover:bg-white/10">Back</Link>
             <Link href={`/admin/stock/transactions/${transaction.id}/edit`} className={`rounded-xl px-5 py-3 text-sm font-semibold text-white transition ${transaction.status === "CANCELLED" ? "cursor-not-allowed border border-white/10 bg-white/5 opacity-50 pointer-events-none" : "border border-white/15 bg-white/5 hover:bg-white/10"}`}>Edit</Link>
           </div>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-4">
+          <div className="rounded-2xl border border-white/10 bg-black/45 backdrop-blur-md p-4"><p className="text-xs uppercase tracking-[0.24em] text-white/40">Status</p><p className="mt-3 text-lg font-bold text-white">{transaction.status === "CANCELLED" ? "Cancelled" : "Posted"}</p></div>
+          <div className="rounded-2xl border border-white/10 bg-black/45 backdrop-blur-md p-4"><p className="text-xs uppercase tracking-[0.24em] text-white/40">Date</p><p className="mt-3 text-lg font-bold text-white">{formatDate(transaction.transactionDate)}</p></div>
+          <div className="rounded-2xl border border-white/10 bg-black/45 backdrop-blur-md p-4"><p className="text-xs uppercase tracking-[0.24em] text-white/40">Reference</p><p className="mt-3 text-lg font-bold text-white">{transaction.reference || "-"}</p></div>
+          <div className="rounded-2xl border border-white/10 bg-black/45 backdrop-blur-md p-4"><p className="text-xs uppercase tracking-[0.24em] text-white/40">Created By</p><p className="mt-3 text-lg font-bold text-white">{transaction.createdByAdmin?.name || "-"}</p></div>
         </div>
 
         {transaction.status === "CANCELLED" ? (
@@ -83,13 +93,6 @@ export default async function AdminStockTransactionDetailPage({ params }: Params
             <div className="mt-1">Reason: {transaction.cancelReason || "-"}</div>
           </div>
         ) : null}
-
-        <div className="grid gap-4 md:grid-cols-4">
-          <div className="rounded-2xl border border-white/10 bg-black/45 backdrop-blur-md p-4"><p className="text-xs uppercase tracking-[0.24em] text-white/40">Status</p><p className="mt-3 text-lg font-bold text-white">{transaction.status === "CANCELLED" ? "Cancelled" : "Posted"}</p></div>
-          <div className="rounded-2xl border border-white/10 bg-black/45 backdrop-blur-md p-4"><p className="text-xs uppercase tracking-[0.24em] text-white/40">Date</p><p className="mt-3 text-lg font-bold text-white">{formatDate(transaction.transactionDate)}</p></div>
-          <div className="rounded-2xl border border-white/10 bg-black/45 backdrop-blur-md p-4"><p className="text-xs uppercase tracking-[0.24em] text-white/40">Reference</p><p className="mt-3 text-lg font-bold text-white">{transaction.reference || "-"}</p></div>
-          <div className="rounded-2xl border border-white/10 bg-black/45 backdrop-blur-md p-4"><p className="text-xs uppercase tracking-[0.24em] text-white/40">Created By</p><p className="mt-3 text-lg font-bold text-white">{transaction.createdByAdmin?.name || "-"}</p></div>
-        </div>
 
         <div className="rounded-[2rem] border border-white/10 bg-black/45 backdrop-blur-md p-5">
           <h2 className="text-xl font-semibold text-white">Lines</h2>

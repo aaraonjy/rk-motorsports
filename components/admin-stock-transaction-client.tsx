@@ -125,7 +125,7 @@ type AvailableBatch = {
   balance?: number | null;
 };
 
-function emptyLine(defaultLocationId = "", transactionType?: StockTransactionTypeValue): FormLine {
+function emptyLine(): FormLine {
   return {
     inventoryProductId: "",
     qty: "1",
@@ -137,7 +137,7 @@ function emptyLine(defaultLocationId = "", transactionType?: StockTransactionTyp
     serialEntryText: "",
     serialSearch: "",
     remarks: "",
-    locationId: transactionType !== "ST" ? defaultLocationId : "",
+    locationId: "",
     fromLocationId: "",
     toLocationId: "",
     adjustmentDirection: "",
@@ -735,7 +735,14 @@ export function AdminStockTransactionClient({
     setTransactionDate(new Date().toISOString().slice(0, 10));
     setReference("");
     setRemarks("");
-    setLines([emptyLine(defaultCreateLocationId, transactionType)]);
+    setLines([
+      defaultCreateLocationId
+        ? {
+            ...emptyLine(),
+            locationId: defaultCreateLocationId,
+          }
+        : emptyLine(),
+    ]);
     setSubmitError("");
     setSubmitSuccess("");
     setBalances({});
@@ -791,7 +798,15 @@ export function AdminStockTransactionClient({
   }
 
   function addLine() {
-    setLines((prev) => [...prev, emptyLine(defaultCreateLocationId, transactionType)]);
+    setLines((prev) => [
+      ...prev,
+      defaultCreateLocationId
+        ? {
+            ...emptyLine(),
+            locationId: defaultCreateLocationId,
+          }
+        : emptyLine(),
+    ]);
   }
 
   function removeLine(index: number) {
@@ -1077,7 +1092,12 @@ export function AdminStockTransactionClient({
                     className={`cursor-pointer align-top text-white/80 transition hover:bg-white/5 ${item.status === "CANCELLED" ? "bg-red-500/5" : ""}`}
                     onClick={() => openView(item.id)}
                   >
-                    <td className="px-3 py-4 font-semibold text-white">{item.transactionNo}</td>
+                    <td className="px-3 py-4 font-semibold text-white">
+                      <div className="flex flex-col gap-1">
+                        <span>{item.transactionNo}</span>
+                        {item.revisedFrom ? <span className="text-xs font-medium text-white/45">↳ Revision of {item.revisedFrom.transactionNo}</span> : null}
+                      </div>
+                    </td>
                     <td className="px-3 py-4">{formatDateInput(item.transactionDate)}</td>
                     <td className="px-3 py-4">{item.reference || "-"}</td>
                     <td className="px-3 py-4">{item.remarks || "-"}</td>
