@@ -397,6 +397,8 @@ export function AdminStockTransactionClient({
 
   const lockedLocationId = singleLocationMode ? stockSettings.defaultLocationId : "";
 
+  const defaultCreateLocationId = transactionType !== "ST" ? stockSettings.defaultLocationId || "" : "";
+
   const filteredTransactions = useMemo(() => {
     const keyword = searchKeyword.trim().toLowerCase();
     return transactions.filter((item) => {
@@ -728,10 +730,10 @@ export function AdminStockTransactionClient({
     setReference("");
     setRemarks("");
     setLines([
-      singleLocationMode && lockedLocationId
+      defaultCreateLocationId
         ? {
             ...emptyLine(),
-            locationId: lockedLocationId,
+            locationId: defaultCreateLocationId,
           }
         : emptyLine(),
     ]);
@@ -784,7 +786,7 @@ export function AdminStockTransactionClient({
       serialNos: [],
       serialEntryText: "",
       serialSearch: "",
-      locationId: singleLocationMode && lockedLocationId ? lockedLocationId : lines[index]?.locationId || "",
+      locationId: defaultCreateLocationId || lines[index]?.locationId || "",
       qty: product?.serialNumberTracking ? "0" : "1",
     });
   }
@@ -792,10 +794,10 @@ export function AdminStockTransactionClient({
   function addLine() {
     setLines((prev) => [
       ...prev,
-      singleLocationMode && lockedLocationId
+      defaultCreateLocationId
         ? {
             ...emptyLine(),
-            locationId: lockedLocationId,
+            locationId: defaultCreateLocationId,
           }
         : emptyLine(),
     ]);
