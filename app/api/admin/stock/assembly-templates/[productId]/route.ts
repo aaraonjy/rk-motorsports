@@ -6,6 +6,16 @@ import { createAuditLogFromRequest } from "@/lib/audit";
 
 type Params = { params: Promise<{ productId: string }> };
 
+type NormalizedAssemblyTemplateLine = {
+  lineNo: number;
+  componentProductId: string;
+  qty: number;
+  uom: string;
+  isRequired: boolean;
+  allowOverride: boolean;
+  remarks: string | null;
+};
+
 function normalizeUom(value: unknown) {
   return typeof value === "string" ? value.trim().toUpperCase() : "";
 }
@@ -95,11 +105,11 @@ export async function PUT(req: Request, context: Params) {
       return NextResponse.json({ ok: false, error: "Please provide at least one assembly template line." }, { status: 400 });
     }
 
-    const normalizedLines = rawLines.map((line: any, index: number) => {
+    const normalizedLines: NormalizedAssemblyTemplateLine[] = rawLines.map((line: any, index: number): NormalizedAssemblyTemplateLine => {
       const componentProductId = typeof line.componentProductId === "string" ? line.componentProductId.trim() : "";
       const qty = normalizeQty(line.qty);
       const uom = normalizeUom(line.uom);
-      const remarks = typeof line.remarks === "string" ? line.remarks.trim() || null : null;
+      const lineRemarks = typeof line.remarks === "string" ? line.remarks.trim() || null : null;
 
       if (!componentProductId) {
         throw new Error(`Line ${index + 1}: component item is required.`);
@@ -121,7 +131,7 @@ export async function PUT(req: Request, context: Params) {
         uom,
         isRequired: Boolean(line.isRequired),
         allowOverride: Boolean(line.allowOverride),
-        remarks,
+        remarks: lineRemarks,
       };
     });
 
