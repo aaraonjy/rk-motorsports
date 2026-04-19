@@ -313,6 +313,25 @@ function SearchableSelect({
   );
 }
 
+function emptyLine(defaultLocationId = "", transactionType?: StockTransactionTypeValue): FormLine {
+  return {
+    inventoryProductId: "",
+    qty: "1",
+    unitCost: "0.00",
+    batchNo: "",
+    batchMode: "existing",
+    expiryDate: "",
+    serialNos: [],
+    serialEntryText: "",
+    serialSearch: "",
+    remarks: "",
+    locationId: transactionType !== "ST" ? defaultLocationId : "",
+    fromLocationId: "",
+    toLocationId: "",
+    adjustmentDirection: "",
+  };
+}
+
 function buildInitialLines(transaction: TransactionRecord): FormLine[] {
   return transaction.lines.map((line) => ({
     inventoryProductId: line.inventoryProduct.id,
@@ -379,6 +398,7 @@ export function AdminStockTransactionEditClient({
 
   const singleLocationMode = stockSettings.stockModuleEnabled && !stockSettings.multiLocationEnabled && !!stockSettings.defaultLocationId;
   const lockedLocationId = singleLocationMode ? stockSettings.defaultLocationId : "";
+  const defaultCreateLocationId = transactionType !== "ST" ? stockSettings.defaultLocationId || "" : "";
 
   useEffect(() => {
     let cancelled = false;
@@ -536,13 +556,13 @@ export function AdminStockTransactionEditClient({
       serialNos: [],
       serialEntryText: "",
       serialSearch: "",
-      locationId: singleLocationMode && lockedLocationId ? lockedLocationId : lines[index]?.locationId || "",
+      locationId: defaultCreateLocationId || lines[index]?.locationId || "",
       qty: product?.serialNumberTracking ? "0" : "1",
     });
   }
 
   function addLine() {
-    setLines((prev) => [...prev, { inventoryProductId: "", qty: "1", unitCost: "0.00", batchNo: "", batchMode: "existing", expiryDate: "", serialNos: [], serialEntryText: "", serialSearch: "", remarks: "", locationId: singleLocationMode && lockedLocationId ? lockedLocationId : "", fromLocationId: "", toLocationId: "", adjustmentDirection: "" }]);
+    setLines((prev) => [...prev, emptyLine(defaultCreateLocationId, transactionType)]);
   }
 
   function removeLine(index: number) {
