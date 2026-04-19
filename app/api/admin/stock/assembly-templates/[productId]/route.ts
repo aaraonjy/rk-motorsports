@@ -197,17 +197,20 @@ export async function PUT(req: Request, context: Params) {
       });
     });
 
-    await createAuditLogFromRequest(req, {
+    await createAuditLogFromRequest({
+      req,
+      user: {
+        id: admin.id,
+        name: admin.name,
+        email: admin.email,
+        role: admin.role,
+      },
       module: "STOCK_ASSEMBLY_TEMPLATE",
       action: "SAVE",
       entityType: "AssemblyTemplate",
       entityId: saved.id,
       entityCode: product.code,
       description: `Saved assembly template for ${product.code}.`,
-      userId: admin.id,
-      userName: admin.name,
-      userEmail: admin.email,
-      userRole: admin.role,
       status: "SUCCESS",
       newValues: {
         finishedGoodProductId: productId,
