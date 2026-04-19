@@ -154,6 +154,24 @@ function getTypeLabel(type: StockTransactionTypeValue) {
   }
 }
 
+function getBackHref(type: StockTransactionTypeValue) {
+  switch (type) {
+    case "OB":
+      return "/admin/stock/opening-stock";
+    case "SR":
+      return "/admin/stock/receive";
+    case "SI":
+      return "/admin/stock/issue";
+    case "SA":
+      return "/admin/stock/adjustment";
+    case "ST":
+      return "/admin/stock/transfer";
+    default:
+      return "/admin/stock/opening-stock";
+  }
+}
+
+
 function balanceKey(productId: string, locationId: string, batchNo?: string) {
   return `${productId}__${locationId}__${(batchNo || "").trim().toUpperCase()}`;
 }
@@ -822,7 +840,7 @@ export function AdminStockTransactionEditClient({
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <button type="button" onClick={() => router.push(`/admin/stock/transactions/${transactionId}`)} className="rounded-xl border border-white/15 bg-white/5 px-5 py-3 text-sm text-white/80 transition hover:bg-white/10">Back</button>
+          <button type="button" onClick={() => router.push(getBackHref(transactionType))} className="rounded-xl border border-white/15 bg-white/5 px-5 py-3 text-sm text-white/80 transition hover:bg-white/10">Back</button>
           <button disabled={isSubmitting} className="inline-flex min-w-[190px] items-center justify-center rounded-xl bg-red-500 px-5 py-3 font-semibold text-white transition hover:bg-red-400 disabled:cursor-not-allowed disabled:opacity-60">{isSubmitting ? "Saving..." : `Save ${title}`}</button>
         </div>
 
