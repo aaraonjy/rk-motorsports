@@ -229,7 +229,7 @@ export async function PUT(req: Request, context: Params) {
     const locationIds = Array.from(new Set(rawLines.flatMap((line) => [line.locationId, line.fromLocationId, line.toLocationId]).map((value) => String(value || "").trim()).filter(Boolean)));
 
     const [products, locations] = await Promise.all([
-      db.inventoryProduct.findMany({ where: { id: { in: inventoryProductIds } }, select: { id: true, isActive: true, trackInventory: true, batchTracking: true, serialNumberTracking: true } }),
+      db.inventoryProduct.findMany({ where: { id: { in: inventoryProductIds } }, select: { id: true, isActive: true, trackInventory: true, batchTracking: true, serialNumberTracking: true, baseUom: true, uomConversions: { select: { uomCode: true, conversionRate: true } } } }),
       db.stockLocation.findMany({ where: { id: { in: locationIds } } }),
     ]);
 
