@@ -103,7 +103,21 @@ export default async function AdminAssemblyTemplatePage({ params }: Params) {
 
           <AdminAssemblyTemplateClient
             product={product}
-            componentOptions={componentOptions}
+            componentOptions={componentOptions.map((product) => ({
+              id: product.id,
+              code: product.code,
+              description: product.description,
+              baseUom: product.baseUom,
+              batchTracking: product.batchTracking,
+              serialNumberTracking: product.serialNumberTracking,
+              uomConversions: Array.isArray(product.uomConversions)
+                ? product.uomConversions.map((item) => ({
+                    id: item.id,
+                    uomCode: item.uomCode,
+                    conversionRate: Number(item.conversionRate ?? 0),
+                  }))
+                : [],
+            }))}
             initialRemarks={template?.remarks || ""}
             initialProducts={(template?.lines || []).map((line) => ({
               id: line.id,
