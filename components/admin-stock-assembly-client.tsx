@@ -398,6 +398,7 @@ function BatchPicker({
 }
 
 
+
 function SerialPicker({
   label,
   availableSerials,
@@ -491,22 +492,24 @@ function SerialPicker({
               ) : (
                 filtered.map((serial) => {
                   const selected = selectedSerials.some((item) => item.toUpperCase() === serial.serialNo.toUpperCase());
+                  const meta = [serial.batchNo || null, serial.expiryDate ? `Exp ${formatDateInput(serial.expiryDate)}` : null]
+                    .filter(Boolean)
+                    .join(" • ");
                   return (
                     <button
                       key={serial.id}
                       type="button"
-                      onClick={() => onToggle(serial.serialNo)}
+                      onClick={() => {
+                        onToggle(serial.serialNo);
+                        setIsOpen(false);
+                      }}
                       className={`flex w-full items-start justify-between gap-3 rounded-xl px-3 py-3 text-left text-sm transition ${
                         selected ? "bg-white/10 text-white" : "text-white/85 hover:bg-white/10 hover:text-white"
                       }`}
                     >
                       <div>
                         <div className="font-medium">{serial.serialNo}</div>
-                        <div className="mt-1 text-xs text-white/45">
-                          {[serial.batchNo || null, serial.expiryDate ? `Exp ${formatDateInput(serial.expiryDate)}` : null]
-                            .filter(Boolean)
-                            .join(" • ") || "-"}
-                        </div>
+                        {meta ? <div className="mt-1 text-xs text-white/45">{meta}</div> : null}
                       </div>
                       <div className="text-xs font-semibold">{selected ? "Selected" : "Select"}</div>
                     </button>
@@ -547,6 +550,7 @@ function SerialPicker({
     </div>
   );
 }
+
 
 
 export function AdminStockAssemblyClient({
@@ -1033,17 +1037,15 @@ export function AdminStockAssemblyClient({
                 <th className="px-3 py-3 font-medium">Doc No</th>
                 <th className="px-3 py-3 font-medium">Date</th>
                 <th className="px-3 py-3 font-medium">Reference</th>
-                                <th className="px-3 py-3 font-medium">Qty</th>
-                <th className="px-3 py-3 font-medium">Location</th>
-                <th className="px-3 py-3 font-medium">Status</th>
+                                                                <th className="px-3 py-3 font-medium">Status</th>
                 <th className="px-3 py-3 font-medium text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/10">
               {isLoadingTransactions ? (
-                <tr><td colSpan={7} className="px-3 py-8 text-center text-white/50">Loading transactions...</td></tr>
+                <tr><td colSpan={5} className="px-3 py-8 text-center text-white/50">Loading transactions...</td></tr>
               ) : visibleTransactions.length === 0 ? (
-                <tr><td colSpan={7} className="px-3 py-8 text-center text-white/50">No stock assembly transactions found.</td></tr>
+                <tr><td colSpan={5} className="px-3 py-8 text-center text-white/50">No stock assembly transactions found.</td></tr>
               ) : (
                 visibleTransactions.map((transaction) => {
                   const fgLine = transaction.lines.find((line) => line.adjustmentDirection === "IN") || transaction.lines[0];
@@ -1057,9 +1059,7 @@ export function AdminStockAssemblyClient({
                       </td>
                       <td className="px-3 py-4">{formatDateInput(transaction.transactionDate)}</td>
                       <td className="px-3 py-4">{transaction.reference || "-"}</td>
-                                            <td className="px-3 py-4">{formatQty(fgLine?.qty)} {fgLine?.inventoryProduct.baseUom || ""}</td>
-                      <td className="px-3 py-4">{fgLine?.location ? `${fgLine.location.code} — ${fgLine.location.name}` : "-"}</td>
-                      <td className="px-3 py-4">
+                                                                                        <td className="px-3 py-4">
                         <span className={transaction.status === "CANCELLED" ? "inline-flex rounded-full border border-red-500/25 bg-red-500/10 px-3 py-1 text-xs font-semibold text-red-200" : "inline-flex rounded-full border border-emerald-500/25 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-200"}>
                           {transaction.status === "CANCELLED" ? "Cancelled" : "Posted"}
                         </span>
