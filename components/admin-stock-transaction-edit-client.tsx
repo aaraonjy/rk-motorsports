@@ -725,7 +725,7 @@ export function AdminStockTransactionEditClient({
   }
 
   function addLine() {
-    setLines((prev) => [...prev, { inventoryProductId: "", qty: "1", unitCost: "0.00", batchNo: "", batchMode: "existing", expiryDate: "", serialNos: [], serialEntryText: "", serialSearch: "", remarks: "", locationId: defaultCreateLocationId || "", fromLocationId: "", toLocationId: "", adjustmentDirection: "" }]);
+    setLines((prev) => [...prev, { inventoryProductId: "", qty: "1", uomCode: "", unitCost: "0.00", batchNo: "", batchMode: "existing", expiryDate: "", serialNos: [], serialEntryText: "", serialSearch: "", remarks: "", locationId: defaultCreateLocationId || "", fromLocationId: "", toLocationId: "", adjustmentDirection: "" }]);
   }
 
   function removeLine(index: number) {
