@@ -328,7 +328,7 @@ function SearchableSelect({
         onClick={() => {
           if (disabled) return;
           setIsOpen((prev) => !prev);
-          setSearch(selectedOption?.label || "");
+          setSearch("");
         }}
         className={`input-rk flex items-center justify-between gap-3 text-left ${disabled ? "cursor-not-allowed opacity-60" : ""}`}
       >
