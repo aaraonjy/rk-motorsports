@@ -383,6 +383,7 @@ function BatchPicker({
   );
 }
 
+
 function SerialPicker({
   label,
   availableSerials,
@@ -402,6 +403,7 @@ function SerialPicker({
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [manualMode, setManualMode] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -425,7 +427,7 @@ function SerialPicker({
 
   return (
     <div className="space-y-3" ref={containerRef}>
-      <div>
+      <div className="relative">
         <label className="label-rk">{label}</label>
         <button
           type="button"
@@ -437,13 +439,18 @@ function SerialPicker({
           }}
           className={`input-rk flex items-center justify-between gap-3 text-left ${disabled ? "cursor-not-allowed opacity-60" : ""}`}
         >
-          <span className={selectedSerials.length > 0 ? "truncate text-white" : "truncate text-white/45"}>
-            {selectedSerials.length > 0 ? `${selectedSerials.length} serial(s) selected` : "Select existing serial no"}
+          <span className={selectedSerials.length > 0 || entryText.trim() ? "truncate text-white" : "truncate text-white/45"}>
+            {selectedSerials.length > 0
+              ? `${selectedSerials.length} serial(s) selected`
+              : entryText.trim()
+              ? "1 manual serial entered"
+              : "Select existing serial or create new"}
           </span>
           <span className="shrink-0 text-white/60">▾</span>
         </button>
+
         {isOpen ? (
-          <div className="mt-2 overflow-hidden rounded-2xl border border-white/10 bg-[#0b0b0f] shadow-2xl">
+          <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-[140] overflow-hidden rounded-2xl border border-white/10 bg-[#0b0b0f] shadow-2xl">
             <div className="border-b border-white/10 p-3">
               <input
                 autoFocus
@@ -454,6 +461,17 @@ function SerialPicker({
               />
             </div>
             <div className="max-h-64 overflow-y-auto p-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setManualMode(true);
+                  setIsOpen(false);
+                }}
+                className="flex w-full items-center rounded-xl px-3 py-3 text-left text-sm text-white transition hover:bg-white/10"
+              >
+                + Create New Serial
+              </button>
+
               {filtered.length === 0 ? (
                 <div className="rounded-xl px-3 py-3 text-sm text-white/45">No serial found.</div>
               ) : (
@@ -471,7 +489,9 @@ function SerialPicker({
                       <div>
                         <div className="font-medium">{serial.serialNo}</div>
                         <div className="mt-1 text-xs text-white/45">
-                          {[serial.batchNo || null, serial.expiryDate ? `Exp ${formatDateInput(serial.expiryDate)}` : null].filter(Boolean).join(" • ") || "-"}
+                          {[serial.batchNo || null, serial.expiryDate ? `Exp ${formatDateInput(serial.expiryDate)}` : null]
+                            .filter(Boolean)
+                            .join(" • ") || "-"}
                         </div>
                       </div>
                       <div className="text-xs font-semibold">{selected ? "Selected" : "Select"}</div>
@@ -484,15 +504,17 @@ function SerialPicker({
         ) : null}
       </div>
 
-      <div>
-        <label className="label-rk">Manual Serial Input</label>
-        <textarea
-          className="input-rk min-h-[110px]"
-          value={entryText}
-          onChange={(e) => onEntryTextChange(e.target.value)}
-          placeholder="Enter one serial per line or comma separated"
-        />
-      </div>
+      {manualMode ? (
+        <div>
+          <label className="label-rk">New Serial No</label>
+          <input
+            className="input-rk"
+            value={entryText}
+            onChange={(e) => onEntryTextChange(e.target.value)}
+            placeholder="Enter new serial no"
+          />
+        </div>
+      ) : null}
 
       {selectedSerials.length > 0 ? (
         <div className="flex flex-wrap gap-2">
@@ -511,6 +533,7 @@ function SerialPicker({
     </div>
   );
 }
+
 
 export function AdminStockAssemblyClient({
   finishedGoods,
@@ -1021,16 +1044,6 @@ export function AdminStockAssemblyClient({
                   Create finished goods by consuming component stock based on predefined assembly templates. This will deduct component quantities and add the assembled product into inventory with full traceability.
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsCreateOpen(false);
-                  resetCreateForm();
-                }}
-                className="rounded-xl border border-white/15 bg-white/5 px-5 py-3 text-sm text-white/80 transition hover:bg-white/10"
-              >
-                Close
-              </button>
             </div>
 
             {(templateError || templateInfo || submitError) ? (
@@ -1213,12 +1226,12 @@ export function AdminStockAssemblyClient({
                         ) : null}
 
                         <div className="mt-4">
-                          <label className="label-rk">Line Remarks</label>
+                          <label className="label-rk">Product Remarks</label>
                           <input
                             className="input-rk"
                             value={line.remarks}
                             onChange={(e) => updateTemplateLine(index, (current) => ({ ...current, remarks: e.target.value }))}
-                            placeholder="Optional line remarks"
+                            placeholder="Optional product remarks"
                           />
                         </div>
                       </div>
@@ -1234,7 +1247,17 @@ export function AdminStockAssemblyClient({
                   onClick={() => void handleSubmit()}
                   className="inline-flex min-w-[200px] items-center justify-center rounded-xl bg-red-500 px-5 py-3 font-semibold text-white transition hover:bg-red-400 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {isSubmitting ? "Posting..." : "Post Stock Assembly"}
+                  {isSubmitting ? "Creating..." : "Create Stock Assembly"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsCreateOpen(false);
+                    resetCreateForm();
+                  }}
+                  className="rounded-xl border border-white/15 bg-white/5 px-5 py-3 text-sm text-white/80 transition hover:bg-white/10"
+                >
+                  Close
                 </button>
               </div>
             </div>
