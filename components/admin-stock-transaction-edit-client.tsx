@@ -317,6 +317,129 @@ function SearchableSelect({
   );
 }
 
+function OutboundSerialPicker({
+  label,
+  availableSerials,
+  selectedSerials,
+  searchValue,
+  onSearchValueChange,
+  onToggle,
+  disabled = false,
+}: {
+  label: string;
+  availableSerials: AvailableSerial[];
+  selectedSerials: string[];
+  searchValue: string;
+  onSearchValueChange: (value: string) => void;
+  onToggle: (serialNo: string) => void;
+  disabled?: boolean;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    function handleOutsideClick(event: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, []);
+
+  const filtered = useMemo(() => {
+    const keyword = searchValue.trim().toLowerCase();
+    if (!keyword) return availableSerials;
+    return availableSerials.filter((item) => {
+      const labelText = `${item.serialNo} ${item.batchNo || ""} ${item.expiryDate || ""}`.toLowerCase();
+      return labelText.includes(keyword);
+    });
+  }, [availableSerials, searchValue]);
+
+  return (
+    <div className="space-y-3" ref={containerRef}>
+      <div className="relative">
+        <label className="label-rk">{label}</label>
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => {
+            if (disabled) return;
+            setIsOpen((prev) => !prev);
+          }}
+          className={`input-rk flex items-center justify-between gap-3 text-left ${disabled ? "cursor-not-allowed opacity-60" : ""}`}
+        >
+          <span className={selectedSerials.length > 0 ? "truncate text-white" : "truncate text-white/45"}>
+            {selectedSerials.length > 0 ? `${selectedSerials.length} serial(s) selected` : "Select existing serial no"}
+          </span>
+          <span className="shrink-0 text-white/60">▾</span>
+        </button>
+
+        {isOpen ? (
+          <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-[140] overflow-hidden rounded-2xl border border-white/10 bg-[#0b0b0f] shadow-2xl">
+            <div className="border-b border-white/10 p-3">
+              <input
+                autoFocus
+                className="input-rk"
+                value={searchValue}
+                onChange={(e) => onSearchValueChange(e.target.value)}
+                placeholder="Search serial no"
+              />
+            </div>
+            <div className="max-h-64 overflow-y-auto p-2">
+              {filtered.length === 0 ? (
+                <div className="rounded-xl px-3 py-3 text-sm text-white/45">No available serial numbers found for the selected product/location.</div>
+              ) : (
+                filtered.map((serial) => {
+                  const selected = selectedSerials.some((value) => value.toUpperCase() === serial.serialNo.toUpperCase());
+                  const meta = [serial.batchNo || null, serial.expiryDate ? `Exp ${serial.expiryDate}` : null]
+                    .filter(Boolean)
+                    .join(" • ");
+
+                  return (
+                    <button
+                      key={serial.id}
+                      type="button"
+                      onClick={() => {
+                        onToggle(serial.serialNo);
+                        setIsOpen(false);
+                      }}
+                      className={`flex w-full items-start justify-between gap-3 rounded-xl px-3 py-3 text-left text-sm transition ${
+                        selected ? "bg-white/10 text-white" : "text-white/85 hover:bg-white/10 hover:text-white"
+                      }`}
+                    >
+                      <div>
+                        <div className="font-medium">{serial.serialNo}</div>
+                        {meta ? <div className="mt-1 text-xs text-white/45">{meta}</div> : null}
+                      </div>
+                      <div className="text-xs font-semibold">{selected ? "Selected" : "Select"}</div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        ) : null}
+      </div>
+
+      {selectedSerials.length > 0 ? (
+        <div className="flex flex-wrap gap-2">
+          {selectedSerials.map((serialNo) => (
+            <button
+              key={serialNo}
+              type="button"
+              onClick={() => onToggle(serialNo)}
+              className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs text-white/80 transition hover:bg-white/10"
+            >
+              {serialNo} ×
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function buildInitialLines(transaction: TransactionRecord): FormLine[] {
   return transaction.lines.map((line) => ({
     inventoryProductId: line.inventoryProduct.id,
@@ -806,28 +929,23 @@ export function AdminStockTransactionEditClient({
                   ) : null}
 
                   {isSerialTracked && outboundSerialFlow ? (
-                    <div className="md:col-span-2 xl:col-span-4 rounded-2xl border border-white/10 bg-black/20 p-4">
-                      <div className="grid gap-4 md:grid-cols-[minmax(220px,0.8fr)_1fr]">
-                        <div>
-                          <label className="label-rk">Search Serial No</label>
-                          <input className="input-rk" value={line.serialSearch} onChange={(e) => updateLine(index, { serialSearch: e.target.value })} placeholder="Filter available serial numbers" />
-                        </div>
-                        <div className="flex items-end text-sm text-white/55">{loadingSerials[index] ? "Loading available serial numbers..." : `${line.serialNos.length} serial(s) selected`}</div>
-                      </div>
-                      <div className="mt-4 max-h-64 overflow-y-auto rounded-2xl border border-white/10 bg-black/20 p-2">
-                        {loadingSerials[index] ? <div className="px-3 py-3 text-sm text-white/45">Loading available serial numbers...</div> : filteredSerialRows.length === 0 ? <div className="px-3 py-3 text-sm text-white/45">No available serial numbers found for the selected product/location{isBatchTracked ? "/batch" : ""}.</div> : filteredSerialRows.map((serial) => {
-                          const checked = line.serialNos.some((value) => value.toUpperCase() === serial.serialNo.toUpperCase());
-                          return (
-                            <label key={serial.id} className="flex cursor-pointer items-center justify-between gap-3 rounded-xl px-3 py-3 text-sm text-white/85 transition hover:bg-white/5">
-                              <div>
-                                <div className="font-medium text-white">{serial.serialNo}</div>
-                                {serial.batchNo ? <div className="mt-1 text-xs text-white/45">Batch: {serial.batchNo}</div> : null}
-                              </div>
-                              <input type="checkbox" checked={checked} onChange={() => toggleSelectedSerial(index, serial.serialNo)} />
-                            </label>
-                          );
-                        })}
-                      </div>
+                    <div className="md:col-span-2 xl:col-span-4">
+                      <OutboundSerialPicker
+                        label="Serial No"
+                        availableSerials={serialRows}
+                        selectedSerials={line.serialNos}
+                        searchValue={line.serialSearch}
+                        onSearchValueChange={(value) => updateLine(index, { serialSearch: value })}
+                        onToggle={(serialNo) => toggleSelectedSerial(index, serialNo)}
+                        disabled={loadingSerials[index]}
+                      />
+                      <p className="mt-2 text-xs text-white/45">
+                        {loadingSerials[index]
+                          ? "Loading available serial numbers..."
+                          : serialRows.length === 0
+                            ? `No available serial numbers found for the selected product/location${isBatchTracked ? "/batch" : ""}.`
+                            : "Select available serial numbers from the dropdown."}
+                      </p>
                     </div>
                   ) : null}
 
