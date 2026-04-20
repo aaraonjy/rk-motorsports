@@ -60,10 +60,16 @@ export async function POST(req: Request, context: Params) {
               }
             }
 
-            if (transaction.transactionType === "SI" || ((transaction.transactionType === "SA" || transaction.transactionType === "AS") && line.adjustmentDirection === "OUT")) {
+            if (transaction.transactionType === "SI" || (transaction.transactionType === "SA" && line.adjustmentDirection === "OUT")) {
               if (serial.status !== "OUT_OF_STOCK") {
                 throw new Error(`Serial No ${serialEntry.serialNo} cannot be cancelled because it is no longer in outbound state.`);
               }
+            }
+
+            if (transaction.transactionType === "AS" && line.adjustmentDirection === "OUT") {
+              // Stock Assembly cancellation should be blocked by downstream usage of the finished good,
+              // not by requiring consumed component serials to remain in a generic outbound state.
+              // The component serials will be restored during the reversal step below.
             }
 
             if (transaction.transactionType === "ST") {
@@ -78,6 +84,11 @@ export async function POST(req: Request, context: Params) {
             if (balance < qty) {
               throw new Error(`Transaction ${transaction.transactionNo} cannot be cancelled because the current stock balance is no longer sufficient to reverse it.`);
             }
+          }
+
+          if (transaction.transactionType === "AS" && line.adjustmentDirection === "OUT") {
+            // For Stock Assembly cancellation, consumed component quantities are restored back into stock.
+            // We only need to ensure the assembled finished good (IN lines) is still available to reverse.
           }
 
           if (transaction.transactionType === "ST") {
