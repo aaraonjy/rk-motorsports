@@ -584,6 +584,7 @@ export function AdminStockAssemblyClient({
   const [remarks, setRemarks] = useState("");
   const [fgBatchNo, setFgBatchNo] = useState("");
   const [fgBatchMode, setFgBatchMode] = useState<"existing" | "new">("new");
+  const [fgBatchExpiryDate, setFgBatchExpiryDate] = useState("");
   const [fgSerialEntryText, setFgSerialEntryText] = useState("");
   const [fgSerialNos, setFgSerialNos] = useState<string[]>([]);
   const [templateLines, setTemplateLines] = useState<TemplateLineForm[]>([]);
@@ -709,6 +710,7 @@ export function AdminStockAssemblyClient({
     setRemarks("");
     setFgBatchNo("");
     setFgBatchMode("new");
+    setFgBatchExpiryDate("");
     setFgSerialEntryText("");
     setFgSerialNos([]);
     setTemplateLines([]);
@@ -807,10 +809,17 @@ export function AdminStockAssemblyClient({
           if (!response.ok || !data.ok) return [];
           return Array.isArray(data.items) ? data.items : [];
         })
-        .then((rows: AvailableBatch[]) => setFgAvailableBatches(rows))
+        .then((rows: AvailableBatch[]) => {
+          setFgAvailableBatches(rows);
+          if (fgBatchMode === "existing" && fgBatchNo.trim()) {
+            const matched = rows.find((item) => item.batchNo.toUpperCase() === fgBatchNo.trim().toUpperCase()) || null;
+            setFgBatchExpiryDate(matched?.expiryDate ? formatDateInput(matched.expiryDate) : "");
+          }
+        })
         .catch(() => setFgAvailableBatches([]));
     } else {
       setFgAvailableBatches([]);
+      setFgBatchExpiryDate("");
     }
 
     if (selectedFinishedGood.serialNumberTracking) {
@@ -829,7 +838,7 @@ export function AdminStockAssemblyClient({
     } else {
       setFgAvailableSerials([]);
     }
-  }, [locationId, selectedFinishedGood]);
+  }, [locationId, selectedFinishedGood, fgBatchMode, fgBatchNo]);
 
   useEffect(() => {
     if (!locationId) {
@@ -938,7 +947,7 @@ export function AdminStockAssemblyClient({
           qty: Number(normalizeQtyInput(assemblyQty)),
           unitCost: Number(fgUnitCost.toFixed(2)),
           batchNo: selectedFinishedGood.batchTracking ? normalizeBatchNo(fgBatchNo) : null,
-          expiryDate: null,
+          expiryDate: selectedFinishedGood.batchTracking && fgBatchExpiryDate.trim() ? fgBatchExpiryDate : null,
           serialNos: selectedFinishedGood.serialNumberTracking ? uniqueSerialNos(parseSerialEntryText(fgSerialEntryText)) : [],
           remarks: remarks.trim() || null,
           locationId,
@@ -1160,10 +1169,16 @@ export function AdminStockAssemblyClient({
                     const raw = e.target.value;
                     if (raw === "") {
                       setAssemblyQty("");
+                      setFgSerialNos([]);
+                      setFgSerialEntryText("");
                       return;
                     }
                     const next = Math.floor(Number(raw));
-                    setAssemblyQty(Number.isFinite(next) && next > 0 ? String(next) : "1");
+                    const normalizedQty = Number.isFinite(next) && next > 0 ? String(next) : "1";
+                    const clampedSerials = clampSerialNosToQty(fgSerialNos, normalizedQty);
+                    setAssemblyQty(normalizedQty);
+                    setFgSerialNos(clampedSerials);
+                    setFgSerialEntryText(clampedSerials.join("\n"));
                   }}
                 />
               </div>
@@ -1199,10 +1214,34 @@ export function AdminStockAssemblyClient({
                           onChange={({ mode, batchNo }) => {
                             setFgBatchMode(mode);
                             setFgBatchNo(batchNo);
+                            if (mode === "new") {
+                              setFgBatchExpiryDate("");
+                            } else {
+                              const matched = fgAvailableBatches.find((item) => item.batchNo.toUpperCase() === batchNo.trim().toUpperCase()) || null;
+                              setFgBatchExpiryDate(matched?.expiryDate ? formatDateInput(matched.expiryDate) : "");
+                            }
                           }}
                         />
                         {fgBatchMode === "new" ? (
-                          <input className="input-rk mt-3" value={fgBatchNo} onChange={(e) => setFgBatchNo(e.target.value.toUpperCase())} placeholder="Enter new batch no" />
+                          <div className="mt-3 grid gap-3 md:grid-cols-2">
+                            <input
+                              className="input-rk"
+                              value={fgBatchNo}
+                              onChange={(e) => setFgBatchNo(e.target.value.toUpperCase())}
+                              placeholder="Enter new batch no"
+                            />
+                            <input
+                              type="date"
+                              className="input-rk"
+                              value={fgBatchExpiryDate}
+                              onChange={(e) => setFgBatchExpiryDate(e.target.value)}
+                            />
+                          </div>
+                        ) : fgBatchNo ? (
+                          <div className="mt-3">
+                            <label className="label-rk">Finished Good Batch Expiry Date</label>
+                            <input type="date" className="input-rk" value={fgBatchExpiryDate} disabled />
+                          </div>
                         ) : null}
                       </div>
                     ) : null}
@@ -1213,7 +1252,7 @@ export function AdminStockAssemblyClient({
                         selectedSerials={fgSerialNos}
                         entryText={fgSerialEntryText}
                         onEntryTextChange={(value) => {
-                          const clamped = clampSerialNosToQty(parseSerialEntryText(value), assemblyQty);
+                          const clamped = clampSerialNosToQty(parseSerialEntryText(value).map((item) => item.toUpperCase()), assemblyQty);
                           setFgSerialEntryText(clamped.join("\n"));
                           setFgSerialNos(clamped);
                         }}
