@@ -200,33 +200,6 @@ function uniqueSerialNos(values: string[]) {
   return next;
 }
 
-function getSerialDisplayLabel(
-  availableSerials: AvailableSerial[],
-  selectedSerials: string[],
-  entryText: string
-) {
-  const manualEntries = uniqueSerialNos(parseSerialEntryText(entryText).map((item) => item.toUpperCase()));
-  if (selectedSerials.length === 1) {
-    const selected = availableSerials.find((item) => item.serialNo.toUpperCase() === selectedSerials[0].toUpperCase()) || null;
-    if (!selected) return selectedSerials[0];
-    const parts = [selected.serialNo];
-    if (selected.batchNo) parts.push(selected.batchNo);
-    if (selected.expiryDate) parts.push(`Exp ${formatDateInput(selected.expiryDate)}`);
-    return parts.join(" • ");
-  }
-  if (selectedSerials.length > 1) {
-    return `${selectedSerials.length} serial(s) selected`;
-  }
-  if (manualEntries.length === 1) {
-    return manualEntries[0];
-  }
-  if (manualEntries.length > 1) {
-    return `${manualEntries.length} serial(s) entered`;
-  }
-  return "";
-}
-
-
 function getProductUomOptions(product: InventoryProductOption | null | undefined) {
   if (!product) return [];
   const seen = new Set<string>();
@@ -427,7 +400,7 @@ function OutboundSerialPicker({
     const keyword = searchValue.trim().toLowerCase();
     if (!keyword) return availableSerials;
     return availableSerials.filter((item) => {
-      const labelText = `${item.serialNo} ${item.batchNo || ""} ${item.expiryDate || ""}`.toLowerCase();
+      const labelText = `${item.serialNo} ${item.batchNo || ""}`.toLowerCase();
       return labelText.includes(keyword);
     });
   }, [availableSerials, searchValue]);
@@ -446,7 +419,7 @@ function OutboundSerialPicker({
           className={`input-rk flex items-center justify-between gap-3 text-left ${disabled ? "cursor-not-allowed opacity-60" : ""}`}
         >
           <span className={selectedSerials.length > 0 ? "truncate text-white" : "truncate text-white/45"}>
-            {selectedSerials.length > 0 ? `${selectedSerials.length} serial(s) selected` : "Select existing serial no"}
+            {selectedSerials.length === 1 ? selectedSerials[0] : selectedSerials.length > 1 ? `${selectedSerials.length} serial(s) selected` : "Select existing serial no"}
           </span>
           <span className="shrink-0 text-white/60">▾</span>
         </button>
@@ -468,7 +441,7 @@ function OutboundSerialPicker({
               ) : (
                 filtered.map((serial) => {
                   const selected = selectedSerials.some((value) => value.toUpperCase() === serial.serialNo.toUpperCase());
-                  const meta = [serial.batchNo || null, serial.expiryDate ? `Exp ${serial.expiryDate}` : null]
+                  const meta = [serial.batchNo || null]
                     .filter(Boolean)
                     .join(" • ");
 
@@ -498,20 +471,6 @@ function OutboundSerialPicker({
         ) : null}
       </div>
 
-      {selectedSerials.length > 0 ? (
-        <div className="flex flex-wrap gap-2">
-          {selectedSerials.map((serialNo) => (
-            <button
-              key={serialNo}
-              type="button"
-              onClick={() => onToggle(serialNo)}
-              className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs text-white/80 transition hover:bg-white/10"
-            >
-              {serialNo} ×
-            </button>
-          ))}
-        </div>
-      ) : null}
     </div>
   );
 }
@@ -998,8 +957,8 @@ export function AdminStockTransactionEditClient({
                         <div>
                           <label className="label-rk">New Serial No</label>
                           <div className="flex gap-3">
-                            <input className="input-rk" value={line.serialEntryText} onChange={(e) => updateLine(index, { serialEntryText: e.target.value })} placeholder="Enter new serial no" />
-                            <button type="button" onClick={() => { if (!line.serialEntryText.trim()) return; addInboundSerial(index, line.serialEntryText); updateLine(index, { serialEntryText: "", serialSearch: "" }); }} className="inline-flex items-center justify-center rounded-xl bg-white/10 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/15">Add</button>
+                            <input className="input-rk" value={line.serialEntryText} onChange={(e) => updateLine(index, { serialEntryText: e.target.value.toUpperCase() })} placeholder="Enter new serial no" />
+                            <button type="button" onClick={() => { if (!line.serialEntryText.trim()) return; addInboundSerial(index, line.serialEntryText); updateLine(index, { serialEntryText: "", serialSearch: "" }); }} className="inline-flex items-center justify-center rounded-xl bg-white/10 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/15">Create New Serial</button>
                           </div>
                         </div>
                       ) : null}

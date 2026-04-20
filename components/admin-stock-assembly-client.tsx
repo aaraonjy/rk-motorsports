@@ -170,33 +170,6 @@ function uniqueSerialNos(values: string[]) {
   return next;
 }
 
-function getSerialDisplayLabel(
-  availableSerials: AvailableSerial[],
-  selectedSerials: string[],
-  entryText: string
-) {
-  const manualEntries = uniqueSerialNos(parseSerialEntryText(entryText).map((item) => item.toUpperCase()));
-  if (selectedSerials.length === 1) {
-    const selected = availableSerials.find((item) => item.serialNo.toUpperCase() === selectedSerials[0].toUpperCase()) || null;
-    if (!selected) return selectedSerials[0];
-    const parts = [selected.serialNo];
-    if (selected.batchNo) parts.push(selected.batchNo);
-    if (selected.expiryDate) parts.push(`Exp ${formatDateInput(selected.expiryDate)}`);
-    return parts.join(" • ");
-  }
-  if (selectedSerials.length > 1) {
-    return `${selectedSerials.length} serial(s) selected`;
-  }
-  if (manualEntries.length === 1) {
-    return manualEntries[0];
-  }
-  if (manualEntries.length > 1) {
-    return `${manualEntries.length} serial(s) entered`;
-  }
-  return "";
-}
-
-
 function clampSerialNosToQty(values: string[], qty: string | number | null | undefined) {
   const unique = uniqueSerialNos(values);
   const parsedQty = Math.max(0, Math.floor(Number(qty ?? 0)));
@@ -476,7 +449,7 @@ function SerialPicker({
     const keyword = search.trim().toLowerCase();
     if (!keyword) return availableSerials;
     return availableSerials.filter((item) => {
-      const label = `${item.serialNo} ${item.batchNo || ""} ${item.expiryDate ? formatDateInput(item.expiryDate) : ""}`.toLowerCase();
+      const label = `${item.serialNo} ${item.batchNo || ""}`.toLowerCase();
       return label.includes(keyword);
     });
   }, [availableSerials, search]);
@@ -496,10 +469,12 @@ function SerialPicker({
           className={`input-rk flex items-center justify-between gap-3 text-left ${disabled ? "cursor-not-allowed opacity-60" : ""}`}
         >
           <span className={selectedSerials.length > 0 || entryText.trim() ? "truncate text-white" : "truncate text-white/45"}>
-            {selectedSerials.length > 0
+            {selectedSerials.length === 1
+              ? selectedSerials[0]
+              : selectedSerials.length > 1
               ? `${selectedSerials.length} serial(s) selected`
               : entryText.trim()
-              ? "1 manual serial entered"
+              ? parseSerialEntryText(entryText)[0] || "Select existing serial or create new"
               : "Select existing serial or create new"}
           </span>
           <span className="shrink-0 text-white/60">▾</span>
@@ -533,7 +508,7 @@ function SerialPicker({
               ) : (
                 filtered.map((serial) => {
                   const selected = selectedSerials.some((item) => item.toUpperCase() === serial.serialNo.toUpperCase());
-                  const meta = [serial.batchNo || null, serial.expiryDate ? `Exp ${formatDateInput(serial.expiryDate)}` : null]
+                  const meta = [serial.batchNo || null]
                     .filter(Boolean)
                     .join(" • ");
                   return (
@@ -568,7 +543,7 @@ function SerialPicker({
           <input
             className="input-rk"
             value={entryText}
-            onChange={(e) => onEntryTextChange(e.target.value)}
+            onChange={(e) => onEntryTextChange(e.target.value.toUpperCase())}
             placeholder="Enter new serial no"
           />
         </div>

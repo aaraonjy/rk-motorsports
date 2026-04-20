@@ -220,33 +220,6 @@ function uniqueSerialNos(values: string[]) {
   return next;
 }
 
-function getSerialDisplayLabel(
-  availableSerials: AvailableSerial[],
-  selectedSerials: string[],
-  entryText: string
-) {
-  const manualEntries = uniqueSerialNos(parseSerialEntryText(entryText).map((item) => item.toUpperCase()));
-  if (selectedSerials.length === 1) {
-    const selected = availableSerials.find((item) => item.serialNo.toUpperCase() === selectedSerials[0].toUpperCase()) || null;
-    if (!selected) return selectedSerials[0];
-    const parts = [selected.serialNo];
-    if (selected.batchNo) parts.push(selected.batchNo);
-    if (selected.expiryDate) parts.push(`Exp ${formatDateInput(selected.expiryDate)}`);
-    return parts.join(" • ");
-  }
-  if (selectedSerials.length > 1) {
-    return `${selectedSerials.length} serial(s) selected`;
-  }
-  if (manualEntries.length === 1) {
-    return manualEntries[0];
-  }
-  if (manualEntries.length > 1) {
-    return `${manualEntries.length} serial(s) entered`;
-  }
-  return "";
-}
-
-
 function getProductUomOptions(product: InventoryProductOption | null | undefined) {
   if (!product) return [];
   const seen = new Set<string>();
@@ -443,7 +416,7 @@ function OutboundSerialPicker({
     const keyword = searchValue.trim().toLowerCase();
     if (!keyword) return availableSerials;
     return availableSerials.filter((item) => {
-      const labelText = `${item.serialNo} ${item.batchNo || ""} ${item.expiryDate || ""}`.toLowerCase();
+      const labelText = `${item.serialNo} ${item.batchNo || ""}`.toLowerCase();
       return labelText.includes(keyword);
     });
   }, [availableSerials, searchValue]);
@@ -462,7 +435,7 @@ function OutboundSerialPicker({
           className={`input-rk flex items-center justify-between gap-3 text-left ${disabled ? "cursor-not-allowed opacity-60" : ""}`}
         >
           <span className={selectedSerials.length > 0 ? "truncate text-white" : "truncate text-white/45"}>
-            {selectedSerials.length > 0 ? `${selectedSerials.length} serial(s) selected` : "Select existing serial no"}
+            {selectedSerials.length === 1 ? selectedSerials[0] : selectedSerials.length > 1 ? `${selectedSerials.length} serial(s) selected` : "Select existing serial no"}
           </span>
           <span className="shrink-0 text-white/60">▾</span>
         </button>
@@ -484,7 +457,7 @@ function OutboundSerialPicker({
               ) : (
                 filtered.map((serial) => {
                   const selected = selectedSerials.some((value) => value.toUpperCase() === serial.serialNo.toUpperCase());
-                  const meta = [serial.batchNo || null, serial.expiryDate ? `Exp ${serial.expiryDate}` : null]
+                  const meta = [serial.batchNo || null]
                     .filter(Boolean)
                     .join(" • ");
 
@@ -514,20 +487,6 @@ function OutboundSerialPicker({
         ) : null}
       </div>
 
-      {selectedSerials.length > 0 ? (
-        <div className="flex flex-wrap gap-2">
-          {selectedSerials.map((serialNo) => (
-            <button
-              key={serialNo}
-              type="button"
-              onClick={() => onToggle(serialNo)}
-              className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs text-white/80 transition hover:bg-white/10"
-            >
-              {serialNo} ×
-            </button>
-          ))}
-        </div>
-      ) : null}
     </div>
   );
 }
@@ -1692,26 +1651,31 @@ export function AdminStockTransactionClient({
                                     label: "+ Create New Serial",
                                     searchText: "create new serial",
                                   },
+                                  ...(line.serialNos.length > 1
+                                    ? [{
+                                        id: "__COUNT__",
+                                        label: `${line.serialNos.length} serial(s) selected`,
+                                        searchText: line.serialNos.join(" ").toLowerCase(),
+                                      }]
+                                    : []),
                                   ...line.serialNos.map((serialNo) => ({
                                     id: serialNo,
                                     label: serialNo,
                                     searchText: serialNo.toLowerCase(),
                                   })),
                                 ]}
-                                value={line.serialSearch === "__NEW__" ? "__NEW__" : ""}
+                                value={line.serialSearch === "__NEW__" ? "__NEW__" : line.serialNos.length > 1 ? "__COUNT__" : line.serialNos[0] || ""}
                                 onChange={(option) => {
                                   if (!option) return;
                                   if (option.id === "__NEW__") {
-                                    updateLine(index, { serialSearch: "__NEW__", serialEntryText: "" });
+                                    updateLine(index, { serialSearch: "__NEW__", serialEntryText: "", serialNos: [] });
                                     return;
                                   }
-                                  addInboundSerial(index, option.id);
-                                  updateLine(index, { serialSearch: "" });
+                                  if (option.id === "__COUNT__") return;
+                                  updateLine(index, { serialSearch: "", serialEntryText: "", serialNos: [option.id] });
                                 }}
                               />
-                              <p className="mt-2 text-xs text-white/45">
-                                Add each serial no one by one. Qty follows the selected serial count.
-                              </p>
+
                             </div>
 
                             {line.serialSearch === "__NEW__" ? (
@@ -1721,15 +1685,15 @@ export function AdminStockTransactionClient({
                                   <input
                                     className="input-rk"
                                     value={line.serialEntryText}
-                                    onChange={(e) => updateLine(index, { serialEntryText: e.target.value })}
+                                    onChange={(e) => updateLine(index, { serialEntryText: e.target.value.toUpperCase() })}
                                     placeholder="Enter new serial no"
                                   />
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      if (!line.serialEntryText.trim()) return;
-                                      addInboundSerial(index, line.serialEntryText);
-                                      updateLine(index, { serialEntryText: "", serialSearch: "" });
+                                      const nextSerial = line.serialEntryText.trim().toUpperCase();
+                                      if (!nextSerial) return;
+                                      updateLine(index, { serialNos: [nextSerial], serialEntryText: nextSerial, serialSearch: "" });
                                     }}
                                     className="inline-flex items-center justify-center rounded-xl bg-white/10 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/15"
                                   >
@@ -1739,24 +1703,6 @@ export function AdminStockTransactionClient({
                               </div>
                             ) : null}
 
-                            <div className="md:col-span-2 xl:col-span-4">
-                              <div className="mt-1 flex flex-wrap gap-2">
-                                {line.serialNos.length === 0 ? (
-                                  <div className="text-sm text-white/45">No serial numbers added yet.</div>
-                                ) : (
-                                  line.serialNos.map((serialNo) => (
-                                    <button
-                                      key={serialNo}
-                                      type="button"
-                                      onClick={() => removeInboundSerial(index, serialNo)}
-                                      className="rounded-full border border-white/15 bg-white/5 px-3 py-2 text-xs text-white/80 hover:bg-white/10"
-                                    >
-                                      {serialNo} ✕
-                                    </button>
-                                  ))
-                                )}
-                              </div>
-                            </div>
                           </>
                         ) : null}
 
