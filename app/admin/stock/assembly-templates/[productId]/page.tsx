@@ -99,7 +99,7 @@ export default async function AdminAssemblyTemplatePage({ params }: Params) {
             product={product}
             componentOptions={componentOptions}
             initialRemarks={template?.remarks || ""}
-            initialLines={(template?.lines || []).map((line) => ({
+            initialProducts={(template?.lines || []).map((line) => ({
               id: line.id,
               lineNo: line.lineNo,
               componentProductId: line.componentProductId,
