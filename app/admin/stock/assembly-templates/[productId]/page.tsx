@@ -55,6 +55,12 @@ export default async function AdminAssemblyTemplatePage({ params }: Params) {
         code: true,
         description: true,
         baseUom: true,
+        batchTracking: true,
+        serialNumberTracking: true,
+        uomConversions: {
+          orderBy: [{ uomCode: "asc" }],
+          select: { id: true, uomCode: true, conversionRate: true },
+        },
       },
     }),
   ]);

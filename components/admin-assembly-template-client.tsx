@@ -24,6 +24,8 @@ type ComponentOption = {
   code: string;
   description: string;
   baseUom: string;
+  batchTracking?: boolean;
+  serialNumberTracking?: boolean;
   uomConversions?: ComponentUomOption[];
 };
 
@@ -64,6 +66,12 @@ type SearchableSelectOption = {
   searchText: string;
 };
 
+type ComponentSearchableOption = SearchableSelectOption & {
+  componentId: string;
+  componentCode: string;
+  componentDescription: string;
+};
+
 function emptyProduct(lineNo: number): EditableProduct {
   return {
     lineNo,
@@ -101,6 +109,17 @@ function getUomOptions(component: ComponentOption | null | undefined) {
     if (Number(item.conversionRate) > 0) pushOption(item.uomCode, Number(item.conversionRate));
   }
   return options;
+}
+
+function getComponentProductOptions(componentOptions: ComponentOption[]) {
+  return componentOptions.map((option) => ({
+    id: option.id,
+    componentId: option.id,
+    componentCode: option.code,
+    componentDescription: option.description,
+    label: `${option.code} — ${option.description}`,
+    searchText: `${option.code} ${option.description} ${option.baseUom}`.toLowerCase(),
+  }));
 }
 
 function SearchableSelect({
@@ -224,6 +243,10 @@ export function AdminAssemblyTemplateClient({
   const [submitSuccess, setSubmitSuccess] = useState("");
 
   const optionMap = useMemo(() => new Map(componentOptions.map((item) => [item.id, item])), [componentOptions]);
+  const componentProductOptions = useMemo<ComponentSearchableOption[]>(
+    () => getComponentProductOptions(componentOptions),
+    [componentOptions]
+  );
 
   function renumber(nextProducts: EditableProduct[]) {
     return nextProducts.map((line, index) => ({ ...line, lineNo: index + 1 }));
@@ -370,12 +393,13 @@ export function AdminAssemblyTemplateClient({
 
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
                   <div>
-                    <label className="label-rk">Component Item</label>
-                    <select
-                      className="input-rk"
+                    <SearchableSelect
+                      label="Product"
+                      placeholder="Search or select product"
+                      options={componentProductOptions}
                       value={line.componentProductId}
-                      onChange={(e) => {
-                        const nextProductId = e.target.value;
+                      onChange={(option) => {
+                        const nextProductId = option?.id || "";
                         const nextProduct = optionMap.get(nextProductId);
                         updateProduct(line.lineNo, (current) => ({
                           ...current,
@@ -383,14 +407,7 @@ export function AdminAssemblyTemplateClient({
                           uom: current.uom || nextProduct?.baseUom || "",
                         }));
                       }}
-                    >
-                      <option value="">Select component item</option>
-                      {componentOptions.map((option) => (
-                        <option key={option.id} value={option.id}>
-                          {option.code} — {option.description}
-                        </option>
-                      ))}
-                    </select>
+                    />
                     {selectedComponent ? (
                       <p className="mt-2 text-xs text-white/45">
                         Base UOM: {selectedComponent.baseUom}
@@ -399,12 +416,18 @@ export function AdminAssemblyTemplateClient({
                   </div>
 
                   <div>
-                    <label className="label-rk">UOM</label>
-                    <input
-                      className="input-rk"
+                    <SearchableSelect
+                      label="UOM"
+                      placeholder="Select UOM"
+                      options={getUomOptions(selectedComponent)}
                       value={line.uom}
-                      onChange={(e) => updateProduct(line.lineNo, (current) => ({ ...current, uom: e.target.value.toUpperCase() }))}
-                      placeholder={selectedComponent?.baseUom || "PCS"}
+                      disabled={!selectedComponent}
+                      onChange={(option) =>
+                        updateProduct(line.lineNo, (current) => ({
+                          ...current,
+                          uom: option?.id || "",
+                        }))
+                      }
                     />
                   </div>
                 </div>
@@ -427,7 +450,7 @@ export function AdminAssemblyTemplateClient({
                       className="input-rk"
                       value={line.remarks}
                       onChange={(e) => updateProduct(line.lineNo, (current) => ({ ...current, remarks: e.target.value }))}
-                      placeholder="Optional line remarks"
+                      placeholder="Optional product remarks"
                     />
                   </div>
                 </div>
