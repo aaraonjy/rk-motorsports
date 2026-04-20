@@ -58,6 +58,12 @@ type EditableProduct = {
   remarks: string;
 };
 
+type SearchableSelectOption = {
+  id: string;
+  label: string;
+  searchText: string;
+};
+
 function emptyProduct(lineNo: number): EditableProduct {
   return {
     lineNo,
