@@ -170,6 +170,33 @@ function uniqueSerialNos(values: string[]) {
   return next;
 }
 
+function getSerialDisplayLabel(
+  availableSerials: AvailableSerial[],
+  selectedSerials: string[],
+  entryText: string
+) {
+  const manualEntries = uniqueSerialNos(parseSerialEntryText(entryText).map((item) => item.toUpperCase()));
+  if (selectedSerials.length === 1) {
+    const selected = availableSerials.find((item) => item.serialNo.toUpperCase() === selectedSerials[0].toUpperCase()) || null;
+    if (!selected) return selectedSerials[0];
+    const parts = [selected.serialNo];
+    if (selected.batchNo) parts.push(selected.batchNo);
+    if (selected.expiryDate) parts.push(`Exp ${formatDateInput(selected.expiryDate)}`);
+    return parts.join(" • ");
+  }
+  if (selectedSerials.length > 1) {
+    return `${selectedSerials.length} serial(s) selected`;
+  }
+  if (manualEntries.length === 1) {
+    return manualEntries[0];
+  }
+  if (manualEntries.length > 1) {
+    return `${manualEntries.length} serial(s) entered`;
+  }
+  return "";
+}
+
+
 function clampSerialNosToQty(values: string[], qty: string | number | null | undefined) {
   const unique = uniqueSerialNos(values);
   const parsedQty = Math.max(0, Math.floor(Number(qty ?? 0)));
@@ -469,47 +496,14 @@ function SerialPicker({
           className={`input-rk flex items-center justify-between gap-3 text-left ${disabled ? "cursor-not-allowed opacity-60" : ""}`}
         >
           <span className={selectedSerials.length > 0 || entryText.trim() ? "truncate text-white" : "truncate text-white/45"}>
-            {selectedSerials.length === 1
-              ? selectedSerials[0]
-              : selectedSerials.length > 1
+            {selectedSerials.length > 0
               ? `${selectedSerials.length} serial(s) selected`
               : entryText.trim()
-              ? parseSerialEntryText(entryText)[0] || "1 manual serial entered"
+              ? "1 manual serial entered"
               : "Select existing serial or create new"}
           </span>
           <span className="shrink-0 text-white/60">▾</span>
         </button>
-
-        {(manualMode || selectedSerials.length > 0) ? (
-          <div className="mt-3 space-y-3">
-            {manualMode ? (
-              <div>
-                <label className="label-rk">New Serial No</label>
-                <input
-                  className="input-rk"
-                  value={entryText}
-                  onChange={(e) => onEntryTextChange(e.target.value)}
-                  placeholder="Enter new serial no"
-                />
-              </div>
-            ) : null}
-
-            {selectedSerials.length > 0 ? (
-              <div className="flex flex-wrap gap-2">
-                {selectedSerials.map((serialNo) => (
-                  <button
-                    key={serialNo}
-                    type="button"
-                    onClick={() => onToggle(serialNo)}
-                    className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs text-white/80 transition hover:bg-white/10"
-                  >
-                    {serialNo} ×
-                  </button>
-                ))}
-              </div>
-            ) : null}
-          </div>
-        ) : null}
 
         {isOpen ? (
           <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-[140] overflow-hidden rounded-2xl border border-white/10 bg-[#0b0b0f] shadow-2xl">
@@ -567,6 +561,33 @@ function SerialPicker({
           </div>
         ) : null}
       </div>
+
+      {manualMode ? (
+        <div>
+          <label className="label-rk">New Serial No</label>
+          <input
+            className="input-rk"
+            value={entryText}
+            onChange={(e) => onEntryTextChange(e.target.value)}
+            placeholder="Enter new serial no"
+          />
+        </div>
+      ) : null}
+
+      {selectedSerials.length > 0 ? (
+        <div className="flex flex-wrap gap-2">
+          {selectedSerials.map((serialNo) => (
+            <button
+              key={serialNo}
+              type="button"
+              onClick={() => onToggle(serialNo)}
+              className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs text-white/80 transition hover:bg-white/10"
+            >
+              {serialNo} ×
+            </button>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
