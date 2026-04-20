@@ -7,6 +7,12 @@ import { useRouter } from "next/navigation";
 type StockTransactionTypeValue = "OB" | "SR" | "SI" | "SA" | "ST" | "AS";
 type AdjustmentDirectionValue = "IN" | "OUT";
 
+type InventoryProductUomOption = {
+  id?: string;
+  uomCode: string;
+  conversionRate: number;
+};
+
 type InventoryProductOption = {
   id: string;
   code: string;
@@ -15,6 +21,7 @@ type InventoryProductOption = {
   unitCost: number;
   batchTracking: boolean;
   serialNumberTracking: boolean;
+  uomConversions?: InventoryProductUomOption[];
 };
 
 type StockLocationOption = {
@@ -68,6 +75,7 @@ type Props = {
 type FormLine = {
   inventoryProductId: string;
   qty: string;
+  uomCode: string;
   unitCost: string;
   batchNo: string;
   batchMode: "existing" | "new";
@@ -190,6 +198,47 @@ function uniqueSerialNos(values: string[]) {
     next.push(value);
   }
   return next;
+}
+
+function getProductUomOptions(product: InventoryProductOption | null | undefined) {
+  if (!product) return [];
+  const seen = new Set<string>();
+  const options: Array<{ id: string; label: string; searchText: string; uomCode: string; conversionRate: number }> = [];
+  const pushOption = (uomCode: string, conversionRate: number) => {
+    const normalized = String(uomCode || "").trim().toUpperCase();
+    if (!normalized || seen.has(normalized)) return;
+    seen.add(normalized);
+    options.push({
+      id: normalized,
+      label: normalized === product.baseUom ? `${normalized} (Base UOM)` : `${normalized} (1 = ${conversionRate} ${product.baseUom})`,
+      searchText: `${normalized} ${product.baseUom}`.toLowerCase(),
+      uomCode: normalized,
+      conversionRate,
+    });
+  };
+
+  pushOption(product.baseUom, 1);
+  for (const item of product.uomConversions || []) {
+    if (Number(item.conversionRate) > 0) {
+      pushOption(item.uomCode, Number(item.conversionRate));
+    }
+  }
+  return options;
+}
+
+function getUomConversionRate(product: InventoryProductOption | null | undefined, uomCode: string | null | undefined) {
+  if (!product) return 1;
+  const normalized = String(uomCode || product.baseUom).trim().toUpperCase();
+  if (!normalized || normalized === product.baseUom) return 1;
+  const matched = (product.uomConversions || []).find((item) => item.uomCode.toUpperCase() === normalized);
+  return matched && Number(matched.conversionRate) > 0 ? Number(matched.conversionRate) : 1;
+}
+
+function convertQtyToBase(product: InventoryProductOption | null | undefined, qty: string | number | null | undefined, uomCode: string | null | undefined) {
+  const numericQty = Number(qty ?? 0);
+  if (!Number.isFinite(numericQty) || numericQty <= 0) return 0;
+  const rate = getUomConversionRate(product, uomCode);
+  return Math.round((numericQty * rate + Number.EPSILON) * 100) / 100;
 }
 
 function normalizeSerialToken(token: string) {
@@ -445,6 +494,7 @@ function buildInitialLines(transaction: TransactionRecord): FormLine[] {
     inventoryProductId: line.inventoryProduct.id,
     qty: formatQty(line.qty),
     unitCost: line.unitCost == null ? "0.00" : formatQty(line.unitCost),
+    uomCode: line.inventoryProduct.baseUom,
     batchNo: line.batchNo || "",
     batchMode: "existing",
     expiryDate: line.expiryDate ? formatDateInput(line.expiryDate) : "",
@@ -649,7 +699,10 @@ export function AdminStockTransactionEditClient({
       if (i !== index) return line;
       const next = { ...line, ...patch };
       const product = initialProducts.find((item) => item.id === next.inventoryProductId);
-      if (product?.serialNumberTracking) next.qty = String(next.serialNos.length || 0);
+      if (product?.serialNumberTracking) {
+        next.qty = String(next.serialNos.length || 0);
+        next.uomCode = product.baseUom;
+      }
       return next;
     }));
   }
@@ -659,6 +712,7 @@ export function AdminStockTransactionEditClient({
     updateLine(index, {
       inventoryProductId: productId,
       unitCost: product ? product.unitCost.toFixed(2) : "0.00",
+      uomCode: product?.baseUom || "",
       batchNo: "",
       batchMode: "existing",
       expiryDate: "",
@@ -740,6 +794,7 @@ export function AdminStockTransactionEditClient({
         lines: lines.map((line) => ({
           inventoryProductId: line.inventoryProductId || null,
           qty: Number(line.qty || 0),
+          uomCode: line.uomCode || null,
           unitCost: line.unitCost.trim() ? Number(line.unitCost) : null,
           batchNo: line.batchNo.trim().toUpperCase() || null,
           expiryDate: line.expiryDate || null,
@@ -798,6 +853,7 @@ export function AdminStockTransactionEditClient({
         <div className="space-y-4">
           {lines.map((line, index) => {
             const selectedProduct = initialProducts.find((item) => item.id === line.inventoryProductId) || null;
+            const uomOptions = getProductUomOptions(selectedProduct);
             const isBatchTracked = !!selectedProduct?.batchTracking;
             const isSerialTracked = !!selectedProduct?.serialNumberTracking;
             const inboundSerialFlow = isInboundSerialFlow(transactionType, line.adjustmentDirection);
@@ -826,7 +882,7 @@ export function AdminStockTransactionEditClient({
                   <div>
                     <label className="label-rk">Qty</label>
                     <input type="number" min="0.01" step="0.01" className="input-rk" value={line.qty} disabled={isSerialTracked} onChange={(e) => updateLine(index, { qty: e.target.value })} required />
-                    {isSerialTracked ? <p className="mt-2 text-xs text-white/45">Qty auto-follows selected serial count.</p> : null}
+                    {isSerialTracked ? <p className="mt-2 text-xs text-white/45">Qty auto-follows selected serial count and uses Base UOM.</p> : null}
                   </div>
 
                   <div>

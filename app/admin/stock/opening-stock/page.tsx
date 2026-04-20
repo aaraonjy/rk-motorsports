@@ -20,6 +20,10 @@ export default async function AdminOpeningStockPage() {
         unitCost: true,
         batchTracking: true,
         serialNumberTracking: true,
+        uomConversions: {
+          orderBy: [{ uomCode: "asc" }],
+          select: { id: true, uomCode: true, conversionRate: true },
+        },
       },
     }),
     db.stockLocation.findMany({
@@ -51,6 +55,13 @@ export default async function AdminOpeningStockPage() {
               unitCost: Number(product.unitCost ?? 0),
               batchTracking: product.batchTracking,
               serialNumberTracking: product.serialNumberTracking,
+              uomConversions: Array.isArray(product.uomConversions)
+                ? product.uomConversions.map((item) => ({
+                    id: item.id,
+                    uomCode: item.uomCode,
+                    conversionRate: Number(item.conversionRate ?? 0),
+                  }))
+                : [],
             }))}
             initialLocations={locations}
           />

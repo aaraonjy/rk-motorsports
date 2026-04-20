@@ -3,6 +3,12 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+type InventoryProductUomOption = {
+  id?: string;
+  uomCode: string;
+  conversionRate: number;
+};
+
 type InventoryProductOption = {
   id: string;
   code: string;
@@ -11,6 +17,7 @@ type InventoryProductOption = {
   unitCost: number;
   batchTracking: boolean;
   serialNumberTracking: boolean;
+  uomConversions?: InventoryProductUomOption[];
 };
 
 type StockLocationOption = {

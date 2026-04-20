@@ -17,6 +17,7 @@ type Params = { params: Promise<{ id: string }> };
 type StockLinePayload = {
   inventoryProductId?: string;
   qty?: number;
+  uomCode?: string | null;
   unitCost?: number | null;
   batchNo?: string | null;
   expiryDate?: string | null;
@@ -61,6 +62,30 @@ function normalizeSerialNumbers(value: unknown) {
 function roundQty(value: Prisma.Decimal | number | string | null | undefined) {
   return Math.round((Number(value ?? 0) + Number.EPSILON) * 100) / 100;
 }
+
+function normalizeUomCode(value: unknown) {
+  return typeof value === "string" ? value.trim().toUpperCase() : "";
+}
+
+function resolveConversionRate(product: any, uomCode: string) {
+  if (!uomCode || uomCode === product.baseUom) return 1;
+  const matched = Array.isArray(product.uomConversions)
+    ? product.uomConversions.find((item: any) => item.uomCode.toUpperCase() === uomCode)
+    : null;
+  if (!matched) {
+    throw new Error(`Selected UOM ${uomCode} is invalid for the selected product.`);
+  }
+  const rate = Number(matched.conversionRate ?? 0);
+  if (!Number.isFinite(rate) || rate <= 0) {
+    throw new Error(`Selected UOM ${uomCode} has invalid conversion rate.`);
+  }
+  return Math.round((rate + Number.EPSILON) * 10000) / 10000;
+}
+
+function convertQtyToBase(qty: number, rate: number) {
+  return Math.round((qty * rate + Number.EPSILON) * 100) / 100;
+}
+
 
 function transactionUsesOutboundLocation(
   transactionType: StockTransactionType,
@@ -215,7 +240,10 @@ export async function PUT(req: Request, context: Params) {
       const inventoryProductId = String(line.inventoryProductId || "").trim();
       const product = productMap.get(inventoryProductId);
       if (!product || !product.isActive || !product.trackInventory) throw new Error("Selected stock item is invalid, inactive, or not tracked by inventory.");
-      const qty = assertPositiveQty(line.qty);
+      const inputQty = assertPositiveQty(line.qty);
+      const uomCode = normalizeUomCode((line as any).uomCode) || product.baseUom;
+      const conversionRate = resolveConversionRate(product, uomCode);
+      const qty = convertQtyToBase(inputQty, conversionRate);
       const unitCost = line.unitCost == null ? null : normalizeNonNegativeNumber(line.unitCost, "Unit cost");
       const batchNo = typeof line.batchNo === "string" ? line.batchNo.trim().toUpperCase() || null : null;
       const expiryDate = typeof line.expiryDate === "string" && line.expiryDate.trim() ? new Date(line.expiryDate) : null;

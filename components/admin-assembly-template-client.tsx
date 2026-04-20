@@ -13,14 +13,21 @@ type ProductSummary = {
   isAssemblyItem: boolean;
 };
 
+type ComponentUomOption = {
+  id?: string;
+  uomCode: string;
+  conversionRate: number;
+};
+
 type ComponentOption = {
   id: string;
   code: string;
   description: string;
   baseUom: string;
+  uomConversions?: ComponentUomOption[];
 };
 
-type TemplateLineRecord = {
+type TemplateProductRecord = {
   id: string;
   lineNo: number;
   componentProductId: string;
@@ -37,10 +44,10 @@ type Props = {
   product: ProductSummary;
   componentOptions: ComponentOption[];
   initialRemarks: string;
-  initialLines: TemplateLineRecord[];
+  initialProducts: TemplateProductRecord[];
 };
 
-type EditableLine = {
+type EditableProduct = {
   id?: string;
   lineNo: number;
   componentProductId: string;
@@ -51,7 +58,7 @@ type EditableLine = {
   remarks: string;
 };
 
-function emptyLine(lineNo: number): EditableLine {
+function emptyProduct(lineNo: number): EditableProduct {
   return {
     lineNo,
     componentProductId: "",
@@ -69,16 +76,132 @@ function normalizeQty(value: string) {
   return parsed.toFixed(4).replace(/\.0+$/, "").replace(/(\.\d*?)0+$/, "$1");
 }
 
+function getUomOptions(component: ComponentOption | null | undefined) {
+  if (!component) return [];
+  const seen = new Set<string>();
+  const options: SearchableSelectOption[] = [];
+  const pushOption = (uomCode: string, conversionRate: number) => {
+    const normalized = String(uomCode || "").trim().toUpperCase();
+    if (!normalized || seen.has(normalized)) return;
+    seen.add(normalized);
+    options.push({
+      id: normalized,
+      label: normalized === component.baseUom ? `${normalized} (Base UOM)` : `${normalized} (1 = ${conversionRate} ${component.baseUom})`,
+      searchText: `${normalized} ${component.baseUom}`.toLowerCase(),
+    });
+  };
+  pushOption(component.baseUom, 1);
+  for (const item of component.uomConversions || []) {
+    if (Number(item.conversionRate) > 0) pushOption(item.uomCode, Number(item.conversionRate));
+  }
+  return options;
+}
+
+function SearchableSelect({
+  label,
+  placeholder,
+  options,
+  value,
+  disabled = false,
+  onChange,
+}: {
+  label: string;
+  placeholder: string;
+  options: SearchableSelectOption[];
+  value: string;
+  disabled?: boolean;
+  onChange: (option: SearchableSelectOption | null) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const selectedOption = useMemo(() => options.find((item) => item.id === value) || null, [options, value]);
+
+  useEffect(() => {
+    setSearch(selectedOption?.label || "");
+  }, [selectedOption?.label]);
+
+  useEffect(() => {
+    function handleOutsideClick(event: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, []);
+
+  const filteredOptions = useMemo(() => {
+    const keyword = search.trim().toLowerCase();
+    if (!keyword) return options;
+    return options.filter((item) => item.searchText.includes(keyword));
+  }, [options, search]);
+
+  return (
+    <div ref={containerRef} className="relative">
+      <label className="label-rk">{label}</label>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => {
+          if (disabled) return;
+          setIsOpen((prev) => !prev);
+          setSearch(selectedOption?.label || "");
+        }}
+        className={`input-rk flex items-center justify-between gap-3 text-left ${disabled ? "cursor-not-allowed opacity-60" : ""}`}
+      >
+        <span className={selectedOption ? "truncate text-white" : "truncate text-white/45"}>
+          {selectedOption ? selectedOption.label : placeholder}
+        </span>
+        <span className="shrink-0 text-white/60">▾</span>
+      </button>
+
+      {isOpen ? (
+        <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-[120] overflow-hidden rounded-2xl border border-white/10 bg-[#0b0b0f] shadow-2xl">
+          <div className="border-b border-white/10 p-3">
+            <input autoFocus className="input-rk" value={search} onChange={(e) => setSearch(e.target.value)} placeholder={`Search ${label.toLowerCase()}`} />
+          </div>
+          <div className="max-h-56 overflow-y-auto p-2">
+            {filteredOptions.length === 0 ? (
+              <div className="rounded-xl px-3 py-3 text-sm text-white/45">No matching {label.toLowerCase()} found.</div>
+            ) : (
+              filteredOptions.map((option) => {
+                const isSelected = selectedOption?.id === option.id;
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => {
+                      onChange(option);
+                      setSearch(option.label);
+                      setIsOpen(false);
+                    }}
+                    className={`flex w-full items-center rounded-xl px-3 py-3 text-left text-sm transition ${
+                      isSelected ? "bg-white/10 text-white" : "text-white/85 hover:bg-white/10 hover:text-white"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function AdminAssemblyTemplateClient({
   product,
   componentOptions,
   initialRemarks,
-  initialLines,
+  initialProducts,
 }: Props) {
   const [remarks, setRemarks] = useState(initialRemarks);
-  const [lines, setLines] = useState<EditableLine[]>(
-    initialLines.length > 0
-      ? initialLines.map((line, index) => ({
+  const [lines, setProducts] = useState<EditableProduct[]>(
+    initialProducts.length > 0
+      ? initialProducts.map((line, index) => ({
           id: line.id,
           lineNo: index + 1,
           componentProductId: line.componentProductId,
@@ -88,7 +211,7 @@ export function AdminAssemblyTemplateClient({
           allowOverride: line.allowOverride,
           remarks: line.remarks || "",
         }))
-      : [emptyLine(1)]
+      : [emptyProduct(1)]
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
@@ -96,23 +219,23 @@ export function AdminAssemblyTemplateClient({
 
   const optionMap = useMemo(() => new Map(componentOptions.map((item) => [item.id, item])), [componentOptions]);
 
-  function renumber(nextLines: EditableLine[]) {
-    return nextLines.map((line, index) => ({ ...line, lineNo: index + 1 }));
+  function renumber(nextProducts: EditableProduct[]) {
+    return nextProducts.map((line, index) => ({ ...line, lineNo: index + 1 }));
   }
 
-  function addLine() {
-    setLines((prev) => [...prev, emptyLine(prev.length + 1)]);
+  function addProduct() {
+    setProducts((prev) => [...prev, emptyProduct(prev.length + 1)]);
   }
 
-  function removeLine(lineNo: number) {
-    setLines((prev) => {
+  function removeProduct(lineNo: number) {
+    setProducts((prev) => {
       const next = prev.filter((line) => line.lineNo !== lineNo);
-      return renumber(next.length > 0 ? next : [emptyLine(1)]);
+      return renumber(next.length > 0 ? next : [emptyProduct(1)]);
     });
   }
 
-  function updateLine(lineNo: number, updater: (current: EditableLine) => EditableLine) {
-    setLines((prev) => prev.map((line) => (line.lineNo === lineNo ? updater(line) : line)));
+  function updateProduct(lineNo: number, updater: (current: EditableProduct) => EditableProduct) {
+    setProducts((prev) => prev.map((line) => (line.lineNo === lineNo ? updater(line) : line)));
   }
 
   async function handleSave() {
@@ -147,11 +270,11 @@ export function AdminAssemblyTemplateClient({
         return;
       }
 
-      const savedLines = Array.isArray(data.template?.lines) ? data.template.lines : [];
+      const savedProducts = Array.isArray(data.template?.lines) ? data.template.lines : [];
       setRemarks(data.template?.remarks || "");
-      setLines(
-        savedLines.length > 0
-          ? savedLines.map((line: any, index: number) => ({
+      setProducts(
+        savedProducts.length > 0
+          ? savedProducts.map((line: any, index: number) => ({
               id: line.id,
               lineNo: index + 1,
               componentProductId: line.componentProductId,
@@ -161,7 +284,7 @@ export function AdminAssemblyTemplateClient({
               allowOverride: Boolean(line.allowOverride),
               remarks: line.remarks || "",
             }))
-          : [emptyLine(1)]
+          : [emptyProduct(1)]
       );
       setSubmitSuccess("Assembly template saved successfully.");
     } catch {
@@ -189,7 +312,7 @@ export function AdminAssemblyTemplateClient({
       ) : null}
 
       <div className="rounded-2xl border border-sky-500/25 bg-sky-500/10 p-5 text-sm text-sky-100">
-        <p className="font-semibold">Assembly Template Lines</p>
+        <p className="font-semibold">Assembly Template Products</p>
         <p className="mt-2 text-sky-100/80">
           Define the default BOM / component recipe for this finished good. Batch and serial allocation will still happen during actual Stock Assembly posting.
         </p>
@@ -208,17 +331,17 @@ export function AdminAssemblyTemplateClient({
       <div className="rounded-[2rem] border border-white/10 bg-black/20 p-5 md:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-sm font-semibold text-white">Template Lines</p>
+            <p className="text-sm font-semibold text-white">Template Products</p>
             <p className="mt-1 text-xs text-white/45">
               Add component item, qty, UOM, required flag, and allow override setting.
             </p>
           </div>
           <button
             type="button"
-            onClick={addLine}
+            onClick={addProduct}
             className="inline-flex items-center justify-center rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
           >
-            Add Line
+            Add Product
           </button>
         </div>
 
@@ -229,10 +352,10 @@ export function AdminAssemblyTemplateClient({
             return (
               <div key={`${line.id || "new"}-${line.lineNo}`} className="rounded-2xl border border-white/10 bg-black/20 p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="text-sm font-semibold text-white">Line {line.lineNo}</div>
+                  <div className="text-sm font-semibold text-white">Product {line.lineNo}</div>
                   <button
                     type="button"
-                    onClick={() => removeLine(line.lineNo)}
+                    onClick={() => removeProduct(line.lineNo)}
                     className="rounded-lg border border-red-500/25 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-200 transition hover:bg-red-500/15"
                   >
                     Remove
@@ -248,7 +371,7 @@ export function AdminAssemblyTemplateClient({
                       onChange={(e) => {
                         const nextProductId = e.target.value;
                         const nextProduct = optionMap.get(nextProductId);
-                        updateLine(line.lineNo, (current) => ({
+                        updateProduct(line.lineNo, (current) => ({
                           ...current,
                           componentProductId: nextProductId,
                           uom: current.uom || nextProduct?.baseUom || "",
@@ -274,7 +397,7 @@ export function AdminAssemblyTemplateClient({
                     <input
                       className="input-rk"
                       value={line.uom}
-                      onChange={(e) => updateLine(line.lineNo, (current) => ({ ...current, uom: e.target.value.toUpperCase() }))}
+                      onChange={(e) => updateProduct(line.lineNo, (current) => ({ ...current, uom: e.target.value.toUpperCase() }))}
                       placeholder={selectedComponent?.baseUom || "PCS"}
                     />
                   </div>
@@ -289,7 +412,7 @@ export function AdminAssemblyTemplateClient({
                       step="0.0001"
                       className="input-rk"
                       value={line.qty}
-                      onChange={(e) => updateLine(line.lineNo, (current) => ({ ...current, qty: e.target.value }))}
+                      onChange={(e) => updateProduct(line.lineNo, (current) => ({ ...current, qty: e.target.value }))}
                     />
                   </div>
                   <div>
@@ -297,7 +420,7 @@ export function AdminAssemblyTemplateClient({
                     <input
                       className="input-rk"
                       value={line.remarks}
-                      onChange={(e) => updateLine(line.lineNo, (current) => ({ ...current, remarks: e.target.value }))}
+                      onChange={(e) => updateProduct(line.lineNo, (current) => ({ ...current, remarks: e.target.value }))}
                       placeholder="Optional line remarks"
                     />
                   </div>
@@ -308,7 +431,7 @@ export function AdminAssemblyTemplateClient({
                     <input
                       type="checkbox"
                       checked={line.isRequired}
-                      onChange={(e) => updateLine(line.lineNo, (current) => ({ ...current, isRequired: e.target.checked }))}
+                      onChange={(e) => updateProduct(line.lineNo, (current) => ({ ...current, isRequired: e.target.checked }))}
                     />
                     <span>Required</span>
                   </label>
@@ -316,7 +439,7 @@ export function AdminAssemblyTemplateClient({
                     <input
                       type="checkbox"
                       checked={line.allowOverride}
-                      onChange={(e) => updateLine(line.lineNo, (current) => ({ ...current, allowOverride: e.target.checked }))}
+                      onChange={(e) => updateProduct(line.lineNo, (current) => ({ ...current, allowOverride: e.target.checked }))}
                     />
                     <span>Allow Override</span>
                   </label>

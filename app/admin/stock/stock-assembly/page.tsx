@@ -25,6 +25,10 @@ export default async function AdminStockAssemblyPage() {
         unitCost: true,
         batchTracking: true,
         serialNumberTracking: true,
+        uomConversions: {
+          orderBy: [{ uomCode: "asc" }],
+          select: { id: true, uomCode: true, conversionRate: true },
+        },
       },
     }),
     db.inventoryProduct.findMany({
@@ -42,6 +46,10 @@ export default async function AdminStockAssemblyPage() {
         unitCost: true,
         batchTracking: true,
         serialNumberTracking: true,
+        uomConversions: {
+          orderBy: [{ uomCode: "asc" }],
+          select: { id: true, uomCode: true, conversionRate: true },
+        },
       },
     }),
     db.stockLocation.findMany({
@@ -72,6 +80,13 @@ export default async function AdminStockAssemblyPage() {
               unitCost: Number(product.unitCost ?? 0),
               batchTracking: product.batchTracking,
               serialNumberTracking: product.serialNumberTracking,
+              uomConversions: Array.isArray(product.uomConversions)
+                ? product.uomConversions.map((item) => ({
+                    id: item.id,
+                    uomCode: item.uomCode,
+                    conversionRate: Number(item.conversionRate ?? 0),
+                  }))
+                : [],
             }))}
             allProducts={allProducts.map((product) => ({
               id: product.id,
@@ -81,6 +96,13 @@ export default async function AdminStockAssemblyPage() {
               unitCost: Number(product.unitCost ?? 0),
               batchTracking: product.batchTracking,
               serialNumberTracking: product.serialNumberTracking,
+              uomConversions: Array.isArray(product.uomConversions)
+                ? product.uomConversions.map((item) => ({
+                    id: item.id,
+                    uomCode: item.uomCode,
+                    conversionRate: Number(item.conversionRate ?? 0),
+                  }))
+                : [],
             }))}
             locations={locations}
           />

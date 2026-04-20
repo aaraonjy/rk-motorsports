@@ -16,6 +16,7 @@ import {
 type StockLinePayload = {
   inventoryProductId?: string;
   qty?: number;
+  uomCode?: string | null;
   unitCost?: number | null;
   batchNo?: string | null;
   expiryDate?: string | null;
@@ -63,6 +64,30 @@ function normalizeSerialNumbers(value: unknown) {
   }
   return unique;
 }
+
+function normalizeUomCode(value: unknown) {
+  return typeof value === "string" ? value.trim().toUpperCase() : "";
+}
+
+function resolveConversionRate(product: any, uomCode: string) {
+  if (!uomCode || uomCode === product.baseUom) return 1;
+  const matched = Array.isArray(product.uomConversions)
+    ? product.uomConversions.find((item: any) => item.uomCode.toUpperCase() === uomCode)
+    : null;
+  if (!matched) {
+    throw new Error(`Selected UOM ${uomCode} is invalid for the selected product.`);
+  }
+  const rate = Number(matched.conversionRate ?? 0);
+  if (!Number.isFinite(rate) || rate <= 0) {
+    throw new Error(`Selected UOM ${uomCode} has invalid conversion rate.`);
+  }
+  return Math.round((rate + Number.EPSILON) * 10000) / 10000;
+}
+
+function convertQtyToBase(qty: number, rate: number) {
+  return Math.round((qty * rate + Number.EPSILON) * 100) / 100;
+}
+
 
 function transactionUsesOutboundLocation(
   transactionType: StockTransactionType,
@@ -171,7 +196,7 @@ export async function POST(req: Request) {
     const [products, locations] = await Promise.all([
       db.inventoryProduct.findMany({
         where: { id: { in: inventoryProductIds } },
-        select: { id: true, isActive: true, trackInventory: true, batchTracking: true, serialNumberTracking: true },
+        select: { id: true, isActive: true, trackInventory: true, batchTracking: true, serialNumberTracking: true, baseUom: true, uomConversions: { select: { uomCode: true, conversionRate: true } } },
       }),
       db.stockLocation.findMany({ where: { id: { in: locationIds } } }),
     ]);
@@ -186,7 +211,10 @@ export async function POST(req: Request) {
         throw new Error("Selected stock item is invalid, inactive, or not tracked by inventory.");
       }
 
-      const qty = assertPositiveQty(line.qty);
+      const inputQty = assertPositiveQty(line.qty);
+      const uomCode = normalizeUomCode((line as any).uomCode) || product.baseUom;
+      const conversionRate = resolveConversionRate(product, uomCode);
+      const qty = convertQtyToBase(inputQty, conversionRate);
       const unitCost = line.unitCost == null ? null : normalizeNonNegativeNumber(line.unitCost, "Unit cost");
       const batchNo = typeof line.batchNo === "string" ? line.batchNo.trim().toUpperCase() || null : null;
       const expiryDate = typeof line.expiryDate === "string" && line.expiryDate.trim() ? new Date(line.expiryDate) : null;
@@ -223,7 +251,7 @@ export async function POST(req: Request) {
         if (serialNos.length === 0) {
           throw new Error(`Serial No is required for serial-tracked product.`);
         }
-        if (Math.round((qty + Number.EPSILON) * 100) / 100 !== serialNos.length) {
+        if (Math.round((inputQty + Number.EPSILON) * 100) / 100 !== serialNos.length) {
           throw new Error("Serial-tracked lines require quantity to match the number of serial numbers.");
         }
       }
@@ -239,6 +267,8 @@ export async function POST(req: Request) {
       return {
         inventoryProductId,
         qty,
+        inputQty,
+        uomCode,
         unitCost,
         batchNo,
         expiryDate,

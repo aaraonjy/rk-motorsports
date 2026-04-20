@@ -99,3 +99,30 @@ export function buildLedgerValues(
     qtyOut: direction === "OUT" ? qty : DECIMAL_ZERO,
   };
 }
+
+
+export function getUomConversionRateForProduct(
+  product: { baseUom: string; uomConversions?: Array<{ uomCode: string; conversionRate: number | string | Prisma.Decimal }> },
+  uomCode?: string | null
+) {
+  const normalized = String(uomCode || product.baseUom).trim().toUpperCase();
+  if (!normalized || normalized === product.baseUom) return 1;
+  const matched = Array.isArray(product.uomConversions)
+    ? product.uomConversions.find((item) => item.uomCode.toUpperCase() === normalized)
+    : null;
+  if (!matched) {
+    throw new Error(`Selected UOM ${normalized} is invalid for the selected product.`);
+  }
+  const rate = Number(matched.conversionRate ?? 0);
+  if (!Number.isFinite(rate) || rate <= 0) {
+    throw new Error(`Selected UOM ${normalized} has invalid conversion rate.`);
+  }
+  return Math.round((rate + Number.EPSILON) * 10000) / 10000;
+}
+
+export function convertQtyToBaseUom(
+  qty: number,
+  rate: number
+) {
+  return Math.round((qty * rate + Number.EPSILON) * 100) / 100;
+}
