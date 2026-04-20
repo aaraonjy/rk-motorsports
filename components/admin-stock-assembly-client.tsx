@@ -105,6 +105,20 @@ type CancelTarget = {
   transactionNo: string;
 };
 
+type StockSettingsConfig = {
+  stockModuleEnabled: boolean;
+  multiLocationEnabled: boolean;
+  allowNegativeStock: boolean;
+  costingMethod: "AVERAGE";
+  defaultLocationId: string;
+};
+
+type StockSettingsResponse = {
+  ok: boolean;
+  config?: StockSettingsConfig;
+  error?: string;
+};
+
 function formatDateInput(value?: string | null) {
   const date = value ? new Date(value) : new Date();
   if (Number.isNaN(date.getTime())) return new Date().toISOString().slice(0, 10);
@@ -117,9 +131,9 @@ function formatQty(value: number | string | null | undefined) {
 }
 
 function normalizeQtyInput(value: string) {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed) || parsed <= 0) return "1.00";
-  return parsed.toFixed(2);
+  const parsed = Math.floor(Number(value));
+  if (!Number.isFinite(parsed) || parsed <= 0) return "1";
+  return String(parsed);
 }
 
 function normalizeBatchNo(value: string) {
@@ -571,6 +585,13 @@ export function AdminStockAssemblyClient({
   const [cancelTarget, setCancelTarget] = useState<CancelTarget | null>(null);
   const [cancelReason, setCancelReason] = useState("");
   const [isCancelling, setIsCancelling] = useState(false);
+  const [stockSettings, setStockSettings] = useState<StockSettingsConfig>({
+    stockModuleEnabled: false,
+    multiLocationEnabled: true,
+    allowNegativeStock: false,
+    costingMethod: "AVERAGE",
+    defaultLocationId: "",
+  });
 
   const activeLocations = useMemo(() => locations.filter((item) => item.isActive), [locations]);
   const finishedGoodMap = useMemo(() => new Map(finishedGoods.map((item) => [item.id, item])), [finishedGoods]);
@@ -597,7 +618,7 @@ export function AdminStockAssemblyClient({
   );
 
   const selectedFinishedGood = finishedGoodId ? finishedGoodMap.get(finishedGoodId) || null : null;
-  const parsedAssemblyQty = Math.max(0, Number(assemblyQty || "0"));
+  const parsedAssemblyQty = Math.max(0, Math.floor(Number(assemblyQty || "0")));
 
   const visibleTransactions = useMemo(
     () => transactions.filter((item) => !(Array.isArray(item.revisions) && item.revisions.length > 0)),
@@ -625,10 +646,46 @@ export function AdminStockAssemblyClient({
     void loadTransactions();
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadStockSettings() {
+      try {
+        const response = await fetch("/api/admin/settings/stock", { cache: "no-store" });
+        const data = (await response.json()) as StockSettingsResponse;
+        if (!response.ok || !data.ok || cancelled) return;
+        setStockSettings(
+          data.config || {
+            stockModuleEnabled: false,
+            multiLocationEnabled: true,
+            allowNegativeStock: false,
+            costingMethod: "AVERAGE",
+            defaultLocationId: "",
+          }
+        );
+      } catch {
+        if (!cancelled) {
+          setStockSettings({
+            stockModuleEnabled: false,
+            multiLocationEnabled: true,
+            allowNegativeStock: false,
+            costingMethod: "AVERAGE",
+            defaultLocationId: "",
+          });
+        }
+      }
+    }
+
+    void loadStockSettings();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   function resetCreateForm() {
     setFinishedGoodId("");
-    setLocationId("");
-    setAssemblyQty("1.00");
+    setLocationId(stockSettings.defaultLocationId || "");
+    setAssemblyQty("1");
     setTransactionDate(formatDateInput());
     setReference("");
     setRemarks("");
@@ -646,6 +703,12 @@ export function AdminStockAssemblyClient({
     setSubmitError("");
     setSubmitSuccess("");
   }
+
+  useEffect(() => {
+    if (!isCreateOpen) return;
+    if (!stockSettings.defaultLocationId) return;
+    setLocationId((prev) => prev || stockSettings.defaultLocationId);
+  }, [isCreateOpen, stockSettings.defaultLocationId]);
 
   useEffect(() => {
     if (!finishedGoodId) {
@@ -970,8 +1033,7 @@ export function AdminStockAssemblyClient({
                 <th className="px-3 py-3 font-medium">Doc No</th>
                 <th className="px-3 py-3 font-medium">Date</th>
                 <th className="px-3 py-3 font-medium">Reference</th>
-                <th className="px-3 py-3 font-medium">Finished Good</th>
-                <th className="px-3 py-3 font-medium">Qty</th>
+                                <th className="px-3 py-3 font-medium">Qty</th>
                 <th className="px-3 py-3 font-medium">Location</th>
                 <th className="px-3 py-3 font-medium">Status</th>
                 <th className="px-3 py-3 font-medium text-right">Action</th>
@@ -979,9 +1041,9 @@ export function AdminStockAssemblyClient({
             </thead>
             <tbody className="divide-y divide-white/10">
               {isLoadingTransactions ? (
-                <tr><td colSpan={8} className="px-3 py-8 text-center text-white/50">Loading transactions...</td></tr>
+                <tr><td colSpan={7} className="px-3 py-8 text-center text-white/50">Loading transactions...</td></tr>
               ) : visibleTransactions.length === 0 ? (
-                <tr><td colSpan={8} className="px-3 py-8 text-center text-white/50">No stock assembly transactions found.</td></tr>
+                <tr><td colSpan={7} className="px-3 py-8 text-center text-white/50">No stock assembly transactions found.</td></tr>
               ) : (
                 visibleTransactions.map((transaction) => {
                   const fgLine = transaction.lines.find((line) => line.adjustmentDirection === "IN") || transaction.lines[0];
@@ -995,11 +1057,7 @@ export function AdminStockAssemblyClient({
                       </td>
                       <td className="px-3 py-4">{formatDateInput(transaction.transactionDate)}</td>
                       <td className="px-3 py-4">{transaction.reference || "-"}</td>
-                      <td className="px-3 py-4">
-                        <div className="font-medium text-white">{fgLine?.inventoryProduct.code || "-"}</div>
-                        <div className="mt-1 text-xs text-white/45">{fgLine?.inventoryProduct.description || "-"}</div>
-                      </td>
-                      <td className="px-3 py-4">{formatQty(fgLine?.qty)} {fgLine?.inventoryProduct.baseUom || ""}</td>
+                                            <td className="px-3 py-4">{formatQty(fgLine?.qty)} {fgLine?.inventoryProduct.baseUom || ""}</td>
                       <td className="px-3 py-4">{fgLine?.location ? `${fgLine.location.code} — ${fgLine.location.name}` : "-"}</td>
                       <td className="px-3 py-4">
                         <span className={transaction.status === "CANCELLED" ? "inline-flex rounded-full border border-red-500/25 bg-red-500/10 px-3 py-1 text-xs font-semibold text-red-200" : "inline-flex rounded-full border border-emerald-500/25 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-200"}>
@@ -1078,7 +1136,22 @@ export function AdminStockAssemblyClient({
               </div>
               <div>
                 <label className="label-rk">Assembly Qty</label>
-                <input type="number" min="0.01" step="0.01" className="input-rk" value={assemblyQty} onChange={(e) => setAssemblyQty(e.target.value)} />
+                <input
+                  type="number"
+                  min="1"
+                  step="1"
+                  className="input-rk"
+                  value={assemblyQty}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    if (raw === "") {
+                      setAssemblyQty("");
+                      return;
+                    }
+                    const next = Math.floor(Number(raw));
+                    setAssemblyQty(Number.isFinite(next) && next > 0 ? String(next) : "1");
+                  }}
+                />
               </div>
               <div>
                 <label className="label-rk">Reference</label>
