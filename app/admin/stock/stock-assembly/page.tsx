@@ -57,7 +57,7 @@ export default async function AdminStockAssemblyPage() {
           <div>
             <h1 className="mt-3 text-4xl font-bold">Stock Assembly</h1>
             <p className="mt-4 max-w-3xl text-white/70">
-              Produce finished goods from saved assembly templates and post the corresponding finished good stock in together with component stock out.
+              Create finished goods by consuming component stock based on predefined assembly templates. This will deduct component quantities and add the assembled product into inventory with full traceability.
             </p>
           </div>
         </div>
