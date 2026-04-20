@@ -242,6 +242,11 @@ export function AdminAssemblyTemplateClient({
   const [submitError, setSubmitError] = useState("");
   const [submitSuccess, setSubmitSuccess] = useState("");
 
+  useEffect(() => {
+    if (!submitSuccess) return;
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [submitSuccess]);
+
   const optionMap = useMemo(() => new Map(componentOptions.map((item) => [item.id, item])), [componentOptions]);
   const componentProductOptions = useMemo<ComponentSearchableOption[]>(
     () => getComponentProductOptions(componentOptions),
