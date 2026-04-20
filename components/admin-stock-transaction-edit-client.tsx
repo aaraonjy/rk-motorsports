@@ -757,20 +757,30 @@ export function AdminStockTransactionEditClient({
     const line = lines[index];
     const normalized = value.trim().toUpperCase();
     if (normalized === "__NEW__") {
-      updateLine(index, { batchMode: "new", batchNo: "", expiryDate: "", serialNos: [], serialSearch: "" });
+      updateLine(index, { batchMode: "new", batchNo: "", expiryDate: "", serialSearch: "" });
       return;
     }
     const matched = (availableBatches[index] || []).find((item) => item.batchNo.toUpperCase() === normalized) || null;
-    updateLine(index, { batchMode: "existing", batchNo: matched?.batchNo || normalized, expiryDate: matched?.expiryDate ? formatDateInput(matched.expiryDate) : line.expiryDate, serialNos: [], serialSearch: "" });
+    updateLine(index, {
+      batchMode: "existing",
+      batchNo: matched?.batchNo || normalized,
+      expiryDate: matched?.expiryDate ? formatDateInput(matched.expiryDate) : line.expiryDate,
+      serialSearch: "",
+    });
   }
 
   function setInboundNewBatchValue(index: number, value: string) {
-    updateLine(index, { batchMode: "new", batchNo: value.trim().toUpperCase(), serialNos: [], serialSearch: "" });
+    updateLine(index, { batchMode: "new", batchNo: value.trim().toUpperCase(), serialSearch: "" });
   }
 
   function setOutboundBatch(index: number, batchNo: string) {
     const matched = (availableBatches[index] || []).find((item) => item.batchNo.toUpperCase() === batchNo.toUpperCase()) || null;
-    updateLine(index, { batchMode: "existing", batchNo, expiryDate: matched?.expiryDate ? formatDateInput(matched.expiryDate) : "", serialNos: [], serialSearch: "" });
+    updateLine(index, {
+      batchMode: "existing",
+      batchNo,
+      expiryDate: matched?.expiryDate ? formatDateInput(matched.expiryDate) : "",
+      serialSearch: "",
+    });
   }
 
   function addInboundSerial(index: number, serialNo: string) {
