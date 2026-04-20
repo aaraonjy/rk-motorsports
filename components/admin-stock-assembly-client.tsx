@@ -163,6 +163,13 @@ function uniqueSerialNos(values: string[]) {
   return next;
 }
 
+function clampSerialNosToQty(values: string[], qty: string | number | null | undefined) {
+  const unique = uniqueSerialNos(values);
+  const parsedQty = Math.max(0, Math.floor(Number(qty ?? 0)));
+  if (parsedQty <= 0) return [];
+  return unique.slice(0, parsedQty);
+}
+
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("en-MY", {
     style: "currency",
@@ -874,9 +881,9 @@ export function AdminStockAssemblyClient({
   function toggleFgSerial(serialNo: string) {
     const exists = fgSerialNos.some((item) => item.toUpperCase() === serialNo.toUpperCase());
     const next = exists ? fgSerialNos.filter((item) => item.toUpperCase() !== serialNo.toUpperCase()) : [...fgSerialNos, serialNo];
-    const unique = uniqueSerialNos(next);
-    setFgSerialNos(unique);
-    setFgSerialEntryText(unique.join("\n"));
+    const clamped = clampSerialNosToQty(next, assemblyQty);
+    setFgSerialNos(clamped);
+    setFgSerialEntryText(clamped.join("\n"));
   }
 
   function toggleLineSerial(index: number, serialNo: string) {
@@ -885,8 +892,8 @@ export function AdminStockAssemblyClient({
       const next = exists
         ? current.serialNos.filter((item) => item.toUpperCase() !== serialNo.toUpperCase())
         : [...current.serialNos, serialNo];
-      const unique = uniqueSerialNos(next);
-      return { ...current, serialNos: unique, serialEntryText: unique.join("\n") };
+      const clamped = clampSerialNosToQty(next, current.qty);
+      return { ...current, serialNos: clamped, serialEntryText: clamped.join("\n") };
     });
   }
 
@@ -1199,9 +1206,9 @@ export function AdminStockAssemblyClient({
                         selectedSerials={fgSerialNos}
                         entryText={fgSerialEntryText}
                         onEntryTextChange={(value) => {
-                          const parsed = uniqueSerialNos(parseSerialEntryText(value));
-                          setFgSerialEntryText(value);
-                          setFgSerialNos(parsed);
+                          const clamped = clampSerialNosToQty(parseSerialEntryText(value), assemblyQty);
+                          setFgSerialEntryText(clamped.join("\n"));
+                          setFgSerialNos(clamped);
                         }}
                         onToggle={toggleFgSerial}
                       />
@@ -1256,7 +1263,18 @@ export function AdminStockAssemblyClient({
                               className="input-rk"
                               value={line.qty}
                               disabled={!line.allowOverride}
-                              onChange={(e) => updateTemplateLine(index, (current) => ({ ...current, qty: e.target.value }))}
+                              onChange={(e) =>
+                                updateTemplateLine(index, (current) => {
+                                  const nextQty = e.target.value;
+                                  const clampedSerials = clampSerialNosToQty(current.serialNos, nextQty);
+                                  return {
+                                    ...current,
+                                    qty: nextQty,
+                                    serialNos: clampedSerials,
+                                    serialEntryText: clampedSerials.join("\n"),
+                                  };
+                                })
+                              }
                             />
                           </div>
                           <div>
@@ -1287,11 +1305,14 @@ export function AdminStockAssemblyClient({
                               selectedSerials={line.serialNos}
                               entryText={line.serialEntryText}
                               onEntryTextChange={(value) =>
-                                updateTemplateLine(index, (current) => ({
-                                  ...current,
-                                  serialEntryText: value,
-                                  serialNos: uniqueSerialNos(parseSerialEntryText(value)),
-                                }))
+                                updateTemplateLine(index, (current) => {
+                                  const clampedSerials = clampSerialNosToQty(parseSerialEntryText(value), current.qty);
+                                  return {
+                                    ...current,
+                                    serialEntryText: clampedSerials.join("\n"),
+                                    serialNos: clampedSerials,
+                                  };
+                                })
                               }
                               onToggle={(serialNo) => toggleLineSerial(index, serialNo)}
                             />
