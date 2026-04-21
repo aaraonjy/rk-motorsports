@@ -59,16 +59,17 @@ export async function getStockBalance(
 
 
 function hashLockKey(input: string) {
-  let hash = 1469598103934665603n;
-  const prime = 1099511628211n;
-  const mod = 1n << 64n;
+  let hash = BigInt("1469598103934665603");
+  const prime = BigInt("1099511628211");
+  const mod = BigInt("18446744073709551616");
+  const signedThreshold = BigInt("9223372036854775808");
 
   for (const ch of input) {
     hash ^= BigInt(ch.codePointAt(0) ?? 0);
     hash = (hash * prime) % mod;
   }
 
-  if (hash >= (1n << 63n)) {
+  if (hash >= signedThreshold) {
     hash -= mod;
   }
 
