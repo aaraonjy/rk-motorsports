@@ -700,7 +700,7 @@ export function AdminStockTransactionEditClient({
       const next = { ...line, ...patch };
       const product = initialProducts.find((item) => item.id === next.inventoryProductId);
       if (product?.serialNumberTracking) {
-        next.qty = String(next.serialNos.length || 0);
+        next.qty = (next.serialNos.length || 0).toFixed(2)
         next.uomCode = product.baseUom;
       }
       return next;
