@@ -1,4 +1,3 @@
-
 import { NextResponse } from "next/server";
 import { StockAdjustmentDirection, StockTransactionType } from "@prisma/client";
 import { requireAdmin } from "@/lib/auth";
@@ -18,7 +17,8 @@ import {
   normalizeStockDate,
 } from "@/lib/stock";
 import {
-  normalizeStockNumberFormatConfig,
+  normalizeMoneyDecimalPlaces,
+  normalizeQtyDecimalPlaces,
   parseNonNegativeNumberWithDecimalPlaces,
   roundToDecimalPlaces,
   STOCK_STORAGE_DECIMAL_PLACES,
@@ -42,7 +42,9 @@ type StockLinePayload = {
 };
 
 function normalizeType(value: unknown) {
-  if (value === "OB" || value === "SR" || value === "SI" || value === "SA" || value === "ST" || value === "AS") return value as StockTransactionType;
+  if (value === "OB" || value === "SR" || value === "SI" || value === "SA" || value === "ST" || value === "AS") {
+    return value as StockTransactionType;
+  }
   throw new Error("Invalid stock transaction type.");
 }
 
@@ -53,7 +55,9 @@ function normalizeAdjustmentDirection(value: unknown) {
 
 function normalizeSerialNumbers(value: unknown) {
   const items = Array.isArray(value) ? value : [];
-  const normalized = items.map((item) => (typeof item === "string" ? item.trim() : "")).filter(Boolean);
+  const normalized = items
+    .map((item) => (typeof item === "string" ? item.trim() : ""))
+    .filter(Boolean);
   const seen = new Set<string>();
   const unique: string[] = [];
   for (const serialNo of normalized) {
@@ -65,7 +69,7 @@ function normalizeSerialNumbers(value: unknown) {
   return unique;
 }
 
-function roundQty(value: number | string | null | undefined) {
+function roundQty(value: unknown) {
   return roundToDecimalPlaces(Number(value ?? 0), STOCK_STORAGE_DECIMAL_PLACES.qty);
 }
 
@@ -91,7 +95,6 @@ function resolveConversionRate(product: any, uomCode: string) {
 function convertQtyToBase(qty: number, rate: number) {
   return roundToDecimalPlaces(qty * rate, STOCK_STORAGE_DECIMAL_PLACES.qty);
 }
-
 
 function transactionUsesOutboundLocation(
   transactionType: StockTransactionType,
@@ -127,15 +130,23 @@ export async function GET(_req: Request, context: Params) {
                 inventoryBatch: { select: { id: true, batchNo: true, expiryDate: true } },
               },
             },
-            ledgerEntries: { orderBy: [{ createdAt: "asc" }], include: { location: { select: { id: true, code: true, name: true } } } },
+            ledgerEntries: {
+              orderBy: [{ createdAt: "asc" }],
+              include: { location: { select: { id: true, code: true, name: true } } },
+            },
           },
         },
       },
     });
-    if (!transaction) return NextResponse.json({ ok: false, error: "Stock transaction not found." }, { status: 404 });
+    if (!transaction) {
+      return NextResponse.json({ ok: false, error: "Stock transaction not found." }, { status: 404 });
+    }
     return NextResponse.json({ ok: true, transaction });
   } catch (error) {
-    return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : "Unable to load stock transaction." }, { status: error instanceof Error && error.message === "FORBIDDEN" ? 403 : 500 });
+    return NextResponse.json(
+      { ok: false, error: error instanceof Error ? error.message : "Unable to load stock transaction." },
+      { status: error instanceof Error && error.message === "FORBIDDEN" ? 403 : 500 }
+    );
   }
 }
 
@@ -153,24 +164,48 @@ async function applyCancellation(tx: any, transaction: any, adminId: string, can
             });
         if (!serial) throw new Error(`Serial No ${serialEntry.serialNo} cannot be found for edit.`);
 
-        if (transaction.transactionType === "OB" || transaction.transactionType === "SR" || ((transaction.transactionType === "SA" || transaction.transactionType === "AS") && line.adjustmentDirection === "IN")) {
-          if (serial.status !== "IN_STOCK" || serial.currentLocationId !== line.locationId) throw new Error(`Serial No ${serialEntry.serialNo} cannot be edited because later stock activity already changed it.`);
+        if (
+          transaction.transactionType === "OB" ||
+          transaction.transactionType === "SR" ||
+          ((transaction.transactionType === "SA" || transaction.transactionType === "AS") &&
+            line.adjustmentDirection === "IN")
+        ) {
+          if (serial.status !== "IN_STOCK" || serial.currentLocationId !== line.locationId) {
+            throw new Error(`Serial No ${serialEntry.serialNo} cannot be edited because later stock activity already changed it.`);
+          }
         }
-        if (transaction.transactionType === "SI" || ((transaction.transactionType === "SA" || transaction.transactionType === "AS") && line.adjustmentDirection === "OUT")) {
-          if (serial.status !== "OUT_OF_STOCK") throw new Error(`Serial No ${serialEntry.serialNo} cannot be edited because it is no longer in outbound state.`);
+        if (
+          transaction.transactionType === "SI" ||
+          ((transaction.transactionType === "SA" || transaction.transactionType === "AS") &&
+            line.adjustmentDirection === "OUT")
+        ) {
+          if (serial.status !== "OUT_OF_STOCK") {
+            throw new Error(`Serial No ${serialEntry.serialNo} cannot be edited because it is no longer in outbound state.`);
+          }
         }
         if (transaction.transactionType === "ST") {
-          if (serial.status !== "IN_STOCK" || serial.currentLocationId !== line.toLocationId) throw new Error(`Serial No ${serialEntry.serialNo} cannot be edited because it is no longer at the destination location.`);
+          if (serial.status !== "IN_STOCK" || serial.currentLocationId !== line.toLocationId) {
+            throw new Error(`Serial No ${serialEntry.serialNo} cannot be edited because it is no longer at the destination location.`);
+          }
         }
       }
     } else {
-      if (transaction.transactionType === "OB" || transaction.transactionType === "SR" || ((transaction.transactionType === "SA" || transaction.transactionType === "AS") && line.adjustmentDirection === "IN")) {
+      if (
+        transaction.transactionType === "OB" ||
+        transaction.transactionType === "SR" ||
+        ((transaction.transactionType === "SA" || transaction.transactionType === "AS") &&
+          line.adjustmentDirection === "IN")
+      ) {
         const balance = await getStockBalance(tx, line.inventoryProductId, line.locationId!, { batchNo });
-        if (balance < qty) throw new Error(`Transaction ${transaction.transactionNo} cannot be edited because the current stock balance is no longer sufficient to reverse it.`);
+        if (balance < qty) {
+          throw new Error(`Transaction ${transaction.transactionNo} cannot be edited because the current stock balance is no longer sufficient to reverse it.`);
+        }
       }
       if (transaction.transactionType === "ST") {
         const destinationBalance = await getStockBalance(tx, line.inventoryProductId, line.toLocationId!, { batchNo });
-        if (destinationBalance < qty) throw new Error(`Transaction ${transaction.transactionNo} cannot be edited because the destination stock balance is no longer sufficient to reverse it.`);
+        if (destinationBalance < qty) {
+          throw new Error(`Transaction ${transaction.transactionNo} cannot be edited because the destination stock balance is no longer sufficient to reverse it.`);
+        }
       }
     }
   }
@@ -182,32 +217,116 @@ async function applyCancellation(tx: any, transaction: any, adminId: string, can
     if (transaction.transactionType === "ST") {
       const outValues = buildLedgerValues(qty, "OUT");
       const inValues = buildLedgerValues(qty, "IN");
-      await tx.stockLedger.create({ data: { movementDate: new Date(), movementType: transaction.transactionType, movementDirection: "OUT", ...outValues, batchNo: line.batchNo, inventoryProductId: line.inventoryProductId, locationId: line.toLocationId!, transactionId: transaction.id, transactionLineId: line.id, referenceNo: transaction.transactionNo, referenceText: "Edit reversal", sourceType: "MANUAL_STOCK_TRANSACTION_EDIT", sourceId: transaction.id, remarks } });
-      await tx.stockLedger.create({ data: { movementDate: new Date(), movementType: transaction.transactionType, movementDirection: "IN", ...inValues, batchNo: line.batchNo, inventoryProductId: line.inventoryProductId, locationId: line.fromLocationId!, transactionId: transaction.id, transactionLineId: line.id, referenceNo: transaction.transactionNo, referenceText: "Edit reversal", sourceType: "MANUAL_STOCK_TRANSACTION_EDIT", sourceId: transaction.id, remarks } });
+      await tx.stockLedger.create({
+        data: {
+          movementDate: new Date(),
+          movementType: transaction.transactionType,
+          movementDirection: "OUT",
+          ...outValues,
+          batchNo: line.batchNo,
+          inventoryProductId: line.inventoryProductId,
+          locationId: line.toLocationId!,
+          transactionId: transaction.id,
+          transactionLineId: line.id,
+          referenceNo: transaction.transactionNo,
+          referenceText: "Edit reversal",
+          sourceType: "MANUAL_STOCK_TRANSACTION_EDIT",
+          sourceId: transaction.id,
+          remarks,
+        },
+      });
+      await tx.stockLedger.create({
+        data: {
+          movementDate: new Date(),
+          movementType: transaction.transactionType,
+          movementDirection: "IN",
+          ...inValues,
+          batchNo: line.batchNo,
+          inventoryProductId: line.inventoryProductId,
+          locationId: line.fromLocationId!,
+          transactionId: transaction.id,
+          transactionLineId: line.id,
+          referenceNo: transaction.transactionNo,
+          referenceText: "Edit reversal",
+          sourceType: "MANUAL_STOCK_TRANSACTION_EDIT",
+          sourceId: transaction.id,
+          remarks,
+        },
+      });
     } else {
-      const reverseDirection = transaction.transactionType === "SI" || ((transaction.transactionType === "SA" || transaction.transactionType === "AS") && line.adjustmentDirection === "OUT") ? "IN" : "OUT";
+      const reverseDirection =
+        transaction.transactionType === "SI" ||
+        ((transaction.transactionType === "SA" || transaction.transactionType === "AS") &&
+          line.adjustmentDirection === "OUT")
+          ? "IN"
+          : "OUT";
       const ledgerValues = buildLedgerValues(qty, reverseDirection);
-      await tx.stockLedger.create({ data: { movementDate: new Date(), movementType: transaction.transactionType, movementDirection: reverseDirection, ...ledgerValues, batchNo: line.batchNo, inventoryProductId: line.inventoryProductId, locationId: line.locationId!, transactionId: transaction.id, transactionLineId: line.id, referenceNo: transaction.transactionNo, referenceText: "Edit reversal", sourceType: "MANUAL_STOCK_TRANSACTION_EDIT", sourceId: transaction.id, remarks } });
+      await tx.stockLedger.create({
+        data: {
+          movementDate: new Date(),
+          movementType: transaction.transactionType,
+          movementDirection: reverseDirection,
+          ...ledgerValues,
+          batchNo: line.batchNo,
+          inventoryProductId: line.inventoryProductId,
+          locationId: line.locationId!,
+          transactionId: transaction.id,
+          transactionLineId: line.id,
+          referenceNo: transaction.transactionNo,
+          referenceText: "Edit reversal",
+          sourceType: "MANUAL_STOCK_TRANSACTION_EDIT",
+          sourceId: transaction.id,
+          remarks,
+        },
+      });
     }
 
     if (line.serialEntries.length > 0) {
       for (const serialEntry of line.serialEntries) {
         const serial = serialEntry.inventorySerialId
           ? await tx.inventorySerial.findUnique({ where: { id: serialEntry.inventorySerialId } })
-          : await tx.inventorySerial.findUnique({ where: { inventoryProductId_serialNo: { inventoryProductId: line.inventoryProductId, serialNo: serialEntry.serialNo } } });
+          : await tx.inventorySerial.findUnique({
+              where: { inventoryProductId_serialNo: { inventoryProductId: line.inventoryProductId, serialNo: serialEntry.serialNo } },
+            });
         if (!serial) continue;
-        if (transaction.transactionType === "OB" || transaction.transactionType === "SR" || ((transaction.transactionType === "SA" || transaction.transactionType === "AS") && line.adjustmentDirection === "IN")) {
-          await tx.inventorySerial.update({ where: { id: serial.id }, data: { status: "OUT_OF_STOCK", currentLocationId: null } });
-        } else if (transaction.transactionType === "SI" || ((transaction.transactionType === "SA" || transaction.transactionType === "AS") && line.adjustmentDirection === "OUT")) {
-          await tx.inventorySerial.update({ where: { id: serial.id }, data: { status: "IN_STOCK", currentLocationId: line.locationId } });
+        if (
+          transaction.transactionType === "OB" ||
+          transaction.transactionType === "SR" ||
+          ((transaction.transactionType === "SA" || transaction.transactionType === "AS") &&
+            line.adjustmentDirection === "IN")
+        ) {
+          await tx.inventorySerial.update({
+            where: { id: serial.id },
+            data: { status: "OUT_OF_STOCK", currentLocationId: null },
+          });
+        } else if (
+          transaction.transactionType === "SI" ||
+          ((transaction.transactionType === "SA" || transaction.transactionType === "AS") &&
+            line.adjustmentDirection === "OUT")
+        ) {
+          await tx.inventorySerial.update({
+            where: { id: serial.id },
+            data: { status: "IN_STOCK", currentLocationId: line.locationId },
+          });
         } else if (transaction.transactionType === "ST") {
-          await tx.inventorySerial.update({ where: { id: serial.id }, data: { status: "IN_STOCK", currentLocationId: line.fromLocationId } });
+          await tx.inventorySerial.update({
+            where: { id: serial.id },
+            data: { status: "IN_STOCK", currentLocationId: line.fromLocationId },
+          });
         }
       }
     }
   }
 
-  await tx.stockTransaction.update({ where: { id: transaction.id }, data: { status: "CANCELLED", cancelledAt: new Date(), cancelledByAdminId: adminId, cancelReason } });
+  await tx.stockTransaction.update({
+    where: { id: transaction.id },
+    data: {
+      status: "CANCELLED",
+      cancelledAt: new Date(),
+      cancelledByAdminId: adminId,
+      cancelReason,
+    },
+  });
 }
 
 export async function PUT(req: Request, context: Params) {
@@ -216,27 +335,65 @@ export async function PUT(req: Request, context: Params) {
     const { id } = await context.params;
     const body = await req.json().catch(() => ({}));
 
-    const existing = await db.stockTransaction.findUnique({ where: { id }, include: { lines: { include: { serialEntries: true } } } });
-    if (!existing) return NextResponse.json({ ok: false, error: "Stock transaction not found." }, { status: 404 });
-    if (existing.status === "CANCELLED") return NextResponse.json({ ok: false, error: "Cancelled transactions cannot be edited." }, { status: 400 });
+    const existing = await db.stockTransaction.findUnique({
+      where: { id },
+      include: { lines: { include: { serialEntries: true } } },
+    });
+    if (!existing) {
+      return NextResponse.json({ ok: false, error: "Stock transaction not found." }, { status: 404 });
+    }
+    if (existing.status === "CANCELLED") {
+      return NextResponse.json({ ok: false, error: "Cancelled transactions cannot be edited." }, { status: 400 });
+    }
 
     const transactionType = normalizeType(body.transactionType);
-    if (transactionType !== existing.transactionType) return NextResponse.json({ ok: false, error: "Transaction type cannot be changed during edit." }, { status: 400 });
+    if (transactionType !== existing.transactionType) {
+      return NextResponse.json({ ok: false, error: "Transaction type cannot be changed during edit." }, { status: 400 });
+    }
     const transactionDate = normalizeStockDate(body.transactionDate);
     const reference = typeof body.reference === "string" ? body.reference.trim() : null;
     const remarks = typeof body.remarks === "string" ? body.remarks.trim() : null;
     const rawLines = Array.isArray(body.lines) ? (body.lines as StockLinePayload[]) : [];
-    if (rawLines.length === 0) return NextResponse.json({ ok: false, error: "Please provide at least one stock line." }, { status: 400 });
+    if (rawLines.length === 0) {
+      return NextResponse.json({ ok: false, error: "Please provide at least one stock line." }, { status: 400 });
+    }
 
     const config = await db.stockConfiguration.findUnique({ where: { id: "default" } });
-    const formatConfig = normalizeStockNumberFormatConfig(config);
-    if (!config?.stockModuleEnabled) return NextResponse.json({ ok: false, error: "Stock module is disabled." }, { status: 400 });
+    const formatConfig = {
+      qtyDecimalPlaces: normalizeQtyDecimalPlaces(config?.qtyDecimalPlaces),
+      unitCostDecimalPlaces: normalizeMoneyDecimalPlaces(config?.unitCostDecimalPlaces),
+      priceDecimalPlaces: normalizeMoneyDecimalPlaces(config?.priceDecimalPlaces),
+    };
 
-    const inventoryProductIds = Array.from(new Set(rawLines.map((line) => String(line.inventoryProductId || "").trim()).filter(Boolean)));
-    const locationIds = Array.from(new Set(rawLines.flatMap((line) => [line.locationId, line.fromLocationId, line.toLocationId]).map((value) => String(value || "").trim()).filter(Boolean)));
+    if (!config?.stockModuleEnabled) {
+      return NextResponse.json({ ok: false, error: "Stock module is disabled." }, { status: 400 });
+    }
+
+    const inventoryProductIds = Array.from(
+      new Set(rawLines.map((line) => String(line.inventoryProductId || "").trim()).filter(Boolean))
+    );
+    const locationIds = Array.from(
+      new Set(
+        rawLines
+          .flatMap((line) => [line.locationId, line.fromLocationId, line.toLocationId])
+          .map((value) => String(value || "").trim())
+          .filter(Boolean)
+      )
+    );
 
     const [products, locations] = await Promise.all([
-      db.inventoryProduct.findMany({ where: { id: { in: inventoryProductIds } }, select: { id: true, isActive: true, trackInventory: true, batchTracking: true, serialNumberTracking: true, baseUom: true, uomConversions: { select: { uomCode: true, conversionRate: true } } } }),
+      db.inventoryProduct.findMany({
+        where: { id: { in: inventoryProductIds } },
+        select: {
+          id: true,
+          isActive: true,
+          trackInventory: true,
+          batchTracking: true,
+          serialNumberTracking: true,
+          baseUom: true,
+          uomConversions: { select: { uomCode: true, conversionRate: true } },
+        },
+      }),
       db.stockLocation.findMany({ where: { id: { in: locationIds } } }),
     ]);
 
@@ -246,12 +403,22 @@ export async function PUT(req: Request, context: Params) {
     const normalizedLines = rawLines.map((line) => {
       const inventoryProductId = String(line.inventoryProductId || "").trim();
       const product = productMap.get(inventoryProductId);
-      if (!product || !product.isActive || !product.trackInventory) throw new Error("Selected stock item is invalid, inactive, or not tracked by inventory.");
+      if (!product || !product.isActive || !product.trackInventory) {
+        throw new Error("Selected stock item is invalid, inactive, or not tracked by inventory.");
+      }
+
       const inputQty = assertPositiveQty(line.qty, "Quantity", formatConfig.qtyDecimalPlaces);
       const uomCode = normalizeUomCode((line as any).uomCode) || product.baseUom;
       const conversionRate = resolveConversionRate(product, uomCode);
       const qty = convertQtyToBase(inputQty, conversionRate);
-      const unitCost = line.unitCost == null ? null : parseNonNegativeNumberWithDecimalPlaces(line.unitCost, formatConfig.unitCostDecimalPlaces, "Unit cost");
+      const unitCost =
+        line.unitCost == null
+          ? null
+          : parseNonNegativeNumberWithDecimalPlaces(
+              line.unitCost,
+              formatConfig.unitCostDecimalPlaces,
+              "Unit cost"
+            );
       const batchNo = typeof line.batchNo === "string" ? line.batchNo.trim().toUpperCase() || null : null;
       const expiryDate = typeof line.expiryDate === "string" && line.expiryDate.trim() ? new Date(line.expiryDate) : null;
       const serialNos = normalizeSerialNumbers(line.serialNos);
@@ -261,31 +428,68 @@ export async function PUT(req: Request, context: Params) {
       const toLocationId = String(line.toLocationId || "").trim() || null;
 
       if (transactionType === "ST") {
-        if (!fromLocationId || !toLocationId) throw new Error("Stock Transfer requires both source and destination locations.");
-        if (fromLocationId === toLocationId) throw new Error("Stock Transfer source and destination cannot be the same.");
+        if (!fromLocationId || !toLocationId) {
+          throw new Error("Stock Transfer requires both source and destination locations.");
+        }
+        if (fromLocationId === toLocationId) {
+          throw new Error("Stock Transfer source and destination cannot be the same.");
+        }
       } else if (!locationId) {
         throw new Error("This stock transaction requires a location.");
       }
-      if (product.batchTracking && !batchNo) throw new Error("Batch No is required for batch-tracked products.");
-      if (expiryDate && Number.isNaN(expiryDate.getTime())) throw new Error("Expiry Date is invalid.");
-      if ((transactionType === "SA" || transactionType === "AS") && !adjustmentDirection) throw new Error(`${transactionType === "AS" ? "Stock Assembly" : "Stock Adjustment"} requires adjustment direction IN or OUT.`);
-      if (transactionType !== "SA" && transactionType !== "AS" && adjustmentDirection) throw new Error("Adjustment direction is only allowed for Stock Adjustment or Stock Assembly.");
-      if (product.serialNumberTracking) {
-        if (serialNos.length === 0) throw new Error("Serial No is required for serial-tracked product.");
-        if (inputQty !== serialNos.length) throw new Error("Serial-tracked lines require quantity to match the number of serial numbers.");
+
+      if (product.batchTracking && !batchNo) {
+        throw new Error("Batch No is required for batch-tracked products.");
       }
+      if (expiryDate && Number.isNaN(expiryDate.getTime())) {
+        throw new Error("Expiry Date is invalid.");
+      }
+      if ((transactionType === "SA" || transactionType === "AS") && !adjustmentDirection) {
+        throw new Error(`${transactionType === "AS" ? "Stock Assembly" : "Stock Adjustment"} requires adjustment direction IN or OUT.`);
+      }
+      if (transactionType !== "SA" && transactionType !== "AS" && adjustmentDirection) {
+        throw new Error("Adjustment direction is only allowed for Stock Adjustment or Stock Assembly.");
+      }
+      if (product.serialNumberTracking) {
+        if (serialNos.length === 0) {
+          throw new Error("Serial No is required for serial-tracked product.");
+        }
+        if (inputQty !== serialNos.length) {
+          throw new Error("Serial-tracked lines require quantity to match the number of serial numbers.");
+        }
+      }
+
       for (const locationRef of [locationId, fromLocationId, toLocationId]) {
         if (!locationRef) continue;
         const location = locationMap.get(locationRef);
-        if (!location || !location.isActive) throw new Error("Selected stock location is invalid or inactive.");
+        if (!location || !location.isActive) {
+          throw new Error("Selected stock location is invalid or inactive.");
+        }
       }
-      return { inventoryProductId, qty, unitCost, batchNo, expiryDate, serialNos, remarks: typeof line.remarks === "string" ? line.remarks.trim() || null : null, locationId, fromLocationId, toLocationId, adjustmentDirection, product };
+
+      return {
+        inventoryProductId,
+        qty,
+        unitCost,
+        batchNo,
+        expiryDate,
+        serialNos,
+        remarks: typeof line.remarks === "string" ? line.remarks.trim() || null : null,
+        locationId,
+        fromLocationId,
+        toLocationId,
+        adjustmentDirection,
+        product,
+      };
     });
 
     const created = await db.$transaction(async (tx) => {
       await acquireAdvisoryLock(tx, buildTransactionEntityLockKey(id));
 
-      const current = await tx.stockTransaction.findUnique({ where: { id }, include: { lines: { include: { serialEntries: true } } } });
+      const current = await tx.stockTransaction.findUnique({
+        where: { id },
+        include: { lines: { include: { serialEntries: true } } },
+      });
       if (!current) throw new Error("Stock transaction not found.");
       if (current.status === "CANCELLED") throw new Error("Cancelled transactions cannot be edited.");
 
@@ -316,8 +520,12 @@ export async function PUT(req: Request, context: Params) {
 
       if (!config.allowNegativeStock) {
         for (const line of normalizedLines) {
-          const usesOutbound = transactionType === "SI" || transactionType === "ST" || ((transactionType === "SA" || transactionType === "AS") && line.adjustmentDirection === "OUT");
+          const usesOutbound =
+            transactionType === "SI" ||
+            transactionType === "ST" ||
+            ((transactionType === "SA" || transactionType === "AS") && line.adjustmentDirection === "OUT");
           if (!usesOutbound) continue;
+
           const outboundLocationId = transactionUsesOutboundLocation(transactionType, line.adjustmentDirection, line)!;
           if (line.product.serialNumberTracking) {
             const availableCount = await tx.inventorySerial.count({
@@ -329,10 +537,14 @@ export async function PUT(req: Request, context: Params) {
                 ...(line.batchNo ? { inventoryBatch: { is: { batchNo: line.batchNo } } } : {}),
               },
             });
-            if (availableCount !== line.serialNos.length) throw new Error("One or more selected serial numbers are unavailable at the selected location.");
+            if (availableCount !== line.serialNos.length) {
+              throw new Error("One or more selected serial numbers are unavailable at the selected location.");
+            }
           } else {
             const balance = await getStockBalance(tx, line.inventoryProductId, outboundLocationId, { batchNo: line.batchNo });
-            if (balance < line.qty) throw new Error(`Insufficient stock for edited transaction.`);
+            if (balance < line.qty) {
+              throw new Error("Insufficient stock for edited transaction.");
+            }
           }
         }
       }
@@ -359,7 +571,14 @@ export async function PUT(req: Request, context: Params) {
               fromLocationId: line.fromLocationId,
               toLocationId: line.toLocationId,
               adjustmentDirection: line.adjustmentDirection,
-              serialEntries: line.serialNos.length ? { create: line.serialNos.map((serialNo) => ({ inventoryProductId: line.inventoryProductId, serialNo })) } : undefined,
+              serialEntries: line.serialNos.length
+                ? {
+                    create: line.serialNos.map((serialNo) => ({
+                      inventoryProductId: line.inventoryProductId,
+                      serialNo,
+                    })),
+                  }
+                : undefined,
             })),
           },
         },
@@ -376,47 +595,184 @@ export async function PUT(req: Request, context: Params) {
           });
           batchId = batch.id;
         }
+
         const qty = createStoredQtyDecimal(line.qty);
-        const direction = transactionType === "ST" ? null : transactionType === "OB" || transactionType === "SR" || ((transactionType === "SA" || transactionType === "AS") && line.adjustmentDirection === "IN") ? "IN" : "OUT";
+        const direction =
+          transactionType === "ST"
+            ? null
+            : transactionType === "OB" ||
+              transactionType === "SR" ||
+              ((transactionType === "SA" || transactionType === "AS") && line.adjustmentDirection === "IN")
+              ? "IN"
+              : "OUT";
+
         if (transactionType === "ST") {
           const outValues = buildLedgerValues(qty, "OUT");
           const inValues = buildLedgerValues(qty, "IN");
-          await tx.stockLedger.create({ data: { movementDate: transaction.transactionDate, movementType: transaction.transactionType, movementDirection: "OUT", ...outValues, batchNo: line.batchNo, inventoryProductId: line.inventoryProductId, locationId: line.fromLocationId!, transactionId: transaction.id, transactionLineId: line.id, referenceNo: transaction.transactionNo, referenceText: transaction.reference, sourceType: "MANUAL_STOCK_TRANSACTION", sourceId: transaction.id, remarks: line.remarks ?? transaction.remarks } });
-          await tx.stockLedger.create({ data: { movementDate: transaction.transactionDate, movementType: transaction.transactionType, movementDirection: "IN", ...inValues, batchNo: line.batchNo, inventoryProductId: line.inventoryProductId, locationId: line.toLocationId!, transactionId: transaction.id, transactionLineId: line.id, referenceNo: transaction.transactionNo, referenceText: transaction.reference, sourceType: "MANUAL_STOCK_TRANSACTION", sourceId: transaction.id, remarks: line.remarks ?? transaction.remarks } });
+          await tx.stockLedger.create({
+            data: {
+              movementDate: transaction.transactionDate,
+              movementType: transaction.transactionType,
+              movementDirection: "OUT",
+              ...outValues,
+              batchNo: line.batchNo,
+              inventoryProductId: line.inventoryProductId,
+              locationId: line.fromLocationId!,
+              transactionId: transaction.id,
+              transactionLineId: line.id,
+              referenceNo: transaction.transactionNo,
+              referenceText: transaction.reference,
+              sourceType: "MANUAL_STOCK_TRANSACTION",
+              sourceId: transaction.id,
+              remarks: line.remarks ?? transaction.remarks,
+            },
+          });
+          await tx.stockLedger.create({
+            data: {
+              movementDate: transaction.transactionDate,
+              movementType: transaction.transactionType,
+              movementDirection: "IN",
+              ...inValues,
+              batchNo: line.batchNo,
+              inventoryProductId: line.inventoryProductId,
+              locationId: line.toLocationId!,
+              transactionId: transaction.id,
+              transactionLineId: line.id,
+              referenceNo: transaction.transactionNo,
+              referenceText: transaction.reference,
+              sourceType: "MANUAL_STOCK_TRANSACTION",
+              sourceId: transaction.id,
+              remarks: line.remarks ?? transaction.remarks,
+            },
+          });
         } else {
           const values = buildLedgerValues(qty, direction!);
-          await tx.stockLedger.create({ data: { movementDate: transaction.transactionDate, movementType: transaction.transactionType, movementDirection: direction!, ...values, batchNo: line.batchNo, inventoryProductId: line.inventoryProductId, locationId: line.locationId!, transactionId: transaction.id, transactionLineId: line.id, referenceNo: transaction.transactionNo, referenceText: transaction.reference, sourceType: "MANUAL_STOCK_TRANSACTION", sourceId: transaction.id, remarks: line.remarks ?? transaction.remarks } });
+          await tx.stockLedger.create({
+            data: {
+              movementDate: transaction.transactionDate,
+              movementType: transaction.transactionType,
+              movementDirection: direction!,
+              ...values,
+              batchNo: line.batchNo,
+              inventoryProductId: line.inventoryProductId,
+              locationId: line.locationId!,
+              transactionId: transaction.id,
+              transactionLineId: line.id,
+              referenceNo: transaction.transactionNo,
+              referenceText: transaction.reference,
+              sourceType: "MANUAL_STOCK_TRANSACTION",
+              sourceId: transaction.id,
+              remarks: line.remarks ?? transaction.remarks,
+            },
+          });
         }
 
-        const serialEntries = await tx.stockTransactionLineSerial.findMany({ where: { transactionLineId: line.id }, orderBy: [{ serialNo: "asc" }] });
+        const serialEntries = await tx.stockTransactionLineSerial.findMany({
+          where: { transactionLineId: line.id },
+          orderBy: [{ serialNo: "asc" }],
+        });
+
         if (serialEntries.length > 0) {
-          if (transactionType === "OB" || transactionType === "SR" || ((transactionType === "SA" || transactionType === "AS") && line.adjustmentDirection === "IN")) {
+          if (
+            transactionType === "OB" ||
+            transactionType === "SR" ||
+            ((transactionType === "SA" || transactionType === "AS") && line.adjustmentDirection === "IN")
+          ) {
             for (const serialEntry of serialEntries) {
-              const existingSerial = await tx.inventorySerial.findUnique({ where: { inventoryProductId_serialNo: { inventoryProductId: line.inventoryProductId, serialNo: serialEntry.serialNo } } });
+              const existingSerial = await tx.inventorySerial.findUnique({
+                where: {
+                  inventoryProductId_serialNo: {
+                    inventoryProductId: line.inventoryProductId,
+                    serialNo: serialEntry.serialNo,
+                  },
+                },
+              });
               let serialRecord;
               if (existingSerial) {
-                if (existingSerial.status === "IN_STOCK") throw new Error(`Serial No ${serialEntry.serialNo} is already in stock for this product.`);
-                serialRecord = await tx.inventorySerial.update({ where: { id: existingSerial.id }, data: { inventoryBatchId: batchId, currentLocationId: line.locationId!, status: "IN_STOCK" } });
+                if (existingSerial.status === "IN_STOCK") {
+                  throw new Error(`Serial No ${serialEntry.serialNo} is already in stock for this product.`);
+                }
+                serialRecord = await tx.inventorySerial.update({
+                  where: { id: existingSerial.id },
+                  data: {
+                    inventoryBatchId: batchId,
+                    currentLocationId: line.locationId!,
+                    status: "IN_STOCK",
+                  },
+                });
               } else {
-                serialRecord = await tx.inventorySerial.create({ data: { inventoryProductId: line.inventoryProductId, inventoryBatchId: batchId, serialNo: serialEntry.serialNo, currentLocationId: line.locationId!, status: "IN_STOCK" } });
+                serialRecord = await tx.inventorySerial.create({
+                  data: {
+                    inventoryProductId: line.inventoryProductId,
+                    inventoryBatchId: batchId,
+                    serialNo: serialEntry.serialNo,
+                    currentLocationId: line.locationId!,
+                    status: "IN_STOCK",
+                  },
+                });
               }
-              await tx.stockTransactionLineSerial.update({ where: { id: serialEntry.id }, data: { inventorySerialId: serialRecord.id, inventoryBatchId: batchId } });
+              await tx.stockTransactionLineSerial.update({
+                where: { id: serialEntry.id },
+                data: { inventorySerialId: serialRecord.id, inventoryBatchId: batchId },
+              });
             }
           }
-          if (transactionType === "SI" || ((transactionType === "SA" || transactionType === "AS") && line.adjustmentDirection === "OUT")) {
+
+          if (
+            transactionType === "SI" ||
+            ((transactionType === "SA" || transactionType === "AS") && line.adjustmentDirection === "OUT")
+          ) {
             for (const serialEntry of serialEntries) {
-              const serialRecord = await tx.inventorySerial.findUnique({ where: { inventoryProductId_serialNo: { inventoryProductId: line.inventoryProductId, serialNo: serialEntry.serialNo } } });
-              if (!serialRecord || serialRecord.status !== "IN_STOCK" || serialRecord.currentLocationId !== line.locationId) throw new Error(`Serial No ${serialEntry.serialNo} is not available at the selected location.`);
-              await tx.inventorySerial.update({ where: { id: serialRecord.id }, data: { status: "OUT_OF_STOCK", currentLocationId: null } });
-              await tx.stockTransactionLineSerial.update({ where: { id: serialEntry.id }, data: { inventorySerialId: serialRecord.id, inventoryBatchId: serialRecord.inventoryBatchId } });
+              const serialRecord = await tx.inventorySerial.findUnique({
+                where: {
+                  inventoryProductId_serialNo: {
+                    inventoryProductId: line.inventoryProductId,
+                    serialNo: serialEntry.serialNo,
+                  },
+                },
+              });
+              if (!serialRecord || serialRecord.status !== "IN_STOCK" || serialRecord.currentLocationId !== line.locationId) {
+                throw new Error(`Serial No ${serialEntry.serialNo} is not available at the selected location.`);
+              }
+              await tx.inventorySerial.update({
+                where: { id: serialRecord.id },
+                data: { status: "OUT_OF_STOCK", currentLocationId: null },
+              });
+              await tx.stockTransactionLineSerial.update({
+                where: { id: serialEntry.id },
+                data: { inventorySerialId: serialRecord.id, inventoryBatchId: serialRecord.inventoryBatchId },
+              });
             }
           }
+
           if (transactionType === "ST") {
             for (const serialEntry of serialEntries) {
-              const serialRecord = await tx.inventorySerial.findUnique({ where: { inventoryProductId_serialNo: { inventoryProductId: line.inventoryProductId, serialNo: serialEntry.serialNo } } });
-              if (!serialRecord || serialRecord.status !== "IN_STOCK" || serialRecord.currentLocationId !== line.fromLocationId) throw new Error(`Serial No ${serialEntry.serialNo} is not available at the selected source location.`);
-              await tx.inventorySerial.update({ where: { id: serialRecord.id }, data: { currentLocationId: line.toLocationId!, inventoryBatchId: batchId ?? serialRecord.inventoryBatchId, status: "IN_STOCK" } });
-              await tx.stockTransactionLineSerial.update({ where: { id: serialEntry.id }, data: { inventorySerialId: serialRecord.id, inventoryBatchId: batchId ?? serialRecord.inventoryBatchId } });
+              const serialRecord = await tx.inventorySerial.findUnique({
+                where: {
+                  inventoryProductId_serialNo: {
+                    inventoryProductId: line.inventoryProductId,
+                    serialNo: serialEntry.serialNo,
+                  },
+                },
+              });
+              if (!serialRecord || serialRecord.status !== "IN_STOCK" || serialRecord.currentLocationId !== line.fromLocationId) {
+                throw new Error(`Serial No ${serialEntry.serialNo} is not available at the selected source location.`);
+              }
+              await tx.inventorySerial.update({
+                where: { id: serialRecord.id },
+                data: {
+                  currentLocationId: line.toLocationId!,
+                  inventoryBatchId: batchId ?? serialRecord.inventoryBatchId,
+                  status: "IN_STOCK",
+                },
+              });
+              await tx.stockTransactionLineSerial.update({
+                where: { id: serialEntry.id },
+                data: {
+                  inventorySerialId: serialRecord.id,
+                  inventoryBatchId: batchId ?? serialRecord.inventoryBatchId,
+                },
+              });
             }
           }
         }
@@ -433,17 +789,42 @@ export async function PUT(req: Request, context: Params) {
               location: { select: { id: true, code: true, name: true } },
               fromLocation: { select: { id: true, code: true, name: true } },
               toLocation: { select: { id: true, code: true, name: true } },
-              serialEntries: { orderBy: [{ serialNo: "asc" }], include: { inventorySerial: { select: { id: true, serialNo: true, status: true } } } },
+              serialEntries: {
+                orderBy: [{ serialNo: "asc" }],
+                include: { inventorySerial: { select: { id: true, serialNo: true, status: true } } },
+              },
             },
           },
         },
       });
     });
 
-    await createAuditLogFromRequest({ req, user: admin, module: "Stock Transactions", action: "EDIT", entityType: "StockTransaction", entityId: created?.id, entityCode: created?.transactionNo, description: `${admin.name} edited stock transaction ${existing.transactionNo} and reposted as ${created?.transactionNo}.`, newValues: { originalTransactionId: existing.id, newTransactionId: created?.id, transactionType, transactionDate: transactionDate.toISOString(), reference, remarks, lineCount: normalizedLines.length }, status: "SUCCESS" });
+    await createAuditLogFromRequest({
+      req,
+      user: admin,
+      module: "Stock Transactions",
+      action: "EDIT",
+      entityType: "StockTransaction",
+      entityId: created?.id,
+      entityCode: created?.transactionNo,
+      description: `${admin.name} edited stock transaction ${existing.transactionNo} and reposted as ${created?.transactionNo}.`,
+      newValues: {
+        originalTransactionId: existing.id,
+        newTransactionId: created?.id,
+        transactionType,
+        transactionDate: transactionDate.toISOString(),
+        reference,
+        remarks,
+        lineCount: normalizedLines.length,
+      },
+      status: "SUCCESS",
+    });
 
     return NextResponse.json({ ok: true, transaction: created });
   } catch (error) {
-    return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : "Unable to update stock transaction." }, { status: error instanceof Error && error.message === "FORBIDDEN" ? 403 : 500 });
+    return NextResponse.json(
+      { ok: false, error: error instanceof Error ? error.message : "Unable to update stock transaction." },
+      { status: error instanceof Error && error.message === "FORBIDDEN" ? 403 : 500 }
+    );
   }
 }
