@@ -1,18 +1,17 @@
-
 import { NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { createAuditLogFromRequest } from "@/lib/audit";
+import {
+  normalizeStockNumberFormatConfig,
+  parseNonNegativeNumberWithDecimalPlaces,
+  toStoredDecimalString,
+  STOCK_STORAGE_DECIMAL_PLACES,
+} from "@/lib/stock-format";
+import { Prisma } from "@prisma/client";
 
 function normalizeCode(value: unknown) {
   return typeof value === "string" ? value.trim().toUpperCase() : "";
-}
-
-function normalizeMoney(value: unknown) {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed) || parsed < 0) return null;
-  return Math.round((parsed + Number.EPSILON) * 100) / 100;
 }
 
 function normalizeRate(value: unknown) {
@@ -69,6 +68,8 @@ export async function POST(req: Request) {
   try {
     const admin = await requireAdmin();
     const body = await req.json().catch(() => ({}));
+    const stockConfig = await db.stockConfiguration.findUnique({ where: { id: "default" } });
+    const formatConfig = normalizeStockNumberFormatConfig(stockConfig);
 
     const code = normalizeCode(body.code);
     const description = typeof body.description === "string" ? body.description.trim() : "";
@@ -77,8 +78,8 @@ export async function POST(req: Request) {
     const brandId = typeof body.brandId === "string" && body.brandId.trim() ? body.brandId.trim() : null;
     const itemType = normalizeItemType(body.itemType);
     const baseUom = normalizeCode(body.baseUom);
-    const unitCost = normalizeMoney(body.unitCost);
-    const sellingPrice = normalizeMoney(body.sellingPrice);
+    const unitCost = parseNonNegativeNumberWithDecimalPlaces(body.unitCost, formatConfig.unitCostDecimalPlaces, "Unit cost");
+    const sellingPrice = parseNonNegativeNumberWithDecimalPlaces(body.sellingPrice, formatConfig.priceDecimalPlaces, "Selling price");
     const trackInventory = itemType === "STOCK_ITEM" ? Boolean(body.trackInventory) : false;
     const serialNumberTracking = Boolean(body.serialNumberTracking);
     const batchTracking = Boolean(body.batchTracking);
@@ -98,9 +99,6 @@ export async function POST(req: Request) {
     if (!code) return NextResponse.json({ ok: false, error: "Product code is required." }, { status: 400 });
     if (!description) return NextResponse.json({ ok: false, error: "Product description is required." }, { status: 400 });
     if (!baseUom) return NextResponse.json({ ok: false, error: "Base UOM is required." }, { status: 400 });
-    if (unitCost == null || sellingPrice == null) {
-      return NextResponse.json({ ok: false, error: "Unit cost and selling price must be valid positive numbers." }, { status: 400 });
-    }
 
     const duplicateUom = new Set<string>();
     for (const item of uomConversions) {
@@ -144,8 +142,8 @@ export async function POST(req: Request) {
         brandId: brand?.id ?? null,
         itemType,
         baseUom,
-        unitCost: new Prisma.Decimal(unitCost.toFixed(2)),
-        sellingPrice: new Prisma.Decimal(sellingPrice.toFixed(2)),
+        unitCost: new Prisma.Decimal(toStoredDecimalString(unitCost, STOCK_STORAGE_DECIMAL_PLACES.money)),
+        sellingPrice: new Prisma.Decimal(toStoredDecimalString(sellingPrice, STOCK_STORAGE_DECIMAL_PLACES.money)),
         trackInventory,
         serialNumberTracking,
         batchTracking,

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { DEFAULT_STOCK_NUMBER_FORMAT_CONFIG, formatNumberByDecimalPlaces, normalizeStockNumberFormatConfig } from "@/lib/stock-format";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -31,12 +32,22 @@ function getBackHref(type: "OB" | "SR" | "SI" | "SA" | "ST" | "AS") {
   }
 }
 
+function formatQty(value: number | string | null | undefined, decimalPlaces: number) {
+  return formatNumberByDecimalPlaces(value, decimalPlaces);
+}
+
+function formatMoney(value: number | string | null | undefined, decimalPlaces: number) {
+  return `RM ${formatNumberByDecimalPlaces(value, decimalPlaces)}`;
+}
+
 export default async function AdminStockTransactionDetailPage({ params }: Params) {
   const user = await getSessionUser();
   if (!user) redirect("/login");
   if (user.role !== "ADMIN") redirect("/dashboard");
 
   const { id } = await params;
+  const stockConfigRecord = await db.stockConfiguration.findUnique({ where: { id: "default" } });
+  const stockNumberFormat = normalizeStockNumberFormatConfig(stockConfigRecord ?? DEFAULT_STOCK_NUMBER_FORMAT_CONFIG);
   const transaction = await db.stockTransaction.findUnique({
     where: { id },
     include: {
@@ -105,7 +116,7 @@ export default async function AdminStockTransactionDetailPage({ params }: Params
                 {transaction.lines.map((line) => (
                   <tr key={line.id}>
                     <td className="px-3 py-3 text-white"><div className="font-medium">{line.inventoryProduct.code}</div><div className="text-white/60">{line.inventoryProduct.description}</div></td>
-                    <td className="px-3 py-3 text-right text-white">{Number(line.qty).toFixed(2)}</td>
+                    <td className="px-3 py-3 text-right text-white">{formatNumberByDecimalPlaces(line.qty, stockNumberFormat.qtyDecimalPlaces)}</td>
                     <td className="px-3 py-3 text-white/75">{line.batchNo || "-"}</td>
                     <td className="px-3 py-3 text-white/75">{line.location ? `${line.location.code} — ${line.location.name}` : line.fromLocation && line.toLocation ? `${line.fromLocation.code} — ${line.fromLocation.name} → ${line.toLocation.code} — ${line.toLocation.name}` : "-"}</td>
                     <td className="px-3 py-3 text-white/75">{line.serialEntries.length ? line.serialEntries.map((item) => item.serialNo).join(", ") : "-"}</td>

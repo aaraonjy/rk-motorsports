@@ -2,6 +2,11 @@ import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { AdminStockConfigurationClient } from "@/components/admin-stock-configuration-client";
+import {
+  DEFAULT_STOCK_NUMBER_FORMAT_CONFIG,
+  normalizeMoneyDecimalPlaces,
+  normalizeQtyDecimalPlaces,
+} from "@/lib/stock-format";
 
 export default async function AdminStockSettingsPage() {
   const user = await getSessionUser();
@@ -42,6 +47,9 @@ export default async function AdminStockSettingsPage() {
               allowNegativeStock: config?.allowNegativeStock ?? false,
               costingMethod: config?.costingMethod ?? "AVERAGE",
               defaultLocationId: config?.defaultLocationId ?? "",
+              qtyDecimalPlaces: normalizeQtyDecimalPlaces(config?.qtyDecimalPlaces ?? DEFAULT_STOCK_NUMBER_FORMAT_CONFIG.qtyDecimalPlaces),
+              unitCostDecimalPlaces: normalizeMoneyDecimalPlaces(config?.unitCostDecimalPlaces ?? DEFAULT_STOCK_NUMBER_FORMAT_CONFIG.unitCostDecimalPlaces),
+              priceDecimalPlaces: normalizeMoneyDecimalPlaces(config?.priceDecimalPlaces ?? DEFAULT_STOCK_NUMBER_FORMAT_CONFIG.priceDecimalPlaces),
             }}
             locations={locations}
           />

@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { createAuditLogFromRequest } from "@/lib/audit";
@@ -8,13 +7,15 @@ import {
   acquireAdvisoryLock,
   buildLedgerValues,
   buildTransactionEntityLockKey,
+  createStoredQtyDecimal,
   getStockBalance,
 } from "@/lib/stock";
+import { roundToDecimalPlaces, STOCK_STORAGE_DECIMAL_PLACES } from "@/lib/stock-format";
 
 type Params = { params: Promise<{ id: string }> };
 
-function roundQty(value: Prisma.Decimal | number | string | null | undefined) {
-  return Math.round((Number(value ?? 0) + Number.EPSILON) * 100) / 100;
+function roundQty(value: number | string | null | undefined) {
+  return roundToDecimalPlaces(Number(value ?? 0), STOCK_STORAGE_DECIMAL_PLACES.qty);
 }
 
 export async function POST(req: Request, context: Params) {
@@ -121,7 +122,7 @@ export async function POST(req: Request, context: Params) {
       }
 
       for (const line of transaction.lines) {
-        const qty = new Prisma.Decimal(roundQty(line.qty).toFixed(2));
+        const qty = createStoredQtyDecimal(roundQty(line.qty));
         const remarks = line.remarks ?? transaction.remarks ?? "Cancellation reversal";
 
         if (transaction.transactionType === "ST") {

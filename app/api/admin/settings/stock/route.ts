@@ -3,13 +3,17 @@ import { StockCostingMethod } from "@prisma/client";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { createAuditLogFromRequest } from "@/lib/audit";
+import {
+  DEFAULT_STOCK_NUMBER_FORMAT_CONFIG,
+  normalizeMoneyDecimalPlaces,
+  normalizeQtyDecimalPlaces,
+} from "@/lib/stock-format";
 
 function normalizeCostingMethod(value: unknown): StockCostingMethod {
   return value === StockCostingMethod.AVERAGE
     ? StockCostingMethod.AVERAGE
     : StockCostingMethod.AVERAGE;
 }
-
 
 export async function GET() {
   try {
@@ -23,6 +27,9 @@ export async function GET() {
         allowNegativeStock: true,
         costingMethod: true,
         defaultLocationId: true,
+        qtyDecimalPlaces: true,
+        unitCostDecimalPlaces: true,
+        priceDecimalPlaces: true,
       },
     });
 
@@ -34,6 +41,9 @@ export async function GET() {
         allowNegativeStock: config?.allowNegativeStock ?? false,
         costingMethod: config?.costingMethod ?? StockCostingMethod.AVERAGE,
         defaultLocationId: config?.defaultLocationId ?? "",
+        qtyDecimalPlaces: normalizeQtyDecimalPlaces(config?.qtyDecimalPlaces),
+        unitCostDecimalPlaces: normalizeMoneyDecimalPlaces(config?.unitCostDecimalPlaces),
+        priceDecimalPlaces: normalizeMoneyDecimalPlaces(config?.priceDecimalPlaces),
       },
     });
   } catch (error) {
@@ -66,6 +76,9 @@ export async function POST(req: Request) {
       typeof body.defaultLocationId === "string" && body.defaultLocationId.trim()
         ? body.defaultLocationId.trim()
         : null;
+    const qtyDecimalPlaces = normalizeQtyDecimalPlaces(body.qtyDecimalPlaces);
+    const unitCostDecimalPlaces = normalizeMoneyDecimalPlaces(body.unitCostDecimalPlaces);
+    const priceDecimalPlaces = normalizeMoneyDecimalPlaces(body.priceDecimalPlaces);
 
     if (stockModuleEnabled && !defaultLocationId) {
       return NextResponse.json(
@@ -100,6 +113,9 @@ export async function POST(req: Request) {
         allowNegativeStock,
         costingMethod,
         defaultLocationId: stockModuleEnabled ? defaultLocationId : null,
+        qtyDecimalPlaces,
+        unitCostDecimalPlaces,
+        priceDecimalPlaces,
       },
       create: {
         id: "default",
@@ -108,6 +124,9 @@ export async function POST(req: Request) {
         allowNegativeStock,
         costingMethod,
         defaultLocationId: stockModuleEnabled ? defaultLocationId : null,
+        qtyDecimalPlaces: DEFAULT_STOCK_NUMBER_FORMAT_CONFIG.qtyDecimalPlaces,
+        unitCostDecimalPlaces: DEFAULT_STOCK_NUMBER_FORMAT_CONFIG.unitCostDecimalPlaces,
+        priceDecimalPlaces: DEFAULT_STOCK_NUMBER_FORMAT_CONFIG.priceDecimalPlaces,
       },
     });
 
@@ -127,6 +146,9 @@ export async function POST(req: Request) {
             allowNegativeStock: existing.allowNegativeStock,
             costingMethod: existing.costingMethod,
             defaultLocationId: existing.defaultLocationId,
+            qtyDecimalPlaces: normalizeQtyDecimalPlaces(existing.qtyDecimalPlaces),
+            unitCostDecimalPlaces: normalizeMoneyDecimalPlaces(existing.unitCostDecimalPlaces),
+            priceDecimalPlaces: normalizeMoneyDecimalPlaces(existing.priceDecimalPlaces),
           }
         : null,
       newValues: {
@@ -135,6 +157,9 @@ export async function POST(req: Request) {
         allowNegativeStock: saved.allowNegativeStock,
         costingMethod: saved.costingMethod,
         defaultLocationId: saved.defaultLocationId,
+        qtyDecimalPlaces: normalizeQtyDecimalPlaces(saved.qtyDecimalPlaces),
+        unitCostDecimalPlaces: normalizeMoneyDecimalPlaces(saved.unitCostDecimalPlaces),
+        priceDecimalPlaces: normalizeMoneyDecimalPlaces(saved.priceDecimalPlaces),
       },
       status: "SUCCESS",
     });

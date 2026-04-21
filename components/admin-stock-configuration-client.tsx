@@ -1,6 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import {
+  DEFAULT_STOCK_NUMBER_FORMAT_CONFIG,
+  MoneyDecimalPlaces,
+  QtyDecimalPlaces,
+} from "@/lib/stock-format";
 
 type StockLocationOption = {
   id: string;
@@ -16,6 +21,9 @@ type Props = {
     allowNegativeStock: boolean;
     costingMethod: "AVERAGE";
     defaultLocationId: string;
+    qtyDecimalPlaces: QtyDecimalPlaces;
+    unitCostDecimalPlaces: MoneyDecimalPlaces;
+    priceDecimalPlaces: MoneyDecimalPlaces;
   };
   locations: StockLocationOption[];
 };
@@ -157,6 +165,52 @@ export function AdminStockConfigurationClient({ initialConfig, locations }: Prop
             </div>
           </div>
 
+          <div className="grid gap-4 md:grid-cols-3">
+            <div>
+              <label className="label-rk">Qty Input Format</label>
+              <div className="relative">
+                <select
+                  className="input-rk appearance-none pr-12"
+                  value={form.qtyDecimalPlaces}
+                  onChange={(e) => setForm((prev) => ({ ...prev, qtyDecimalPlaces: Number(e.target.value) as QtyDecimalPlaces }))}
+                >
+                  <option value={0}>No Decimal</option>
+                  <option value={2}>2 Decimal Point</option>
+                  <option value={3}>3 Decimal Point</option>
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/60">▾</div>
+              </div>
+            </div>
+            <div>
+              <label className="label-rk">Unit Cost Input Format</label>
+              <div className="relative">
+                <select
+                  className="input-rk appearance-none pr-12"
+                  value={form.unitCostDecimalPlaces}
+                  onChange={(e) => setForm((prev) => ({ ...prev, unitCostDecimalPlaces: Number(e.target.value) as MoneyDecimalPlaces }))}
+                >
+                  <option value={2}>2 Decimal Point</option>
+                  <option value={3}>3 Decimal Point</option>
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/60">▾</div>
+              </div>
+            </div>
+            <div>
+              <label className="label-rk">Price Input Format</label>
+              <div className="relative">
+                <select
+                  className="input-rk appearance-none pr-12"
+                  value={form.priceDecimalPlaces}
+                  onChange={(e) => setForm((prev) => ({ ...prev, priceDecimalPlaces: Number(e.target.value) as MoneyDecimalPlaces }))}
+                >
+                  <option value={2}>2 Decimal Point</option>
+                  <option value={3}>3 Decimal Point</option>
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/60">▾</div>
+              </div>
+            </div>
+          </div>
+
           {error ? <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</div> : null}
           {success ? <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">{success}</div> : null}
 
@@ -178,6 +232,10 @@ export function AdminStockConfigurationClient({ initialConfig, locations }: Prop
             <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
               <div className="font-semibold text-white">When stock module is ON</div>
               <div className="mt-2">Stock settings prepare the stock control foundation. Product-level Serial Tracking and Batch Tracking are maintained in Product Master.</div>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+              <div className="font-semibold text-white">Input format behavior</div>
+              <div className="mt-2">Qty format is applied across stock transactions, stock assembly, assembly template, and read-only stock displays. Unit Cost and Price formats are applied across Product Master input and display screens.</div>
             </div>
             <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
               <div className="font-semibold text-white">Default location</div>

@@ -240,6 +240,9 @@ model StockConfiguration {
   serialTrackingEnabled Boolean            @default(false)
   batchTrackingEnabled  Boolean            @default(false)
   defaultLocationId     String?
+  qtyDecimalPlaces      Int                @default(0)
+  unitCostDecimalPlaces Int                @default(2)
+  priceDecimalPlaces    Int                @default(2)
   createdAt             DateTime           @default(now())
   updatedAt             DateTime           @updatedAt
   defaultLocation       StockLocation?     @relation(fields: [defaultLocationId], references: [id], onDelete: SetNull)
@@ -276,8 +279,8 @@ model InventoryProduct {
   brandId              String?
   itemType             InventoryItemType
   baseUom              String
-  unitCost             Decimal                @default(0) @db.Decimal(12, 2)
-  sellingPrice         Decimal                @default(0) @db.Decimal(12, 2)
+  unitCost             Decimal                @default(0) @db.Decimal(12, 3)
+  sellingPrice         Decimal                @default(0) @db.Decimal(12, 3)
   trackInventory       Boolean                @default(false)
   serialNumberTracking Boolean                @default(false)
   batchTracking        Boolean                @default(false)
@@ -331,7 +334,7 @@ model AssemblyTemplateLine {
   assemblyTemplateId  String
   lineNo              Int
   componentProductId  String
-  qty                 Decimal           @db.Decimal(12, 4)
+  qty                 Decimal           @db.Decimal(12, 3)
   uom                 String
   isRequired          Boolean           @default(true)
   allowOverride       Boolean           @default(false)
@@ -710,8 +713,8 @@ model StockTransactionLine {
   id                  String                   @id @default(cuid())
   transactionId       String
   inventoryProductId  String
-  qty                 Decimal                  @db.Decimal(12, 2)
-  unitCost            Decimal?                 @db.Decimal(12, 2)
+  qty                 Decimal                  @db.Decimal(12, 3)
+  unitCost            Decimal?                 @db.Decimal(12, 3)
   batchNo             String?
   expiryDate          DateTime?
   remarks             String?
@@ -741,9 +744,9 @@ model StockLedger {
   movementDate      DateTime
   movementType      StockTransactionType
   movementDirection StockMovementDirection
-  qty               Decimal                @db.Decimal(12, 2)
-  qtyIn             Decimal                @default(0) @db.Decimal(12, 2)
-  qtyOut            Decimal                @default(0) @db.Decimal(12, 2)
+  qty               Decimal                @db.Decimal(12, 3)
+  qtyIn             Decimal                @default(0) @db.Decimal(12, 3)
+  qtyOut            Decimal                @default(0) @db.Decimal(12, 3)
   batchNo            String?
   inventoryProductId String
   locationId        String

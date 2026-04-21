@@ -3,6 +3,14 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+  DEFAULT_STOCK_NUMBER_FORMAT_CONFIG,
+  formatNumberByDecimalPlaces,
+  getNumberInputStep,
+  normalizeInputByDecimalPlaces,
+  normalizeStockNumberFormatConfig,
+  roundToDecimalPlaces,
+} from "@/lib/stock-format";
 
 type StockTransactionTypeValue = "OB" | "SR" | "SI" | "SA" | "ST" | "AS";
 type AdjustmentDirectionValue = "IN" | "OUT";
@@ -115,6 +123,9 @@ type StockSettingsConfig = {
   allowNegativeStock: boolean;
   costingMethod: "AVERAGE";
   defaultLocationId: string;
+  qtyDecimalPlaces: 0 | 2 | 3;
+  unitCostDecimalPlaces: 2 | 3;
+  priceDecimalPlaces: 2 | 3;
 };
 
 type StockSettingsResponse = {
@@ -146,9 +157,8 @@ function formatDateInput(value: string | null | undefined) {
   return date.toISOString().slice(0, 10);
 }
 
-function formatQty(value: string | number | null | undefined) {
-  const num = Number(value ?? 0);
-  return Number.isFinite(num) ? num.toFixed(2) : "0.00";
+function formatQty(value: string | number | null | undefined, decimalPlaces: number) {
+  return formatNumberByDecimalPlaces(value, decimalPlaces);
 }
 
 
@@ -245,7 +255,7 @@ function convertQtyToBase(product: InventoryProductOption | null | undefined, qt
   const numericQty = Number(qty ?? 0);
   if (!Number.isFinite(numericQty) || numericQty <= 0) return 0;
   const rate = getUomConversionRate(product, uomCode);
-  return Math.round((numericQty * rate + Number.EPSILON) * 100) / 100;
+  return roundToDecimalPlaces(numericQty * rate, 3);
 }
 
 function normalizeSerialToken(token: string) {
@@ -501,11 +511,11 @@ function OutboundSerialPicker({
   );
 }
 
-function buildInitialLines(transaction: TransactionRecord): FormLine[] {
+function buildInitialLines(transaction: TransactionRecord, stockSettings: StockSettingsConfig = { stockModuleEnabled: false, multiLocationEnabled: true, allowNegativeStock: false, costingMethod: "AVERAGE", defaultLocationId: "", ...DEFAULT_STOCK_NUMBER_FORMAT_CONFIG }): FormLine[] {
   return transaction.lines.map((line) => ({
     inventoryProductId: line.inventoryProduct.id,
-    qty: formatQty(line.qty),
-    unitCost: line.unitCost == null ? "0.00" : formatQty(line.unitCost),
+    qty: formatQty(line.qty, stockSettings.qtyDecimalPlaces),
+    unitCost: line.unitCost == null ? formatNumberByDecimalPlaces(0, stockSettings.unitCostDecimalPlaces) : formatQty(line.unitCost, stockSettings.unitCostDecimalPlaces),
     uomCode: line.inventoryProduct.baseUom,
     batchNo: line.batchNo || "",
     batchMode: "existing",
@@ -554,6 +564,9 @@ export function AdminStockTransactionEditClient({
     allowNegativeStock: false,
     costingMethod: "AVERAGE",
     defaultLocationId: "",
+    qtyDecimalPlaces: DEFAULT_STOCK_NUMBER_FORMAT_CONFIG.qtyDecimalPlaces,
+    unitCostDecimalPlaces: DEFAULT_STOCK_NUMBER_FORMAT_CONFIG.unitCostDecimalPlaces,
+    priceDecimalPlaces: DEFAULT_STOCK_NUMBER_FORMAT_CONFIG.priceDecimalPlaces,
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
@@ -585,16 +598,17 @@ export function AdminStockTransactionEditClient({
         const response = await fetch("/api/admin/settings/stock", { cache: "no-store" });
         const data = (await response.json()) as StockSettingsResponse;
         if (!response.ok || !data.ok || cancelled) return;
-        setStockSettings(data.config || {
-          stockModuleEnabled: false,
-          multiLocationEnabled: true,
-          allowNegativeStock: false,
+        setStockSettings({
+          stockModuleEnabled: Boolean(data.config?.stockModuleEnabled),
+          multiLocationEnabled: Boolean(data.config?.multiLocationEnabled),
+          allowNegativeStock: Boolean(data.config?.allowNegativeStock),
           costingMethod: "AVERAGE",
-          defaultLocationId: "",
+          defaultLocationId: data.config?.defaultLocationId || "",
+          ...normalizeStockNumberFormatConfig(data.config),
         });
       } catch {
         if (!cancelled) {
-          setStockSettings({ stockModuleEnabled: false, multiLocationEnabled: true, allowNegativeStock: false, costingMethod: "AVERAGE", defaultLocationId: "" });
+          setStockSettings({ stockModuleEnabled: false, multiLocationEnabled: true, allowNegativeStock: false, costingMethod: "AVERAGE", defaultLocationId: "", ...DEFAULT_STOCK_NUMBER_FORMAT_CONFIG });
         }
       }
     }
@@ -730,7 +744,7 @@ export function AdminStockTransactionEditClient({
     const product = initialProducts.find((item) => item.id === productId);
     updateLine(index, {
       inventoryProductId: productId,
-      unitCost: product ? product.unitCost.toFixed(2) : "0.00",
+      unitCost: product ? formatNumberByDecimalPlaces(product.unitCost, stockSettings.unitCostDecimalPlaces) : formatNumberByDecimalPlaces(0, stockSettings.unitCostDecimalPlaces),
       uomCode: product?.baseUom || "",
       batchNo: "",
       batchMode: "existing",
@@ -756,7 +770,7 @@ export function AdminStockTransactionEditClient({
     if (requiresBatchSelectionBeforeBalance(product, transactionType, direction) && !batchNo?.trim()) return "Select batch no to view balance.";
     const key = balanceKey(productId, locationId, batchNo);
     if (loadingBalances[key]) return "Loading current balance...";
-    return `Current Balance: ${formatQty(typeof balances[key] === "number" ? balances[key] : 0)}`;
+    return `Current Balance: ${formatQty(typeof balances[key] === "number" ? balances[key] : 0, stockSettings.qtyDecimalPlaces)}`;
   }
 
   function toggleSelectedSerial(index: number, serialNo: string) {
@@ -764,12 +778,12 @@ export function AdminStockTransactionEditClient({
     const exists = line.serialNos.some((value) => value.toUpperCase() === serialNo.toUpperCase());
     const nextSerials = exists ? line.serialNos.filter((value) => value.toUpperCase() !== serialNo.toUpperCase()) : [...line.serialNos, serialNo];
     const uniqueNext = uniqueSerialNos(nextSerials);
-    updateLine(index, { serialNos: uniqueNext, qty: formatQty(uniqueNext.length) });
+    updateLine(index, { serialNos: uniqueNext, qty: formatQty(uniqueNext.length, stockSettings.qtyDecimalPlaces) });
   }
 
   function removeInboundSerial(index: number, serialNo: string) {
     const nextSerials = lines[index].serialNos.filter((value) => value.toUpperCase() !== serialNo.toUpperCase());
-    updateLine(index, { serialNos: nextSerials, qty: formatQty(nextSerials.length) });
+    updateLine(index, { serialNos: nextSerials, qty: formatQty(nextSerials.length, stockSettings.qtyDecimalPlaces) });
   }
 
   function setInboundBatch(index: number, value: string) {
@@ -806,7 +820,7 @@ export function AdminStockTransactionEditClient({
     const normalized = serialNo.trim().toUpperCase();
     if (!normalized) return;
     const nextSerials = uniqueSerialNos([...(lines[index]?.serialNos || []), normalized]);
-    updateLine(index, { serialNos: nextSerials, serialEntryText: "", qty: formatQty(nextSerials.length) });
+    updateLine(index, { serialNos: nextSerials, serialEntryText: "", qty: formatQty(nextSerials.length, stockSettings.qtyDecimalPlaces) });
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -905,18 +919,18 @@ export function AdminStockTransactionEditClient({
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                   <div className="xl:col-span-2">
                     <SearchableSelect label="Product" placeholder="Search or select product" options={productOptions} value={line.inventoryProductId} onChange={(option) => handleProductChange(index, option?.id || "")} />
-                    <p className="mt-2 text-xs text-white/45">{selectedProduct ? `UOM: ${selectedProduct.baseUom}${isBatchTracked ? " • Batch Tracked" : ""}${isSerialTracked ? " • Serial Tracked" : ""} • Default Unit Cost: RM ${selectedProduct.unitCost.toFixed(2)}` : "Only active inventory-tracked products are shown."}</p>
+                    <p className="mt-2 text-xs text-white/45">{selectedProduct ? `UOM: ${selectedProduct.baseUom}${isBatchTracked ? " • Batch Tracked" : ""}${isSerialTracked ? " • Serial Tracked" : ""} • Default Unit Cost: RM ${formatNumberByDecimalPlaces(selectedProduct.unitCost, stockSettings.unitCostDecimalPlaces)}` : "Only active inventory-tracked products are shown."}</p>
                   </div>
 
                   <div>
                     <label className="label-rk">Qty</label>
-                    <input type="number" min="0.01" step="0.01" className={`input-rk ${getFieldErrorClass(line.qtyError)}`} value={line.qty} disabled={isSerialTracked} onChange={(e) => updateLine(index, { qty: e.target.value })} required />
+                    <input type="number" min={stockSettings.qtyDecimalPlaces === 0 ? "1" : getNumberInputStep(stockSettings.qtyDecimalPlaces)} step={getNumberInputStep(stockSettings.qtyDecimalPlaces)} className={`input-rk ${getFieldErrorClass(line.qtyError)}`} value={line.qty} disabled={isSerialTracked} onChange={(e) => updateLine(index, { qty: e.target.value })} onBlur={(e) => updateLine(index, { qty: normalizeInputByDecimalPlaces(e.target.value, stockSettings.qtyDecimalPlaces, 1) })} required />
                     {isSerialTracked ? <p className="mt-2 text-xs text-white/45">Qty auto-follows selected serial count and uses Base UOM.</p> : null}
                   </div>
 
                   <div>
                     <label className="label-rk">Unit Cost</label>
-                    <input type="number" min="0" step="0.01" className="input-rk" value={line.unitCost} onChange={(e) => updateLine(index, { unitCost: e.target.value })} />
+                    <input type="number" min="0" step={getNumberInputStep(stockSettings.unitCostDecimalPlaces)} className="input-rk" value={line.unitCost} onChange={(e) => updateLine(index, { unitCost: e.target.value })} onBlur={(e) => updateLine(index, { unitCost: normalizeInputByDecimalPlaces(e.target.value, stockSettings.unitCostDecimalPlaces, 0) })} />
                   </div>
 
                   {requiresSingleLocation(transactionType) ? (
@@ -959,7 +973,7 @@ export function AdminStockTransactionEditClient({
                         <SearchableSelect
                           label="Batch No"
                           placeholder={loadingBatches[index] ? (outboundBatchFlow ? "Loading available batches..." : "Loading existing batches...") : outboundBatchFlow ? "Search or select batch no" : "Select existing batch or create new"}
-                          options={outboundBatchFlow ? (availableBatches[index] || []).map((batch) => ({ id: batch.batchNo, label: batch.balance != null ? `${batch.batchNo}${batch.expiryDate ? ` • Exp ${formatDateInput(batch.expiryDate)}` : ""} • Bal ${formatQty(batch.balance)}` : `${batch.batchNo}${batch.expiryDate ? ` • Exp ${formatDateInput(batch.expiryDate)}` : ""}`, searchText: `${batch.batchNo} ${batch.expiryDate || ""}`.toLowerCase() })) : [{ id: "__NEW__", label: "+ Create New Batch", searchText: "create new batch new" }, ...(availableBatches[index] || []).map((batch) => ({ id: batch.batchNo, label: `${batch.batchNo}${batch.expiryDate ? ` • Exp ${formatDateInput(batch.expiryDate)}` : ""}`, searchText: `${batch.batchNo} ${batch.expiryDate || ""}`.toLowerCase() }))]}
+                          options={outboundBatchFlow ? (availableBatches[index] || []).map((batch) => ({ id: batch.batchNo, label: batch.balance != null ? `${batch.batchNo}${batch.expiryDate ? ` • Exp ${formatDateInput(batch.expiryDate)}` : ""} • Bal ${formatQty(batch.balance, stockSettings.qtyDecimalPlaces)}` : `${batch.batchNo}${batch.expiryDate ? ` • Exp ${formatDateInput(batch.expiryDate)}` : ""}`, searchText: `${batch.batchNo} ${batch.expiryDate || ""}`.toLowerCase() })) : [{ id: "__NEW__", label: "+ Create New Batch", searchText: "create new batch new" }, ...(availableBatches[index] || []).map((batch) => ({ id: batch.batchNo, label: `${batch.batchNo}${batch.expiryDate ? ` • Exp ${formatDateInput(batch.expiryDate)}` : ""}`, searchText: `${batch.batchNo} ${batch.expiryDate || ""}`.toLowerCase() }))]}
                           value={inboundBatchFlow && line.batchMode === "new" ? "__NEW__" : line.batchNo}
                           disabled={loadingBatches[index]}
                           onChange={(option) => outboundBatchFlow ? setOutboundBatch(index, option?.id || "") : setInboundBatch(index, option?.id || "")}

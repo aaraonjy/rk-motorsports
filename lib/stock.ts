@@ -1,4 +1,11 @@
 import { Prisma, StockAdjustmentDirection, StockTransactionType } from "@prisma/client";
+import {
+  DEFAULT_STOCK_NUMBER_FORMAT_CONFIG,
+  STOCK_STORAGE_DECIMAL_PLACES,
+  normalizeQtyDecimalPlaces,
+  roundToDecimalPlaces,
+  toStoredDecimalString,
+} from "@/lib/stock-format";
 
 const DECIMAL_ZERO = new Prisma.Decimal(0);
 
@@ -25,12 +32,24 @@ export function normalizeStockDate(input?: string | null) {
   return date;
 }
 
-export function assertPositiveQty(value: unknown, label = "Quantity") {
+export function assertPositiveQty(
+  value: unknown,
+  label = "Quantity",
+  decimalPlaces = DEFAULT_STOCK_NUMBER_FORMAT_CONFIG.qtyDecimalPlaces
+) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed <= 0) {
     throw new Error(`${label} must be greater than 0.`);
   }
-  return Math.round((parsed + Number.EPSILON) * 100) / 100;
+
+  const allowedPlaces = normalizeQtyDecimalPlaces(decimalPlaces);
+  const raw = String(value ?? "").trim();
+  const actualPlaces = raw.includes(".") ? raw.split(".")[1].length : 0;
+  if (actualPlaces > allowedPlaces) {
+    throw new Error(`${label} allows maximum ${allowedPlaces} decimal place${allowedPlaces === 1 ? "" : "s"}.`);
+  }
+
+  return roundToDecimalPlaces(parsed, allowedPlaces);
 }
 
 export async function getStockBalance(
@@ -53,10 +72,8 @@ export async function getStockBalance(
 
   const qtyIn = decimalToNumber(aggregate._sum.qtyIn);
   const qtyOut = decimalToNumber(aggregate._sum.qtyOut);
-  return Math.round((qtyIn - qtyOut + Number.EPSILON) * 100) / 100;
+  return roundToDecimalPlaces(qtyIn - qtyOut, STOCK_STORAGE_DECIMAL_PLACES.qty);
 }
-
-
 
 function hashLockKey(input: string) {
   let hash = BigInt("1469598103934665603");
@@ -195,6 +212,13 @@ export function buildLedgerValues(
   };
 }
 
+export function createStoredQtyDecimal(value: unknown) {
+  return new Prisma.Decimal(toStoredDecimalString(value, STOCK_STORAGE_DECIMAL_PLACES.qty));
+}
+
+export function createStoredMoneyDecimal(value: unknown) {
+  return new Prisma.Decimal(toStoredDecimalString(value, STOCK_STORAGE_DECIMAL_PLACES.money));
+}
 
 export function getUomConversionRateForProduct(
   product: { baseUom: string; uomConversions?: Array<{ uomCode: string; conversionRate: number | string | Prisma.Decimal }> },
@@ -212,12 +236,12 @@ export function getUomConversionRateForProduct(
   if (!Number.isFinite(rate) || rate <= 0) {
     throw new Error(`Selected UOM ${normalized} has invalid conversion rate.`);
   }
-  return Math.round((rate + Number.EPSILON) * 10000) / 10000;
+  return roundToDecimalPlaces(rate, STOCK_STORAGE_DECIMAL_PLACES.conversionRate);
 }
 
 export function convertQtyToBaseUom(
   qty: number,
   rate: number
 ) {
-  return Math.round((qty * rate + Number.EPSILON) * 100) / 100;
+  return roundToDecimalPlaces(qty * rate, STOCK_STORAGE_DECIMAL_PLACES.qty);
 }

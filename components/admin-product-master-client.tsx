@@ -2,6 +2,12 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  DEFAULT_STOCK_NUMBER_FORMAT_CONFIG,
+  formatNumberByDecimalPlaces,
+  getNumberInputStep,
+  normalizeStockNumberFormatConfig,
+} from "@/lib/stock-format";
 
 type InventoryItemTypeValue = "STOCK_ITEM" | "SERVICE_ITEM" | "NON_STOCK_ITEM";
 type MasterOption = { id: string; code: string; name: string; isActive: boolean };
@@ -61,6 +67,17 @@ type ProductFormState = {
   isActive: boolean;
 };
 
+type StockSettingsConfig = {
+  qtyDecimalPlaces: 0 | 2 | 3;
+  unitCostDecimalPlaces: 2 | 3;
+  priceDecimalPlaces: 2 | 3;
+};
+
+type StockSettingsResponse = {
+  ok: boolean;
+  config?: Partial<StockSettingsConfig>;
+};
+
 type Props = {
   initialProducts: InventoryProductRecord[];
   locations: StockLocationOption[];
@@ -69,19 +86,19 @@ type Props = {
   productBrands: MasterOption[];
 };
 
-function formatCurrency(value: number) {
+function formatCurrency(value: number, decimalPlaces: number) {
   return new Intl.NumberFormat("en-MY", {
     style: "currency",
     currency: "MYR",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    minimumFractionDigits: decimalPlaces,
+    maximumFractionDigits: decimalPlaces,
   }).format(value);
 }
 
-function normalizeMoneyInput(value: string) {
+function normalizeMoneyInput(value: string, decimalPlaces: number) {
   const parsed = Number(value);
-  if (!Number.isFinite(parsed) || parsed < 0) return "0.00";
-  return parsed.toFixed(2);
+  if (!Number.isFinite(parsed) || parsed < 0) return formatNumberByDecimalPlaces(0, decimalPlaces);
+  return formatNumberByDecimalPlaces(parsed, decimalPlaces);
 }
 
 function emptyForm(): ProductFormState {
@@ -96,8 +113,8 @@ function emptyForm(): ProductFormState {
     brandSearch: "",
     itemType: "STOCK_ITEM",
     baseUom: "PCS",
-    unitCost: "0.00",
-    sellingPrice: "0.00",
+    unitCost: formatNumberByDecimalPlaces(0, DEFAULT_STOCK_NUMBER_FORMAT_CONFIG.unitCostDecimalPlaces),
+    sellingPrice: formatNumberByDecimalPlaces(0, DEFAULT_STOCK_NUMBER_FORMAT_CONFIG.priceDecimalPlaces),
     trackInventory: true,
     serialNumberTracking: false,
     batchTracking: false,
@@ -304,6 +321,7 @@ export function AdminProductMasterClient({
   const [submitError, setSubmitError] = useState("");
   const [submitSuccess, setSubmitSuccess] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [stockSettings, setStockSettings] = useState<StockSettingsConfig>(DEFAULT_STOCK_NUMBER_FORMAT_CONFIG);
   const pageSize = 10;
 
   const activeGroups = useMemo(() => productGroups.filter((item) => item.isActive), [productGroups]);
@@ -312,6 +330,27 @@ export function AdminProductMasterClient({
     () => productSubGroups.filter((item) => item.isActive && (!form.groupId || item.groupId === form.groupId)),
     [productSubGroups, form.groupId]
   );
+
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadStockSettings() {
+      try {
+        const response = await fetch("/api/admin/settings/stock", { cache: "no-store" });
+        const data = (await response.json()) as StockSettingsResponse;
+        if (!response.ok || !data.ok || cancelled) return;
+        setStockSettings(normalizeStockNumberFormatConfig(data.config));
+      } catch {
+        if (!cancelled) setStockSettings(DEFAULT_STOCK_NUMBER_FORMAT_CONFIG);
+      }
+    }
+
+    void loadStockSettings();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const filteredProducts = useMemo(() => {
     const normalizedKeyword = keyword.trim().toLowerCase();
@@ -395,8 +434,8 @@ export function AdminProductMasterClient({
       brandSearch: detailedProduct.brand || "",
       itemType: detailedProduct.itemType,
       baseUom: detailedProduct.baseUom,
-      unitCost: detailedProduct.unitCost.toFixed(2),
-      sellingPrice: detailedProduct.sellingPrice.toFixed(2),
+      unitCost: formatNumberByDecimalPlaces(detailedProduct.unitCost, stockSettings.unitCostDecimalPlaces),
+      sellingPrice: formatNumberByDecimalPlaces(detailedProduct.sellingPrice, stockSettings.priceDecimalPlaces),
       trackInventory: detailedProduct.trackInventory,
       serialNumberTracking: detailedProduct.serialNumberTracking,
       batchTracking: detailedProduct.batchTracking,
@@ -545,8 +584,8 @@ export function AdminProductMasterClient({
           conversionRate: Number(normalizeConversionRate(item.conversionRate)),
         })),
         itemType: form.itemType,
-        unitCost: Number(normalizeMoneyInput(form.unitCost)),
-        sellingPrice: Number(normalizeMoneyInput(form.sellingPrice)),
+        unitCost: Number(normalizeMoneyInput(form.unitCost, stockSettings.unitCostDecimalPlaces)),
+        sellingPrice: Number(normalizeMoneyInput(form.sellingPrice, stockSettings.priceDecimalPlaces)),
         trackInventory: form.itemType === "STOCK_ITEM" ? form.trackInventory : false,
         serialNumberTracking: form.serialNumberTracking,
         batchTracking: form.batchTracking,
@@ -677,7 +716,7 @@ export function AdminProductMasterClient({
                       </span>
                     </div>
                   </td>
-                  <td className="px-3 py-4">{formatCurrency(product.sellingPrice)}</td>
+                  <td className="px-3 py-4">{formatCurrency(product.sellingPrice, stockSettings.priceDecimalPlaces)}</td>
                   <td className="px-3 py-4">
                     <span className={product.isActive ? "inline-flex rounded-full border border-emerald-500/30 bg-emerald-500/15 px-3 py-1 text-xs font-semibold text-emerald-300" : "inline-flex rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold text-white/65"}>
                       {product.isActive ? "Active" : "Inactive"}
@@ -896,8 +935,8 @@ export function AdminProductMasterClient({
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
-                <div><label className="label-rk">Unit Cost (RM)</label><input type="number" min="0" step="0.01" className="input-rk" value={form.unitCost} onChange={(e) => setForm((prev) => ({ ...prev, unitCost: e.target.value }))} /></div>
-                <div><label className="label-rk">Selling Price (RM)</label><input type="number" min="0" step="0.01" className="input-rk" value={form.sellingPrice} onChange={(e) => setForm((prev) => ({ ...prev, sellingPrice: e.target.value }))} /></div>
+                <div><label className="label-rk">Unit Cost (RM)</label><input type="number" min="0" step={getNumberInputStep(stockSettings.unitCostDecimalPlaces)} className="input-rk" value={form.unitCost} onChange={(e) => setForm((prev) => ({ ...prev, unitCost: e.target.value }))} onBlur={(e) => setForm((prev) => ({ ...prev, unitCost: normalizeMoneyInput(e.target.value, stockSettings.unitCostDecimalPlaces) }))} /></div>
+                <div><label className="label-rk">Selling Price (RM)</label><input type="number" min="0" step={getNumberInputStep(stockSettings.priceDecimalPlaces)} className="input-rk" value={form.sellingPrice} onChange={(e) => setForm((prev) => ({ ...prev, sellingPrice: e.target.value }))} onBlur={(e) => setForm((prev) => ({ ...prev, sellingPrice: normalizeMoneyInput(e.target.value, stockSettings.priceDecimalPlaces) }))} /></div>
               </div>
 
               <div className="grid gap-3 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-white/75 md:grid-cols-5">

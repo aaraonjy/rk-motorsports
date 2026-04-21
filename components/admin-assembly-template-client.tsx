@@ -1,6 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  DEFAULT_STOCK_NUMBER_FORMAT_CONFIG,
+  formatNumberByDecimalPlaces,
+  getNumberInputStep,
+  normalizeInputByDecimalPlaces,
+  normalizeStockNumberFormatConfig,
+} from "@/lib/stock-format";
 
 type ProductSummary = {
   id: string;
@@ -49,6 +56,17 @@ type Props = {
   initialProducts: TemplateProductRecord[];
 };
 
+type StockSettingsConfig = {
+  qtyDecimalPlaces: 0 | 2 | 3;
+  unitCostDecimalPlaces: 2 | 3;
+  priceDecimalPlaces: 2 | 3;
+};
+
+type StockSettingsResponse = {
+  ok: boolean;
+  config?: Partial<StockSettingsConfig>;
+};
+
 type EditableProduct = {
   id?: string;
   lineNo: number;
@@ -84,10 +102,8 @@ function emptyProduct(lineNo: number): EditableProduct {
   };
 }
 
-function normalizeQty(value: string) {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed) || parsed <= 0) return "1";
-  return parsed.toFixed(4).replace(/\.0+$/, "").replace(/(\.\d*?)0+$/, "$1");
+function normalizeQty(value: string, decimalPlaces: number) {
+  return normalizeInputByDecimalPlaces(value, decimalPlaces, 1);
 }
 
 function getUomOptions(component: ComponentOption | null | undefined) {
@@ -230,7 +246,7 @@ export function AdminAssemblyTemplateClient({
           id: line.id,
           lineNo: index + 1,
           componentProductId: line.componentProductId,
-          qty: String(line.qty),
+          qty: formatNumberByDecimalPlaces(line.qty, stockSettings.qtyDecimalPlaces),
           uom: line.uom,
           isRequired: line.isRequired,
           allowOverride: line.allowOverride,
@@ -238,6 +254,11 @@ export function AdminAssemblyTemplateClient({
         }))
       : [emptyProduct(1)]
   );
+  const [stockSettings, setStockSettings] = useState<StockSettingsConfig>({
+    qtyDecimalPlaces: DEFAULT_STOCK_NUMBER_FORMAT_CONFIG.qtyDecimalPlaces,
+    unitCostDecimalPlaces: DEFAULT_STOCK_NUMBER_FORMAT_CONFIG.unitCostDecimalPlaces,
+    priceDecimalPlaces: DEFAULT_STOCK_NUMBER_FORMAT_CONFIG.priceDecimalPlaces,
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [submitSuccess, setSubmitSuccess] = useState("");
@@ -246,6 +267,22 @@ export function AdminAssemblyTemplateClient({
     if (!submitSuccess) return;
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [submitSuccess]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadStockSettings() {
+      try {
+        const response = await fetch("/api/admin/settings/stock", { cache: "no-store" });
+        const data = (await response.json()) as StockSettingsResponse;
+        if (!response.ok || !data.ok || cancelled) return;
+        setStockSettings(normalizeStockNumberFormatConfig(data.config));
+      } catch {}
+    }
+    void loadStockSettings();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const optionMap = useMemo(() => new Map(componentOptions.map((item) => [item.id, item])), [componentOptions]);
   const componentProductOptions = useMemo<ComponentSearchableOption[]>(
@@ -284,7 +321,7 @@ export function AdminAssemblyTemplateClient({
           id: line.id,
           lineNo: index + 1,
           componentProductId: line.componentProductId,
-          qty: Number(normalizeQty(line.qty)),
+          qty: Number(normalizeQty(line.qty, stockSettings.qtyDecimalPlaces)),
           uom: line.uom.trim().toUpperCase(),
           isRequired: line.isRequired,
           allowOverride: line.allowOverride,
@@ -443,10 +480,11 @@ export function AdminAssemblyTemplateClient({
                     <input
                       type="number"
                       min="0.0001"
-                      step="0.0001"
+                      step={getNumberInputStep(stockSettings.qtyDecimalPlaces)}
                       className="input-rk"
                       value={line.qty}
                       onChange={(e) => updateProduct(line.lineNo, (current) => ({ ...current, qty: e.target.value }))}
+                        onBlur={(e) => updateProduct(line.lineNo, (current) => ({ ...current, qty: normalizeQty(e.target.value, stockSettings.qtyDecimalPlaces) }))}
                     />
                   </div>
                   <div>

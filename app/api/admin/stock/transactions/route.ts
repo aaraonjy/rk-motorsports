@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { Prisma, StockAdjustmentDirection, StockTransactionType } from "@prisma/client";
+import { StockAdjustmentDirection, StockTransactionType } from "@prisma/client";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { createAuditLogFromRequest } from "@/lib/audit";
@@ -8,6 +8,8 @@ import {
   acquireAdvisoryLock,
   assertPositiveQty,
   buildLedgerValues,
+  createStoredMoneyDecimal,
+  createStoredQtyDecimal,
   buildTransactionNumberLockKey,
   generateStockTransactionNumber,
   getStockBalance,
@@ -15,6 +17,12 @@ import {
   isOutboundTransaction,
   normalizeStockDate,
 } from "@/lib/stock";
+import {
+  normalizeStockNumberFormatConfig,
+  parseNonNegativeNumberWithDecimalPlaces,
+  roundToDecimalPlaces,
+  STOCK_STORAGE_DECIMAL_PLACES,
+} from "@/lib/stock-format";
 
 type StockLinePayload = {
   inventoryProductId?: string;
@@ -41,14 +49,6 @@ function normalizeType(value: unknown) {
 function normalizeAdjustmentDirection(value: unknown) {
   if (value === "IN" || value === "OUT") return value as StockAdjustmentDirection;
   return null;
-}
-
-function normalizeNonNegativeNumber(value: unknown, label = "Value") {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed) || parsed < 0) {
-    throw new Error(`${label} must be 0 or greater.`);
-  }
-  return Math.round((parsed + Number.EPSILON) * 100) / 100;
 }
 
 function normalizeSerialNumbers(value: unknown) {
@@ -84,11 +84,11 @@ function resolveConversionRate(product: any, uomCode: string) {
   if (!Number.isFinite(rate) || rate <= 0) {
     throw new Error(`Selected UOM ${uomCode} has invalid conversion rate.`);
   }
-  return Math.round((rate + Number.EPSILON) * 10000) / 10000;
+  return roundToDecimalPlaces(rate, STOCK_STORAGE_DECIMAL_PLACES.conversionRate);
 }
 
 function convertQtyToBase(qty: number, rate: number) {
-  return Math.round((qty * rate + Number.EPSILON) * 100) / 100;
+  return roundToDecimalPlaces(qty * rate, STOCK_STORAGE_DECIMAL_PLACES.qty);
 }
 
 
@@ -182,6 +182,7 @@ export async function POST(req: Request) {
     }
 
     const config = await db.stockConfiguration.findUnique({ where: { id: "default" } });
+    const formatConfig = normalizeStockNumberFormatConfig(config);
     if (!config?.stockModuleEnabled) {
       return NextResponse.json({ ok: false, error: "Stock module is disabled." }, { status: 400 });
     }
@@ -214,11 +215,11 @@ export async function POST(req: Request) {
         throw new Error("Selected stock item is invalid, inactive, or not tracked by inventory.");
       }
 
-      const inputQty = assertPositiveQty(line.qty);
+      const inputQty = assertPositiveQty(line.qty, "Quantity", formatConfig.qtyDecimalPlaces);
       const uomCode = normalizeUomCode((line as any).uomCode) || product.baseUom;
       const conversionRate = resolveConversionRate(product, uomCode);
       const qty = convertQtyToBase(inputQty, conversionRate);
-      const unitCost = line.unitCost == null ? null : normalizeNonNegativeNumber(line.unitCost, "Unit cost");
+      const unitCost = line.unitCost == null ? null : parseNonNegativeNumberWithDecimalPlaces(line.unitCost, formatConfig.unitCostDecimalPlaces, "Unit cost");
       const batchNo = typeof line.batchNo === "string" ? line.batchNo.trim().toUpperCase() || null : null;
       const expiryDate = typeof line.expiryDate === "string" && line.expiryDate.trim() ? new Date(line.expiryDate) : null;
       const serialNos = normalizeSerialNumbers(line.serialNos);
@@ -254,7 +255,7 @@ export async function POST(req: Request) {
         if (serialNos.length === 0) {
           throw new Error(`Serial No is required for serial-tracked product.`);
         }
-        if (Math.round((inputQty + Number.EPSILON) * 100) / 100 !== serialNos.length) {
+        if (inputQty !== serialNos.length) {
           throw new Error("Serial-tracked lines require quantity to match the number of serial numbers.");
         }
       }
@@ -350,8 +351,8 @@ export async function POST(req: Request) {
           lines: {
             create: normalizedLines.map((line) => ({
               inventoryProductId: line.inventoryProductId,
-              qty: new Prisma.Decimal(line.qty.toFixed(2)),
-              unitCost: line.unitCost == null ? null : new Prisma.Decimal(line.unitCost.toFixed(2)),
+              qty: createStoredQtyDecimal(line.qty),
+              unitCost: line.unitCost == null ? null : createStoredMoneyDecimal(line.unitCost),
               batchNo: line.batchNo,
               expiryDate: line.expiryDate,
               remarks: line.remarks,
@@ -402,7 +403,7 @@ export async function POST(req: Request) {
           batchKeyMap.set(`${line.inventoryProductId}__${line.batchNo}`, batch.id);
         }
 
-        const qty = new Prisma.Decimal(Number(line.qty).toFixed(2));
+        const qty = createStoredQtyDecimal(line.qty);
         const direction =
           transactionType === "ST"
             ? null

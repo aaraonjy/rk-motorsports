@@ -1,6 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  DEFAULT_STOCK_NUMBER_FORMAT_CONFIG,
+  formatNumberByDecimalPlaces,
+  normalizeStockNumberFormatConfig,
+} from "@/lib/stock-format";
 
 type ProductOption = {
   id: string;
@@ -57,8 +62,8 @@ type Props = {
   locations: LocationOption[];
 };
 
-function formatNumber(value: number) {
-  return Number.isFinite(value) ? value.toFixed(2) : "0.00";
+function formatNumber(value: number, decimalPlaces: number) {
+  return formatNumberByDecimalPlaces(value, decimalPlaces);
 }
 
 function formatDate(value: string | null) {
@@ -81,6 +86,7 @@ function statusBadge(status: BatchRow["status"]) {
 
 export function AdminBatchNoClient({ initialRows, products, locations }: Props) {
   const [rows, setRows] = useState(initialRows);
+  const [qtyDecimalPlaces, setQtyDecimalPlaces] = useState(DEFAULT_STOCK_NUMBER_FORMAT_CONFIG.qtyDecimalPlaces);
   const [productFilter, setProductFilter] = useState("ALL");
   const [batchKeyword, setBatchKeyword] = useState("");
   const [locationFilter, setLocationFilter] = useState("ALL");
@@ -91,6 +97,22 @@ export function AdminBatchNoClient({ initialRows, products, locations }: Props) 
   const [selectedDetail, setSelectedDetail] = useState<BatchDetail | null>(null);
   const [loadingDetailId, setLoadingDetailId] = useState<string | null>(null);
   const [actioningId, setActioningId] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadStockSettings() {
+      try {
+        const response = await fetch("/api/admin/settings/stock", { cache: "no-store" });
+        const data = await response.json();
+        if (!response.ok || !data.ok || cancelled) return;
+        setQtyDecimalPlaces(normalizeStockNumberFormatConfig(data.config).qtyDecimalPlaces);
+      } catch {}
+    }
+    void loadStockSettings();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const filteredRows = useMemo(() => {
     const keyword = batchKeyword.trim().toLowerCase();
@@ -222,7 +244,7 @@ export function AdminBatchNoClient({ initialRows, products, locations }: Props) 
                   <td className="px-3 py-4">{item.productDescription}</td>
                   <td className="px-3 py-4 font-medium text-white">{item.batchNo}</td>
                   <td className="px-3 py-4">{formatDate(item.expiryDate)}</td>
-                  <td className="px-3 py-4 text-right font-medium text-white">{formatNumber(item.balance)}</td>
+                  <td className="px-3 py-4 text-right font-medium text-white">{formatNumber(item.balance, qtyDecimalPlaces)}</td>
                   <td className="px-3 py-4 text-white/70">{item.locationSummary || "—"}</td>
                   <td className="px-3 py-4 text-right">{item.linkedSerialCount}</td>
                   <td className="px-3 py-4 text-right">{item.usageCount}</td>
@@ -259,7 +281,7 @@ export function AdminBatchNoClient({ initialRows, products, locations }: Props) 
             </div>
 
             <div className="mt-6 grid gap-4 md:grid-cols-4">
-              <div className="rounded-2xl border border-white/10 bg-black/20 p-4"><p className="text-xs uppercase tracking-[0.24em] text-white/40">Balance</p><p className="mt-3 text-2xl font-bold text-white">{formatNumber(selectedDetail.batch.balance)}</p></div>
+              <div className="rounded-2xl border border-white/10 bg-black/20 p-4"><p className="text-xs uppercase tracking-[0.24em] text-white/40">Balance</p><p className="mt-3 text-2xl font-bold text-white">{formatNumber(selectedDetail.batch.balance, qtyDecimalPlaces)}</p></div>
               <div className="rounded-2xl border border-white/10 bg-black/20 p-4"><p className="text-xs uppercase tracking-[0.24em] text-white/40">Linked Serial</p><p className="mt-3 text-2xl font-bold text-white">{selectedDetail.batch.linkedSerialCount}</p></div>
               <div className="rounded-2xl border border-white/10 bg-black/20 p-4"><p className="text-xs uppercase tracking-[0.24em] text-white/40">Usage Count</p><p className="mt-3 text-2xl font-bold text-white">{selectedDetail.batch.usageCount}</p></div>
               <div className="rounded-2xl border border-white/10 bg-black/20 p-4"><p className="text-xs uppercase tracking-[0.24em] text-white/40">Status</p><p className="mt-3"><span className={statusBadge(selectedDetail.batch.status)}>{selectedDetail.batch.status === "ZERO_BALANCE" ? "Zero Balance" : selectedDetail.batch.status === "ARCHIVED" ? "Archived" : "Active"}</span></p></div>

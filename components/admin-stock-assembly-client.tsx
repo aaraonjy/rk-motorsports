@@ -2,6 +2,13 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  DEFAULT_STOCK_NUMBER_FORMAT_CONFIG,
+  formatNumberByDecimalPlaces,
+  getNumberInputStep,
+  normalizeInputByDecimalPlaces,
+  normalizeStockNumberFormatConfig,
+} from "@/lib/stock-format";
 
 type InventoryProductUomOption = {
   id?: string;
@@ -120,6 +127,9 @@ type StockSettingsConfig = {
   allowNegativeStock: boolean;
   costingMethod: "AVERAGE";
   defaultLocationId: string;
+  qtyDecimalPlaces: 0 | 2 | 3;
+  unitCostDecimalPlaces: 2 | 3;
+  priceDecimalPlaces: 2 | 3;
 };
 
 type StockSettingsResponse = {
@@ -134,15 +144,12 @@ function formatDateInput(value?: string | null) {
   return date.toISOString().slice(0, 10);
 }
 
-function formatQty(value: number | string | null | undefined) {
-  const num = Number(value ?? 0);
-  return Number.isFinite(num) ? num.toFixed(2) : "0.00";
+function formatQty(value: number | string | null | undefined, decimalPlaces: number) {
+  return formatNumberByDecimalPlaces(value, decimalPlaces);
 }
 
-function normalizeQtyInput(value: string) {
-  const parsed = Math.floor(Number(value));
-  if (!Number.isFinite(parsed) || parsed <= 0) return "1";
-  return String(parsed);
+function normalizeQtyInput(value: string, decimalPlaces: number) {
+  return normalizeInputByDecimalPlaces(value, decimalPlaces, 1);
 }
 
 function normalizeBatchNo(value: string) {
@@ -179,19 +186,19 @@ function clampSerialNosToQty(values: string[], qty: string | number | null | und
   return unique.slice(0, parsedQty);
 }
 
-function formatCurrency(value: number) {
+function formatCurrency(value: number, decimalPlaces: number) {
   return new Intl.NumberFormat("en-MY", {
     style: "currency",
     currency: "MYR",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    minimumFractionDigits: decimalPlaces,
+    maximumFractionDigits: decimalPlaces,
   }).format(value);
 }
 
-function formatBatchLabel(batch: AvailableBatch) {
+function formatBatchLabel(batch: AvailableBatch, decimalPlaces = DEFAULT_STOCK_NUMBER_FORMAT_CONFIG.qtyDecimalPlaces) {
   const parts = [batch.batchNo];
   if (batch.expiryDate) parts.push(`Exp ${formatDateInput(batch.expiryDate)}`);
-  if (typeof batch.balance === "number") parts.push(`Bal ${formatQty(batch.balance)}`);
+  if (typeof batch.balance === "number") parts.push(`Bal ${formatQty(batch.balance, decimalPlaces)}`);
   return parts.join(" • ");
 }
 
@@ -407,7 +414,7 @@ function BatchPicker({
                       : "text-white/85 hover:bg-white/10 hover:text-white"
                   }`}
                 >
-                  {formatBatchLabel(batch)}
+                  {formatBatchLabel(batch, stockSettings.qtyDecimalPlaces)}
                 </button>
               ))
             )}
@@ -599,7 +606,7 @@ export function AdminStockAssemblyClient({
 }) {
   const [finishedGoodId, setFinishedGoodId] = useState("");
   const [locationId, setLocationId] = useState("");
-  const [assemblyQty, setAssemblyQty] = useState("1.00");
+  const [assemblyQty, setAssemblyQty] = useState(formatNumberByDecimalPlaces(1, DEFAULT_STOCK_NUMBER_FORMAT_CONFIG.qtyDecimalPlaces));
   const [transactionDate, setTransactionDate] = useState(formatDateInput());
   const [reference, setReference] = useState("");
   const [remarks, setRemarks] = useState("");
@@ -632,6 +639,9 @@ export function AdminStockAssemblyClient({
     allowNegativeStock: false,
     costingMethod: "AVERAGE",
     defaultLocationId: "",
+    qtyDecimalPlaces: DEFAULT_STOCK_NUMBER_FORMAT_CONFIG.qtyDecimalPlaces,
+    unitCostDecimalPlaces: DEFAULT_STOCK_NUMBER_FORMAT_CONFIG.unitCostDecimalPlaces,
+    priceDecimalPlaces: DEFAULT_STOCK_NUMBER_FORMAT_CONFIG.priceDecimalPlaces,
   });
 
   const activeLocations = useMemo(() => locations.filter((item) => item.isActive), [locations]);
@@ -659,7 +669,7 @@ export function AdminStockAssemblyClient({
   );
 
   const selectedFinishedGood = finishedGoodId ? finishedGoodMap.get(finishedGoodId) || null : null;
-  const parsedAssemblyQty = Math.max(0, Math.floor(Number(assemblyQty || "0")));
+  const parsedAssemblyQty = Math.max(0, Number(assemblyQty || "0"));
 
   const visibleTransactions = useMemo(
     () => transactions.filter((item) => !(Array.isArray(item.revisions) && item.revisions.length > 0)),
@@ -786,7 +796,7 @@ export function AdminStockAssemblyClient({
             templateLineId: line.id,
             lineNo: line.lineNo,
             componentProductId: line.componentProductId,
-            qty: formatQty(line.qty * parsedAssemblyQty),
+            qty: formatQty(line.qty * parsedAssemblyQty, stockSettings.qtyDecimalPlaces),
             uom: line.uom,
             isRequired: line.isRequired,
             allowOverride: line.allowOverride,
@@ -992,7 +1002,7 @@ export function AdminStockAssemblyClient({
         setSubmitError("Please select serial no for the finished good.");
         return;
       }
-      if (fgSerialValues.length !== Number(normalizeQtyInput(assemblyQty))) {
+      if (fgSerialValues.length !== Number(normalizeQtyInput(assemblyQty, 0))) {
         setSubmitError("Finished good serial quantity must match the assembly qty.");
         return;
       }
@@ -1017,7 +1027,7 @@ export function AdminStockAssemblyClient({
         if (serialValues.length === 0) {
           validatedLines[index].serialError = "Please select serial no.";
           hasLineError = true;
-        } else if (serialValues.length !== Number(normalizeQtyInput(line.qty))) {
+        } else if (serialValues.length !== Number(normalizeQtyInput(line.qty, 0))) {
           validatedLines[index].serialError = "Serial quantity must match Qty Out.";
           hasLineError = true;
         }
@@ -1035,8 +1045,8 @@ export function AdminStockAssemblyClient({
       const lines = [
         {
           inventoryProductId: selectedFinishedGood.id,
-          qty: Number(normalizeQtyInput(assemblyQty)),
-          unitCost: Number(fgUnitCost.toFixed(2)),
+          qty: Number(normalizeQtyInput(assemblyQty, stockSettings.qtyDecimalPlaces)),
+          unitCost: Number(formatNumberByDecimalPlaces(fgUnitCost, stockSettings.unitCostDecimalPlaces)),
           batchNo: selectedFinishedGood.batchTracking ? normalizeBatchNo(fgBatchNo) : null,
           expiryDate: selectedFinishedGood.batchTracking && fgBatchExpiryDate.trim() ? fgBatchExpiryDate : null,
           serialNos: selectedFinishedGood.serialNumberTracking ? uniqueSerialNos(parseSerialEntryText(fgSerialEntryText)) : [],
@@ -1048,8 +1058,8 @@ export function AdminStockAssemblyClient({
           const product = productMap.get(line.componentProductId);
           return {
             inventoryProductId: line.componentProductId,
-            qty: Number(normalizeQtyInput(line.qty)),
-            unitCost: Number((product?.unitCost || 0).toFixed(2)),
+            qty: Number(normalizeQtyInput(line.qty, stockSettings.qtyDecimalPlaces)),
+            unitCost: Number(formatNumberByDecimalPlaces(product?.unitCost || 0, stockSettings.unitCostDecimalPlaces)),
             batchNo: product?.batchTracking ? normalizeBatchNo(line.batchNo) : null,
             expiryDate: null,
             serialNos: product?.serialNumberTracking ? uniqueSerialNos(parseSerialEntryText(line.serialEntryText)) : [],
@@ -1291,7 +1301,7 @@ export function AdminStockAssemblyClient({
                   <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/80">
                     <div className="font-semibold text-white">{selectedFinishedGood.code}</div>
                     <div className="mt-1 text-white/60">{selectedFinishedGood.description}</div>
-                    <div className="mt-1 text-white/60">Qty In: {formatQty(assemblyQty)} {selectedFinishedGood.baseUom}</div>
+                    <div className="mt-1 text-white/60">Qty In: {formatQty(assemblyQty, stockSettings.qtyDecimalPlaces)} {selectedFinishedGood.baseUom}</div>
                     <div className="mt-1 text-white/60">Estimated Unit Cost: {formatCurrency(fgUnitCost)}</div>
                   </div>
                   <div className="grid gap-4">
@@ -1389,7 +1399,7 @@ export function AdminStockAssemblyClient({
                             </div>
                             {!product?.batchTracking ? (
                               <div className="mt-2 text-xs text-white/45">
-                                Current Balance: {formatQty(lineBalances[index] ?? 0)}
+                                Current Balance: {formatQty(lineBalances[index] ?? 0, stockSettings.qtyDecimalPlaces)}
                               </div>
                             ) : null}
                             {product?.serialNumberTracking ? (
@@ -1406,7 +1416,7 @@ export function AdminStockAssemblyClient({
                             <input
                               type="number"
                               min="0.01"
-                              step="0.01"
+                              step={getNumberInputStep(stockSettings.qtyDecimalPlaces)}
                               className="input-rk"
                               value={line.qty}
                               disabled={!line.allowOverride}
