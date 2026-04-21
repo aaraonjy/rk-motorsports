@@ -1282,8 +1282,8 @@ export function AdminStockAssemblyClient({
                 <label className="label-rk">Assembly Qty</label>
                 <input
                   type="number"
-                  min="1"
-                  step="1"
+                  min={stockSettings.qtyDecimalPlaces === 0 ? "1" : getNumberInputStep(stockSettings.qtyDecimalPlaces)}
+                  step={getNumberInputStep(stockSettings.qtyDecimalPlaces)}
                   className="input-rk"
                   value={assemblyQty}
                   onChange={(e) => {
@@ -1294,10 +1294,15 @@ export function AdminStockAssemblyClient({
                       setFgSerialEntryText("");
                       return;
                     }
-                    const next = Math.floor(Number(raw));
-                    const normalizedQty = Number.isFinite(next) && next > 0 ? String(next) : "1";
-                    const clampedSerials = clampSerialNosToQty(fgSerialNos, normalizedQty);
+                    const clampedSerials = clampSerialNosToQty(fgSerialNos, raw);
+                    setAssemblyQty(raw);
+                    setFgSerialNos(clampedSerials);
+                    setFgSerialEntryText(clampedSerials.join("\n"));
+                  }}
+                  onBlur={(e) => {
+                    const normalizedQty = normalizeQtyInput(e.target.value, stockSettings.qtyDecimalPlaces);
                     setAssemblyQty(normalizedQty);
+                    const clampedSerials = clampSerialNosToQty(fgSerialNos, normalizedQty);
                     setFgSerialNos(clampedSerials);
                     setFgSerialEntryText(clampedSerials.join("\n"));
                   }}

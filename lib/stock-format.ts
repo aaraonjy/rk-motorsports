@@ -60,11 +60,16 @@ export function formatNumberByDecimalPlaces(value: string | number | null | unde
 }
 
 export function normalizeInputByDecimalPlaces(value: string | number | null | undefined, decimalPlaces: number, fallback = 0): string {
-  const parsed = Number(value ?? fallback);
+  const raw = String(value ?? "").trim();
+  if (raw === "") return "";
+
+  const parsed = Number(raw);
   if (!Number.isFinite(parsed)) {
-    return formatNumberByDecimalPlaces(fallback, decimalPlaces);
+    const fallbackParsed = Number(fallback);
+    return Number.isFinite(fallbackParsed) ? String(fallbackParsed) : "";
   }
-  return formatNumberByDecimalPlaces(parsed, decimalPlaces);
+
+  return raw;
 }
 
 export function countDecimalPlaces(value: unknown): number {
