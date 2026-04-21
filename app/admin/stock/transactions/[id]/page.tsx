@@ -71,7 +71,7 @@ export default async function AdminStockTransactionDetailPage({ params }: Params
             <h1 className="mt-3 text-4xl font-bold">{transaction.transactionNo}</h1>
             <p className="mt-4 text-white/70">View stock transaction detail, line items, serials, and ledger impact.</p>
             {transaction.revisedFrom ? (
-              <p className="mt-3 text-sm text-white/50">↳ Revision of {transaction.revisedFrom.transactionNo}</p>
+              <Link href={`/admin/stock/transactions/${transaction.revisedFrom.id}`} className="mt-3 inline-flex text-sm text-white/50 transition hover:text-white/80">↳ Revision of {transaction.revisedFrom.transactionNo}</Link>
             ) : null}
           </div>
           <div className="flex flex-wrap gap-3">
@@ -97,7 +97,7 @@ export default async function AdminStockTransactionDetailPage({ params }: Params
         ) : null}
 
         <div className="rounded-[2rem] border border-white/10 bg-black/45 backdrop-blur-md p-5">
-          <h2 className="text-xl font-semibold text-white">Lines</h2>
+          <h2 className="text-xl font-semibold text-white">Products</h2>
           <div className="mt-4 overflow-x-auto">
             <table className="min-w-full divide-y divide-white/10 text-sm">
               <thead><tr className="text-left text-white/45"><th className="px-3 py-3 font-medium">Product</th><th className="px-3 py-3 font-medium text-right">Qty</th><th className="px-3 py-3 font-medium">Batch</th><th className="px-3 py-3 font-medium">Location</th><th className="px-3 py-3 font-medium">Serial No</th></tr></thead>
