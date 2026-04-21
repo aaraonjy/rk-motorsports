@@ -46,7 +46,7 @@ export function assertPositiveQty(
   const raw = String(value ?? "").trim();
   const actualPlaces = raw.includes(".") ? raw.split(".")[1].length : 0;
   if (actualPlaces > allowedPlaces) {
-    throw new Error(`${label} allows maximum ${allowedPlaces} decimal place${allowedPlaces === 1 ? "" : "s"}.`);
+    throw new Error(`${label} allows maximum ${allowedPlaces} decimal places.`);
   }
 
   return roundToDecimalPlaces(parsed, allowedPlaces);
