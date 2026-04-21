@@ -317,6 +317,7 @@ function BatchPicker({
   onChange,
   allowCreate = false,
   disabled = false,
+  decimalPlaces = DEFAULT_STOCK_NUMBER_FORMAT_CONFIG.qtyDecimalPlaces,
 }: {
   label: string;
   batches: AvailableBatch[];
@@ -324,6 +325,7 @@ function BatchPicker({
   onChange: (payload: { mode: "existing" | "new"; batchNo: string }) => void;
   allowCreate?: boolean;
   disabled?: boolean;
+  decimalPlaces?: number;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -335,7 +337,7 @@ function BatchPicker({
   );
 
   useEffect(() => {
-    setSearch(selectedBatch ? formatBatchLabel(selectedBatch) : value);
+    setSearch(selectedBatch ? formatBatchLabel(selectedBatch, decimalPlaces) : value);
   }, [selectedBatch, value]);
 
   useEffect(() => {
@@ -351,7 +353,7 @@ function BatchPicker({
   const filtered = useMemo(() => {
     const keyword = search.trim().toLowerCase();
     if (!keyword) return batches;
-    return batches.filter((item) => formatBatchLabel(item).toLowerCase().includes(keyword));
+    return batches.filter((item) => formatBatchLabel(item, decimalPlaces).toLowerCase().includes(keyword));
   }, [batches, search]);
 
   return (
@@ -368,7 +370,7 @@ function BatchPicker({
         className={`input-rk flex items-center justify-between gap-3 text-left ${disabled ? "cursor-not-allowed opacity-60" : ""}`}
       >
         <span className={value ? "truncate text-white" : "truncate text-white/45"}>
-          {value ? (selectedBatch ? formatBatchLabel(selectedBatch) : value) : "Select existing batch or create new"}
+          {value ? (selectedBatch ? formatBatchLabel(selectedBatch, decimalPlaces) : value) : "Select existing batch or create new"}
         </span>
         <span className="shrink-0 text-white/60">▾</span>
       </button>
@@ -414,7 +416,7 @@ function BatchPicker({
                       : "text-white/85 hover:bg-white/10 hover:text-white"
                   }`}
                 >
-                  {formatBatchLabel(batch, stockSettings.qtyDecimalPlaces)}
+                  {formatBatchLabel(batch, decimalPlaces)}
                 </button>
               ))
             )}
@@ -706,13 +708,27 @@ export function AdminStockAssemblyClient({
         const data = (await response.json()) as StockSettingsResponse;
         if (!response.ok || !data.ok || cancelled) return;
         setStockSettings(
-          data.config || {
-            stockModuleEnabled: false,
-            multiLocationEnabled: true,
-            allowNegativeStock: false,
-            costingMethod: "AVERAGE",
-            defaultLocationId: "",
-          }
+          normalizeStockNumberFormatConfig(data.config)
+            ? {
+                stockModuleEnabled: data.config?.stockModuleEnabled ?? false,
+                multiLocationEnabled: data.config?.multiLocationEnabled ?? true,
+                allowNegativeStock: data.config?.allowNegativeStock ?? false,
+                costingMethod: data.config?.costingMethod ?? "AVERAGE",
+                defaultLocationId: data.config?.defaultLocationId ?? "",
+                qtyDecimalPlaces: normalizeStockNumberFormatConfig(data.config).qtyDecimalPlaces,
+                unitCostDecimalPlaces: normalizeStockNumberFormatConfig(data.config).unitCostDecimalPlaces,
+                priceDecimalPlaces: normalizeStockNumberFormatConfig(data.config).priceDecimalPlaces,
+              }
+            : {
+                stockModuleEnabled: false,
+                multiLocationEnabled: true,
+                allowNegativeStock: false,
+                costingMethod: "AVERAGE",
+                defaultLocationId: "",
+                qtyDecimalPlaces: DEFAULT_STOCK_NUMBER_FORMAT_CONFIG.qtyDecimalPlaces,
+                unitCostDecimalPlaces: DEFAULT_STOCK_NUMBER_FORMAT_CONFIG.unitCostDecimalPlaces,
+                priceDecimalPlaces: DEFAULT_STOCK_NUMBER_FORMAT_CONFIG.priceDecimalPlaces,
+              }
         );
       } catch {
         if (!cancelled) {
@@ -722,6 +738,9 @@ export function AdminStockAssemblyClient({
             allowNegativeStock: false,
             costingMethod: "AVERAGE",
             defaultLocationId: "",
+            qtyDecimalPlaces: DEFAULT_STOCK_NUMBER_FORMAT_CONFIG.qtyDecimalPlaces,
+            unitCostDecimalPlaces: DEFAULT_STOCK_NUMBER_FORMAT_CONFIG.unitCostDecimalPlaces,
+            priceDecimalPlaces: DEFAULT_STOCK_NUMBER_FORMAT_CONFIG.priceDecimalPlaces,
           });
         }
       }
@@ -736,7 +755,7 @@ export function AdminStockAssemblyClient({
   function resetCreateForm() {
     setFinishedGoodId("");
     setLocationId(stockSettings.defaultLocationId || "");
-    setAssemblyQty("1");
+    setAssemblyQty(formatNumberByDecimalPlaces(1, stockSettings.qtyDecimalPlaces));
     setTransactionDate(formatDateInput());
     setReference("");
     setRemarks("");
@@ -1302,7 +1321,7 @@ export function AdminStockAssemblyClient({
                     <div className="font-semibold text-white">{selectedFinishedGood.code}</div>
                     <div className="mt-1 text-white/60">{selectedFinishedGood.description}</div>
                     <div className="mt-1 text-white/60">Qty In: {formatQty(assemblyQty, stockSettings.qtyDecimalPlaces)} {selectedFinishedGood.baseUom}</div>
-                    <div className="mt-1 text-white/60">Estimated Unit Cost: {formatCurrency(fgUnitCost)}</div>
+                    <div className="mt-1 text-white/60">Estimated Unit Cost: {formatCurrency(fgUnitCost, stockSettings.unitCostDecimalPlaces)}</div>
                   </div>
                   <div className="grid gap-4">
                     {selectedFinishedGood.batchTracking ? (
@@ -1312,6 +1331,7 @@ export function AdminStockAssemblyClient({
                           batches={fgAvailableBatches}
                           value={fgBatchNo}
                           allowCreate
+                          decimalPlaces={stockSettings.qtyDecimalPlaces}
                           onChange={({ mode, batchNo }) => {
                             setFgBatchMode(mode);
                             setFgBatchNo(batchNo);
@@ -1447,6 +1467,7 @@ export function AdminStockAssemblyClient({
                               batches={batches}
                               value={line.batchNo}
                               allowCreate={false}
+                              decimalPlaces={stockSettings.qtyDecimalPlaces}
                               onChange={({ mode, batchNo }) =>
                                 updateTemplateLine(index, (current) => ({ ...current, batchMode: mode, batchNo }))
                               }
