@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { createAuditLogFromRequest } from "@/lib/audit";
 import {
-  normalizeStockNumberFormatConfig,
+  normalizeMoneyDecimalPlaces,
   parseNonNegativeNumberWithDecimalPlaces,
   toStoredDecimalString,
   STOCK_STORAGE_DECIMAL_PLACES,
 } from "@/lib/stock-format";
-import { Prisma } from "@prisma/client";
 
 function normalizeCode(value: unknown) {
   return typeof value === "string" ? value.trim().toUpperCase() : "";
@@ -69,7 +69,10 @@ export async function POST(req: Request) {
     const admin = await requireAdmin();
     const body = await req.json().catch(() => ({}));
     const stockConfig = await db.stockConfiguration.findUnique({ where: { id: "default" } });
-    const formatConfig = normalizeStockNumberFormatConfig(stockConfig);
+    const formatConfig = {
+      unitCostDecimalPlaces: normalizeMoneyDecimalPlaces(stockConfig?.unitCostDecimalPlaces),
+      priceDecimalPlaces: normalizeMoneyDecimalPlaces(stockConfig?.priceDecimalPlaces),
+    };
 
     const code = normalizeCode(body.code);
     const description = typeof body.description === "string" ? body.description.trim() : "";
@@ -78,8 +81,16 @@ export async function POST(req: Request) {
     const brandId = typeof body.brandId === "string" && body.brandId.trim() ? body.brandId.trim() : null;
     const itemType = normalizeItemType(body.itemType);
     const baseUom = normalizeCode(body.baseUom);
-    const unitCost = parseNonNegativeNumberWithDecimalPlaces(body.unitCost, formatConfig.unitCostDecimalPlaces, "Unit cost");
-    const sellingPrice = parseNonNegativeNumberWithDecimalPlaces(body.sellingPrice, formatConfig.priceDecimalPlaces, "Selling price");
+    const unitCost = parseNonNegativeNumberWithDecimalPlaces(
+      body.unitCost,
+      formatConfig.unitCostDecimalPlaces,
+      "Unit cost"
+    );
+    const sellingPrice = parseNonNegativeNumberWithDecimalPlaces(
+      body.sellingPrice,
+      formatConfig.priceDecimalPlaces,
+      "Selling price"
+    );
     const trackInventory = itemType === "STOCK_ITEM" ? Boolean(body.trackInventory) : false;
     const serialNumberTracking = Boolean(body.serialNumberTracking);
     const batchTracking = Boolean(body.batchTracking);
@@ -175,12 +186,31 @@ export async function POST(req: Request) {
       entityId: created.id,
       entityCode: created.code,
       description: `${admin.name} created product ${created.code}.`,
-      newValues: { code: created.code, description: created.description, itemType: created.itemType, baseUom: created.baseUom, unitCost: Number(created.unitCost), sellingPrice: Number(created.sellingPrice), trackInventory: created.trackInventory, serialNumberTracking: created.serialNumberTracking, batchTracking: (created as any).batchTracking, isAssemblyItem: Boolean((created as any).isAssemblyItem), isActive: created.isActive, uomConversions: created.uomConversions.map((item: any) => ({ uomCode: item.uomCode, conversionRate: Number(item.conversionRate) })) },
+      newValues: {
+        code: created.code,
+        description: created.description,
+        itemType: created.itemType,
+        baseUom: created.baseUom,
+        unitCost: Number(created.unitCost),
+        sellingPrice: Number(created.sellingPrice),
+        trackInventory: created.trackInventory,
+        serialNumberTracking: created.serialNumberTracking,
+        batchTracking: (created as any).batchTracking,
+        isAssemblyItem: Boolean((created as any).isAssemblyItem),
+        isActive: created.isActive,
+        uomConversions: created.uomConversions.map((item: any) => ({
+          uomCode: item.uomCode,
+          conversionRate: Number(item.conversionRate),
+        })),
+      },
       status: "SUCCESS",
     });
 
     return NextResponse.json({ ok: true, product: mapProduct(created) });
   } catch (error) {
-    return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : "Unable to create product." }, { status: error instanceof Error && error.message === "FORBIDDEN" ? 403 : 500 });
+    return NextResponse.json(
+      { ok: false, error: error instanceof Error ? error.message : "Unable to create product." },
+      { status: error instanceof Error && error.message === "FORBIDDEN" ? 403 : 500 }
+    );
   }
 }
