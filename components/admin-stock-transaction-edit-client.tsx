@@ -700,7 +700,7 @@ export function AdminStockTransactionEditClient({
       const next = { ...line, ...patch };
       const product = initialProducts.find((item) => item.id === next.inventoryProductId);
       if (product?.serialNumberTracking) {
-        next.qty = (next.serialNos.length || 0).toFixed(2)
+        next.qty = formatQty(next.serialNos.length || 0);
         next.uomCode = product.baseUom;
       }
       return next;
@@ -720,12 +720,12 @@ export function AdminStockTransactionEditClient({
       serialEntryText: "",
       serialSearch: "",
       locationId: defaultCreateLocationId || lines[index]?.locationId || "",
-      qty: product?.serialNumberTracking ? "0" : "1",
+      qty: product?.serialNumberTracking ? "0.00" : "1.00",
     });
   }
 
   function addLine() {
-    setLines((prev) => [...prev, { inventoryProductId: "", qty: "1", uomCode: "", unitCost: "0.00", batchNo: "", batchMode: "existing", expiryDate: "", serialNos: [], serialEntryText: "", serialSearch: "", remarks: "", locationId: defaultCreateLocationId || "", fromLocationId: "", toLocationId: "", adjustmentDirection: "" }]);
+    setLines((prev) => [...prev, { inventoryProductId: "", qty: "1.00", uomCode: "", unitCost: "0.00", batchNo: "", batchMode: "existing", expiryDate: "", serialNos: [], serialEntryText: "", serialSearch: "", remarks: "", locationId: defaultCreateLocationId || "", fromLocationId: "", toLocationId: "", adjustmentDirection: "" }]);
   }
 
   function removeLine(index: number) {
@@ -745,12 +745,12 @@ export function AdminStockTransactionEditClient({
     const exists = line.serialNos.some((value) => value.toUpperCase() === serialNo.toUpperCase());
     const nextSerials = exists ? line.serialNos.filter((value) => value.toUpperCase() !== serialNo.toUpperCase()) : [...line.serialNos, serialNo];
     const uniqueNext = uniqueSerialNos(nextSerials);
-    updateLine(index, { serialNos: uniqueNext, qty: String(uniqueNext.length) });
+    updateLine(index, { serialNos: uniqueNext, qty: formatQty(uniqueNext.length) });
   }
 
   function removeInboundSerial(index: number, serialNo: string) {
     const nextSerials = lines[index].serialNos.filter((value) => value.toUpperCase() !== serialNo.toUpperCase());
-    updateLine(index, { serialNos: nextSerials, qty: String(nextSerials.length) });
+    updateLine(index, { serialNos: nextSerials, qty: formatQty(nextSerials.length) });
   }
 
   function setInboundBatch(index: number, value: string) {
@@ -787,7 +787,7 @@ export function AdminStockTransactionEditClient({
     const normalized = serialNo.trim().toUpperCase();
     if (!normalized) return;
     const nextSerials = uniqueSerialNos([...(lines[index]?.serialNos || []), normalized]);
-    updateLine(index, { serialNos: nextSerials, serialEntryText: "", qty: String(nextSerials.length) });
+    updateLine(index, { serialNos: nextSerials, serialEntryText: "", qty: formatQty(nextSerials.length) });
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
