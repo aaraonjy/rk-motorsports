@@ -294,7 +294,7 @@ export function AdminBatchNoClient({ initialRows, products, locations }: Props) 
                   <table className="min-w-full divide-y divide-white/10 text-sm">
                     <thead><tr className="text-left text-white/45"><th className="px-3 py-3 font-medium">Location</th><th className="px-3 py-3 font-medium text-right">Balance</th></tr></thead>
                     <tbody className="divide-y divide-white/10">
-                      {selectedDetail.locations.length === 0 ? <tr><td colSpan={2} className="px-3 py-6 text-center text-white/50">No active location balance.</td></tr> : selectedDetail.locations.map((row) => <tr key={row.locationId}><td className="px-3 py-3 text-white/80">{row.locationLabel}</td><td className="px-3 py-3 text-right text-white">{formatNumber(row.balance)}</td></tr>)}
+                      {selectedDetail.locations.length === 0 ? <tr><td colSpan={2} className="px-3 py-6 text-center text-white/50">No active location balance.</td></tr> : selectedDetail.locations.map((row) => <tr key={row.locationId}><td className="px-3 py-3 text-white/80">{row.locationLabel}</td><td className="px-3 py-3 text-right text-white">{formatNumber(row.balance, qtyDecimalPlaces)}</td></tr>)}
                     </tbody>
                   </table>
                 </div>
@@ -319,7 +319,7 @@ export function AdminBatchNoClient({ initialRows, products, locations }: Props) 
                 <table className="min-w-full divide-y divide-white/10 text-sm">
                   <thead><tr className="text-left text-white/45"><th className="px-3 py-3 font-medium">Date</th><th className="px-3 py-3 font-medium">Type</th><th className="px-3 py-3 font-medium">Direction</th><th className="px-3 py-3 font-medium text-right">Qty</th><th className="px-3 py-3 font-medium">Location</th><th className="px-3 py-3 font-medium">Reference</th><th className="px-3 py-3 font-medium">Remarks</th></tr></thead>
                   <tbody className="divide-y divide-white/10">
-                    {selectedDetail.history.length === 0 ? <tr><td colSpan={7} className="px-3 py-6 text-center text-white/50">No transaction history found.</td></tr> : selectedDetail.history.map((row) => <tr key={row.id}><td className="px-3 py-3 text-white/75">{formatDate(row.movementDate)}</td><td className="px-3 py-3 text-white">{row.movementType}</td><td className="px-3 py-3 text-white/75">{row.movementDirection}</td><td className="px-3 py-3 text-right text-white">{formatNumber(row.qty)}</td><td className="px-3 py-3 text-white/75">{row.locationLabel}</td><td className="px-3 py-3 text-white/75">{row.referenceNo || "—"}</td><td className="px-3 py-3 text-white/60">{row.remarks || "—"}</td></tr>)}
+                    {selectedDetail.history.length === 0 ? <tr><td colSpan={7} className="px-3 py-6 text-center text-white/50">No transaction history found.</td></tr> : selectedDetail.history.map((row) => <tr key={row.id}><td className="px-3 py-3 text-white/75">{formatDate(row.movementDate)}</td><td className="px-3 py-3 text-white">{row.movementType}</td><td className="px-3 py-3 text-white/75">{row.movementDirection}</td><td className="px-3 py-3 text-right text-white">{formatNumber(row.qty, qtyDecimalPlaces)}</td><td className="px-3 py-3 text-white/75">{row.locationLabel}</td><td className="px-3 py-3 text-white/75">{row.referenceNo || "—"}</td><td className="px-3 py-3 text-white/60">{row.remarks || "—"}</td></tr>)}
                   </tbody>
                 </table>
               </div>
