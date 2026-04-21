@@ -2,7 +2,11 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { formatNumberByDecimalPlaces, normalizeStockNumberFormatConfig } from "@/lib/stock-format";
+import {
+  formatNumberByDecimalPlaces,
+  normalizeMoneyDecimalPlaces,
+  normalizeQtyDecimalPlaces,
+} from "@/lib/stock-format";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -47,11 +51,11 @@ export default async function AdminStockTransactionDetailPage({ params }: Params
 
   const { id } = await params;
   const stockConfigRecord = await db.stockConfiguration.findUnique({ where: { id: "default" } });
-  const stockNumberFormat = normalizeStockNumberFormatConfig({
-    qtyDecimalPlaces: stockConfigRecord?.qtyDecimalPlaces,
-    unitCostDecimalPlaces: stockConfigRecord?.unitCostDecimalPlaces,
-    priceDecimalPlaces: stockConfigRecord?.priceDecimalPlaces,
-  });
+  const stockNumberFormat = {
+    qtyDecimalPlaces: normalizeQtyDecimalPlaces(stockConfigRecord?.qtyDecimalPlaces),
+    unitCostDecimalPlaces: normalizeMoneyDecimalPlaces(stockConfigRecord?.unitCostDecimalPlaces),
+    priceDecimalPlaces: normalizeMoneyDecimalPlaces(stockConfigRecord?.priceDecimalPlaces),
+  };
 
   const transaction = await db.stockTransaction.findUnique({
     where: { id },
@@ -66,7 +70,10 @@ export default async function AdminStockTransactionDetailPage({ params }: Params
           fromLocation: { select: { id: true, code: true, name: true } },
           toLocation: { select: { id: true, code: true, name: true } },
           serialEntries: { orderBy: [{ serialNo: "asc" }], select: { id: true, serialNo: true } },
-          ledgerEntries: { orderBy: [{ createdAt: "asc" }], include: { location: { select: { id: true, code: true, name: true } } } },
+          ledgerEntries: {
+            orderBy: [{ createdAt: "asc" }],
+            include: { location: { select: { id: true, code: true, name: true } } },
+          },
         },
       },
     },
