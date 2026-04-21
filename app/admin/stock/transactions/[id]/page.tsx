@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { DEFAULT_STOCK_NUMBER_FORMAT_CONFIG, formatNumberByDecimalPlaces, normalizeStockNumberFormatConfig } from "@/lib/stock-format";
+import { formatNumberByDecimalPlaces, normalizeStockNumberFormatConfig } from "@/lib/stock-format";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -47,7 +47,12 @@ export default async function AdminStockTransactionDetailPage({ params }: Params
 
   const { id } = await params;
   const stockConfigRecord = await db.stockConfiguration.findUnique({ where: { id: "default" } });
-  const stockNumberFormat = normalizeStockNumberFormatConfig(stockConfigRecord ?? DEFAULT_STOCK_NUMBER_FORMAT_CONFIG);
+  const stockNumberFormat = normalizeStockNumberFormatConfig({
+    qtyDecimalPlaces: stockConfigRecord?.qtyDecimalPlaces,
+    unitCostDecimalPlaces: stockConfigRecord?.unitCostDecimalPlaces,
+    priceDecimalPlaces: stockConfigRecord?.priceDecimalPlaces,
+  });
+
   const transaction = await db.stockTransaction.findUnique({
     where: { id },
     include: {
@@ -69,7 +74,11 @@ export default async function AdminStockTransactionDetailPage({ params }: Params
 
   if (!transaction) {
     return (
-      <section className="section-pad"><div className="container-rk max-w-5xl"><p className="text-white/70">Stock transaction not found.</p></div></section>
+      <section className="section-pad">
+        <div className="container-rk max-w-5xl">
+          <p className="text-white/70">Stock transaction not found.</p>
+        </div>
+      </section>
     );
   }
 
@@ -82,20 +91,51 @@ export default async function AdminStockTransactionDetailPage({ params }: Params
             <h1 className="mt-3 text-4xl font-bold">{transaction.transactionNo}</h1>
             <p className="mt-4 text-white/70">View stock transaction detail, line items, serials, and ledger impact.</p>
             {transaction.revisedFrom ? (
-              <Link href={`/admin/stock/transactions/${transaction.revisedFrom.id}`} className="mt-3 inline-flex text-sm text-white/50 transition hover:text-white/80">↳ Revision of {transaction.revisedFrom.transactionNo}</Link>
+              <Link
+                href={`/admin/stock/transactions/${transaction.revisedFrom.id}`}
+                className="mt-3 inline-flex text-sm text-white/50 transition hover:text-white/80"
+              >
+                ↳ Revision of {transaction.revisedFrom.transactionNo}
+              </Link>
             ) : null}
           </div>
           <div className="flex flex-wrap gap-3">
-            <Link href={getBackHref(transaction.transactionType)} className="rounded-xl border border-white/15 bg-white/5 px-5 py-3 text-sm text-white/80 transition hover:bg-white/10">Back</Link>
-            <Link href={`/admin/stock/transactions/${transaction.id}/edit`} className={`rounded-xl px-5 py-3 text-sm font-semibold text-white transition ${transaction.status === "CANCELLED" ? "cursor-not-allowed border border-white/10 bg-white/5 opacity-50 pointer-events-none" : "border border-white/15 bg-white/5 hover:bg-white/10"}`}>Edit</Link>
+            <Link
+              href={getBackHref(transaction.transactionType)}
+              className="rounded-xl border border-white/15 bg-white/5 px-5 py-3 text-sm text-white/80 transition hover:bg-white/10"
+            >
+              Back
+            </Link>
+            <Link
+              href={`/admin/stock/transactions/${transaction.id}/edit`}
+              className={`rounded-xl px-5 py-3 text-sm font-semibold text-white transition ${
+                transaction.status === "CANCELLED"
+                  ? "pointer-events-none cursor-not-allowed border border-white/10 bg-white/5 opacity-50"
+                  : "border border-white/15 bg-white/5 hover:bg-white/10"
+              }`}
+            >
+              Edit
+            </Link>
           </div>
         </div>
 
         <div className="grid gap-4 md:grid-cols-4">
-          <div className="rounded-2xl border border-white/10 bg-black/45 backdrop-blur-md p-4"><p className="text-xs uppercase tracking-[0.24em] text-white/40">Status</p><p className="mt-3 text-lg font-bold text-white">{transaction.status === "CANCELLED" ? "Cancelled" : "Posted"}</p></div>
-          <div className="rounded-2xl border border-white/10 bg-black/45 backdrop-blur-md p-4"><p className="text-xs uppercase tracking-[0.24em] text-white/40">Date</p><p className="mt-3 text-lg font-bold text-white">{formatDate(transaction.transactionDate)}</p></div>
-          <div className="rounded-2xl border border-white/10 bg-black/45 backdrop-blur-md p-4"><p className="text-xs uppercase tracking-[0.24em] text-white/40">Reference</p><p className="mt-3 text-lg font-bold text-white">{transaction.reference || "-"}</p></div>
-          <div className="rounded-2xl border border-white/10 bg-black/45 backdrop-blur-md p-4"><p className="text-xs uppercase tracking-[0.24em] text-white/40">Created By</p><p className="mt-3 text-lg font-bold text-white">{transaction.createdByAdmin?.name || "-"}</p></div>
+          <div className="rounded-2xl border border-white/10 bg-black/45 p-4 backdrop-blur-md">
+            <p className="text-xs uppercase tracking-[0.24em] text-white/40">Status</p>
+            <p className="mt-3 text-lg font-bold text-white">{transaction.status === "CANCELLED" ? "Cancelled" : "Posted"}</p>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-black/45 p-4 backdrop-blur-md">
+            <p className="text-xs uppercase tracking-[0.24em] text-white/40">Date</p>
+            <p className="mt-3 text-lg font-bold text-white">{formatDate(transaction.transactionDate)}</p>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-black/45 p-4 backdrop-blur-md">
+            <p className="text-xs uppercase tracking-[0.24em] text-white/40">Reference</p>
+            <p className="mt-3 text-lg font-bold text-white">{transaction.reference || "-"}</p>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-black/45 p-4 backdrop-blur-md">
+            <p className="text-xs uppercase tracking-[0.24em] text-white/40">Created By</p>
+            <p className="mt-3 text-lg font-bold text-white">{transaction.createdByAdmin?.name || "-"}</p>
+          </div>
         </div>
 
         {transaction.status === "CANCELLED" ? (
@@ -107,21 +147,84 @@ export default async function AdminStockTransactionDetailPage({ params }: Params
           </div>
         ) : null}
 
-        <div className="rounded-[2rem] border border-white/10 bg-black/45 backdrop-blur-md p-5">
+        <div className="rounded-[2rem] border border-white/10 bg-black/45 p-5 backdrop-blur-md">
           <h2 className="text-xl font-semibold text-white">Products</h2>
           <div className="mt-4 overflow-x-auto">
             <table className="min-w-full divide-y divide-white/10 text-sm">
-              <thead><tr className="text-left text-white/45"><th className="px-3 py-3 font-medium">Product</th><th className="px-3 py-3 font-medium text-right">Qty</th><th className="px-3 py-3 font-medium">Batch</th><th className="px-3 py-3 font-medium">Location</th><th className="px-3 py-3 font-medium">Serial No</th></tr></thead>
+              <thead>
+                <tr className="text-left text-white/45">
+                  <th className="px-3 py-3 font-medium">Product</th>
+                  <th className="px-3 py-3 font-medium text-right">Qty</th>
+                  <th className="px-3 py-3 font-medium text-right">Unit Cost</th>
+                  <th className="px-3 py-3 font-medium">Batch</th>
+                  <th className="px-3 py-3 font-medium">Location</th>
+                  <th className="px-3 py-3 font-medium">Serial No</th>
+                </tr>
+              </thead>
               <tbody className="divide-y divide-white/10">
                 {transaction.lines.map((line) => (
                   <tr key={line.id}>
-                    <td className="px-3 py-3 text-white"><div className="font-medium">{line.inventoryProduct.code}</div><div className="text-white/60">{line.inventoryProduct.description}</div></td>
-                    <td className="px-3 py-3 text-right text-white">{formatNumberByDecimalPlaces(line.qty, stockNumberFormat.qtyDecimalPlaces)}</td>
+                    <td className="px-3 py-3 text-white">
+                      <div className="font-medium">{line.inventoryProduct.code}</div>
+                      <div className="text-white/60">{line.inventoryProduct.description}</div>
+                    </td>
+                    <td className="px-3 py-3 text-right text-white">
+                      {formatQty(line.qty, stockNumberFormat.qtyDecimalPlaces)}
+                    </td>
+                    <td className="px-3 py-3 text-right text-white">
+                      {line.unitCost == null ? "-" : formatMoney(line.unitCost, stockNumberFormat.unitCostDecimalPlaces)}
+                    </td>
                     <td className="px-3 py-3 text-white/75">{line.batchNo || "-"}</td>
-                    <td className="px-3 py-3 text-white/75">{line.location ? `${line.location.code} — ${line.location.name}` : line.fromLocation && line.toLocation ? `${line.fromLocation.code} — ${line.fromLocation.name} → ${line.toLocation.code} — ${line.toLocation.name}` : "-"}</td>
-                    <td className="px-3 py-3 text-white/75">{line.serialEntries.length ? line.serialEntries.map((item) => item.serialNo).join(", ") : "-"}</td>
+                    <td className="px-3 py-3 text-white/75">
+                      {line.location
+                        ? `${line.location.code} — ${line.location.name}`
+                        : line.fromLocation && line.toLocation
+                          ? `${line.fromLocation.code} — ${line.fromLocation.name} → ${line.toLocation.code} — ${line.toLocation.name}`
+                          : "-"}
+                    </td>
+                    <td className="px-3 py-3 text-white/75">
+                      {line.serialEntries.length ? line.serialEntries.map((item) => item.serialNo).join(", ") : "-"}
+                    </td>
                   </tr>
                 ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="rounded-[2rem] border border-white/10 bg-black/45 p-5 backdrop-blur-md">
+          <h2 className="text-xl font-semibold text-white">Ledger Impact</h2>
+          <div className="mt-4 overflow-x-auto">
+            <table className="min-w-full divide-y divide-white/10 text-sm">
+              <thead>
+                <tr className="text-left text-white/45">
+                  <th className="px-3 py-3 font-medium">Product</th>
+                  <th className="px-3 py-3 font-medium">Direction</th>
+                  <th className="px-3 py-3 font-medium text-right">Qty</th>
+                  <th className="px-3 py-3 font-medium">Location</th>
+                  <th className="px-3 py-3 font-medium">Batch</th>
+                  <th className="px-3 py-3 font-medium">Remarks</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/10">
+                {transaction.lines.flatMap((line) =>
+                  line.ledgerEntries.map((entry) => (
+                    <tr key={entry.id}>
+                      <td className="px-3 py-3 text-white">
+                        {line.inventoryProduct.code} — {line.inventoryProduct.description}
+                      </td>
+                      <td className="px-3 py-3 text-white/75">{entry.movementDirection}</td>
+                      <td className="px-3 py-3 text-right text-white">
+                        {formatQty(entry.qty, stockNumberFormat.qtyDecimalPlaces)}
+                      </td>
+                      <td className="px-3 py-3 text-white/75">
+                        {entry.location ? `${entry.location.code} — ${entry.location.name}` : "-"}
+                      </td>
+                      <td className="px-3 py-3 text-white/75">{entry.batchNo || "-"}</td>
+                      <td className="px-3 py-3 text-white/75">{entry.remarks || "-"}</td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
