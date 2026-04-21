@@ -88,6 +88,13 @@ type FormLine = {
   fromLocationId: string;
   toLocationId: string;
   adjustmentDirection: "" | AdjustmentDirectionValue;
+  productError?: string;
+  qtyError?: string;
+  locationError?: string;
+  fromLocationError?: string;
+  toLocationError?: string;
+  batchError?: string;
+  serialError?: string;
 };
 
 type SearchableSelectOption = {
@@ -267,6 +274,11 @@ function requiresBatchSelectionBeforeBalance(
 ) {
   if (!product?.batchTracking) return false;
   return type === "SI" || type === "ST" || type === "OB" || type === "SR" || (type === "SA" && direction === "OUT") || (type === "SA" && direction === "IN") || (type === "AS" && direction === "OUT") || (type === "AS" && direction === "IN");
+}
+
+
+function getFieldErrorClass(error?: string) {
+  return error ? "border-red-500 bg-red-500/5" : "";
 }
 
 function SearchableSelect({
@@ -506,6 +518,13 @@ function buildInitialLines(transaction: TransactionRecord): FormLine[] {
     fromLocationId: line.fromLocation?.id || "",
     toLocationId: line.toLocation?.id || "",
     adjustmentDirection: line.adjustmentDirection || "",
+    productError: "",
+    qtyError: "",
+    locationError: "",
+    fromLocationError: "",
+    toLocationError: "",
+    batchError: "",
+    serialError: "",
   }));
 }
 
@@ -891,7 +910,7 @@ export function AdminStockTransactionEditClient({
 
                   <div>
                     <label className="label-rk">Qty</label>
-                    <input type="number" min="0.01" step="0.01" className="input-rk" value={line.qty} disabled={isSerialTracked} onChange={(e) => updateLine(index, { qty: e.target.value })} required />
+                    <input type="number" min="0.01" step="0.01" className={`input-rk ${getFieldErrorClass(line.qtyError)}`} value={line.qty} disabled={isSerialTracked} onChange={(e) => updateLine(index, { qty: e.target.value })} required />
                     {isSerialTracked ? <p className="mt-2 text-xs text-white/45">Qty auto-follows selected serial count and uses Base UOM.</p> : null}
                   </div>
 

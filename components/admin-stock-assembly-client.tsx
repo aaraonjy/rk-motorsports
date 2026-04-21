@@ -195,6 +195,11 @@ function formatBatchLabel(batch: AvailableBatch) {
   return parts.join(" • ");
 }
 
+
+function getFieldErrorClass(error?: string) {
+  return error ? "border-red-500 bg-red-500/5" : "";
+}
+
 function SearchableSelect({
   label,
   placeholder,
@@ -1400,7 +1405,7 @@ export function AdminStockAssemblyClient({
                         </div>
 
                         {product?.batchTracking ? (
-                          <div className="mt-4">
+                          <div className={`mt-4 rounded-xl ${line.batchError ? "ring-1 ring-red-500/70" : ""}`}>
                             <BatchPicker
                               label="Batch No"
                               batches={batches}
@@ -1415,7 +1420,7 @@ export function AdminStockAssemblyClient({
                         ) : null}
 
                         {product?.serialNumberTracking ? (
-                          <div className="mt-4">
+                          <div className={`mt-4 rounded-xl ${line.serialError ? "ring-1 ring-red-500/70" : ""}`}>
                             <SerialPicker
                               label="Serial No"
                               availableSerials={serials}

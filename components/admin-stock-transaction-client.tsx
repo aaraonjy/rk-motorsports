@@ -90,6 +90,13 @@ type FormLine = {
   fromLocationId: string;
   toLocationId: string;
   adjustmentDirection: "" | AdjustmentDirectionValue;
+  productError?: string;
+  qtyError?: string;
+  locationError?: string;
+  fromLocationError?: string;
+  toLocationError?: string;
+  batchError?: string;
+  serialError?: string;
 };
 
 type SearchableSelectOption = {
@@ -150,6 +157,13 @@ function emptyLine(): FormLine {
     fromLocationId: "",
     toLocationId: "",
     adjustmentDirection: "",
+    productError: "",
+    qtyError: "",
+    locationError: "",
+    fromLocationError: "",
+    toLocationError: "",
+    batchError: "",
+    serialError: "",
   };
 }
 
@@ -276,6 +290,11 @@ function requiresBatchSelectionBeforeBalance(
 ) {
   if (!product?.batchTracking) return false;
   return type === "SI" || type === "ST" || type === "OB" || type === "SR" || (type === "SA" && direction === "OUT") || (type === "SA" && direction === "IN") || (type === "AS" && direction === "OUT") || (type === "AS" && direction === "IN");
+}
+
+
+function getFieldErrorClass(error?: string) {
+  return error ? "border-red-500 bg-red-500/5" : "";
 }
 
 function SearchableSelect({
@@ -1552,6 +1571,7 @@ export function AdminStockTransactionClient({
                                 value={line.fromLocationId}
                                 onChange={(option) => updateLine(index, { fromLocationId: option?.id || "", batchNo: "", batchMode: "existing", expiryDate: "", serialNos: [], serialSearch: "" })}
                               />
+                              {line.qtyError ? <div className="mt-2 text-xs text-red-300">{line.qtyError}</div> : null}
                               <p className="mt-2 text-xs text-white/45">{getBalanceText(line.inventoryProductId, line.fromLocationId, balanceBatchNo, selectedProduct, line.adjustmentDirection)}</p>
                             </div>
                             <div>
@@ -1562,6 +1582,7 @@ export function AdminStockTransactionClient({
                                 value={line.toLocationId}
                                 onChange={(option) => updateLine(index, { toLocationId: option?.id || "" })}
                               />
+                              {line.qtyError ? <div className="mt-2 text-xs text-red-300">{line.qtyError}</div> : null}
                               <p className="mt-2 text-xs text-white/45">{getBalanceText(line.inventoryProductId, line.toLocationId, balanceBatchNo, selectedProduct, line.adjustmentDirection)}</p>
                             </div>
                           </>
@@ -1610,6 +1631,7 @@ export function AdminStockTransactionClient({
                                     : setInboundBatch(index, option?.id || "")
                                 }
                               />
+                              {line.qtyError ? <div className="mt-2 text-xs text-red-300">{line.qtyError}</div> : null}
                               <p className="mt-2 text-xs text-white/45">
                                 {loadingBatches[index]
                                   ? outboundBatchFlow
@@ -1690,6 +1712,7 @@ export function AdminStockTransactionClient({
                                   updateLine(index, { serialSearch: "", serialEntryText: "" });
                                 }}
                               />
+                              {line.batchError ? <div className="mt-2 text-xs text-red-300">{line.batchError}</div> : null}
                             </div>
 
                             {line.serialSearch === "__NEW__" ? (
