@@ -82,6 +82,8 @@ type TemplateLineForm = {
   batchMode: "existing" | "new";
   serialNos: string[];
   serialEntryText: string;
+  batchError?: string;
+  serialError?: string;
 };
 
 type TransactionSummary = {
@@ -786,6 +788,8 @@ export function AdminStockAssemblyClient({
             batchMode: "existing",
             serialNos: [],
             serialEntryText: "",
+            batchError: "",
+            serialError: "",
           }))
         );
         setTemplateInfo("");
@@ -905,7 +909,11 @@ export function AdminStockAssemblyClient({
   }, [templateLines, locationId, productMap]);
 
   function updateTemplateLine(index: number, updater: (current: TemplateLineForm) => TemplateLineForm) {
-    setTemplateLines((prev) => prev.map((line, lineIndex) => (lineIndex === index ? updater(line) : line)));
+    setTemplateLines((prev) =>
+      prev.map((line, lineIndex) =>
+        lineIndex === index ? { ...updater(line), batchError: "", serialError: "" } : line
+      )
+    );
   }
 
   function toggleFgSerial(serialNo: string) {
@@ -969,28 +977,35 @@ export function AdminStockAssemblyClient({
       }
     }
 
-    for (let index = 0; index < templateLines.length; index += 1) {
-      const line = templateLines[index];
+    const validatedLines = templateLines.map((line) => ({ ...line, batchError: "", serialError: "" }));
+    let hasLineError = false;
+
+    for (let index = 0; index < validatedLines.length; index += 1) {
+      const line = validatedLines[index];
       const product = productMap.get(line.componentProductId);
 
       if (!product) continue;
 
       if (product.batchTracking && !normalizeBatchNo(line.batchNo)) {
-        setSubmitError(`Product ${index + 1} — ${product.code}: Please select batch no.`);
-        return;
+        validatedLines[index].batchError = "Please select batch no.";
+        hasLineError = true;
       }
 
       if (product.serialNumberTracking) {
         const serialValues = uniqueSerialNos(parseSerialEntryText(line.serialEntryText));
         if (serialValues.length === 0) {
-          setSubmitError(`Product ${index + 1} — ${product.code}: Please select serial no.`);
-          return;
-        }
-        if (serialValues.length !== Number(normalizeQtyInput(line.qty))) {
-          setSubmitError(`Product ${index + 1} — ${product.code}: Serial quantity must match Qty Out.`);
-          return;
+          validatedLines[index].serialError = "Please select serial no.";
+          hasLineError = true;
+        } else if (serialValues.length !== Number(normalizeQtyInput(line.qty))) {
+          validatedLines[index].serialError = "Serial quantity must match Qty Out.";
+          hasLineError = true;
         }
       }
+    }
+
+    if (hasLineError) {
+      setTemplateLines(validatedLines);
+      return;
     }
 
     setIsSubmitting(true);
@@ -1395,6 +1410,7 @@ export function AdminStockAssemblyClient({
                                 updateTemplateLine(index, (current) => ({ ...current, batchMode: mode, batchNo }))
                               }
                             />
+                            {line.batchError ? <div className="mt-2 text-xs text-red-300">{line.batchError}</div> : null}
                           </div>
                         ) : null}
 
@@ -1417,6 +1433,7 @@ export function AdminStockAssemblyClient({
                               }
                               onToggle={(serialNo) => toggleLineSerial(index, serialNo)}
                             />
+                            {line.serialError ? <div className="mt-2 text-xs text-red-300">{line.serialError}</div> : null}
                           </div>
                         ) : null}
 
