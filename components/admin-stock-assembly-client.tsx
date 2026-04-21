@@ -1077,7 +1077,7 @@ export function AdminStockAssemblyClient({
                       <td className="px-3 py-4 font-semibold text-white">
                         <div>{transaction.transactionNo}</div>
                         {transaction.revisedFrom ? (
-                          <Link href={`/admin/stock/transactions/${transaction.revisedFrom.id}`} className="mt-1 inline-flex text-xs text-white/45 transition hover:text-white/80">↳ Revision of {transaction.revisedFrom.transactionNo}</Link>
+                          <Link href={`/admin/stock/transactions/${transaction.revisedFrom.id}`} className="mt-1 inline-flex text-xs text-white/45 transition hover:text-white/80 hover:underline underline-offset-2">↳ Revision of {transaction.revisedFrom.transactionNo}</Link>
                         ) : null}
                       </td>
                       <td className="px-3 py-4">{formatDateInput(transaction.transactionDate)}</td>
