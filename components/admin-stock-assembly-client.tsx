@@ -614,6 +614,7 @@ export function AdminStockAssemblyClient({
   const [isLoadingTemplate, setIsLoadingTemplate] = useState(false);
   const [availableBatches, setAvailableBatches] = useState<Record<number, AvailableBatch[]>>({});
   const [availableSerials, setAvailableSerials] = useState<Record<number, AvailableSerial[]>>({});
+  const [lineBalances, setLineBalances] = useState<Record<number, number>>({});
   const [fgAvailableBatches, setFgAvailableBatches] = useState<AvailableBatch[]>([]);
   const [fgAvailableSerials, setFgAvailableSerials] = useState<AvailableSerial[]>([]);
   const [transactions, setTransactions] = useState<TransactionSummary[]>([]);
@@ -739,6 +740,7 @@ export function AdminStockAssemblyClient({
     setTemplateInfo("");
     setAvailableBatches({});
     setAvailableSerials({});
+    setLineBalances({});
     setFgAvailableBatches([]);
     setFgAvailableSerials([]);
     setSubmitError("");
@@ -867,6 +869,7 @@ export function AdminStockAssemblyClient({
     if (!locationId) {
       setAvailableBatches({});
       setAvailableSerials({});
+      setLineBalances({});
       return;
     }
 
@@ -910,6 +913,19 @@ export function AdminStockAssemblyClient({
           .then((rows: AvailableSerial[]) => setAvailableSerials((prev) => ({ ...prev, [index]: rows })))
           .catch(() => setAvailableSerials((prev) => ({ ...prev, [index]: [] })));
       }
+
+      const balanceParams = new URLSearchParams({
+        inventoryProductId: line.componentProductId,
+        locationId,
+      });
+      fetch(`/api/admin/stock/balance?${balanceParams.toString()}`, { cache: "no-store" })
+        .then(async (response) => {
+          const data = await response.json();
+          if (!response.ok || !data.ok) return 0;
+          return typeof data.balance === "number" ? data.balance : 0;
+        })
+        .then((balance: number) => setLineBalances((prev) => ({ ...prev, [index]: balance })))
+        .catch(() => setLineBalances((prev) => ({ ...prev, [index]: 0 })));
     });
   }, [templateLines, locationId, productMap]);
 
@@ -1371,6 +1387,16 @@ export function AdminStockAssemblyClient({
                             <div className="mt-1 text-xs text-white/45">
                               Base UOM: {product?.baseUom || line.uom} • Required: {line.isRequired ? "Yes" : "No"} • Override: {line.allowOverride ? "Allowed" : "No"}
                             </div>
+                            {!product?.batchTracking ? (
+                              <div className="mt-2 text-xs text-white/45">
+                                Current Balance: {formatQty(lineBalances[index] ?? 0)}
+                              </div>
+                            ) : null}
+                            {product?.serialNumberTracking ? (
+                              <div className="mt-1 text-xs text-white/45">
+                                Available Serials: {serials.length}
+                              </div>
+                            ) : null}
                           </div>
                         </div>
 
