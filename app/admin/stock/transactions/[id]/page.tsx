@@ -176,10 +176,10 @@ export default async function AdminStockTransactionDetailPage({ params }: Params
                       <div className="text-white/60">{line.inventoryProduct.description}</div>
                     </td>
                     <td className="px-3 py-3 text-right text-white">
-                      {formatQty(line.qty, stockNumberFormat.qtyDecimalPlaces)}
+                      {formatQty(Number(line.qty ?? 0), stockNumberFormat.qtyDecimalPlaces)}
                     </td>
                     <td className="px-3 py-3 text-right text-white">
-                      {line.unitCost == null ? "-" : formatMoney(line.unitCost, stockNumberFormat.unitCostDecimalPlaces)}
+                      {line.unitCost == null ? "-" : formatMoney(Number(line.unitCost), stockNumberFormat.unitCostDecimalPlaces)}
                     </td>
                     <td className="px-3 py-3 text-white/75">{line.batchNo || "-"}</td>
                     <td className="px-3 py-3 text-white/75">
@@ -222,7 +222,7 @@ export default async function AdminStockTransactionDetailPage({ params }: Params
                       </td>
                       <td className="px-3 py-3 text-white/75">{entry.movementDirection}</td>
                       <td className="px-3 py-3 text-right text-white">
-                        {formatQty(entry.qty, stockNumberFormat.qtyDecimalPlaces)}
+                        {formatQty(Number(entry.qty ?? 0), stockNumberFormat.qtyDecimalPlaces)}
                       </td>
                       <td className="px-3 py-3 text-white/75">
                         {entry.location ? `${entry.location.code} — ${entry.location.name}` : "-"}
