@@ -18,7 +18,8 @@ import {
   normalizeStockDate,
 } from "@/lib/stock";
 import {
-  normalizeStockNumberFormatConfig,
+  normalizeMoneyDecimalPlaces,
+  normalizeQtyDecimalPlaces,
   parseNonNegativeNumberWithDecimalPlaces,
   roundToDecimalPlaces,
   STOCK_STORAGE_DECIMAL_PLACES,
@@ -90,7 +91,6 @@ function resolveConversionRate(product: any, uomCode: string) {
 function convertQtyToBase(qty: number, rate: number) {
   return roundToDecimalPlaces(qty * rate, STOCK_STORAGE_DECIMAL_PLACES.qty);
 }
-
 
 function transactionUsesOutboundLocation(
   transactionType: StockTransactionType,
@@ -182,7 +182,12 @@ export async function POST(req: Request) {
     }
 
     const config = await db.stockConfiguration.findUnique({ where: { id: "default" } });
-    const formatConfig = normalizeStockNumberFormatConfig(config);
+    const formatConfig = {
+      qtyDecimalPlaces: normalizeQtyDecimalPlaces(config?.qtyDecimalPlaces),
+      unitCostDecimalPlaces: normalizeMoneyDecimalPlaces(config?.unitCostDecimalPlaces),
+      priceDecimalPlaces: normalizeMoneyDecimalPlaces(config?.priceDecimalPlaces),
+    };
+
     if (!config?.stockModuleEnabled) {
       return NextResponse.json({ ok: false, error: "Stock module is disabled." }, { status: 400 });
     }
@@ -200,7 +205,15 @@ export async function POST(req: Request) {
     const [products, locations] = await Promise.all([
       db.inventoryProduct.findMany({
         where: { id: { in: inventoryProductIds } },
-        select: { id: true, isActive: true, trackInventory: true, batchTracking: true, serialNumberTracking: true, baseUom: true, uomConversions: { select: { uomCode: true, conversionRate: true } } },
+        select: {
+          id: true,
+          isActive: true,
+          trackInventory: true,
+          batchTracking: true,
+          serialNumberTracking: true,
+          baseUom: true,
+          uomConversions: { select: { uomCode: true, conversionRate: true } },
+        },
       }),
       db.stockLocation.findMany({ where: { id: { in: locationIds } } }),
     ]);
@@ -219,7 +232,10 @@ export async function POST(req: Request) {
       const uomCode = normalizeUomCode((line as any).uomCode) || product.baseUom;
       const conversionRate = resolveConversionRate(product, uomCode);
       const qty = convertQtyToBase(inputQty, conversionRate);
-      const unitCost = line.unitCost == null ? null : parseNonNegativeNumberWithDecimalPlaces(line.unitCost, formatConfig.unitCostDecimalPlaces, "Unit cost");
+      const unitCost =
+        line.unitCost == null
+          ? null
+          : parseNonNegativeNumberWithDecimalPlaces(line.unitCost, formatConfig.unitCostDecimalPlaces, "Unit cost");
       const batchNo = typeof line.batchNo === "string" ? line.batchNo.trim().toUpperCase() || null : null;
       const expiryDate = typeof line.expiryDate === "string" && line.expiryDate.trim() ? new Date(line.expiryDate) : null;
       const serialNos = normalizeSerialNumbers(line.serialNos);
@@ -331,7 +347,17 @@ export async function POST(req: Request) {
             } else {
               const balance = await getStockBalance(tx, line.inventoryProductId, outboundLocationId, { batchNo: line.batchNo });
               if (balance < line.qty) {
-                throw new Error(`Insufficient stock for ${transactionType === "SI" ? "Stock Issue" : transactionType === "ST" ? "Stock Transfer" : transactionType === "AS" ? "Stock Assembly OUT" : "Stock Adjustment OUT"}.`);
+                throw new Error(
+                  `Insufficient stock for ${
+                    transactionType === "SI"
+                      ? "Stock Issue"
+                      : transactionType === "ST"
+                        ? "Stock Transfer"
+                        : transactionType === "AS"
+                          ? "Stock Assembly OUT"
+                          : "Stock Adjustment OUT"
+                  }.`
+                );
               }
             }
           }
@@ -407,7 +433,9 @@ export async function POST(req: Request) {
         const direction =
           transactionType === "ST"
             ? null
-            : transactionType === "OB" || transactionType === "SR" || ((transactionType === "SA" || transactionType === "AS") && line.adjustmentDirection === "IN")
+            : transactionType === "OB" ||
+              transactionType === "SR" ||
+              ((transactionType === "SA" || transactionType === "AS") && line.adjustmentDirection === "IN")
               ? "IN"
               : "OUT";
 
@@ -480,7 +508,11 @@ export async function POST(req: Request) {
         });
 
         if (serialEntries.length > 0) {
-          if (transactionType === "OB" || transactionType === "SR" || ((transactionType === "SA" || transactionType === "AS") && line.adjustmentDirection === "IN")) {
+          if (
+            transactionType === "OB" ||
+            transactionType === "SR" ||
+            ((transactionType === "SA" || transactionType === "AS") && line.adjustmentDirection === "IN")
+          ) {
             for (const serialEntry of serialEntries) {
               const existing = await tx.inventorySerial.findUnique({
                 where: {
@@ -526,7 +558,10 @@ export async function POST(req: Request) {
             }
           }
 
-          if (transactionType === "SI" || ((transactionType === "SA" || transactionType === "AS") && line.adjustmentDirection === "OUT")) {
+          if (
+            transactionType === "SI" ||
+            ((transactionType === "SA" || transactionType === "AS") && line.adjustmentDirection === "OUT")
+          ) {
             for (const serialEntry of serialEntries) {
               const serialRecord = await tx.inventorySerial.findUnique({
                 where: {
