@@ -4,8 +4,9 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   DEFAULT_STOCK_NUMBER_FORMAT_CONFIG,
+  finalizeInputByDecimalPlaces,
   formatNumberByDecimalPlaces,
-  getNumberInputStep,
+  isValidInputByDecimalPlaces,
   normalizeInputByDecimalPlaces,
   normalizeStockNumberFormatConfig,
   type QtyDecimalPlaces,
@@ -1281,13 +1282,13 @@ export function AdminStockAssemblyClient({
               <div>
                 <label className="label-rk">Assembly Qty</label>
                 <input
-                  type="number"
-                  min={stockSettings.qtyDecimalPlaces === 0 ? "1" : getNumberInputStep(stockSettings.qtyDecimalPlaces)}
-                  step={getNumberInputStep(stockSettings.qtyDecimalPlaces)}
+                  type="text"
+                  inputMode={stockSettings.qtyDecimalPlaces === 0 ? "numeric" : "decimal"}
                   className="input-rk"
                   value={assemblyQty}
                   onChange={(e) => {
                     const raw = e.target.value;
+                    if (!isValidInputByDecimalPlaces(raw, stockSettings.qtyDecimalPlaces)) return;
                     if (raw === "") {
                       setAssemblyQty("");
                       setFgSerialNos([]);
@@ -1300,7 +1301,7 @@ export function AdminStockAssemblyClient({
                     setFgSerialEntryText(clampedSerials.join("\n"));
                   }}
                   onBlur={(e) => {
-                    const normalizedQty = normalizeQtyInput(e.target.value, stockSettings.qtyDecimalPlaces);
+                    const normalizedQty = finalizeInputByDecimalPlaces(e.target.value, stockSettings.qtyDecimalPlaces, 1);
                     setAssemblyQty(normalizedQty);
                     const clampedSerials = clampSerialNosToQty(fgSerialNos, normalizedQty);
                     setFgSerialNos(clampedSerials);
@@ -1440,19 +1441,37 @@ export function AdminStockAssemblyClient({
                           <div>
                             <label className="label-rk">Qty Out</label>
                             <input
-                              type="number"
-                              min="0.01"
-                              step={getNumberInputStep(stockSettings.qtyDecimalPlaces)}
+                              type="text"
+                              inputMode={stockSettings.qtyDecimalPlaces === 0 ? "numeric" : "decimal"}
                               className="input-rk"
                               value={line.qty}
                               disabled={!line.allowOverride}
                               onChange={(e) =>
                                 updateTemplateLine(index, (current) => {
                                   const nextQty = e.target.value;
+                                  if (!isValidInputByDecimalPlaces(nextQty, stockSettings.qtyDecimalPlaces)) {
+                                    return current;
+                                  }
                                   const clampedSerials = clampSerialNosToQty(current.serialNos, nextQty);
                                   return {
                                     ...current,
                                     qty: nextQty,
+                                    serialNos: clampedSerials,
+                                    serialEntryText: clampedSerials.join("\n"),
+                                  };
+                                })
+                              }
+                              onBlur={(e) =>
+                                updateTemplateLine(index, (current) => {
+                                  const normalizedQty = finalizeInputByDecimalPlaces(
+                                    e.target.value,
+                                    stockSettings.qtyDecimalPlaces,
+                                    1
+                                  );
+                                  const clampedSerials = clampSerialNosToQty(current.serialNos, normalizedQty);
+                                  return {
+                                    ...current,
+                                    qty: normalizedQty,
                                     serialNos: clampedSerials,
                                     serialEntryText: clampedSerials.join("\n"),
                                   };

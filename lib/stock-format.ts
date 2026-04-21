@@ -72,6 +72,33 @@ export function normalizeInputByDecimalPlaces(value: string | number | null | un
   return raw;
 }
 
+
+export function isValidInputByDecimalPlaces(value: string | number | null | undefined, decimalPlaces: number): boolean {
+  const raw = String(value ?? "");
+  if (raw === "") return true;
+  if (!/^\d*\.?\d*$/.test(raw)) return false;
+  if (decimalPlaces <= 0) return !raw.includes(".");
+  const [whole, fraction = ""] = raw.split(".");
+  if (whole && !/^\d+$/.test(whole)) return false;
+  return fraction.length <= decimalPlaces;
+}
+
+export function finalizeInputByDecimalPlaces(
+  value: string | number | null | undefined,
+  decimalPlaces: number,
+  fallback = 0
+): string {
+  const raw = String(value ?? "").trim();
+  if (raw === "") return formatNumberByDecimalPlaces(fallback, decimalPlaces);
+
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) {
+    return formatNumberByDecimalPlaces(fallback, decimalPlaces);
+  }
+
+  return formatNumberByDecimalPlaces(parsed, decimalPlaces);
+}
+
 export function countDecimalPlaces(value: unknown): number {
   const raw = String(value ?? '').trim().toLowerCase();
   if (!raw) return 0;

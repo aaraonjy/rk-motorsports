@@ -3,8 +3,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   DEFAULT_STOCK_NUMBER_FORMAT_CONFIG,
+  finalizeInputByDecimalPlaces,
   formatNumberByDecimalPlaces,
-  getNumberInputStep,
+  isValidInputByDecimalPlaces,
   normalizeInputByDecimalPlaces,
   normalizeStockNumberFormatConfig,
 } from "@/lib/stock-format";
@@ -478,13 +479,21 @@ export function AdminAssemblyTemplateClient({
                   <div>
                     <label className="label-rk">Qty</label>
                     <input
-                      type="number"
-                      min="0.0001"
-                      step={getNumberInputStep(stockSettings.qtyDecimalPlaces)}
+                      type="text"
+                      inputMode={stockSettings.qtyDecimalPlaces === 0 ? "numeric" : "decimal"}
                       className="input-rk"
                       value={line.qty}
-                      onChange={(e) => updateProduct(line.lineNo, (current) => ({ ...current, qty: e.target.value }))}
-                        onBlur={(e) => updateProduct(line.lineNo, (current) => ({ ...current, qty: normalizeQty(e.target.value, stockSettings.qtyDecimalPlaces) }))}
+                      onChange={(e) => {
+                        const nextValue = e.target.value;
+                        if (!isValidInputByDecimalPlaces(nextValue, stockSettings.qtyDecimalPlaces)) return;
+                        updateProduct(line.lineNo, (current) => ({ ...current, qty: nextValue }));
+                      }}
+                      onBlur={(e) =>
+                        updateProduct(line.lineNo, (current) => ({
+                          ...current,
+                          qty: finalizeInputByDecimalPlaces(e.target.value, stockSettings.qtyDecimalPlaces, 1),
+                        }))
+                      }
                     />
                   </div>
                   <div>

@@ -5,9 +5,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   DEFAULT_STOCK_NUMBER_FORMAT_CONFIG,
+  finalizeInputByDecimalPlaces,
   formatNumberByDecimalPlaces,
-  getNumberInputStep,
-  normalizeInputByDecimalPlaces,
+  isValidInputByDecimalPlaces,
   normalizeStockNumberFormatConfig,
   roundToDecimalPlaces,
 } from "@/lib/stock-format";
@@ -1529,14 +1529,17 @@ export function AdminStockTransactionClient({
                         <div>
                           <label className="label-rk">Qty</label>
                           <input
-                            type="number"
-                            min={stockSettings.qtyDecimalPlaces === 0 ? "1" : getNumberInputStep(stockSettings.qtyDecimalPlaces)}
-                            step={getNumberInputStep(stockSettings.qtyDecimalPlaces)}
+                            type="text"
+                            inputMode={stockSettings.qtyDecimalPlaces === 0 ? "numeric" : "decimal"}
                             className="input-rk"
                             value={line.qty}
                             disabled={isSerialTracked}
-                            onChange={(e) => updateLine(index, { qty: e.target.value })}
-                            onBlur={(e) => updateLine(index, { qty: normalizeInputByDecimalPlaces(e.target.value, stockSettings.qtyDecimalPlaces, 1) })}
+                            onChange={(e) => {
+                              const nextValue = e.target.value;
+                              if (!isValidInputByDecimalPlaces(nextValue, stockSettings.qtyDecimalPlaces)) return;
+                              updateLine(index, { qty: nextValue });
+                            }}
+                            onBlur={(e) => updateLine(index, { qty: finalizeInputByDecimalPlaces(e.target.value, stockSettings.qtyDecimalPlaces, 1) })}
                             required
                           />
                           {isSerialTracked ? <p className="mt-2 text-xs text-white/45">Qty auto-follows selected serial count and uses Base UOM.</p> : null}
@@ -1544,7 +1547,18 @@ export function AdminStockTransactionClient({
 
                         <div>
                           <label className="label-rk">Unit Cost</label>
-                          <input type="number" min="0" step={getNumberInputStep(stockSettings.unitCostDecimalPlaces)} className="input-rk" value={line.unitCost} onChange={(e) => updateLine(index, { unitCost: e.target.value })} onBlur={(e) => updateLine(index, { unitCost: normalizeInputByDecimalPlaces(e.target.value, stockSettings.unitCostDecimalPlaces, 0) })} />
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            className="input-rk"
+                            value={line.unitCost}
+                            onChange={(e) => {
+                              const nextValue = e.target.value;
+                              if (!isValidInputByDecimalPlaces(nextValue, stockSettings.unitCostDecimalPlaces)) return;
+                              updateLine(index, { unitCost: nextValue });
+                            }}
+                            onBlur={(e) => updateLine(index, { unitCost: finalizeInputByDecimalPlaces(e.target.value, stockSettings.unitCostDecimalPlaces, 0) })}
+                          />
                         </div>
 
                         {requiresSingleLocation(transactionType) ? (
