@@ -509,7 +509,7 @@ export async function POST(req: Request) {
             }
           }
 
-          if (transactionType === "SI" || (transactionType === "SA" && line.adjustmentDirection === "OUT")) {
+          if (transactionType === "SI" || ((transactionType === "SA" || transactionType === "AS") && line.adjustmentDirection === "OUT")) {
             for (const serialEntry of serialEntries) {
               const serialRecord = await tx.inventorySerial.findUnique({
                 where: {

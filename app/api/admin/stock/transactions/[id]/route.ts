@@ -345,7 +345,7 @@ export async function PUT(req: Request, context: Params) {
           batchId = batch.id;
         }
         const qty = new Prisma.Decimal(Number(line.qty).toFixed(2));
-        const direction = transactionType === "ST" ? null : transactionType === "OB" || transactionType === "SR" || (transactionType === "SA" && line.adjustmentDirection === "IN") ? "IN" : "OUT";
+        const direction = transactionType === "ST" ? null : transactionType === "OB" || transactionType === "SR" || ((transactionType === "SA" || transactionType === "AS") && line.adjustmentDirection === "IN") ? "IN" : "OUT";
         if (transactionType === "ST") {
           const outValues = buildLedgerValues(qty, "OUT");
           const inValues = buildLedgerValues(qty, "IN");
@@ -371,7 +371,7 @@ export async function PUT(req: Request, context: Params) {
               await tx.stockTransactionLineSerial.update({ where: { id: serialEntry.id }, data: { inventorySerialId: serialRecord.id, inventoryBatchId: batchId } });
             }
           }
-          if (transactionType === "SI" || (transactionType === "SA" && line.adjustmentDirection === "OUT")) {
+          if (transactionType === "SI" || ((transactionType === "SA" || transactionType === "AS") && line.adjustmentDirection === "OUT")) {
             for (const serialEntry of serialEntries) {
               const serialRecord = await tx.inventorySerial.findUnique({ where: { inventoryProductId_serialNo: { inventoryProductId: line.inventoryProductId, serialNo: serialEntry.serialNo } } });
               if (!serialRecord || serialRecord.status !== "IN_STOCK" || serialRecord.currentLocationId !== line.locationId) throw new Error(`Serial No ${serialEntry.serialNo} is not available at the selected location.`);
