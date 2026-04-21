@@ -200,6 +200,19 @@ function getFieldErrorClass(error?: string) {
   return error ? "border-red-500 bg-red-500/5" : "";
 }
 
+
+function InlineFieldError({ message }: { message?: string }) {
+  if (!message) return null;
+  return (
+    <div className="mt-2 inline-flex items-center gap-2 rounded-xl border border-red-400/30 bg-red-500 px-4 py-2 text-xs font-semibold text-white shadow-[0_8px_24px_rgba(239,68,68,0.25)]">
+      <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-white text-[10px] font-bold text-red-500">
+        !
+      </span>
+      <span>{message}</span>
+    </div>
+  );
+}
+
 function SearchableSelect({
   label,
   placeholder,
@@ -1415,7 +1428,7 @@ export function AdminStockAssemblyClient({
                                 updateTemplateLine(index, (current) => ({ ...current, batchMode: mode, batchNo }))
                               }
                             />
-                            {line.batchError ? <div className="mt-2 text-xs text-red-300">{line.batchError}</div> : null}
+                            <InlineFieldError message={line.batchError} />
                           </div>
                         ) : null}
 
@@ -1438,7 +1451,7 @@ export function AdminStockAssemblyClient({
                               }
                               onToggle={(serialNo) => toggleLineSerial(index, serialNo)}
                             />
-                            {line.serialError ? <div className="mt-2 text-xs text-red-300">{line.serialError}</div> : null}
+                            <InlineFieldError message={line.serialError} />
                           </div>
                         ) : null}
 
