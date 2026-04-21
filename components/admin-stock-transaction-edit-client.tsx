@@ -978,11 +978,26 @@ export function AdminStockTransactionEditClient({
                         />
                       </div>
                       {line.serialSearch === "__NEW__" ? (
-                        <div>
+                        <div className="space-y-2">
                           <label className="label-rk">New Serial No</label>
-                          <div className="flex gap-3">
-                            <input className="input-rk" value={line.serialEntryText} onChange={(e) => updateLine(index, { serialEntryText: e.target.value })} placeholder="Enter new serial no" />
-                            <button type="button" onClick={() => { if (!line.serialEntryText.trim()) return; addInboundSerial(index, line.serialEntryText); updateLine(index, { serialEntryText: "", serialSearch: "" }); }} className="inline-flex items-center justify-center rounded-xl bg-white/10 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/15">Create New Serial</button>
+                          <div className="flex flex-col gap-3 sm:flex-row">
+                            <input
+                              className="input-rk flex-1"
+                              value={line.serialEntryText}
+                              onChange={(e) => updateLine(index, { serialEntryText: e.target.value })}
+                              placeholder="Enter new serial no"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (!line.serialEntryText.trim()) return;
+                                addInboundSerial(index, line.serialEntryText);
+                                updateLine(index, { serialEntryText: "", serialSearch: "" });
+                              }}
+                              className="inline-flex min-w-[160px] items-center justify-center rounded-xl border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
+                            >
+                              Create New Serial
+                            </button>
                           </div>
                         </div>
                       ) : null}

@@ -536,14 +536,28 @@ function SerialPicker({
       </div>
 
       {manualMode ? (
-        <div>
+        <div className="space-y-2">
           <label className="label-rk">New Serial No</label>
-          <input
-            className="input-rk"
-            value={entryText}
-            onChange={(e) => onEntryTextChange(e.target.value)}
-            placeholder="Enter new serial no"
-          />
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <input
+              className="input-rk flex-1"
+              value={entryText}
+              onChange={(e) => onEntryTextChange(e.target.value)}
+              placeholder="Enter new serial no"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                const values = parseSerialEntryText(entryText);
+                if (values.length === 0) return;
+                onEntryTextChange(uniqueSerialNos(values).join("\n"));
+                setManualMode(false);
+              }}
+              className="inline-flex min-w-[160px] items-center justify-center rounded-xl border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
+            >
+              Create New Serial
+            </button>
+          </div>
         </div>
       ) : null}
 
@@ -936,6 +950,47 @@ export function AdminStockAssemblyClient({
     if (templateLines.length === 0) {
       setSubmitError("No assembly template lines are loaded.");
       return;
+    }
+
+    if (selectedFinishedGood.batchTracking && !normalizeBatchNo(fgBatchNo)) {
+      setSubmitError("Please select batch no for the finished good.");
+      return;
+    }
+
+    if (selectedFinishedGood.serialNumberTracking) {
+      const fgSerialValues = uniqueSerialNos(parseSerialEntryText(fgSerialEntryText));
+      if (fgSerialValues.length === 0) {
+        setSubmitError("Please select serial no for the finished good.");
+        return;
+      }
+      if (fgSerialValues.length !== Number(normalizeQtyInput(assemblyQty))) {
+        setSubmitError("Finished good serial quantity must match the assembly qty.");
+        return;
+      }
+    }
+
+    for (let index = 0; index < templateLines.length; index += 1) {
+      const line = templateLines[index];
+      const product = productMap.get(line.componentProductId);
+
+      if (!product) continue;
+
+      if (product.batchTracking && !normalizeBatchNo(line.batchNo)) {
+        setSubmitError(`Product ${index + 1} — ${product.code}: Please select batch no.`);
+        return;
+      }
+
+      if (product.serialNumberTracking) {
+        const serialValues = uniqueSerialNos(parseSerialEntryText(line.serialEntryText));
+        if (serialValues.length === 0) {
+          setSubmitError(`Product ${index + 1} — ${product.code}: Please select serial no.`);
+          return;
+        }
+        if (serialValues.length !== Number(normalizeQtyInput(line.qty))) {
+          setSubmitError(`Product ${index + 1} — ${product.code}: Serial quantity must match Qty Out.`);
+          return;
+        }
+      }
     }
 
     setIsSubmitting(true);
