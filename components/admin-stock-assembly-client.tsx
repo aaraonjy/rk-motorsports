@@ -8,6 +8,7 @@ import {
   getNumberInputStep,
   normalizeInputByDecimalPlaces,
   normalizeStockNumberFormatConfig,
+  type QtyDecimalPlaces,
 } from "@/lib/stock-format";
 
 type InventoryProductUomOption = {
@@ -325,7 +326,7 @@ function BatchPicker({
   onChange: (payload: { mode: "existing" | "new"; batchNo: string }) => void;
   allowCreate?: boolean;
   disabled?: boolean;
-  decimalPlaces?: number;
+  decimalPlaces?: QtyDecimalPlaces;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
