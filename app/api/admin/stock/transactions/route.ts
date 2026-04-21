@@ -4,8 +4,11 @@ import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { createAuditLogFromRequest } from "@/lib/audit";
 import {
+  acquireStockMutationLocks,
+  acquireAdvisoryLock,
   assertPositiveQty,
   buildLedgerValues,
+  buildTransactionNumberLockKey,
   generateStockTransactionNumber,
   getStockBalance,
   isInboundTransaction,
@@ -283,6 +286,19 @@ export async function POST(req: Request) {
     });
 
     const created = await db.$transaction(async (tx) => {
+      await acquireAdvisoryLock(tx, buildTransactionNumberLockKey(transactionType, transactionDate));
+      await acquireStockMutationLocks(
+        tx,
+        normalizedLines.map((line) => ({
+          inventoryProductId: line.inventoryProductId,
+          batchNo: line.batchNo,
+          serialNos: line.serialNos,
+          locationId: line.locationId,
+          fromLocationId: line.fromLocationId,
+          toLocationId: line.toLocationId,
+        }))
+      );
+
       const batchKeyMap = new Map<string, string | null>();
 
       if (!config.allowNegativeStock) {

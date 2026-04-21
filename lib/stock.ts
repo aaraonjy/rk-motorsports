@@ -56,6 +56,100 @@ export async function getStockBalance(
   return Math.round((qtyIn - qtyOut + Number.EPSILON) * 100) / 100;
 }
 
+
+
+function hashLockKey(input: string) {
+  let hash = 1469598103934665603n;
+  const prime = 1099511628211n;
+  const mod = 1n << 64n;
+
+  for (const ch of input) {
+    hash ^= BigInt(ch.codePointAt(0) ?? 0);
+    hash = (hash * prime) % mod;
+  }
+
+  if (hash >= (1n << 63n)) {
+    hash -= mod;
+  }
+
+  return hash;
+}
+
+export async function acquireAdvisoryLock(tx: any, key: string) {
+  const hashed = hashLockKey(key);
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(${hashed})`;
+}
+
+export function buildTransactionNumberLockKey(
+  transactionType: StockTransactionType,
+  transactionDate: Date
+) {
+  const y = transactionDate.getFullYear();
+  const m = String(transactionDate.getMonth() + 1).padStart(2, "0");
+  const d = String(transactionDate.getDate()).padStart(2, "0");
+  return `stock-docno:${transactionType}:${y}${m}${d}`;
+}
+
+export function buildTransactionEntityLockKey(transactionId: string) {
+  return `stock-transaction:${transactionId}`;
+}
+
+export function buildStockBalanceLockKey(
+  inventoryProductId: string,
+  locationId: string,
+  batchNo?: string | null
+) {
+  return `stock-balance:${inventoryProductId}:${locationId}:${String(batchNo || "").trim().toUpperCase()}`;
+}
+
+export function buildSerialLockKey(
+  inventoryProductId: string,
+  serialNo: string
+) {
+  return `stock-serial:${inventoryProductId}:${serialNo.trim().toUpperCase()}`;
+}
+
+type StockLockLine = {
+  inventoryProductId: string;
+  batchNo?: string | null;
+  serialNos?: string[] | null;
+  locationId?: string | null;
+  fromLocationId?: string | null;
+  toLocationId?: string | null;
+};
+
+export async function acquireStockMutationLocks(
+  tx: any,
+  lines: StockLockLine[]
+) {
+  const keys = new Set<string>();
+
+  for (const line of lines) {
+    const inventoryProductId = String(line.inventoryProductId || "").trim();
+    if (!inventoryProductId) continue;
+
+    const serialNos = Array.isArray(line.serialNos) ? line.serialNos : [];
+    if (serialNos.length > 0) {
+      for (const serialNo of serialNos) {
+        const normalizedSerialNo = String(serialNo || "").trim();
+        if (!normalizedSerialNo) continue;
+        keys.add(buildSerialLockKey(inventoryProductId, normalizedSerialNo));
+      }
+      continue;
+    }
+
+    for (const locationId of [line.locationId, line.fromLocationId, line.toLocationId]) {
+      const normalizedLocationId = String(locationId || "").trim();
+      if (!normalizedLocationId) continue;
+      keys.add(buildStockBalanceLockKey(inventoryProductId, normalizedLocationId, line.batchNo));
+    }
+  }
+
+  for (const key of Array.from(keys).sort()) {
+    await acquireAdvisoryLock(tx, key);
+  }
+}
+
 export async function generateStockTransactionNumber(
   tx: any,
   transactionType: StockTransactionType,

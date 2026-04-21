@@ -3,7 +3,13 @@ import { Prisma } from "@prisma/client";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { createAuditLogFromRequest } from "@/lib/audit";
-import { buildLedgerValues, getStockBalance } from "@/lib/stock";
+import {
+  acquireStockMutationLocks,
+  acquireAdvisoryLock,
+  buildLedgerValues,
+  buildTransactionEntityLockKey,
+  getStockBalance,
+} from "@/lib/stock";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -19,6 +25,8 @@ export async function POST(req: Request, context: Params) {
     const cancelReason = typeof body.reason === "string" ? body.reason.trim() || null : null;
 
     const cancelled = await db.$transaction(async (tx) => {
+      await acquireAdvisoryLock(tx, buildTransactionEntityLockKey(id));
+
       const transaction = await tx.stockTransaction.findUnique({
         where: { id },
         include: {
@@ -32,6 +40,18 @@ export async function POST(req: Request, context: Params) {
 
       if (!transaction) throw new Error("Stock transaction not found.");
       if (transaction.status === "CANCELLED") throw new Error("This stock transaction is already cancelled.");
+
+      await acquireStockMutationLocks(
+        tx,
+        transaction.lines.map((line) => ({
+          inventoryProductId: line.inventoryProductId,
+          batchNo: line.batchNo,
+          serialNos: line.serialEntries.map((serialEntry) => serialEntry.serialNo),
+          locationId: line.locationId,
+          fromLocationId: line.fromLocationId,
+          toLocationId: line.toLocationId,
+        }))
+      );
 
       for (const line of transaction.lines) {
         const qty = roundQty(line.qty);

@@ -5,8 +5,12 @@ import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { createAuditLogFromRequest } from "@/lib/audit";
 import {
+  acquireStockMutationLocks,
+  acquireAdvisoryLock,
   assertPositiveQty,
   buildLedgerValues,
+  buildTransactionEntityLockKey,
+  buildTransactionNumberLockKey,
   generateStockTransactionNumber,
   getStockBalance,
   normalizeStockDate,
@@ -276,9 +280,34 @@ export async function PUT(req: Request, context: Params) {
     });
 
     const created = await db.$transaction(async (tx) => {
+      await acquireAdvisoryLock(tx, buildTransactionEntityLockKey(id));
+
       const current = await tx.stockTransaction.findUnique({ where: { id }, include: { lines: { include: { serialEntries: true } } } });
       if (!current) throw new Error("Stock transaction not found.");
       if (current.status === "CANCELLED") throw new Error("Cancelled transactions cannot be edited.");
+
+      await acquireAdvisoryLock(tx, buildTransactionNumberLockKey(transactionType, transactionDate));
+      await acquireStockMutationLocks(
+        tx,
+        [
+          ...current.lines.map((line) => ({
+            inventoryProductId: line.inventoryProductId,
+            batchNo: line.batchNo,
+            serialNos: line.serialEntries.map((serialEntry) => serialEntry.serialNo),
+            locationId: line.locationId,
+            fromLocationId: line.fromLocationId,
+            toLocationId: line.toLocationId,
+          })),
+          ...normalizedLines.map((line) => ({
+            inventoryProductId: line.inventoryProductId,
+            batchNo: line.batchNo,
+            serialNos: line.serialNos,
+            locationId: line.locationId,
+            fromLocationId: line.fromLocationId,
+            toLocationId: line.toLocationId,
+          })),
+        ]
+      );
 
       await applyCancellation(tx, current, admin.id, "Edited and reposted");
 
