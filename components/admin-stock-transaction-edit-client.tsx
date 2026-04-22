@@ -963,7 +963,7 @@ export function AdminStockTransactionEditClient({
     try {
       const payload = {
         transactionType,
-        transactionDate,
+        transactionDate: docDate,
         docDate,
         docNo: docNo.trim() || null,
         docDesc: docDesc.trim() || null,
@@ -1032,7 +1032,6 @@ export function AdminStockTransactionEditClient({
             </div>
             <div className="mt-6 flex flex-wrap justify-end gap-3">
               <button type="button" onClick={() => setIsDocNoModalOpen(false)} className="rounded-xl border border-white/15 bg-white/5 px-5 py-3 text-sm text-white/80 transition hover:bg-white/10">Cancel</button>
-              <button type="button" onClick={() => { setDocNo(""); setDocNoDraft(""); setIsDocNoModalOpen(false); }} className="rounded-xl border border-white/15 bg-white/5 px-5 py-3 text-sm text-white/80 transition hover:bg-white/10">Use Auto</button>
               <button type="button" onClick={() => { setDocNo(docNoDraft.trim()); setIsDocNoModalOpen(false); }} className="rounded-xl bg-red-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-red-400">OK</button>
             </div>
           </div>
