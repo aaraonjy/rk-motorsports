@@ -223,13 +223,16 @@ export async function acquireStockMutationLocks(
 
 function getNextSequenceFromCodes(codes: string[], prefix: string) {
   let maxSeq = 0;
-  const pattern = new RegExp(`^${prefix}-(\\d{4})$`);
+  const normalizedPrefix = `${String(prefix || "").trim().toUpperCase()}-`;
 
   for (const code of codes) {
-    const value = String(code || "");
-    const match = value.match(pattern);
-    if (!match) continue;
-    const seq = Number(match[1]);
+    const value = String(code || "").trim().toUpperCase();
+    if (!value.startsWith(normalizedPrefix)) continue;
+
+    const seqText = value.slice(normalizedPrefix.length);
+    if (!/^\d{4}$/.test(seqText)) continue;
+
+    const seq = Number(seqText);
     if (Number.isFinite(seq) && seq > maxSeq) {
       maxSeq = seq;
     }
