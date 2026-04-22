@@ -963,7 +963,7 @@ export function AdminStockTransactionEditClient({
     try {
       const payload = {
         transactionType,
-        transactionDate,
+        transactionDate: docDate,
         docDate,
         docNo: docNo.trim() || null,
         docDesc: docDesc.trim() || null,
@@ -1032,7 +1032,6 @@ export function AdminStockTransactionEditClient({
             </div>
             <div className="mt-6 flex flex-wrap justify-end gap-3">
               <button type="button" onClick={() => setIsDocNoModalOpen(false)} className="rounded-xl border border-white/15 bg-white/5 px-5 py-3 text-sm text-white/80 transition hover:bg-white/10">Cancel</button>
-              <button type="button" onClick={() => { setDocNo(""); setDocNoDraft(""); setIsDocNoModalOpen(false); }} className="rounded-xl border border-white/15 bg-white/5 px-5 py-3 text-sm text-white/80 transition hover:bg-white/10">Use Auto</button>
               <button type="button" onClick={() => { setDocNo(docNoDraft.trim()); setIsDocNoModalOpen(false); }} className="rounded-xl bg-red-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-red-400">OK</button>
             </div>
           </div>
@@ -1042,14 +1041,10 @@ export function AdminStockTransactionEditClient({
       <form onSubmit={handleSubmit} className="mt-8 space-y-6">
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <div>
-            <label className="label-rk">Transaction Date</label>
-            <input type="date" className="input-rk" value={formatDateInput(transactionDate)} onChange={(e) => setTransactionDate(e.target.value)} required />
-          </div>
-          <div>
             <label className="label-rk">Document Date</label>
-            <input type="date" className="input-rk" value={formatDateInput(docDate)} onChange={(e) => setDocDate(e.target.value)} required />
+            <input type="date" className="input-rk" value={formatDateInput(docDate)} onChange={(e) => { setDocDate(e.target.value); setTransactionDate(e.target.value); }} required />
           </div>
-          <div className="xl:col-span-2">
+          <div className="xl:col-span-3">
             <label className="label-rk">System Doc No</label>
             <button
               type="button"

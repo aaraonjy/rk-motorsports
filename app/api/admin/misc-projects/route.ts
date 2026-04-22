@@ -12,6 +12,23 @@ function mapItem(item: any) {
   return { id: item.id, code: item.code, name: item.name, isActive: item.isActive };
 }
 
+
+export async function GET() {
+  try {
+    await requireAdmin();
+    const items = await db.project.findMany({
+      orderBy: [{ isActive: "desc" }, { code: "asc" }],
+      select: { id: true, code: true, name: true, isActive: true },
+    });
+    return NextResponse.json({ ok: true, items: items.map(mapItem) });
+  } catch (error) {
+    return NextResponse.json(
+      { ok: false, error: error instanceof Error ? error.message : "Unable to load projects." },
+      { status: 500 }
+    );
+  }
+}
+
 export async function POST(req: Request) {
   try {
     await requireAdmin();

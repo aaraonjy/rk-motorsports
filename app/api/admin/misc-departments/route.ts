@@ -15,6 +15,23 @@ function mapItem(item: any) {
   };
 }
 
+
+export async function GET() {
+  try {
+    await requireAdmin();
+    const items = await db.department.findMany({
+      orderBy: [{ isActive: "desc" }, { code: "asc" }],
+      include: { project: { select: { code: true, name: true } } },
+    });
+    return NextResponse.json({ ok: true, items: items.map(mapItem) });
+  } catch (error) {
+    return NextResponse.json(
+      { ok: false, error: error instanceof Error ? error.message : "Unable to load departments." },
+      { status: 500 }
+    );
+  }
+}
+
 export async function POST(req: Request) {
   try {
     await requireAdmin();
