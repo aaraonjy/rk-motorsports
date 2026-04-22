@@ -105,15 +105,6 @@ export default async function AdminStockTransactionDetailPage({ params, searchPa
             <p className="text-sm font-semibold uppercase tracking-[0.24em] text-red-400/80">Stock Transaction</p>
             <h1 className="mt-3 text-4xl font-bold">{transaction.docNo || transaction.transactionNo}</h1>
             <p className="mt-4 text-white/70">View stock transaction detail, line items, serials, and ledger impact.</p>
-            <p className="mt-2 text-sm text-white/45">Internal Transaction No: {transaction.transactionNo}</p>
-            {transaction.revisedFrom ? (
-              <Link
-                href={`/admin/stock/transactions/${transaction.revisedFrom.id}`}
-                className="mt-3 inline-flex text-sm text-white/50 transition hover:text-white/80"
-              >
-                ↳ Revision of {transaction.revisedFrom.transactionNo}
-              </Link>
-            ) : null}
           </div>
           <div className="flex flex-wrap gap-3">
             <Link

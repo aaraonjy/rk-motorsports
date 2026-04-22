@@ -997,7 +997,6 @@ export function AdminStockTransactionEditClient({
         setSubmitError(data.error || `Unable to update ${title.toLowerCase()}.`);
         return;
       }
-      setSubmitSuccess(`${title} updated successfully.`);
       router.push(`/admin/stock/transactions/${data.transaction.id}?success=${encodeURIComponent(`${title} updated successfully.`)}`);
     } catch {
       setSubmitError(`Unable to update ${title.toLowerCase()} right now.`);
