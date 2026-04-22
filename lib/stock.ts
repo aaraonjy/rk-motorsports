@@ -221,6 +221,23 @@ export async function acquireStockMutationLocks(
   }
 }
 
+function getNextSequenceFromCodes(codes: string[], prefix: string) {
+  let maxSeq = 0;
+  const pattern = new RegExp(`^${prefix}-(\\d{4})$`);
+
+  for (const code of codes) {
+    const value = String(code || "");
+    const match = value.match(pattern);
+    if (!match) continue;
+    const seq = Number(match[1]);
+    if (Number.isFinite(seq) && seq > maxSeq) {
+      maxSeq = seq;
+    }
+  }
+
+  return maxSeq + 1;
+}
+
 export async function generateStockTransactionNumber(
   tx: any,
   transactionType: StockTransactionType,
@@ -232,14 +249,21 @@ export async function generateStockTransactionNumber(
   const datePart = `${y}${m}${d}`;
   const prefix = `${transactionType}-${datePart}`;
 
-  const count = await tx.stockTransaction.count({
+  const existing = await tx.stockTransaction.findMany({
     where: {
-      transactionType,
-      transactionDate,
+      transactionNo: {
+        startsWith: `${prefix}-`,
+      },
     },
+    select: { transactionNo: true },
   });
 
-  return `${prefix}-${String(count + 1).padStart(4, "0")}`;
+  const next = getNextSequenceFromCodes(
+    existing.map((row: { transactionNo: string }) => row.transactionNo),
+    prefix
+  );
+
+  return `${prefix}-${String(next).padStart(4, "0")}`;
 }
 
 
@@ -263,16 +287,11 @@ export async function generateStockDocumentNumber(
     select: { docNo: true },
   });
 
-  const used = new Set<number>();
-  for (const row of existing) {
-    const value = String(row.docNo || "");
-    const match = value.match(new RegExp(`^${prefix}-(\\d{4})$`));
-    if (!match) continue;
-    used.add(Number(match[1]));
-  }
+  const next = getNextSequenceFromCodes(
+    existing.map((row: { docNo: string | null }) => String(row.docNo || "")),
+    prefix
+  );
 
-  let next = 1;
-  while (used.has(next)) next += 1;
   return `${prefix}-${String(next).padStart(4, "0")}`;
 }
 
