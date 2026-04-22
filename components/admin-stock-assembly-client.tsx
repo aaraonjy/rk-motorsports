@@ -1246,15 +1246,10 @@ export function AdminStockAssemblyClient({
           </button>
         </div>
 
-        {submitSuccess ? (
-          <div className="mb-5 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
-            {submitSuccess}
-          </div>
-        ) : null}
-
-        {submitError ? (
+        {(submitError || submitSuccess) ? (
           <div className="mt-5 space-y-3">
-            <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{submitError}</div>
+            {submitError ? <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{submitError}</div> : null}
+            {submitSuccess ? <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">{submitSuccess}</div> : null}
           </div>
         ) : null}
 
@@ -1282,7 +1277,7 @@ export function AdminStockAssemblyClient({
                       <td className="px-3 py-4 font-semibold text-white">
                         <div>{transaction.docNo || transaction.transactionNo}</div>
                         {transaction.revisedFrom ? (
-                          <Link href={`/admin/stock/transactions/${transaction.revisedFrom.id}`} className="mt-1 inline-flex text-xs text-white/45 transition hover:text-white/80 hover:underline underline-offset-2">↳ Revision of {transaction.revisedFrom.transactionNo}</Link>
+                          <div className="mt-1 text-xs text-white/45">↳ Revised from previous version</div>
                         ) : null}
                       </td>
                       <td className="px-3 py-4">{formatDateInput(transaction.transactionDate)}</td>
