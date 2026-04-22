@@ -404,9 +404,12 @@ export async function POST(req: Request) {
       const transactionNo = await generateStockTransactionNumber(tx, transactionType, transactionDate);
       const docNo = requestedDocNo || await generateStockDocumentNumber(tx, transactionType, docDate);
 
-      const duplicateDocNo = await tx.stockTransaction.findUnique({ where: { docNo } });
+      const duplicateDocNo = await tx.stockTransaction.findFirst({
+        where: { docNo },
+        select: { id: true },
+      });
       if (duplicateDocNo) {
-        throw new Error("Document No already exists.");
+        throw new Error("Document No already exists. Please retry.");
       }
 
       const transaction = await tx.stockTransaction.create({
@@ -727,10 +730,22 @@ export async function POST(req: Request) {
     });
 
     return NextResponse.json({ ok: true, transaction: created });
-  } catch (error) {
+  } catch (error: any) {
+    const isUniqueDocNo =
+      error?.code === "P2002" &&
+      Array.isArray(error?.meta?.target) &&
+      error.meta.target.includes("docNo");
+
     return NextResponse.json(
-      { ok: false, error: error instanceof Error ? error.message : "Unable to create stock transaction." },
-      { status: error instanceof Error && error.message === "FORBIDDEN" ? 403 : 500 }
+      {
+        ok: false,
+        error: isUniqueDocNo
+          ? "Document No already exists. Please save again so the system can generate the next available number."
+          : error instanceof Error
+            ? error.message
+            : "Unable to create stock transaction.",
+      },
+      { status: error instanceof Error && error.message === "FORBIDDEN" ? 403 : isUniqueDocNo ? 409 : 500 }
     );
   }
 }

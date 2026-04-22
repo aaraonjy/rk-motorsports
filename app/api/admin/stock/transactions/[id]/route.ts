@@ -595,7 +595,7 @@ export async function PUT(req: Request, context: Params) {
         select: { id: true },
       });
       if (duplicateDocNo) {
-        throw new Error("Document No already exists.");
+        throw new Error("Document No already exists. Please retry.");
       }
 
       const transaction = await tx.stockTransaction.create({
@@ -881,10 +881,22 @@ export async function PUT(req: Request, context: Params) {
     });
 
     return NextResponse.json({ ok: true, transaction: created });
-  } catch (error) {
+  } catch (error: any) {
+    const isUniqueDocNo =
+      error?.code === "P2002" &&
+      Array.isArray(error?.meta?.target) &&
+      error.meta.target.includes("docNo");
+
     return NextResponse.json(
-      { ok: false, error: error instanceof Error ? error.message : "Unable to update stock transaction." },
-      { status: error instanceof Error && error.message === "FORBIDDEN" ? 403 : 500 }
+      {
+        ok: false,
+        error: isUniqueDocNo
+          ? "Document No already exists. Please save again so the system can generate the next available number."
+          : error instanceof Error
+            ? error.message
+            : "Unable to update stock transaction.",
+      },
+      { status: error instanceof Error && error.message === "FORBIDDEN" ? 403 : isUniqueDocNo ? 409 : 500 }
     );
   }
 }
