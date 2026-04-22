@@ -266,6 +266,7 @@ export async function generateStockTransactionNumber(
   return `${prefix}-${String(next).padStart(4, "0")}`;
 }
 
+
 export async function generateStockDocumentNumber(
   tx: any,
   transactionType: StockTransactionType,
