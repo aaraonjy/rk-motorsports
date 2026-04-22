@@ -124,9 +124,24 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const type = searchParams.get("transactionType")?.trim() || undefined;
     const q = searchParams.get("q")?.trim() || undefined;
+    const dateFrom = searchParams.get("dateFrom")?.trim() || undefined;
+    const dateTo = searchParams.get("dateTo")?.trim() || undefined;
+    const projectId = searchParams.get("projectId")?.trim() || undefined;
+    const departmentId = searchParams.get("departmentId")?.trim() || undefined;
+
     const rows = await db.stockTransaction.findMany({
       where: {
         ...(type ? { transactionType: type as StockTransactionType } : {}),
+        ...(projectId ? { projectId } : {}),
+        ...(departmentId ? { departmentId } : {}),
+        ...(dateFrom || dateTo
+          ? {
+              transactionDate: {
+                ...(dateFrom ? { gte: normalizeStockDate(dateFrom) } : {}),
+                ...(dateTo ? { lte: normalizeStockDate(dateTo) } : {}),
+              },
+            }
+          : {}),
         ...(q
           ? {
               OR: [
@@ -135,6 +150,17 @@ export async function GET(req: Request) {
                 { docDesc: { contains: q, mode: "insensitive" } },
                 { reference: { contains: q, mode: "insensitive" } },
                 { remarks: { contains: q, mode: "insensitive" } },
+                { project: { is: { code: { contains: q, mode: "insensitive" } } } },
+                { project: { is: { name: { contains: q, mode: "insensitive" } } } },
+                { department: { is: { code: { contains: q, mode: "insensitive" } } } },
+                { department: { is: { name: { contains: q, mode: "insensitive" } } } },
+                { lines: { some: { inventoryProduct: { code: { contains: q, mode: "insensitive" } } } } },
+                { lines: { some: { inventoryProduct: { description: { contains: q, mode: "insensitive" } } } } },
+                { lines: { some: { location: { is: { code: { contains: q, mode: "insensitive" } } } } } },
+                { lines: { some: { fromLocation: { is: { code: { contains: q, mode: "insensitive" } } } } } },
+                { lines: { some: { toLocation: { is: { code: { contains: q, mode: "insensitive" } } } } } },
+                { lines: { some: { batchNo: { contains: q, mode: "insensitive" } } } },
+                { lines: { some: { serialEntries: { some: { serialNo: { contains: q, mode: "insensitive" } } } } } },
               ],
             }
           : {}),

@@ -657,6 +657,8 @@ export function AdminStockTransactionClient({
   const [searchKeyword, setSearchKeyword] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [filterProjectId, setFilterProjectId] = useState("");
+  const [filterDepartmentId, setFilterDepartmentId] = useState("");
   const [projectOptions, setProjectOptions] = useState<ProjectOption[]>([]);
   const [departmentOptions, setDepartmentOptions] = useState<DepartmentOption[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -701,47 +703,21 @@ export function AdminStockTransactionClient({
     () => (projectId ? departmentOptions.filter((item) => item.groupId === projectId && item.isActive) : []),
     [departmentOptions, projectId]
   );
+  const filteredListDepartmentOptions = useMemo(
+    () => (filterProjectId ? departmentOptions.filter((item) => item.groupId === filterProjectId && item.isActive) : []),
+    [departmentOptions, filterProjectId]
+  );
 
   const filteredTransactions = useMemo(() => {
-    const keyword = searchKeyword.trim().toLowerCase();
     return transactions.filter((item) => {
       const hasRevisionChildren = Array.isArray(item.revisions) && item.revisions.length > 0;
-      if (hasRevisionChildren) return false;
-
-      const matchesKeyword =
-        !keyword ||
-        item.transactionNo.toLowerCase().includes(keyword) ||
-        (item.docNo || "").toLowerCase().includes(keyword) ||
-        (item.docDesc || "").toLowerCase().includes(keyword) ||
-        (item.project?.code || "").toLowerCase().includes(keyword) ||
-        (item.project?.name || "").toLowerCase().includes(keyword) ||
-        (item.department?.code || "").toLowerCase().includes(keyword) ||
-        (item.department?.name || "").toLowerCase().includes(keyword) ||
-        (item.revisedFrom?.transactionNo || "").toLowerCase().includes(keyword) ||
-        (item.reference || "").toLowerCase().includes(keyword) ||
-        (item.remarks || "").toLowerCase().includes(keyword) ||
-        item.lines.some(
-          (line) =>
-            line.inventoryProduct.code.toLowerCase().includes(keyword) ||
-            line.inventoryProduct.description.toLowerCase().includes(keyword) ||
-            (line.location?.code || "").toLowerCase().includes(keyword) ||
-            (line.fromLocation?.code || "").toLowerCase().includes(keyword) ||
-            (line.toLocation?.code || "").toLowerCase().includes(keyword) ||
-            (line.batchNo || "").toLowerCase().includes(keyword) ||
-            (line.serialEntries || []).some((entry) => entry.serialNo.toLowerCase().includes(keyword))
-        );
-
-      const rowDate = formatDateInput(item.transactionDate);
-      const matchesFrom = !dateFrom || rowDate >= dateFrom;
-      const matchesTo = !dateTo || rowDate <= dateTo;
-
-      return matchesKeyword && matchesFrom && matchesTo;
+      return !hasRevisionChildren;
     });
-  }, [transactions, searchKeyword, dateFrom, dateTo]);
+  }, [transactions]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchKeyword, dateFrom, dateTo, transactionType]);
+  }, [searchKeyword, dateFrom, dateTo, filterProjectId, filterDepartmentId, transactionType]);
 
   const totalPages = Math.max(1, Math.ceil(filteredTransactions.length / pageSize));
   const paginatedTransactions = useMemo(
@@ -756,7 +732,14 @@ export function AdminStockTransactionClient({
   async function loadTransactions() {
     setIsLoadingTransactions(true);
     try {
-      const response = await fetch(`/api/admin/stock/transactions?transactionType=${transactionType}`, {
+      const params = new URLSearchParams({ transactionType });
+      if (searchKeyword.trim()) params.set("q", searchKeyword.trim());
+      if (dateFrom) params.set("dateFrom", dateFrom);
+      if (dateTo) params.set("dateTo", dateTo);
+      if (filterProjectId) params.set("projectId", filterProjectId);
+      if (filterDepartmentId) params.set("departmentId", filterDepartmentId);
+
+      const response = await fetch(`/api/admin/stock/transactions?${params.toString()}`, {
         cache: "no-store",
       });
       const data = await response.json();
@@ -774,7 +757,7 @@ export function AdminStockTransactionClient({
 
   useEffect(() => {
     void loadTransactions();
-  }, [transactionType]);
+  }, [transactionType, searchKeyword, dateFrom, dateTo, filterProjectId, filterDepartmentId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -857,6 +840,12 @@ export function AdminStockTransactionClient({
       setDepartmentId("");
     }
   }, [departmentId, filteredDepartmentOptions]);
+
+  useEffect(() => {
+    if (filterDepartmentId && !filteredListDepartmentOptions.some((item) => item.id === filterDepartmentId)) {
+      setFilterDepartmentId("");
+    }
+  }, [filterDepartmentId, filteredListDepartmentOptions]);
 
   useEffect(() => {
     if (!singleLocationMode || !lockedLocationId) return;
@@ -1417,8 +1406,8 @@ export function AdminStockTransactionClient({
         </div>
 
         <div className="mt-8 rounded-2xl border border-white/10 bg-black/20 p-4">
-          <div className="grid gap-4 md:grid-cols-3">
-            <div>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+            <div className="xl:col-span-2">
               <label className="label-rk">Search</label>
               <input
                 className="input-rk"
@@ -1434,6 +1423,36 @@ export function AdminStockTransactionClient({
             <div>
               <label className="label-rk">Date To</label>
               <input type="date" className="input-rk" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+            </div>
+            <div>
+              <SearchableSelect
+                label="Project"
+                placeholder="All projects"
+                options={projectOptions.filter((item) => item.isActive).map((item) => ({
+                  id: item.id,
+                  label: `${item.code} — ${item.name}`,
+                  searchText: `${item.code} ${item.name}`.toLowerCase(),
+                }))}
+                value={filterProjectId}
+                onChange={(option) => {
+                  setFilterProjectId(option?.id || "");
+                  setFilterDepartmentId("");
+                }}
+              />
+            </div>
+            <div>
+              <SearchableSelect
+                label="Department"
+                placeholder={filterProjectId ? "All departments" : "Select project first"}
+                options={filteredListDepartmentOptions.map((item) => ({
+                  id: item.id,
+                  label: `${item.code} — ${item.name}`,
+                  searchText: `${item.code} ${item.name}`.toLowerCase(),
+                }))}
+                value={filterDepartmentId}
+                disabled={!filterProjectId}
+                onChange={(option) => setFilterDepartmentId(option?.id || "")}
+              />
             </div>
           </div>
         </div>
