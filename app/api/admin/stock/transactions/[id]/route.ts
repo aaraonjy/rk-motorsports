@@ -585,7 +585,21 @@ export async function PUT(req: Request, context: Params) {
       }
 
       const transactionNo = await generateStockTransactionNumber(tx, transactionType, transactionDate);
-      const docNo = requestedDocNo || await generateStockDocumentNumber(tx, transactionType, docDate);
+
+      const existingDocNoValue = typeof current.docNo === "string" ? current.docNo.trim().toUpperCase() : "";
+      const requestedDocNoValue = typeof requestedDocNo === "string" ? requestedDocNo.trim().toUpperCase() : "";
+      const isReusingCurrentDocNo = !!existingDocNoValue && requestedDocNoValue === existingDocNoValue;
+
+      if (isReusingCurrentDocNo) {
+        await tx.stockTransaction.update({
+          where: { id: current.id },
+          data: { docNo: null },
+        });
+      }
+
+      const docNo = isReusingCurrentDocNo
+        ? current.docNo!
+        : requestedDocNo || await generateStockDocumentNumber(tx, transactionType, docDate);
 
       const duplicateDocNo = await tx.stockTransaction.findFirst({
         where: {

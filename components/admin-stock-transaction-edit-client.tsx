@@ -1012,7 +1012,8 @@ export function AdminStockTransactionEditClient({
         <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/45">{getTypeLabel(transactionType)}</p>
         <h3 className="mt-3 text-2xl font-bold text-white">Edit {title}</h3>
         <p className="mt-3 max-w-3xl text-sm leading-6 text-white/65">{intro}</p>
-        <p className="mt-3 text-sm text-white/50">Original Transaction: {initialTransaction.transactionNo}</p>
+        <p className="mt-3 text-sm text-white/50">Original Internal Transaction No: {initialTransaction.transactionNo}</p>
+        <p className="mt-1 text-sm text-white/50">Current Document No: {initialTransaction.docNo || initialTransaction.transactionNo}</p>
       </div>
 
       {isDocNoModalOpen ? (

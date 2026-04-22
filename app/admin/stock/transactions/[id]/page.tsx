@@ -95,8 +95,9 @@ export default async function AdminStockTransactionDetailPage({ params }: Params
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.24em] text-red-400/80">Stock Transaction</p>
-            <h1 className="mt-3 text-4xl font-bold">{transaction.transactionNo}</h1>
+            <h1 className="mt-3 text-4xl font-bold">{transaction.docNo || transaction.transactionNo}</h1>
             <p className="mt-4 text-white/70">View stock transaction detail, line items, serials, and ledger impact.</p>
+            <p className="mt-2 text-sm text-white/45">Internal Transaction No: {transaction.transactionNo}</p>
             {transaction.revisedFrom ? (
               <Link
                 href={`/admin/stock/transactions/${transaction.revisedFrom.id}`}
@@ -132,8 +133,8 @@ export default async function AdminStockTransactionDetailPage({ params }: Params
             <p className="mt-3 text-lg font-bold text-white">{transaction.status === "CANCELLED" ? "Cancelled" : "Posted"}</p>
           </div>
           <div className="rounded-2xl border border-white/10 bg-black/45 p-4 backdrop-blur-md">
-            <p className="text-xs uppercase tracking-[0.24em] text-white/40">Date</p>
-            <p className="mt-3 text-lg font-bold text-white">{formatDate(transaction.transactionDate)}</p>
+            <p className="text-xs uppercase tracking-[0.24em] text-white/40">Document Date</p>
+            <p className="mt-3 text-lg font-bold text-white">{formatDate(transaction.docDate || transaction.transactionDate)}</p>
           </div>
           <div className="rounded-2xl border border-white/10 bg-black/45 p-4 backdrop-blur-md">
             <p className="text-xs uppercase tracking-[0.24em] text-white/40">Reference</p>
