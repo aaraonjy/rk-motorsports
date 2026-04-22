@@ -966,7 +966,7 @@ export function AdminStockTransactionEditClient({
         transactionType,
         transactionDate: docDate,
         docDate,
-        docNo: docNo.trim() || null,
+        docNo: canOverrideDocNoForType(stockSettings, transactionType) ? docNo.trim() || null : null,
         docDesc: docDesc.trim() || null,
         projectId: projectId || null,
         departmentId: departmentId || null,
@@ -1012,8 +1012,7 @@ export function AdminStockTransactionEditClient({
         <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/45">{getTypeLabel(transactionType)}</p>
         <h3 className="mt-3 text-2xl font-bold text-white">Edit {title}</h3>
         <p className="mt-3 max-w-3xl text-sm leading-6 text-white/65">{intro}</p>
-        <p className="mt-3 text-sm text-white/50">Original Internal Transaction No: {initialTransaction.transactionNo}</p>
-        <p className="mt-1 text-sm text-white/50">Current Document No: {initialTransaction.docNo || initialTransaction.transactionNo}</p>
+        <p className="mt-3 text-sm text-white/50">Current Document No: {initialTransaction.docNo || "-"}</p>
       </div>
 
       {isDocNoModalOpen ? (

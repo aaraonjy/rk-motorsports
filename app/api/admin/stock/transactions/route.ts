@@ -170,7 +170,7 @@ export async function GET(req: Request) {
         createdByAdmin: { select: { id: true, name: true, email: true } },
         project: { select: { id: true, code: true, name: true } },
         department: { select: { id: true, code: true, name: true, projectId: true } },
-        revisedFrom: { select: { id: true, transactionNo: true } },
+        revisedFrom: { select: { id: true, docNo: true } },
         revisions: { select: { id: true } },
         lines: {
           include: {

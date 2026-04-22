@@ -62,7 +62,7 @@ export default async function AdminStockTransactionDetailPage({ params }: Params
     include: {
       createdByAdmin: { select: { id: true, name: true, email: true } },
       cancelledByAdmin: { select: { id: true, name: true, email: true } },
-      revisedFrom: { select: { id: true, transactionNo: true } },
+      revisedFrom: { select: { id: true, docNo: true } },
       lines: {
         include: {
           inventoryProduct: { select: { id: true, code: true, description: true, baseUom: true } },
@@ -95,15 +95,14 @@ export default async function AdminStockTransactionDetailPage({ params }: Params
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.24em] text-red-400/80">Stock Transaction</p>
-            <h1 className="mt-3 text-4xl font-bold">{transaction.docNo || transaction.transactionNo}</h1>
+            <h1 className="mt-3 text-4xl font-bold">{transaction.docNo || "-"}</h1>
             <p className="mt-4 text-white/70">View stock transaction detail, line items, serials, and ledger impact.</p>
-            <p className="mt-2 text-sm text-white/45">Internal Transaction No: {transaction.transactionNo}</p>
-            {transaction.revisedFrom ? (
+                        {transaction.revisedFrom ? (
               <Link
                 href={`/admin/stock/transactions/${transaction.revisedFrom.id}`}
                 className="mt-3 inline-flex text-sm text-white/50 transition hover:text-white/80"
               >
-                ↳ Revision of {transaction.revisedFrom.transactionNo}
+                ↳ Revised from previous version
               </Link>
             ) : null}
           </div>

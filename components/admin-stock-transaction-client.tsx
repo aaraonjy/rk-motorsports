@@ -74,7 +74,7 @@ type TransactionRecord = {
   status: "POSTED" | "CANCELLED";
   cancelReason?: string | null;
   cancelledAt?: string | null;
-  revisedFrom?: { id: string; transactionNo: string } | null;
+  revisedFrom?: { id: string; docNo?: string | null } | null;
   revisions?: Array<{ id: string }>;
   lines: TransactionLineRecord[];
 };
@@ -1314,7 +1314,7 @@ export function AdminStockTransactionClient({
         setSubmitError(data.error || "Unable to cancel transaction.");
         return;
       }
-      setSubmitSuccess(`${cancelTarget.transactionNo} cancelled successfully.`);
+      setSubmitSuccess(`${cancelTarget.docNo || "Selected document"} cancelled successfully.`);
       setCancelTarget(null);
       setCancelReason("");
       await loadTransactions();
@@ -1483,7 +1483,7 @@ export function AdminStockTransactionClient({
                   >
                     <td className="px-3 py-4 font-semibold text-white">
                       <div className="flex flex-col gap-1">
-                        <span>{item.docNo || item.transactionNo}</span>
+                        <span>{item.docNo || "-"}</span>
                         {item.revisedFrom ? (
                           <button
                             type="button"
@@ -1493,7 +1493,7 @@ export function AdminStockTransactionClient({
                             }}
                             className="w-fit text-left text-xs font-medium text-white/45 underline-offset-2 transition hover:text-white/70 hover:underline"
                           >
-                            ↳ Revision of {item.revisedFrom.transactionNo}
+                            ↳ Revised from previous version
                           </button>
                         ) : null}
                       </div>
@@ -1614,7 +1614,7 @@ export function AdminStockTransactionClient({
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 p-4">
           <div className="w-full max-w-xl rounded-[2rem] border border-white/10 bg-[#0b0b0f] p-6 shadow-2xl md:p-8">
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/45">Cancel Transaction</p>
-            <h3 className="mt-3 text-2xl font-bold text-white">{cancelTarget.transactionNo}</h3>
+            <h3 className="mt-3 text-2xl font-bold text-white">{cancelTarget.docNo || "Selected document"}</h3>
             <p className="mt-3 text-sm text-white/65">This will keep the original transaction record, create reversal stock effects, and mark the transaction as Cancelled.</p>
             <div className="mt-6">
               <label className="label-rk">Cancel Reason</label>
