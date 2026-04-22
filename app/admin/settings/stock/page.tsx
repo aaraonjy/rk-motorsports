@@ -34,7 +34,7 @@ export default async function AdminStockSettingsPage() {
             <p className="text-sm font-semibold uppercase tracking-[0.24em] text-red-400/80">Global Settings</p>
             <h1 className="mt-3 text-4xl font-bold">Stock Settings</h1>
             <p className="mt-4 max-w-3xl text-white/70">
-              Configure the stock module foundation without affecting current order logic or stock movement yet.
+              Configure stock numbering, input precision, and document number override permissions.
             </p>
           </div>
         </div>
@@ -47,9 +47,21 @@ export default async function AdminStockSettingsPage() {
               allowNegativeStock: config?.allowNegativeStock ?? false,
               costingMethod: config?.costingMethod ?? "AVERAGE",
               defaultLocationId: config?.defaultLocationId ?? "",
-              qtyDecimalPlaces: normalizeQtyDecimalPlaces(config?.qtyDecimalPlaces ?? DEFAULT_STOCK_NUMBER_FORMAT_CONFIG.qtyDecimalPlaces),
-              unitCostDecimalPlaces: normalizeMoneyDecimalPlaces(config?.unitCostDecimalPlaces ?? DEFAULT_STOCK_NUMBER_FORMAT_CONFIG.unitCostDecimalPlaces),
-              priceDecimalPlaces: normalizeMoneyDecimalPlaces(config?.priceDecimalPlaces ?? DEFAULT_STOCK_NUMBER_FORMAT_CONFIG.priceDecimalPlaces),
+              qtyDecimalPlaces: normalizeQtyDecimalPlaces(
+                config?.qtyDecimalPlaces ?? DEFAULT_STOCK_NUMBER_FORMAT_CONFIG.qtyDecimalPlaces
+              ),
+              unitCostDecimalPlaces: normalizeMoneyDecimalPlaces(
+                config?.unitCostDecimalPlaces ?? DEFAULT_STOCK_NUMBER_FORMAT_CONFIG.unitCostDecimalPlaces
+              ),
+              priceDecimalPlaces: normalizeMoneyDecimalPlaces(
+                config?.priceDecimalPlaces ?? DEFAULT_STOCK_NUMBER_FORMAT_CONFIG.priceDecimalPlaces
+              ),
+              allowDocNoOverrideOB: config?.allowDocNoOverrideOB ?? false,
+              allowDocNoOverrideSR: config?.allowDocNoOverrideSR ?? false,
+              allowDocNoOverrideSI: config?.allowDocNoOverrideSI ?? false,
+              allowDocNoOverrideSA: config?.allowDocNoOverrideSA ?? false,
+              allowDocNoOverrideST: config?.allowDocNoOverrideST ?? false,
+              allowDocNoOverrideAS: config?.allowDocNoOverrideAS ?? false,
             }}
             locations={locations}
           />

@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -13,14 +12,24 @@ type Props = {
   initialItems: Item[];
   requireGroup?: boolean;
   groups?: GroupOption[];
+  groupLabelTitle?: string;
+  groupPlaceholder?: string;
 };
-
 
 function sortItemsByCode(items: Item[]) {
   return [...items].sort((a, b) => a.code.localeCompare(b.code));
 }
 
-export function AdminMasterListClient({ title, subtitle, apiBase, initialItems, requireGroup = false, groups = [] }: Props) {
+export function AdminMasterListClient({
+  title,
+  subtitle,
+  apiBase,
+  initialItems,
+  requireGroup = false,
+  groups = [],
+  groupLabelTitle = "Group",
+  groupPlaceholder = "Select group",
+}: Props) {
   const [items, setItems] = useState(sortItemsByCode(initialItems));
   const [keyword, setKeyword] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -37,66 +46,28 @@ export function AdminMasterListClient({ title, subtitle, apiBase, initialItems, 
 
   const filteredItems = useMemo(() => {
     const q = keyword.trim().toLowerCase();
-    return items.filter((item) =>
-      !q ||
-      item.code.toLowerCase().includes(q) ||
-      item.name.toLowerCase().includes(q) ||
-      (item.groupLabel || "").toLowerCase().includes(q)
-    );
+    return items.filter((item) => !q || item.code.toLowerCase().includes(q) || item.name.toLowerCase().includes(q) || (item.groupLabel || "").toLowerCase().includes(q));
   }, [items, keyword]);
 
   const totalPages = Math.max(1, Math.ceil(filteredItems.length / pageSize));
-  const paginatedItems = useMemo(
-    () => filteredItems.slice((currentPage - 1) * pageSize, currentPage * pageSize),
-    [filteredItems, currentPage]
-  );
+  const paginatedItems = useMemo(() => filteredItems.slice((currentPage - 1) * pageSize, currentPage * pageSize), [filteredItems, currentPage]);
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [keyword]);
-
-  useEffect(() => {
-    if (currentPage > totalPages) setCurrentPage(totalPages);
-  }, [currentPage, totalPages]);
+  useEffect(() => { setCurrentPage(1); }, [keyword]);
+  useEffect(() => { if (currentPage > totalPages) setCurrentPage(totalPages); }, [currentPage, totalPages]);
 
   function openCreate() {
-    setEditingId(null);
-    setCode("");
-    setName("");
-    setGroupId("");
-    setIsActive(true);
-    setError("");
-    setSuccess("");
-    setIsOpen(true);
+    setEditingId(null); setCode(""); setName(""); setGroupId(""); setIsActive(true); setError(""); setSuccess(""); setIsOpen(true);
   }
-
   function openEdit(item: Item) {
-    setEditingId(item.id);
-    setCode(item.code);
-    setName(item.name);
-    setGroupId(item.groupId || "");
-    setIsActive(item.isActive);
-    setError("");
-    setSuccess("");
-    setIsOpen(true);
+    setEditingId(item.id); setCode(item.code); setName(item.name); setGroupId(item.groupId || ""); setIsActive(item.isActive); setError(""); setSuccess(""); setIsOpen(true);
   }
-
   function closeModal() {
-    setIsOpen(false);
-    setEditingId(null);
-    setCode("");
-    setName("");
-    setGroupId("");
-    setIsActive(true);
-    setError("");
+    setIsOpen(false); setEditingId(null); setCode(""); setName(""); setGroupId(""); setIsActive(true); setError("");
   }
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
-    setIsSaving(true);
-    setError("");
-    setSuccess("");
-
+    setIsSaving(true); setError(""); setSuccess("");
     try {
       const response = await fetch(editingId ? `${apiBase}/${editingId}` : apiBase, {
         method: editingId ? "PATCH" : "POST",
@@ -110,8 +81,8 @@ export function AdminMasterListClient({ title, subtitle, apiBase, initialItems, 
       }
       const saved = data.item as Item;
       setItems((prev) => sortItemsByCode(editingId ? prev.map((item) => item.id === saved.id ? saved : item) : [...prev, saved]));
-      setSuccess(editingId ? "Updated successfully." : "Created successfully.");
       closeModal();
+      setSuccess(editingId ? "Updated successfully." : "Created successfully.");
     } catch {
       setError("Unable to save record right now.");
     } finally {
@@ -121,8 +92,7 @@ export function AdminMasterListClient({ title, subtitle, apiBase, initialItems, 
 
   async function handleDelete(item: Item) {
     if (!window.confirm(`Delete ${item.code}?`)) return;
-    setError("");
-    setSuccess("");
+    setError(""); setSuccess("");
     try {
       const response = await fetch(`${apiBase}/${item.id}`, { method: "DELETE" });
       const data = await response.json();
@@ -164,7 +134,7 @@ export function AdminMasterListClient({ title, subtitle, apiBase, initialItems, 
               <tr className="text-left text-white/45">
                 <th className="px-3 py-3 font-medium">Code</th>
                 <th className="px-3 py-3 font-medium">Name</th>
-                {requireGroup ? <th className="px-3 py-3 font-medium">Group</th> : null}
+                {requireGroup ? <th className="px-3 py-3 font-medium">{groupLabelTitle}</th> : null}
                 <th className="px-3 py-3 font-medium">Status</th>
                 <th className="px-3 py-3 font-medium text-right">Action</th>
               </tr>
@@ -177,9 +147,7 @@ export function AdminMasterListClient({ title, subtitle, apiBase, initialItems, 
                   <td className="px-3 py-4 font-semibold text-white">{item.code}</td>
                   <td className="px-3 py-4 text-white/80">{item.name}</td>
                   {requireGroup ? <td className="px-3 py-4 text-white/70">{item.groupLabel || "-"}</td> : null}
-                  <td className="px-3 py-4">
-                    <span className={item.isActive ? "inline-flex rounded-full border border-emerald-500/30 bg-emerald-500/15 px-3 py-1 text-xs font-semibold text-emerald-300" : "inline-flex rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold text-white/65"}>{item.isActive ? "Active" : "Inactive"}</span>
-                  </td>
+                  <td className="px-3 py-4"><span className={item.isActive ? "inline-flex rounded-full border border-emerald-500/30 bg-emerald-500/15 px-3 py-1 text-xs font-semibold text-emerald-300" : "inline-flex rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold text-white/65"}>{item.isActive ? "Active" : "Inactive"}</span></td>
                   <td className="px-3 py-4"><div className="flex justify-end gap-2">
                     <button type="button" onClick={() => openEdit(item)} className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-semibold text-white transition hover:bg-white/10">Edit</button>
                     <button type="button" onClick={() => handleDelete(item)} className="rounded-lg border border-red-500/25 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-200 transition hover:bg-red-500/15">Delete</button>
@@ -189,35 +157,6 @@ export function AdminMasterListClient({ title, subtitle, apiBase, initialItems, 
             </tbody>
           </table>
         </div>
-
-        {filteredItems.length > 0 ? (
-          <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4">
-            <div className="text-sm text-white/55">
-              Showing {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, filteredItems.length)} of {filteredItems.length} records
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-                disabled={currentPage === 1}
-                className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/80 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Prev
-              </button>
-              <div className="rounded-xl border border-white/10 bg-black/20 px-4 py-2 text-sm text-white/80">
-                Page {currentPage} / {totalPages}
-              </div>
-              <button
-                type="button"
-                onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-                disabled={currentPage >= totalPages}
-                className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/80 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        ) : null}
       </div>
 
       {isOpen ? (
@@ -234,10 +173,10 @@ export function AdminMasterListClient({ title, subtitle, apiBase, initialItems, 
               </div>
               {requireGroup ? (
                 <div>
-                  <label className="label-rk">Product Group</label>
+                  <label className="label-rk">{groupLabelTitle}</label>
                   <div className="relative">
                     <select className="input-rk appearance-none pr-12" value={groupId} onChange={(e) => setGroupId(e.target.value)} required>
-                      <option value="">Select group</option>
+                      <option value="">{groupPlaceholder}</option>
                       {groups.filter((item) => item.isActive).map((group) => (
                         <option key={group.id} value={group.id}>{group.code} — {group.name}</option>
                       ))}

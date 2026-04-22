@@ -112,6 +112,59 @@ export function buildTransactionEntityLockKey(transactionId: string) {
   return `stock-transaction:${transactionId}`;
 }
 
+export function buildDocumentNumberLockKey(
+  transactionType: StockTransactionType,
+  documentDate: Date
+) {
+  const y = documentDate.getFullYear();
+  const m = String(documentDate.getMonth() + 1).padStart(2, "0");
+  const d = String(documentDate.getDate()).padStart(2, "0");
+  return `stock-user-docno:${transactionType}:${y}${m}${d}`;
+}
+
+export function normalizeDocumentNo(value: unknown) {
+  return typeof value === "string" ? value.trim().toUpperCase() : "";
+}
+
+export function assertValidDocumentNo(value: unknown, label = "Document No") {
+  const normalized = normalizeDocumentNo(value);
+  if (!normalized) return "";
+  if (normalized.length > 30) {
+    throw new Error(`${label} cannot exceed 30 characters.`);
+  }
+  return normalized;
+}
+
+export function canOverrideDocumentNo(
+  config: {
+    allowDocNoOverrideOB?: boolean | null;
+    allowDocNoOverrideSR?: boolean | null;
+    allowDocNoOverrideSI?: boolean | null;
+    allowDocNoOverrideSA?: boolean | null;
+    allowDocNoOverrideST?: boolean | null;
+    allowDocNoOverrideAS?: boolean | null;
+  } | null | undefined,
+  transactionType: StockTransactionType
+) {
+  if (!config) return false;
+  switch (transactionType) {
+    case "OB":
+      return Boolean(config.allowDocNoOverrideOB);
+    case "SR":
+      return Boolean(config.allowDocNoOverrideSR);
+    case "SI":
+      return Boolean(config.allowDocNoOverrideSI);
+    case "SA":
+      return Boolean(config.allowDocNoOverrideSA);
+    case "ST":
+      return Boolean(config.allowDocNoOverrideST);
+    case "AS":
+      return Boolean(config.allowDocNoOverrideAS);
+    default:
+      return false;
+  }
+}
+
 export function buildStockBalanceLockKey(
   inventoryProductId: string,
   locationId: string,
@@ -187,6 +240,40 @@ export async function generateStockTransactionNumber(
   });
 
   return `${prefix}-${String(count + 1).padStart(4, "0")}`;
+}
+
+
+export async function generateStockDocumentNumber(
+  tx: any,
+  transactionType: StockTransactionType,
+  documentDate: Date
+) {
+  const y = documentDate.getFullYear();
+  const m = String(documentDate.getMonth() + 1).padStart(2, "0");
+  const d = String(documentDate.getDate()).padStart(2, "0");
+  const datePart = `${y}${m}${d}`;
+  const prefix = `${transactionType}-${datePart}`;
+
+  const existing = await tx.stockTransaction.findMany({
+    where: {
+      docNo: {
+        startsWith: `${prefix}-`,
+      },
+    },
+    select: { docNo: true },
+  });
+
+  const used = new Set<number>();
+  for (const row of existing) {
+    const value = String(row.docNo || "");
+    const match = value.match(new RegExp(`^${prefix}-(\\d{4})$`));
+    if (!match) continue;
+    used.add(Number(match[1]));
+  }
+
+  let next = 1;
+  while (used.has(next)) next += 1;
+  return `${prefix}-${String(next).padStart(4, "0")}`;
 }
 
 export function isInboundTransaction(type: StockTransactionType, adjustmentDirection?: StockAdjustmentDirection | null) {

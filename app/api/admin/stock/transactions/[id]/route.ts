@@ -10,9 +10,13 @@ import {
   buildLedgerValues,
   createStoredMoneyDecimal,
   createStoredQtyDecimal,
+  buildDocumentNumberLockKey,
   buildTransactionEntityLockKey,
   buildTransactionNumberLockKey,
+  generateStockDocumentNumber,
   generateStockTransactionNumber,
+  assertValidDocumentNo,
+  canOverrideDocumentNo,
   getStockBalance,
   normalizeStockDate,
 } from "@/lib/stock";
@@ -116,6 +120,8 @@ export async function GET(_req: Request, context: Params) {
       include: {
         createdByAdmin: { select: { id: true, name: true, email: true } },
         cancelledByAdmin: { select: { id: true, name: true, email: true } },
+        project: { select: { id: true, code: true, name: true } },
+        department: { select: { id: true, code: true, name: true, projectId: true } },
         revisedFrom: { select: { id: true, transactionNo: true } },
         lines: {
           include: {
@@ -351,6 +357,11 @@ export async function PUT(req: Request, context: Params) {
       return NextResponse.json({ ok: false, error: "Transaction type cannot be changed during edit." }, { status: 400 });
     }
     const transactionDate = normalizeStockDate(body.transactionDate);
+    const docDate = normalizeStockDate(typeof body.docDate === "string" ? body.docDate : body.transactionDate);
+    const requestedDocNo = assertValidDocumentNo(body.docNo);
+    const docDesc = typeof body.docDesc === "string" ? body.docDesc.trim() || null : null;
+    const projectId = typeof body.projectId === "string" && body.projectId.trim() ? body.projectId.trim() : null;
+    const departmentId = typeof body.departmentId === "string" && body.departmentId.trim() ? body.departmentId.trim() : null;
     const reference = typeof body.reference === "string" ? body.reference.trim() : null;
     const remarks = typeof body.remarks === "string" ? body.remarks.trim() : null;
     const rawLines = Array.isArray(body.lines) ? (body.lines as StockLinePayload[]) : [];
@@ -367,6 +378,29 @@ export async function PUT(req: Request, context: Params) {
 
     if (!config?.stockModuleEnabled) {
       return NextResponse.json({ ok: false, error: "Stock module is disabled." }, { status: 400 });
+    }
+
+    if (requestedDocNo && !canOverrideDocumentNo(config, transactionType)) {
+      return NextResponse.json({ ok: false, error: "Manual Document No override is not allowed for this transaction type." }, { status: 400 });
+    }
+
+    const [project, department] = await Promise.all([
+      projectId
+        ? db.project.findUnique({ where: { id: projectId }, select: { id: true, code: true, name: true, isActive: true } })
+        : Promise.resolve(null),
+      departmentId
+        ? db.department.findUnique({ where: { id: departmentId }, select: { id: true, code: true, name: true, projectId: true, isActive: true } })
+        : Promise.resolve(null),
+    ]);
+
+    if (projectId && (!project || !project.isActive)) {
+      return NextResponse.json({ ok: false, error: "Project is invalid or inactive." }, { status: 400 });
+    }
+    if (departmentId && (!department || !department.isActive)) {
+      return NextResponse.json({ ok: false, error: "Department is invalid or inactive." }, { status: 400 });
+    }
+    if (department && project && department.projectId !== project.id) {
+      return NextResponse.json({ ok: false, error: "Selected Department does not belong to the selected Project." }, { status: 400 });
     }
 
     const inventoryProductIds = Array.from(
@@ -494,6 +528,7 @@ export async function PUT(req: Request, context: Params) {
       if (current.status === "CANCELLED") throw new Error("Cancelled transactions cannot be edited.");
 
       await acquireAdvisoryLock(tx, buildTransactionNumberLockKey(transactionType, transactionDate));
+      await acquireAdvisoryLock(tx, buildDocumentNumberLockKey(transactionType, docDate));
       await acquireStockMutationLocks(
         tx,
         [
@@ -550,9 +585,27 @@ export async function PUT(req: Request, context: Params) {
       }
 
       const transactionNo = await generateStockTransactionNumber(tx, transactionType, transactionDate);
+      const docNo = requestedDocNo || await generateStockDocumentNumber(tx, transactionType, docDate);
+
+      const duplicateDocNo = await tx.stockTransaction.findFirst({
+        where: {
+          docNo,
+          NOT: { id: current.id },
+        },
+        select: { id: true },
+      });
+      if (duplicateDocNo) {
+        throw new Error("Document No already exists.");
+      }
+
       const transaction = await tx.stockTransaction.create({
         data: {
           transactionNo,
+          docNo,
+          docDate,
+          docDesc,
+          projectId: project?.id ?? null,
+          departmentId: department?.id ?? null,
           transactionType,
           transactionDate,
           reference,
@@ -782,6 +835,8 @@ export async function PUT(req: Request, context: Params) {
         where: { id: transaction.id },
         include: {
           createdByAdmin: { select: { id: true, name: true, email: true } },
+          project: { select: { id: true, code: true, name: true } },
+          department: { select: { id: true, code: true, name: true, projectId: true } },
           revisedFrom: { select: { id: true, transactionNo: true } },
           lines: {
             include: {
@@ -813,6 +868,11 @@ export async function PUT(req: Request, context: Params) {
         newTransactionId: created?.id,
         transactionType,
         transactionDate: transactionDate.toISOString(),
+        docNo: created?.docNo ?? null,
+        docDate: docDate.toISOString(),
+        docDesc,
+        projectId: project?.id ?? null,
+        departmentId: department?.id ?? null,
         reference,
         remarks,
         lineCount: normalizedLines.length,

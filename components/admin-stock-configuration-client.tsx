@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react";
 import {
-  DEFAULT_STOCK_NUMBER_FORMAT_CONFIG,
   MoneyDecimalPlaces,
   QtyDecimalPlaces,
 } from "@/lib/stock-format";
@@ -24,9 +23,24 @@ type Props = {
     qtyDecimalPlaces: QtyDecimalPlaces;
     unitCostDecimalPlaces: MoneyDecimalPlaces;
     priceDecimalPlaces: MoneyDecimalPlaces;
+    allowDocNoOverrideOB: boolean;
+    allowDocNoOverrideSR: boolean;
+    allowDocNoOverrideSI: boolean;
+    allowDocNoOverrideSA: boolean;
+    allowDocNoOverrideST: boolean;
+    allowDocNoOverrideAS: boolean;
   };
   locations: StockLocationOption[];
 };
+
+const transactionTypeOptions = [
+  ["allowDocNoOverrideOB", "Opening Stock"],
+  ["allowDocNoOverrideSR", "Stock Receive"],
+  ["allowDocNoOverrideSI", "Stock Issue"],
+  ["allowDocNoOverrideSA", "Stock Adjustment"],
+  ["allowDocNoOverrideST", "Stock Transfer"],
+  ["allowDocNoOverrideAS", "Stock Assembly"],
+] as const;
 
 export function AdminStockConfigurationClient({ initialConfig, locations }: Props) {
   const [form, setForm] = useState(initialConfig);
@@ -34,11 +48,7 @@ export function AdminStockConfigurationClient({ initialConfig, locations }: Prop
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  const activeLocations = useMemo(
-    () => locations.filter((item) => item.isActive),
-    [locations]
-  );
-
+  const activeLocations = useMemo(() => locations.filter((item) => item.isActive), [locations]);
   const stockControlEnabled = form.stockModuleEnabled;
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -65,9 +75,7 @@ export function AdminStockConfigurationClient({ initialConfig, locations }: Prop
 
       const response = await fetch("/api/admin/settings/stock", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 
@@ -91,7 +99,7 @@ export function AdminStockConfigurationClient({ initialConfig, locations }: Prop
         <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/45">Global Settings</p>
         <h2 className="mt-3 text-2xl font-bold text-white">Stock Module Settings</h2>
         <p className="mt-4 max-w-3xl text-sm leading-6 text-white/65">
-          Configure the stock control foundation. Product Master remains usable even when stock control is disabled.
+          Configure stock control foundation, input precision, and per-transaction document number override permissions.
         </p>
 
         <div className="mt-8 space-y-5">
@@ -159,9 +167,6 @@ export function AdminStockConfigurationClient({ initialConfig, locations }: Prop
                 </select>
                 <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/60">▾</div>
               </div>
-              {!stockControlEnabled ? (
-                <p className="mt-2 text-xs text-white/45">Default location is only required when Stock Control is enabled.</p>
-              ) : null}
             </div>
           </div>
 
@@ -169,11 +174,7 @@ export function AdminStockConfigurationClient({ initialConfig, locations }: Prop
             <div>
               <label className="label-rk">Qty Input Format</label>
               <div className="relative">
-                <select
-                  className="input-rk appearance-none pr-12"
-                  value={form.qtyDecimalPlaces}
-                  onChange={(e) => setForm((prev) => ({ ...prev, qtyDecimalPlaces: Number(e.target.value) as QtyDecimalPlaces }))}
-                >
+                <select className="input-rk appearance-none pr-12" value={form.qtyDecimalPlaces} onChange={(e) => setForm((prev) => ({ ...prev, qtyDecimalPlaces: Number(e.target.value) as QtyDecimalPlaces }))}>
                   <option value={0}>No Decimal</option>
                   <option value={2}>2 Decimal Point</option>
                   <option value={3}>3 Decimal Point</option>
@@ -184,11 +185,7 @@ export function AdminStockConfigurationClient({ initialConfig, locations }: Prop
             <div>
               <label className="label-rk">Unit Cost Input Format</label>
               <div className="relative">
-                <select
-                  className="input-rk appearance-none pr-12"
-                  value={form.unitCostDecimalPlaces}
-                  onChange={(e) => setForm((prev) => ({ ...prev, unitCostDecimalPlaces: Number(e.target.value) as MoneyDecimalPlaces }))}
-                >
+                <select className="input-rk appearance-none pr-12" value={form.unitCostDecimalPlaces} onChange={(e) => setForm((prev) => ({ ...prev, unitCostDecimalPlaces: Number(e.target.value) as MoneyDecimalPlaces }))}>
                   <option value={2}>2 Decimal Point</option>
                   <option value={3}>3 Decimal Point</option>
                 </select>
@@ -198,16 +195,30 @@ export function AdminStockConfigurationClient({ initialConfig, locations }: Prop
             <div>
               <label className="label-rk">Price Input Format</label>
               <div className="relative">
-                <select
-                  className="input-rk appearance-none pr-12"
-                  value={form.priceDecimalPlaces}
-                  onChange={(e) => setForm((prev) => ({ ...prev, priceDecimalPlaces: Number(e.target.value) as MoneyDecimalPlaces }))}
-                >
+                <select className="input-rk appearance-none pr-12" value={form.priceDecimalPlaces} onChange={(e) => setForm((prev) => ({ ...prev, priceDecimalPlaces: Number(e.target.value) as MoneyDecimalPlaces }))}>
                   <option value={2}>2 Decimal Point</option>
                   <option value={3}>3 Decimal Point</option>
                 </select>
                 <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/60">▾</div>
               </div>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+            <div className="font-semibold text-white">Allow Modify Doc No</div>
+            <p className="mt-2 text-sm text-white/55">Choose which stock transaction types are allowed to override the system generated document number.</p>
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              {transactionTypeOptions.map(([key, label]) => (
+                <label key={key} className={`flex items-center gap-3 text-sm text-white/75 ${stockControlEnabled ? "" : "opacity-50"}`}>
+                  <input
+                    type="checkbox"
+                    checked={form[key]}
+                    disabled={!stockControlEnabled}
+                    onChange={(e) => setForm((prev) => ({ ...prev, [key]: e.target.checked }))}
+                  />
+                  <span>{label}</span>
+                </label>
+              ))}
             </div>
           </div>
 
@@ -226,45 +237,17 @@ export function AdminStockConfigurationClient({ initialConfig, locations }: Prop
           <h3 className="mt-3 text-xl font-bold text-white">Stock Rules</h3>
           <div className="mt-6 space-y-4 text-sm leading-6 text-white/70">
             <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-              <div className="font-semibold text-white">When stock module is OFF</div>
-              <div className="mt-2">Product List and product picker stay usable, but no stock movement, stock transaction, or stock report logic is triggered. Stock Location master data remains accessible.</div>
-            </div>
-            <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-              <div className="font-semibold text-white">When stock module is ON</div>
-              <div className="mt-2">Stock settings prepare the stock control foundation. Product-level Serial Tracking and Batch Tracking are maintained in Product Master.</div>
+              <div className="font-semibold text-white">Document numbers</div>
+              <div className="mt-2">System transaction number stays internal. Document No is user-facing, unique, max 30 characters, and can only be overridden for enabled transaction types.</div>
             </div>
             <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
               <div className="font-semibold text-white">Input format behavior</div>
               <div className="mt-2">Qty format is applied across stock transactions, stock assembly, assembly template, and read-only stock displays. Unit Cost and Price formats are applied across Product Master input and display screens.</div>
             </div>
             <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-              <div className="font-semibold text-white">Default location</div>
-              <div className="mt-2">Used as the default posting location for Opening Stock, Stock Receive, Stock Issue, and Stock Adjustment. When Multi Location is enabled, users can still change it.</div>
+              <div className="font-semibold text-white">Project / Department</div>
+              <div className="mt-2">Project and Department master data are maintained under Global Settings → Misc and can be linked to stock transaction documents for future filtering and reporting.</div>
             </div>
-          </div>
-        </div>
-
-        <div className="rounded-[2rem] border border-white/10 bg-black/45 p-6 backdrop-blur-md md:p-8">
-          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/45">Available Locations</p>
-          <div className="mt-5 overflow-x-auto">
-            <table className="min-w-full divide-y divide-white/10 text-sm">
-              <thead>
-                <tr className="text-left text-white/45">
-                  <th className="px-3 py-3 font-medium">Code</th>
-                  <th className="px-3 py-3 font-medium">Name</th>
-                  <th className="px-3 py-3 font-medium">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/10 text-white/80">
-                {locations.map((location) => (
-                  <tr key={location.id}>
-                    <td className="px-3 py-4 font-semibold text-white">{location.code}</td>
-                    <td className="px-3 py-4">{location.name}</td>
-                    <td className="px-3 py-4">{location.isActive ? "Active" : "Inactive"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
           </div>
         </div>
       </div>

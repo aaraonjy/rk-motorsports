@@ -243,6 +243,12 @@ model StockConfiguration {
   qtyDecimalPlaces      Int                @default(0)
   unitCostDecimalPlaces Int                @default(2)
   priceDecimalPlaces    Int                @default(2)
+  allowDocNoOverrideOB  Boolean            @default(false)
+  allowDocNoOverrideSR  Boolean            @default(false)
+  allowDocNoOverrideSI  Boolean            @default(false)
+  allowDocNoOverrideSA  Boolean            @default(false)
+  allowDocNoOverrideST  Boolean            @default(false)
+  allowDocNoOverrideAS  Boolean            @default(false)
   createdAt             DateTime           @default(now())
   updatedAt             DateTime           @updatedAt
   defaultLocation       StockLocation?     @relation(fields: [defaultLocationId], references: [id], onDelete: SetNull)
@@ -423,6 +429,35 @@ model ProductBrand {
   products    InventoryProduct[]
 
   @@index([isActive, code])
+  @@index([name])
+}
+
+model Project {
+  id                String             @id @default(cuid())
+  code              String             @unique
+  name              String
+  isActive          Boolean            @default(true)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  departments       Department[]
+  stockTransactions StockTransaction[]
+
+  @@index([isActive, code])
+  @@index([name])
+}
+
+model Department {
+  id                String             @id @default(cuid())
+  code              String             @unique
+  name              String
+  projectId         String
+  isActive          Boolean            @default(true)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  project           Project            @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  stockTransactions StockTransaction[]
+
+  @@index([projectId, isActive])
   @@index([name])
 }
 
@@ -684,6 +719,11 @@ model StockTransaction {
   transactionNo      String                 @unique
   transactionType    StockTransactionType
   transactionDate    DateTime
+  docNo              String?                @unique
+  docDate            DateTime               @default(now())
+  docDesc            String?
+  projectId          String?
+  departmentId       String?
   reference          String?
   remarks            String?
   status             StockTransactionStatus @default(POSTED)
@@ -698,6 +738,8 @@ model StockTransaction {
   cancelledByAdmin   User?                  @relation("CancelledStockTransactions", fields: [cancelledByAdminId], references: [id], onDelete: SetNull)
   revisedFrom        StockTransaction?      @relation("StockTransactionRevisions", fields: [revisedFromId], references: [id], onDelete: SetNull)
   revisions          StockTransaction[]     @relation("StockTransactionRevisions")
+  project            Project?               @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  department         Department?            @relation(fields: [departmentId], references: [id], onDelete: SetNull)
   lines              StockTransactionLine[]
   ledgerEntries      StockLedger[]
 
