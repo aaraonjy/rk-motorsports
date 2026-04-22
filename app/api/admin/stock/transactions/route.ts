@@ -145,8 +145,7 @@ export async function GET(req: Request) {
         ...(q
           ? {
               OR: [
-                { transactionNo: { contains: q, mode: "insensitive" } },
-                { docNo: { contains: q, mode: "insensitive" } },
+                                { docNo: { contains: q, mode: "insensitive" } },
                 { docDesc: { contains: q, mode: "insensitive" } },
                 { reference: { contains: q, mode: "insensitive" } },
                 { remarks: { contains: q, mode: "insensitive" } },
