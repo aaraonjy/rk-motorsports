@@ -223,16 +223,13 @@ export async function acquireStockMutationLocks(
 
 function getNextSequenceFromCodes(codes: string[], prefix: string) {
   let maxSeq = 0;
-  const normalizedPrefix = `${String(prefix || "").trim().toUpperCase()}-`;
+  const pattern = new RegExp(`^${prefix}-(\\d{4})$`);
 
   for (const code of codes) {
-    const value = String(code || "").trim().toUpperCase();
-    if (!value.startsWith(normalizedPrefix)) continue;
-
-    const seqText = value.slice(normalizedPrefix.length);
-    if (!/^\d{4}$/.test(seqText)) continue;
-
-    const seq = Number(seqText);
+    const value = String(code || "");
+    const match = value.match(pattern);
+    if (!match) continue;
+    const seq = Number(match[1]);
     if (Number.isFinite(seq) && seq > maxSeq) {
       maxSeq = seq;
     }
@@ -283,15 +280,24 @@ export async function generateStockDocumentNumber(
 
   const existing = await tx.stockTransaction.findMany({
     where: {
-      docNo: {
-        startsWith: `${prefix}-`,
-      },
+      OR: [
+        {
+          docNo: {
+            startsWith: `${prefix}-`,
+          },
+        },
+        {
+          transactionNo: {
+            startsWith: `${prefix}-`,
+          },
+        },
+      ],
     },
-    select: { docNo: true },
+    select: { docNo: true, transactionNo: true },
   });
 
   const next = getNextSequenceFromCodes(
-    existing.map((row: { docNo: string | null }) => String(row.docNo || "")),
+    existing.map((row: { docNo: string | null; transactionNo: string }) => String(row.docNo || row.transactionNo || "")),
     prefix
   );
 
