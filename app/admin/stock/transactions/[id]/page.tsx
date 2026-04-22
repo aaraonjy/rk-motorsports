@@ -8,7 +8,7 @@ import {
   normalizeQtyDecimalPlaces,
 } from "@/lib/stock-format";
 
-type Params = { params: Promise<{ id: string }> };
+type Params = { params: Promise<{ id: string }>; searchParams?: Promise<{ success?: string }> };
 
 function formatDate(value: Date | string | null | undefined) {
   if (!value) return "-";
@@ -44,12 +44,14 @@ function formatMoney(value: number | string | null | undefined, decimalPlaces: n
   return `RM ${formatNumberByDecimalPlaces(value, decimalPlaces)}`;
 }
 
-export default async function AdminStockTransactionDetailPage({ params }: Params) {
+export default async function AdminStockTransactionDetailPage({ params, searchParams }: Params) {
   const user = await getSessionUser();
   if (!user) redirect("/login");
   if (user.role !== "ADMIN") redirect("/dashboard");
 
   const { id } = await params;
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
+  const successMessage = typeof resolvedSearchParams?.success === "string" ? resolvedSearchParams.success.trim() : "";
   const stockConfigRecord = await db.stockConfiguration.findUnique({ where: { id: "default" } });
   const stockNumberFormat = {
     qtyDecimalPlaces: normalizeQtyDecimalPlaces(stockConfigRecord?.qtyDecimalPlaces),
@@ -62,7 +64,7 @@ export default async function AdminStockTransactionDetailPage({ params }: Params
     include: {
       createdByAdmin: { select: { id: true, name: true, email: true } },
       cancelledByAdmin: { select: { id: true, name: true, email: true } },
-      revisedFrom: { select: { id: true, docNo: true } },
+      revisedFrom: { select: { id: true, transactionNo: true } },
       lines: {
         include: {
           inventoryProduct: { select: { id: true, code: true, description: true, baseUom: true } },
@@ -92,17 +94,24 @@ export default async function AdminStockTransactionDetailPage({ params }: Params
   return (
     <section className="section-pad">
       <div className="container-rk max-w-6xl space-y-6">
+        {successMessage ? (
+          <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+            {successMessage}
+          </div>
+        ) : null}
+
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.24em] text-red-400/80">Stock Transaction</p>
-            <h1 className="mt-3 text-4xl font-bold">{transaction.docNo || "-"}</h1>
+            <h1 className="mt-3 text-4xl font-bold">{transaction.docNo || transaction.transactionNo}</h1>
             <p className="mt-4 text-white/70">View stock transaction detail, line items, serials, and ledger impact.</p>
-                        {transaction.revisedFrom ? (
+            <p className="mt-2 text-sm text-white/45">Internal Transaction No: {transaction.transactionNo}</p>
+            {transaction.revisedFrom ? (
               <Link
                 href={`/admin/stock/transactions/${transaction.revisedFrom.id}`}
                 className="mt-3 inline-flex text-sm text-white/50 transition hover:text-white/80"
               >
-                ↳ Revised from previous version
+                ↳ Revision of {transaction.revisedFrom.transactionNo}
               </Link>
             ) : null}
           </div>

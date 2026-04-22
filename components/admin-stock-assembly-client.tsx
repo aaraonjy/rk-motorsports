@@ -1246,10 +1246,15 @@ export function AdminStockAssemblyClient({
           </button>
         </div>
 
-        {(submitError || submitSuccess) ? (
+        {submitSuccess ? (
+          <div className="mb-5 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+            {submitSuccess}
+          </div>
+        ) : null}
+
+        {submitError ? (
           <div className="mt-5 space-y-3">
-            {submitError ? <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{submitError}</div> : null}
-            {submitSuccess ? <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">{submitSuccess}</div> : null}
+            <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{submitError}</div>
           </div>
         ) : null}
 
