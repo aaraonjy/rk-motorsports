@@ -264,9 +264,9 @@ export default async function AdminStockTransactionDetailPage({ params, searchPa
           <div className="mt-8 space-y-5">
             {transaction.lines.map((line, index) => {
               const productLabel = `${line.inventoryProduct.code} — ${line.inventoryProduct.description}`;
-              const qtyValue = formatQty(Number(line.qty), stockNumberFormat.qtyDecimalPlaces);
+              const qtyValue = formatQty(line.qty, stockNumberFormat.qtyDecimalPlaces);
               const unitCostValue =
-                line.unitCost == null ? "" : formatMoney(Number(line.unitCost), stockNumberFormat.unitCostDecimalPlaces);
+                line.unitCost == null ? "" : formatMoney(line.unitCost, stockNumberFormat.unitCostDecimalPlaces);
               const locationLabel = formatLocationLabel(line);
               const serialLabel = line.serialEntries.length ? line.serialEntries.map((item) => item.serialNo).join(", ") : "";
 
@@ -315,9 +315,9 @@ export default async function AdminStockTransactionDetailPage({ params, searchPa
                         <td className="px-3 py-3 text-white">
                           {line.inventoryProduct.code} — {line.inventoryProduct.description}
                         </td>
-                        <td className="px-3 py-3 text-white/80">{ledger.direction}</td>
+                        <td className="px-3 py-3 text-white/80">{ledger.movementDirection}</td>
                         <td className="px-3 py-3 text-right text-white">
-                          {formatQty(Number(ledger.qty), stockNumberFormat.qtyDecimalPlaces)}
+                          {formatQty(ledger.qty, stockNumberFormat.qtyDecimalPlaces)}
                         </td>
                         <td className="px-3 py-3 text-white/75">
                           {ledger.location ? `${ledger.location.code} — ${ledger.location.name}` : "-"}
