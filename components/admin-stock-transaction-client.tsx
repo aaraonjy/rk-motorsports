@@ -708,6 +708,17 @@ export function AdminStockTransactionClient({
     [departmentOptions, filterProjectId]
   );
 
+  if (!stockSettings.stockModuleEnabled) {
+    return (
+      <div className="rounded-[2rem] border border-red-500/30 bg-red-500/10 p-6 backdrop-blur-md md:p-8">
+        <div className="text-lg font-semibold text-red-200">Stock Module Disabled</div>
+        <p className="mt-2 text-sm text-red-100/90">
+          Stock Control is currently disabled in Global Settings. Please enable it before using {title}.
+        </p>
+      </div>
+    );
+  }
+
   const filteredTransactions = useMemo(() => {
     return transactions.filter((item) => {
       const hasRevisionChildren = Array.isArray(item.revisions) && item.revisions.length > 0;

@@ -712,6 +712,17 @@ export function AdminStockAssemblyClient({
     priceDecimalPlaces: DEFAULT_STOCK_NUMBER_FORMAT_CONFIG.priceDecimalPlaces,
   });
 
+  if (!stockSettings.stockModuleEnabled) {
+    return (
+      <div className="rounded-[2rem] border border-red-500/30 bg-red-500/10 p-6 backdrop-blur-md md:p-8">
+        <div className="text-lg font-semibold text-red-200">Stock Module Disabled</div>
+        <p className="mt-2 text-sm text-red-100/90">
+          Stock Control is currently disabled in Global Settings. Please enable it before using Stock Assembly.
+        </p>
+      </div>
+    );
+  }
+
   const activeLocations = useMemo(() => locations.filter((item) => item.isActive), [locations]);
   const finishedGoodMap = useMemo(() => new Map(finishedGoods.map((item) => [item.id, item])), [finishedGoods]);
   const productMap = useMemo(() => new Map(allProducts.map((item) => [item.id, item])), [allProducts]);

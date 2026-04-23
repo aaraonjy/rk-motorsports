@@ -86,6 +86,9 @@ export function AdminStockConfigurationClient({ initialConfig, locations }: Prop
       }
 
       setSuccess("Stock settings saved successfully.");
+      setTimeout(() => {
+        window.location.reload();
+      }, 500);
     } catch {
       setError("Unable to save stock settings right now.");
     } finally {
