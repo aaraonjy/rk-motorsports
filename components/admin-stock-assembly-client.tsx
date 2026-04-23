@@ -1276,9 +1276,6 @@ export function AdminStockAssemblyClient({
                     <tr key={transaction.id} className={`align-top text-white/80 ${transaction.status === "CANCELLED" ? "bg-red-500/5" : ""}`}>
                       <td className="px-3 py-4 font-semibold text-white">
                         <div>{transaction.docNo || transaction.transactionNo}</div>
-                        {transaction.revisedFrom ? (
-                          <div className="mt-1 text-xs text-white/45">↳ Revised from previous version</div>
-                        ) : null}
                       </td>
                       <td className="px-3 py-4">{formatDateInput(transaction.transactionDate)}</td>
                       <td className="px-3 py-4">{transaction.reference || "-"}</td>
