@@ -61,14 +61,6 @@ export function AdminStockConfigurationClient({ initialConfig, locations }: Prop
     setSuccess(flash);
   }, []);
 
-  useEffect(() => {
-    if (!success) return;
-    const timer = window.setTimeout(() => {
-      setSuccess("");
-    }, 3000);
-    return () => window.clearTimeout(timer);
-  }, [success]);
-
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setIsSaving(true);
@@ -117,10 +109,8 @@ export function AdminStockConfigurationClient({ initialConfig, locations }: Prop
   return (
     <>
       {success ? (
-        <div className="fixed right-6 top-24 z-50">
-          <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-5 py-3 text-sm text-emerald-200 shadow-lg backdrop-blur-md">
-            {success}
-          </div>
+        <div className="mb-6 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-6 py-4 text-sm font-medium text-emerald-200 backdrop-blur-md">
+          {success}
         </div>
       ) : null}
 
