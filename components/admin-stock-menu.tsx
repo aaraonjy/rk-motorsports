@@ -51,6 +51,7 @@ const allItems = sections.flatMap((section) => section.items);
 export function AdminStockMenu() {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
+  const [stockModuleEnabled, setStockModuleEnabled] = useState(true);
   const [multiLocationEnabled, setMultiLocationEnabled] = useState(true);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
 
@@ -77,9 +78,13 @@ export function AdminStockMenu() {
         const response = await fetch("/api/admin/settings/stock", { cache: "no-store" });
         const data = await response.json();
         if (!response.ok || !data.ok || cancelled) return;
+        setStockModuleEnabled(Boolean(data.config?.stockModuleEnabled));
         setMultiLocationEnabled(Boolean(data.config?.multiLocationEnabled));
       } catch {
-        if (!cancelled) setMultiLocationEnabled(true);
+        if (!cancelled) {
+          setStockModuleEnabled(true);
+          setMultiLocationEnabled(true);
+        }
       }
     }
 
@@ -126,14 +131,20 @@ export function AdminStockMenu() {
 
               {section.items.map((item) => {
                 const active = pathname === item.href;
-                const disabled = Boolean(item.requiresMultiLocation) && !multiLocationEnabled;
+                const stockFeatureDisabled =
+                  !stockModuleEnabled && (section.key === "transactions" || section.key === "tracking");
+                const disabled = stockFeatureDisabled || (Boolean(item.requiresMultiLocation) && !multiLocationEnabled);
 
                 if (disabled) {
+                  const disabledTitle = stockFeatureDisabled
+                    ? "Enable Stock Control in Stock Settings to use this feature."
+                    : "Enable Multi Location in Stock Settings to use Stock Transfer.";
+
                   return (
                     <div
                       key={item.href}
                       className="block cursor-not-allowed px-4 py-4 text-sm text-white/35"
-                      title="Enable Multi Location in Stock Settings to use Stock Transfer."
+                      title={disabledTitle}
                     >
                       {item.label}
                     </div>
