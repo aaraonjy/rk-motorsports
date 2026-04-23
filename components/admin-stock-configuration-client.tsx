@@ -61,6 +61,14 @@ export function AdminStockConfigurationClient({ initialConfig, locations }: Prop
     setSuccess(flash);
   }, []);
 
+  useEffect(() => {
+    if (!success) return;
+    const timer = window.setTimeout(() => {
+      setSuccess("");
+    }, 3000);
+    return () => window.clearTimeout(timer);
+  }, [success]);
+
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setIsSaving(true);
@@ -107,7 +115,16 @@ export function AdminStockConfigurationClient({ initialConfig, locations }: Prop
   }
 
   return (
-    <form onSubmit={handleSubmit} className="grid gap-8 xl:grid-cols-[1.1fr_0.9fr]">
+    <>
+      {success ? (
+        <div className="fixed right-6 top-24 z-50">
+          <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-5 py-3 text-sm text-emerald-200 shadow-lg backdrop-blur-md">
+            {success}
+          </div>
+        </div>
+      ) : null}
+
+      <form onSubmit={handleSubmit} className="grid gap-8 xl:grid-cols-[1.1fr_0.9fr]">
       <div className="rounded-[2rem] border border-white/10 bg-black/45 p-6 backdrop-blur-md md:p-8">
         <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/45">Global Settings</p>
         <h2 className="mt-3 text-2xl font-bold text-white">Stock Module Settings</h2>
@@ -236,7 +253,6 @@ export function AdminStockConfigurationClient({ initialConfig, locations }: Prop
           </div>
 
           {error ? <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</div> : null}
-          {success ? <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">{success}</div> : null}
 
           <button disabled={isSaving} className="inline-flex min-w-[190px] items-center justify-center rounded-xl bg-red-500 px-5 py-3 font-semibold text-white transition hover:bg-red-400 disabled:cursor-not-allowed disabled:opacity-60">
             {isSaving ? "Saving..." : "Save Stock Settings"}
@@ -265,5 +281,6 @@ export function AdminStockConfigurationClient({ initialConfig, locations }: Prop
         </div>
       </div>
     </form>
+    </>
   );
 }
