@@ -30,6 +30,12 @@ export default async function AdminBatchNoPage() {
   if (!user) redirect("/login");
   if (user.role !== "ADMIN") redirect("/dashboard");
 
+  const stockConfig = await db.stockConfiguration.findUnique({
+    where: { id: "default" },
+    select: { stockModuleEnabled: true },
+  });
+  if (!stockConfig?.stockModuleEnabled) redirect("/admin");
+
   const [products, locations, batches] = await Promise.all([
     db.inventoryProduct.findMany({
       where: { trackInventory: true },

@@ -12,6 +12,12 @@ export default async function AdminSerialNoPage() {
   if (!user) redirect("/login");
   if (user.role !== "ADMIN") redirect("/dashboard");
 
+  const stockConfig = await db.stockConfiguration.findUnique({
+    where: { id: "default" },
+    select: { stockModuleEnabled: true },
+  });
+  if (!stockConfig?.stockModuleEnabled) redirect("/admin");
+
   const [products, locations, serials] = await Promise.all([
     db.inventoryProduct.findMany({
       where: { trackInventory: true },
