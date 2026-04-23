@@ -636,6 +636,7 @@ export function AdminStockTransactionClient({
   const [loadingSerials, setLoadingSerials] = useState<Record<number, boolean>>({});
   const [availableBatches, setAvailableBatches] = useState<Record<number, AvailableBatch[]>>({});
   const [loadingBatches, setLoadingBatches] = useState<Record<number, boolean>>({});
+  const [isStockSettingsLoaded, setIsStockSettingsLoaded] = useState(false);
   const [stockSettings, setStockSettings] = useState<StockSettingsConfig>({
     stockModuleEnabled: false,
     multiLocationEnabled: true,
@@ -708,7 +709,7 @@ export function AdminStockTransactionClient({
     [departmentOptions, filterProjectId]
   );
 
-  if (!stockSettings.stockModuleEnabled) {
+  if (isStockSettingsLoaded && !stockSettings.stockModuleEnabled) {
     return (
       <div className="rounded-[2rem] border border-red-500/30 bg-red-500/10 p-6 backdrop-blur-md md:p-8">
         <div className="text-lg font-semibold text-red-200">Stock Module Disabled</div>
@@ -792,6 +793,7 @@ export function AdminStockTransactionClient({
           allowDocNoOverrideAS: Boolean(data.config?.allowDocNoOverrideAS),
           ...normalizeStockNumberFormatConfig(data.config),
         });
+        setIsStockSettingsLoaded(true);
       } catch {
         if (!cancelled) {
           setStockSettings({
@@ -808,6 +810,7 @@ export function AdminStockTransactionClient({
             allowDocNoOverrideAS: false,
             ...DEFAULT_STOCK_NUMBER_FORMAT_CONFIG,
           });
+          setIsStockSettingsLoaded(true);
         }
       }
     }
