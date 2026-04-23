@@ -332,24 +332,6 @@ export default async function AdminStockTransactionDetailPage({ params, searchPa
             </div>
           </div>
 
-          <div className="mt-8 flex flex-wrap gap-3">
-            <Link
-              href={getBackHref(transaction.transactionType)}
-              className="rounded-xl border border-white/15 bg-white/5 px-5 py-3 text-sm text-white/80 transition hover:bg-white/10"
-            >
-              Back
-            </Link>
-            <Link
-              href={`/admin/stock/transactions/${transaction.id}/edit`}
-              className={`rounded-xl px-5 py-3 text-sm font-semibold text-white transition ${
-                transaction.status === "CANCELLED"
-                  ? "pointer-events-none cursor-not-allowed border border-white/10 bg-white/5 opacity-50"
-                  : "border border-white/15 bg-white/5 hover:bg-white/10"
-              }`}
-            >
-              Edit
-            </Link>
-          </div>
         </div>
       </div>
     </section>
