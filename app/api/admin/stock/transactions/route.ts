@@ -164,7 +164,7 @@ export async function GET(req: Request) {
             }
           : {}),
       },
-      orderBy: [{ transactionDate: "desc" }, { createdAt: "desc" }],
+      orderBy: [{ docNo: "desc" }, { transactionNo: "desc" }],
       take: 100,
       include: {
         createdByAdmin: { select: { id: true, name: true, email: true } },
