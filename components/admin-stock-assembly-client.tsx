@@ -1304,7 +1304,16 @@ export function AdminStockAssemblyClient({
                         <div className="flex flex-col gap-1">
                           <span>{transaction.docNo || transaction.transactionNo}</span>
                           {transaction.revisedFrom?.docNo ? (
-                            <span className="text-xs font-normal text-white/45">↳ Revision of {transaction.revisedFrom.docNo}</span>
+                            <span className="text-xs font-normal text-white/45">
+                              ↳ Revision of{" "}
+                              <Link
+                                href={`/admin/stock/transactions/${transaction.revisedFrom.id}`}
+                                className="text-blue-400 underline transition hover:text-blue-300"
+                                onClick={(event) => event.stopPropagation()}
+                              >
+                                {transaction.revisedFrom.docNo}
+                              </Link>
+                            </span>
                           ) : null}
                         </div>
                       </td>
