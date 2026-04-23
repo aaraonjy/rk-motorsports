@@ -11,10 +11,15 @@ import {
 type Params = { params: Promise<{ id: string }>; searchParams?: Promise<{ success?: string }> };
 
 function formatDate(value: Date | string | null | undefined) {
-  if (!value) return "-";
+  if (!value) return "";
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "-";
+  if (Number.isNaN(date.getTime())) return "";
   return date.toISOString().slice(0, 10);
+}
+
+function formatDateDisplay(value: Date | string | null | undefined) {
+  const formatted = formatDate(value);
+  return formatted || "-";
 }
 
 function getBackHref(type: "OB" | "SR" | "SI" | "SA" | "ST" | "AS") {
@@ -36,12 +41,79 @@ function getBackHref(type: "OB" | "SR" | "SI" | "SA" | "ST" | "AS") {
   }
 }
 
+function getTypeLabel(type: "OB" | "SR" | "SI" | "SA" | "ST" | "AS") {
+  switch (type) {
+    case "OB":
+      return "Opening Stock";
+    case "SR":
+      return "Stock Receive";
+    case "SI":
+      return "Stock Issue";
+    case "SA":
+      return "Stock Adjustment";
+    case "ST":
+      return "Stock Transfer";
+    case "AS":
+      return "Stock Assembly";
+    default:
+      return "Stock Transaction";
+  }
+}
+
 function formatQty(value: number | string | null | undefined, decimalPlaces: number) {
   return formatNumberByDecimalPlaces(value, decimalPlaces);
 }
 
 function formatMoney(value: number | string | null | undefined, decimalPlaces: number) {
-  return `RM ${formatNumberByDecimalPlaces(value, decimalPlaces)}`;
+  return formatNumberByDecimalPlaces(value, decimalPlaces);
+}
+
+function formatLocationLabel(line: {
+  location?: { code: string; name: string } | null;
+  fromLocation?: { code: string; name: string } | null;
+  toLocation?: { code: string; name: string } | null;
+}) {
+  if (line.location) return `${line.location.code} — ${line.location.name}`;
+  if (line.fromLocation && line.toLocation) {
+    return `${line.fromLocation.code} — ${line.fromLocation.name} → ${line.toLocation.code} — ${line.toLocation.name}`;
+  }
+  if (line.fromLocation) return `${line.fromLocation.code} — ${line.fromLocation.name}`;
+  if (line.toLocation) return `${line.toLocation.code} — ${line.toLocation.name}`;
+  return "";
+}
+
+function ReadonlyField({
+  label,
+  value,
+  className = "",
+}: {
+  label: string;
+  value: string;
+  className?: string;
+}) {
+  return (
+    <div className={className}>
+      <label className="label-rk">{label}</label>
+      <input className="input-rk" value={value} readOnly disabled />
+    </div>
+  );
+}
+
+function ReadonlyTextArea({
+  label,
+  value,
+  className = "",
+}: {
+  label: string;
+  value: string;
+  className?: string;
+}) {
+  return (
+    <div className={className}>
+      <label className="label-rk">{label}</label>
+      <textarea className="input-rk min-h-[96px] resize-none" value={value} readOnly disabled />
+    </div>
+  );
 }
 
 export default async function AdminStockTransactionDetailPage({ params, searchParams }: Params) {
@@ -52,6 +124,7 @@ export default async function AdminStockTransactionDetailPage({ params, searchPa
   const { id } = await params;
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const successMessage = typeof resolvedSearchParams?.success === "string" ? resolvedSearchParams.success.trim() : "";
+
   const stockConfigRecord = await db.stockConfiguration.findUnique({ where: { id: "default" } });
   const stockNumberFormat = {
     qtyDecimalPlaces: normalizeQtyDecimalPlaces(stockConfigRecord?.qtyDecimalPlaces),
@@ -93,9 +166,12 @@ export default async function AdminStockTransactionDetailPage({ params, searchPa
     );
   }
 
+  const title = getTypeLabel(transaction.transactionType);
+  const intro = "View stock transaction details in read-only mode.";
+
   return (
     <section className="section-pad">
-      <div className="container-rk max-w-6xl space-y-6">
+      <div className="container-rk max-w-7xl space-y-6">
         {successMessage ? (
           <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
             {successMessage}
@@ -106,7 +182,7 @@ export default async function AdminStockTransactionDetailPage({ params, searchPa
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.24em] text-red-400/80">Stock Transaction</p>
             <h1 className="mt-3 text-4xl font-bold">{transaction.docNo || transaction.transactionNo}</h1>
-            <p className="mt-4 text-white/70">View stock transaction detail, line items, serials, and ledger impact.</p>
+            <p className="mt-4 max-w-3xl text-white/70">{intro}</p>
             {transaction.revisedFrom?.docNo ? (
               <Link
                 href={`/admin/stock/transactions/${transaction.revisedFrom.id}`}
@@ -136,122 +212,143 @@ export default async function AdminStockTransactionDetailPage({ params, searchPa
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-4 xl:grid-cols-6">
-          <div className="rounded-2xl border border-white/10 bg-black/45 p-4 backdrop-blur-md">
-            <p className="text-xs uppercase tracking-[0.24em] text-white/40">Status</p>
-            <p className="mt-3 text-lg font-bold text-white">{transaction.status === "CANCELLED" ? "Cancelled" : "Posted"}</p>
-          </div>
-          <div className="rounded-2xl border border-white/10 bg-black/45 p-4 backdrop-blur-md">
-            <p className="text-xs uppercase tracking-[0.24em] text-white/40">Document Date</p>
-            <p className="mt-3 text-lg font-bold text-white">{formatDate(transaction.docDate || transaction.transactionDate)}</p>
-          </div>
-          <div className="rounded-2xl border border-white/10 bg-black/45 p-4 backdrop-blur-md">
-            <p className="text-xs uppercase tracking-[0.24em] text-white/40">Reference</p>
-            <p className="mt-3 text-lg font-bold text-white">{transaction.reference || "-"}</p>
-          </div>
-          <div className="rounded-2xl border border-white/10 bg-black/45 p-4 backdrop-blur-md">
-            <p className="text-xs uppercase tracking-[0.24em] text-white/40">Created By</p>
-            <p className="mt-3 text-lg font-bold text-white">{transaction.createdByAdmin?.name || "-"}</p>
-          </div>
-          <div className="rounded-2xl border border-white/10 bg-black/45 p-4 backdrop-blur-md">
-            <p className="text-xs uppercase tracking-[0.24em] text-white/40">Project</p>
-            <p className="mt-3 text-lg font-bold text-white">{transaction.project ? `${transaction.project.code} — ${transaction.project.name}` : "-"}</p>
-          </div>
-          <div className="rounded-2xl border border-white/10 bg-black/45 p-4 backdrop-blur-md">
-            <p className="text-xs uppercase tracking-[0.24em] text-white/40">Department</p>
-            <p className="mt-3 text-lg font-bold text-white">{transaction.department ? `${transaction.department.code} — ${transaction.department.name}` : "-"}</p>
-          </div>
-        </div>
-
         {transaction.status === "CANCELLED" ? (
           <div className="rounded-2xl border border-red-500/25 bg-red-500/10 p-5 text-sm text-red-100">
             <div className="font-semibold">This transaction has been cancelled.</div>
-            <div className="mt-2">Cancelled At: {formatDate(transaction.cancelledAt)}</div>
+            <div className="mt-2">Cancelled At: {formatDateDisplay(transaction.cancelledAt)}</div>
             <div className="mt-1">Cancelled By: {transaction.cancelledByAdmin?.name || "-"}</div>
             <div className="mt-1">Reason: {transaction.cancelReason || "-"}</div>
           </div>
         ) : null}
 
-        <div className="rounded-[2rem] border border-white/10 bg-black/45 p-5 backdrop-blur-md">
-          <h2 className="text-xl font-semibold text-white">Products</h2>
-          <div className="mt-4 overflow-x-auto">
-            <table className="min-w-full divide-y divide-white/10 text-sm">
-              <thead>
-                <tr className="text-left text-white/45">
-                  <th className="px-3 py-3 font-medium">Product</th>
-                  <th className="px-3 py-3 font-medium text-right">Qty</th>
-                  <th className="px-3 py-3 font-medium text-right">Unit Cost</th>
-                  <th className="px-3 py-3 font-medium">Batch</th>
-                  <th className="px-3 py-3 font-medium">Location</th>
-                  <th className="px-3 py-3 font-medium">Serial No</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/10">
-                {transaction.lines.map((line) => (
-                  <tr key={line.id}>
-                    <td className="px-3 py-3 text-white">
-                      <div className="font-medium">{line.inventoryProduct.code}</div>
-                      <div className="text-white/60">{line.inventoryProduct.description}</div>
-                    </td>
-                    <td className="px-3 py-3 text-right text-white">
-                      {formatQty(Number(line.qty ?? 0), stockNumberFormat.qtyDecimalPlaces)}
-                    </td>
-                    <td className="px-3 py-3 text-right text-white">
-                      {line.unitCost == null ? "-" : formatMoney(Number(line.unitCost), stockNumberFormat.unitCostDecimalPlaces)}
-                    </td>
-                    <td className="px-3 py-3 text-white/75">{line.batchNo || "-"}</td>
-                    <td className="px-3 py-3 text-white/75">
-                      {line.location
-                        ? `${line.location.code} — ${line.location.name}`
-                        : line.fromLocation && line.toLocation
-                          ? `${line.fromLocation.code} — ${line.fromLocation.name} → ${line.toLocation.code} — ${line.toLocation.name}`
-                          : "-"}
-                    </td>
-                    <td className="px-3 py-3 text-white/75">
-                      {line.serialEntries.length ? line.serialEntries.map((item) => item.serialNo).join(", ") : "-"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <div className="rounded-[2rem] border border-white/10 bg-black/45 p-5 backdrop-blur-md md:p-6">
+          <p className="text-sm font-semibold uppercase tracking-[0.24em] text-white/40">{title}</p>
+          <h2 className="mt-4 text-4xl font-bold">View {title}</h2>
+          <p className="mt-4 max-w-3xl text-white/70">
+            Use the same transaction layout in read-only mode for easier review and checking.
+          </p>
 
-        <div className="rounded-[2rem] border border-white/10 bg-black/45 p-5 backdrop-blur-md">
-          <h2 className="text-xl font-semibold text-white">Ledger Impact</h2>
-          <div className="mt-4 overflow-x-auto">
-            <table className="min-w-full divide-y divide-white/10 text-sm">
-              <thead>
-                <tr className="text-left text-white/45">
-                  <th className="px-3 py-3 font-medium">Product</th>
-                  <th className="px-3 py-3 font-medium">Direction</th>
-                  <th className="px-3 py-3 font-medium text-right">Qty</th>
-                  <th className="px-3 py-3 font-medium">Location</th>
-                  <th className="px-3 py-3 font-medium">Batch</th>
-                  <th className="px-3 py-3 font-medium">Remarks</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/10">
-                {transaction.lines.flatMap((line) =>
-                  line.ledgerEntries.map((entry) => (
-                    <tr key={entry.id}>
-                      <td className="px-3 py-3 text-white">
-                        {line.inventoryProduct.code} — {line.inventoryProduct.description}
-                      </td>
-                      <td className="px-3 py-3 text-white/75">{entry.movementDirection}</td>
-                      <td className="px-3 py-3 text-right text-white">
-                        {formatQty(Number(entry.qty ?? 0), stockNumberFormat.qtyDecimalPlaces)}
-                      </td>
-                      <td className="px-3 py-3 text-white/75">
-                        {entry.location ? `${entry.location.code} — ${entry.location.name}` : "-"}
-                      </td>
-                      <td className="px-3 py-3 text-white/75">{entry.batchNo || "-"}</td>
-                      <td className="px-3 py-3 text-white/75">{entry.remarks || "-"}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+          <div className="mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+            <ReadonlyField label="Transaction Date" value={formatDateDisplay(transaction.transactionDate)} />
+            <ReadonlyField label="Document Date" value={formatDateDisplay(transaction.docDate || transaction.transactionDate)} />
+            <ReadonlyField
+              label="System Doc No"
+              value={transaction.docNo || transaction.transactionNo || ""}
+              className="xl:col-span-2"
+            />
+          </div>
+
+          <div className="mt-5 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+            <ReadonlyField
+              label="Document Description"
+              value={transaction.docDesc || ""}
+              className={transaction.project || transaction.department ? "md:col-span-2" : "xl:col-span-4 md:col-span-2"}
+            />
+            {transaction.project ? (
+              <ReadonlyField
+                label="Project"
+                value={`${transaction.project.code} — ${transaction.project.name}`}
+                className={transaction.department ? "" : "xl:col-span-2"}
+              />
+            ) : null}
+            {transaction.department ? (
+              <ReadonlyField label="Department" value={`${transaction.department.code} — ${transaction.department.name}`} />
+            ) : null}
+          </div>
+
+          <div className="mt-5 grid gap-5 md:grid-cols-2">
+            <ReadonlyField label="Reference" value={transaction.reference || ""} />
+            <ReadonlyField label="Remarks" value={transaction.remarks || ""} />
+          </div>
+
+          <div className="mt-8 space-y-5">
+            {transaction.lines.map((line, index) => {
+              const productLabel = `${line.inventoryProduct.code} — ${line.inventoryProduct.description}`;
+              const qtyValue = formatQty(line.qty, stockNumberFormat.qtyDecimalPlaces);
+              const unitCostValue =
+                line.unitCost == null ? "" : formatMoney(line.unitCost, stockNumberFormat.unitCostDecimalPlaces);
+              const locationLabel = formatLocationLabel(line);
+              const serialLabel = line.serialEntries.length ? line.serialEntries.map((item) => item.serialNo).join(", ") : "";
+
+              return (
+                <div key={line.id} className="rounded-[1.75rem] border border-white/10 p-5">
+                  <div className="text-xl font-semibold text-white">Product {index + 1}</div>
+
+                  <div className="mt-5 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+                    <ReadonlyField label="Product" value={productLabel} className="md:col-span-2" />
+                    <ReadonlyField label="Qty" value={qtyValue} />
+                    <ReadonlyField label="Unit Cost" value={unitCostValue} />
+                  </div>
+
+                  <div className="mt-5 grid gap-5 md:grid-cols-2">
+                    <ReadonlyField label="Location" value={locationLabel} />
+                    <ReadonlyField label="Batch" value={line.batchNo || ""} />
+                  </div>
+
+                  <div className="mt-5 grid gap-5 md:grid-cols-2">
+                    <ReadonlyTextArea label="Serial No" value={serialLabel} />
+                    <ReadonlyTextArea label="Product Remarks" value={line.remarks || ""} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="mt-8 rounded-[1.75rem] border border-white/10 p-5">
+            <h3 className="text-2xl font-semibold text-white">Ledger Impact</h3>
+            <div className="mt-4 overflow-x-auto">
+              <table className="min-w-full divide-y divide-white/10 text-sm">
+                <thead>
+                  <tr className="text-left text-white/45">
+                    <th className="px-3 py-3 font-medium">Product</th>
+                    <th className="px-3 py-3 font-medium">Direction</th>
+                    <th className="px-3 py-3 font-medium text-right">Qty</th>
+                    <th className="px-3 py-3 font-medium">Location</th>
+                    <th className="px-3 py-3 font-medium">Batch</th>
+                    <th className="px-3 py-3 font-medium">Remarks</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/10">
+                  {transaction.lines.flatMap((line) =>
+                    line.ledgerEntries.map((ledger) => (
+                      <tr key={ledger.id}>
+                        <td className="px-3 py-3 text-white">
+                          {line.inventoryProduct.code} — {line.inventoryProduct.description}
+                        </td>
+                        <td className="px-3 py-3 text-white/80">{ledger.direction}</td>
+                        <td className="px-3 py-3 text-right text-white">
+                          {formatQty(ledger.qty, stockNumberFormat.qtyDecimalPlaces)}
+                        </td>
+                        <td className="px-3 py-3 text-white/75">
+                          {ledger.location ? `${ledger.location.code} — ${ledger.location.name}` : "-"}
+                        </td>
+                        <td className="px-3 py-3 text-white/75">{ledger.batchNo || "-"}</td>
+                        <td className="px-3 py-3 text-white/75">{ledger.remarks || "-"}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="mt-8 flex flex-wrap gap-3">
+            <Link
+              href={getBackHref(transaction.transactionType)}
+              className="rounded-xl border border-white/15 bg-white/5 px-5 py-3 text-sm text-white/80 transition hover:bg-white/10"
+            >
+              Back
+            </Link>
+            <Link
+              href={`/admin/stock/transactions/${transaction.id}/edit`}
+              className={`rounded-xl px-5 py-3 text-sm font-semibold text-white transition ${
+                transaction.status === "CANCELLED"
+                  ? "pointer-events-none cursor-not-allowed border border-white/10 bg-white/5 opacity-50"
+                  : "border border-white/15 bg-white/5 hover:bg-white/10"
+              }`}
+            >
+              Edit
+            </Link>
           </div>
         </div>
       </div>
