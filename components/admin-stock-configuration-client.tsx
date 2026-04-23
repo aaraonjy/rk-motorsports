@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   MoneyDecimalPlaces,
   QtyDecimalPlaces,
@@ -42,6 +42,8 @@ const transactionTypeOptions = [
   ["allowDocNoOverrideAS", "Stock Assembly"],
 ] as const;
 
+const STOCK_SETTINGS_SUCCESS_FLASH_KEY = "rk_stock_settings_success_flash";
+
 export function AdminStockConfigurationClient({ initialConfig, locations }: Props) {
   const [form, setForm] = useState(initialConfig);
   const [isSaving, setIsSaving] = useState(false);
@@ -50,6 +52,14 @@ export function AdminStockConfigurationClient({ initialConfig, locations }: Prop
 
   const activeLocations = useMemo(() => locations.filter((item) => item.isActive), [locations]);
   const stockControlEnabled = form.stockModuleEnabled;
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const flash = window.sessionStorage.getItem(STOCK_SETTINGS_SUCCESS_FLASH_KEY);
+    if (!flash) return;
+    window.sessionStorage.removeItem(STOCK_SETTINGS_SUCCESS_FLASH_KEY);
+    setSuccess(flash);
+  }, []);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -85,10 +95,10 @@ export function AdminStockConfigurationClient({ initialConfig, locations }: Prop
         return;
       }
 
-      setSuccess("Stock settings saved successfully.");
-      setTimeout(() => {
+      if (typeof window !== "undefined") {
+        window.sessionStorage.setItem(STOCK_SETTINGS_SUCCESS_FLASH_KEY, "Stock settings saved successfully.");
         window.location.reload();
-      }, 500);
+      }
     } catch {
       setError("Unable to save stock settings right now.");
     } finally {
