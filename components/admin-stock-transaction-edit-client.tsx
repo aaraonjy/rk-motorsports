@@ -658,6 +658,8 @@ export function AdminStockTransactionEditClient({
   const [submitSuccess, setSubmitSuccess] = useState("");
   const [projectOptions, setProjectOptions] = useState<ProjectOption[]>([]);
   const [departmentOptions, setDepartmentOptions] = useState<DepartmentOption[]>([]);
+  const initialProjectIdRef = useRef(initialTransaction.project?.id || "");
+  const initialDepartmentIdRef = useRef(initialTransaction.department?.id || "");
 
   const activeLocations = useMemo(() => initialLocations.filter((item) => item.isActive), [initialLocations]);
 
@@ -750,6 +752,22 @@ export function AdminStockTransactionEditClient({
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (!projectFeatureEnabled) return;
+    const initialProjectId = initialProjectIdRef.current;
+    if (!initialProjectId) return;
+    if (!projectOptions.some((item) => item.id === initialProjectId && item.isActive)) return;
+    setProjectId((prev) => (prev ? prev : initialProjectId));
+  }, [projectFeatureEnabled, projectOptions]);
+
+  useEffect(() => {
+    if (!departmentFeatureEnabled) return;
+    const initialDepartmentId = initialDepartmentIdRef.current;
+    if (!initialDepartmentId) return;
+    if (!departmentOptions.some((item) => item.id === initialDepartmentId && item.isActive)) return;
+    setDepartmentId((prev) => (prev ? prev : initialDepartmentId));
+  }, [departmentFeatureEnabled, departmentOptions]);
 
   useEffect(() => {
     if (departmentId && !filteredDepartmentOptions.some((item) => item.id === departmentId)) {

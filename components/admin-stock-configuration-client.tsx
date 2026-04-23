@@ -60,6 +60,7 @@ export function AdminStockConfigurationClient({ initialConfig, locations }: Prop
     const flash = window.sessionStorage.getItem(STOCK_SETTINGS_SUCCESS_FLASH_KEY);
     if (!flash) return;
     window.sessionStorage.removeItem(STOCK_SETTINGS_SUCCESS_FLASH_KEY);
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
     setSuccess(flash);
   }, []);
 
@@ -101,7 +102,7 @@ export function AdminStockConfigurationClient({ initialConfig, locations }: Prop
 
       if (typeof window !== "undefined") {
         window.sessionStorage.setItem(STOCK_SETTINGS_SUCCESS_FLASH_KEY, "Stock settings saved successfully.");
-        window.location.reload();
+        window.location.href = window.location.pathname;
       }
     } catch {
       setError("Unable to save stock settings right now.");
