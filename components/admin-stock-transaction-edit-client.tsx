@@ -126,6 +126,8 @@ type StockSettingsConfig = {
   stockModuleEnabled: boolean;
   multiLocationEnabled: boolean;
   allowNegativeStock: boolean;
+  enableProject?: boolean;
+  enableDepartment?: boolean;
   costingMethod: "AVERAGE";
   defaultLocationId: string;
   qtyDecimalPlaces: 0 | 2 | 3;
@@ -643,6 +645,8 @@ export function AdminStockTransactionEditClient({
     stockModuleEnabled: false,
     multiLocationEnabled: true,
     allowNegativeStock: false,
+    enableProject: false,
+    enableDepartment: false,
     costingMethod: "AVERAGE",
     defaultLocationId: "",
     qtyDecimalPlaces: DEFAULT_STOCK_NUMBER_FORMAT_CONFIG.qtyDecimalPlaces,
@@ -695,6 +699,8 @@ export function AdminStockTransactionEditClient({
           stockModuleEnabled: Boolean(data.config?.stockModuleEnabled),
           multiLocationEnabled: Boolean(data.config?.multiLocationEnabled),
           allowNegativeStock: Boolean(data.config?.allowNegativeStock),
+          enableProject: Boolean(data.config?.enableProject),
+          enableDepartment: Boolean(data.config?.enableDepartment),
           costingMethod: "AVERAGE",
           defaultLocationId: data.config?.defaultLocationId || "",
           allowDocNoOverrideOB: Boolean(data.config?.allowDocNoOverrideOB),
@@ -748,6 +754,17 @@ export function AdminStockTransactionEditClient({
       setDepartmentId("");
     }
   }, [departmentId, filteredDepartmentOptions]);
+
+  useEffect(() => {
+    if (projectFeatureEnabled) return;
+    if (projectId) setProjectId("");
+    if (departmentId) setDepartmentId("");
+  }, [projectFeatureEnabled, projectId, departmentId]);
+
+  useEffect(() => {
+    if (departmentFeatureEnabled) return;
+    if (departmentId) setDepartmentId("");
+  }, [departmentFeatureEnabled, departmentId]);
 
   useEffect(() => {
     if (!singleLocationMode || !lockedLocationId) return;
@@ -968,8 +985,8 @@ export function AdminStockTransactionEditClient({
         docDate,
         docNo: canOverrideDocNoForType(stockSettings, transactionType) ? docNo.trim() || null : null,
         docDesc: docDesc.trim() || null,
-        projectId: projectId || null,
-        departmentId: departmentId || null,
+        projectId: projectFeatureEnabled ? (projectId || null) : null,
+        departmentId: departmentFeatureEnabled ? (departmentId || null) : null,
         reference: reference.trim() || null,
         remarks: remarks.trim() || null,
         lines: lines.map((line) => ({
@@ -1068,30 +1085,34 @@ export function AdminStockTransactionEditClient({
             <label className="label-rk">Document Description</label>
             <input className="input-rk" value={docDesc} onChange={(e) => setDocDesc(e.target.value)} placeholder="Optional document description" />
           </div>
-          <div>
-            <label className="label-rk">Project</label>
-            <div className="relative">
-              <select className="input-rk appearance-none pr-12" value={projectId} onChange={(e) => setProjectId(e.target.value)}>
-                <option value="">Select project</option>
-                {projectOptions.filter((item) => item.isActive).map((item) => (
-                  <option key={item.id} value={item.id}>{item.code} — {item.name}</option>
-                ))}
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/60">▾</div>
+          {projectFeatureEnabled ? (
+            <div>
+              <label className="label-rk">Project</label>
+              <div className="relative">
+                <select className="input-rk appearance-none pr-12" value={projectId} onChange={(e) => setProjectId(e.target.value)}>
+                  <option value="">Select project</option>
+                  {projectOptions.filter((item) => item.isActive).map((item) => (
+                    <option key={item.id} value={item.id}>{item.code} — {item.name}</option>
+                  ))}
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/60">▾</div>
+              </div>
             </div>
-          </div>
-          <div>
-            <label className="label-rk">Department</label>
-            <div className="relative">
-              <select className={`input-rk appearance-none pr-12 ${!projectId ? "cursor-not-allowed opacity-60" : ""}`} value={departmentId} onChange={(e) => setDepartmentId(e.target.value)} disabled={!projectId}>
-                <option value="">Select department</option>
-                {filteredDepartmentOptions.map((item) => (
-                  <option key={item.id} value={item.id}>{item.code} — {item.name}</option>
-                ))}
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/60">▾</div>
+          ) : null}
+          {departmentFeatureEnabled ? (
+            <div>
+              <label className="label-rk">Department</label>
+              <div className="relative">
+                <select className={`input-rk appearance-none pr-12 ${!projectId ? "cursor-not-allowed opacity-60" : ""}`} value={departmentId} onChange={(e) => setDepartmentId(e.target.value)} disabled={!projectId}>
+                  <option value="">Select department</option>
+                  {filteredDepartmentOptions.map((item) => (
+                    <option key={item.id} value={item.id}>{item.code} — {item.name}</option>
+                  ))}
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/60">▾</div>
+              </div>
             </div>
-          </div>
+          ) : null}
           <div>
             <label className="label-rk">Reference</label>
             <input className="input-rk" value={reference} onChange={(e) => setReference(e.target.value)} placeholder="Optional reference" />

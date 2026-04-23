@@ -23,6 +23,8 @@ export async function GET() {
         stockModuleEnabled: true,
         multiLocationEnabled: true,
         allowNegativeStock: true,
+        enableProject: true,
+        enableDepartment: true,
         costingMethod: true,
         defaultLocationId: true,
         qtyDecimalPlaces: true,
@@ -43,6 +45,8 @@ export async function GET() {
         stockModuleEnabled: config?.stockModuleEnabled ?? false,
         multiLocationEnabled: config?.multiLocationEnabled ?? false,
         allowNegativeStock: config?.allowNegativeStock ?? false,
+        enableProject: config?.enableProject ?? false,
+        enableDepartment: config?.enableDepartment ?? false,
         costingMethod: config?.costingMethod ?? StockCostingMethod.AVERAGE,
         defaultLocationId: config?.defaultLocationId ?? "",
         qtyDecimalPlaces: normalizeQtyDecimalPlaces(config?.qtyDecimalPlaces),
@@ -72,6 +76,8 @@ export async function POST(req: Request) {
     const stockModuleEnabled = Boolean(body.stockModuleEnabled);
     const multiLocationEnabled = stockModuleEnabled ? Boolean(body.multiLocationEnabled) : false;
     const allowNegativeStock = stockModuleEnabled ? Boolean(body.allowNegativeStock) : false;
+    const enableProject = stockModuleEnabled ? Boolean(body.enableProject) : false;
+    const enableDepartment = stockModuleEnabled && enableProject ? Boolean(body.enableDepartment) : false;
     const costingMethod = normalizeCostingMethod(body.costingMethod);
     const defaultLocationId = typeof body.defaultLocationId === "string" && body.defaultLocationId.trim() ? body.defaultLocationId.trim() : null;
     const qtyDecimalPlaces = normalizeQtyDecimalPlaces(body.qtyDecimalPlaces);
@@ -103,6 +109,8 @@ export async function POST(req: Request) {
         stockModuleEnabled,
         multiLocationEnabled,
         allowNegativeStock,
+        enableProject,
+        enableDepartment,
         costingMethod,
         defaultLocationId: stockModuleEnabled ? defaultLocationId : null,
         qtyDecimalPlaces,
@@ -120,6 +128,8 @@ export async function POST(req: Request) {
         stockModuleEnabled,
         multiLocationEnabled,
         allowNegativeStock,
+        enableProject,
+        enableDepartment,
         costingMethod,
         defaultLocationId: stockModuleEnabled ? defaultLocationId : null,
         qtyDecimalPlaces: DEFAULT_STOCK_NUMBER_FORMAT_CONFIG.qtyDecimalPlaces,
@@ -148,6 +158,8 @@ export async function POST(req: Request) {
             stockModuleEnabled: existing.stockModuleEnabled,
             multiLocationEnabled: existing.multiLocationEnabled,
             allowNegativeStock: existing.allowNegativeStock,
+            enableProject: existing.enableProject,
+            enableDepartment: existing.enableDepartment,
             costingMethod: existing.costingMethod,
             defaultLocationId: existing.defaultLocationId,
             qtyDecimalPlaces: normalizeQtyDecimalPlaces(existing.qtyDecimalPlaces),
@@ -165,6 +177,8 @@ export async function POST(req: Request) {
         stockModuleEnabled: saved.stockModuleEnabled,
         multiLocationEnabled: saved.multiLocationEnabled,
         allowNegativeStock: saved.allowNegativeStock,
+        enableProject: saved.enableProject,
+        enableDepartment: saved.enableDepartment,
         costingMethod: saved.costingMethod,
         defaultLocationId: saved.defaultLocationId,
         qtyDecimalPlaces: normalizeQtyDecimalPlaces(saved.qtyDecimalPlaces),

@@ -370,6 +370,8 @@ export async function PUT(req: Request, context: Params) {
     }
 
     const config = await db.stockConfiguration.findUnique({ where: { id: "default" } });
+    const projectFeatureEnabled = Boolean(config?.enableProject);
+    const departmentFeatureEnabled = projectFeatureEnabled && Boolean(config?.enableDepartment);
     const formatConfig = {
       qtyDecimalPlaces: normalizeQtyDecimalPlaces(config?.qtyDecimalPlaces),
       unitCostDecimalPlaces: normalizeMoneyDecimalPlaces(config?.unitCostDecimalPlaces),
@@ -384,19 +386,26 @@ export async function PUT(req: Request, context: Params) {
       return NextResponse.json({ ok: false, error: "Manual Document No override is not allowed for this transaction type." }, { status: 400 });
     }
 
+    const effectiveProjectId = projectFeatureEnabled ? projectId : null;
+    const effectiveDepartmentId = departmentFeatureEnabled ? departmentId : null;
+
+    if (effectiveDepartmentId && !effectiveProjectId) {
+      return NextResponse.json({ ok: false, error: "Project is required when Department is selected." }, { status: 400 });
+    }
+
     const [project, department] = await Promise.all([
-      projectId
-        ? db.project.findUnique({ where: { id: projectId }, select: { id: true, code: true, name: true, isActive: true } })
+      effectiveProjectId
+        ? db.project.findUnique({ where: { id: effectiveProjectId }, select: { id: true, code: true, name: true, isActive: true } })
         : Promise.resolve(null),
-      departmentId
-        ? db.department.findUnique({ where: { id: departmentId }, select: { id: true, code: true, name: true, projectId: true, isActive: true } })
+      effectiveDepartmentId
+        ? db.department.findUnique({ where: { id: effectiveDepartmentId }, select: { id: true, code: true, name: true, projectId: true, isActive: true } })
         : Promise.resolve(null),
     ]);
 
-    if (projectId && (!project || !project.isActive)) {
+    if (effectiveProjectId && (!project || !project.isActive)) {
       return NextResponse.json({ ok: false, error: "Project is invalid or inactive." }, { status: 400 });
     }
-    if (departmentId && (!department || !department.isActive)) {
+    if (effectiveDepartmentId && (!department || !department.isActive)) {
       return NextResponse.json({ ok: false, error: "Department is invalid or inactive." }, { status: 400 });
     }
     if (department && project && department.projectId !== project.id) {
@@ -885,8 +894,8 @@ export async function PUT(req: Request, context: Params) {
         docNo: created?.docNo ?? null,
         docDate: docDate.toISOString(),
         docDesc,
-        projectId: project?.id ?? null,
-        departmentId: department?.id ?? null,
+        projectId: projectFeatureEnabled ? (project?.id ?? null) : null,
+        departmentId: departmentFeatureEnabled ? (department?.id ?? null) : null,
         reference,
         remarks,
         lineCount: normalizedLines.length,

@@ -235,6 +235,8 @@ model StockConfiguration {
   stockModuleEnabled    Boolean            @default(false)
   multiLocationEnabled  Boolean            @default(false)
   allowNegativeStock    Boolean            @default(false)
+  enableProject         Boolean            @default(false)
+  enableDepartment      Boolean            @default(false)
   costingMethod         StockCostingMethod @default(AVERAGE)
   multiUomEnabled       Boolean            @default(false)
   serialTrackingEnabled Boolean            @default(false)

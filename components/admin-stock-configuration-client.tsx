@@ -18,6 +18,8 @@ type Props = {
     stockModuleEnabled: boolean;
     multiLocationEnabled: boolean;
     allowNegativeStock: boolean;
+    enableProject: boolean;
+    enableDepartment: boolean;
     costingMethod: "AVERAGE";
     defaultLocationId: string;
     qtyDecimalPlaces: QtyDecimalPlaces;
@@ -80,6 +82,8 @@ export function AdminStockConfigurationClient({ initialConfig, locations }: Prop
             ...form,
             multiLocationEnabled: false,
             allowNegativeStock: false,
+            enableProject: false,
+            enableDepartment: false,
             defaultLocationId: "",
           };
 
@@ -134,6 +138,8 @@ export function AdminStockConfigurationClient({ initialConfig, locations }: Prop
                     stockModuleEnabled: e.target.checked,
                     multiLocationEnabled: e.target.checked ? prev.multiLocationEnabled : false,
                     allowNegativeStock: e.target.checked ? prev.allowNegativeStock : false,
+                    enableProject: e.target.checked ? prev.enableProject : false,
+                    enableDepartment: e.target.checked && prev.enableProject ? prev.enableDepartment : false,
                     defaultLocationId: e.target.checked ? prev.defaultLocationId : "",
                   }))
                 }
@@ -158,6 +164,38 @@ export function AdminStockConfigurationClient({ initialConfig, locations }: Prop
               />
               <span>Allow Negative Stock</span>
             </label>
+
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+            <div className="font-semibold text-white">Project / Department</div>
+            <p className="mt-2 text-sm text-white/55">Enable optional stock document tagging fields for Project and Department. Department depends on Project.</p>
+            <div className="mt-4 grid gap-3 text-sm text-white/75">
+              <label className={`flex items-center gap-3 ${stockControlEnabled ? "" : "opacity-50"}`}>
+                <input
+                  type="checkbox"
+                  checked={form.enableProject}
+                  disabled={!stockControlEnabled}
+                  onChange={(e) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      enableProject: e.target.checked,
+                      enableDepartment: e.target.checked ? prev.enableDepartment : false,
+                    }))
+                  }
+                />
+                <span>Enable Project</span>
+              </label>
+              <label className={`flex items-center gap-3 ${stockControlEnabled && form.enableProject ? "" : "opacity-50"}`}>
+                <input
+                  type="checkbox"
+                  checked={form.enableDepartment}
+                  disabled={!stockControlEnabled || !form.enableProject}
+                  onChange={(e) => setForm((prev) => ({ ...prev, enableDepartment: e.target.checked }))}
+                />
+                <span>Enable Department</span>
+              </label>
+            </div>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
