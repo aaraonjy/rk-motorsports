@@ -121,10 +121,6 @@ export function AdminStockMenu() {
 
       {isOpen ? (
         <div className="absolute left-0 top-[calc(100%+12px)] z-[70] min-w-[250px] max-h-[70vh] overflow-y-auto rounded-2xl border border-white/10 bg-[#0b0b0c]/95 shadow-2xl backdrop-blur-xl">
-          <div className="border-b border-white/10 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.24em] text-white/40">
-            Batch B
-          </div>
-
           {sections.map((section, sectionIndex) => (
             <div key={section.key}>
               {sectionIndex > 0 ? <div className="mx-4 border-t border-white/10" /> : null}
