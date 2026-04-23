@@ -106,7 +106,7 @@ type TransactionSummary = {
   transactionDate: string;
   status: "POSTED" | "CANCELLED";
   reference?: string | null;
-  revisedFrom?: { id: string; transactionNo: string } | null;
+  revisedFrom?: { id: string; docNo?: string | null } | null;
   revisions?: Array<{ id: string }>;
   lines: Array<{
     id: string;
@@ -1301,7 +1301,12 @@ export function AdminStockAssemblyClient({
                   return (
                     <tr key={transaction.id} className={`align-top text-white/80 ${transaction.status === "CANCELLED" ? "bg-red-500/5" : ""}`}>
                       <td className="px-3 py-4 font-semibold text-white">
-                        <div>{transaction.docNo || transaction.transactionNo}</div>
+                        <div className="flex flex-col gap-1">
+                          <span>{transaction.docNo || transaction.transactionNo}</span>
+                          {transaction.revisedFrom?.docNo ? (
+                            <span className="text-xs font-normal text-white/45">↳ Revision of {transaction.revisedFrom.docNo}</span>
+                          ) : null}
+                        </div>
                       </td>
                       <td className="px-3 py-4">{formatDateInput(transaction.transactionDate)}</td>
                       <td className="px-3 py-4">{transaction.reference || "-"}</td>

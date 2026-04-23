@@ -64,7 +64,9 @@ export default async function AdminStockTransactionDetailPage({ params, searchPa
     include: {
       createdByAdmin: { select: { id: true, name: true, email: true } },
       cancelledByAdmin: { select: { id: true, name: true, email: true } },
-      revisedFrom: { select: { id: true, transactionNo: true } },
+      project: { select: { id: true, code: true, name: true } },
+      department: { select: { id: true, code: true, name: true, projectId: true } },
+      revisedFrom: { select: { id: true, docNo: true } },
       lines: {
         include: {
           inventoryProduct: { select: { id: true, code: true, description: true, baseUom: true } },
@@ -105,6 +107,9 @@ export default async function AdminStockTransactionDetailPage({ params, searchPa
             <p className="text-sm font-semibold uppercase tracking-[0.24em] text-red-400/80">Stock Transaction</p>
             <h1 className="mt-3 text-4xl font-bold">{transaction.docNo || transaction.transactionNo}</h1>
             <p className="mt-4 text-white/70">View stock transaction detail, line items, serials, and ledger impact.</p>
+            {transaction.revisedFrom?.docNo ? (
+              <p className="mt-3 text-sm text-white/45">↳ Revision of {transaction.revisedFrom.docNo}</p>
+            ) : null}
           </div>
           <div className="flex flex-wrap gap-3">
             <Link
@@ -126,7 +131,7 @@ export default async function AdminStockTransactionDetailPage({ params, searchPa
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-4 xl:grid-cols-6">
           <div className="rounded-2xl border border-white/10 bg-black/45 p-4 backdrop-blur-md">
             <p className="text-xs uppercase tracking-[0.24em] text-white/40">Status</p>
             <p className="mt-3 text-lg font-bold text-white">{transaction.status === "CANCELLED" ? "Cancelled" : "Posted"}</p>
@@ -142,6 +147,14 @@ export default async function AdminStockTransactionDetailPage({ params, searchPa
           <div className="rounded-2xl border border-white/10 bg-black/45 p-4 backdrop-blur-md">
             <p className="text-xs uppercase tracking-[0.24em] text-white/40">Created By</p>
             <p className="mt-3 text-lg font-bold text-white">{transaction.createdByAdmin?.name || "-"}</p>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-black/45 p-4 backdrop-blur-md">
+            <p className="text-xs uppercase tracking-[0.24em] text-white/40">Project</p>
+            <p className="mt-3 text-lg font-bold text-white">{transaction.project ? `${transaction.project.code} — ${transaction.project.name}` : "-"}</p>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-black/45 p-4 backdrop-blur-md">
+            <p className="text-xs uppercase tracking-[0.24em] text-white/40">Department</p>
+            <p className="mt-3 text-lg font-bold text-white">{transaction.department ? `${transaction.department.code} — ${transaction.department.name}` : "-"}</p>
           </div>
         </div>
 

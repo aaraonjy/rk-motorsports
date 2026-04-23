@@ -111,6 +111,59 @@ function transactionUsesOutboundLocation(
   return null;
 }
 
+function parseRevisionDocNo(docNo: string | null | undefined, transactionType: StockTransactionType) {
+  const value = String(docNo || "").trim().toUpperCase();
+  if (!value) return null;
+
+  const escapedType = transactionType.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const standardMatch = value.match(new RegExp(`^(${escapedType}-\\d{8}-\\d{4})(?:-(\\d+))?$`));
+  if (standardMatch) {
+    return {
+      baseDocNo: standardMatch[1],
+      revisionNo: standardMatch[2] ? Number(standardMatch[2]) : 0,
+    };
+  }
+
+  const genericMatch = value.match(/^(.*?)(?:-(\d+))?$/);
+  if (!genericMatch) return null;
+  return {
+    baseDocNo: genericMatch[1],
+    revisionNo: genericMatch[2] ? Number(genericMatch[2]) : 0,
+  };
+}
+
+async function generateStockRevisionDocumentNumber(
+  tx: any,
+  transactionType: StockTransactionType,
+  currentDocNo: string | null | undefined
+) {
+  const parsed = parseRevisionDocNo(currentDocNo, transactionType);
+  if (!parsed) {
+    throw new Error("Current Document No is invalid for revision.");
+  }
+
+  const related = await tx.stockTransaction.findMany({
+    where: {
+      transactionType,
+      docNo: {
+        startsWith: parsed.baseDocNo,
+      },
+    },
+    select: { docNo: true },
+  });
+
+  let maxRevision = 0;
+  for (const item of related) {
+    const candidate = parseRevisionDocNo(item.docNo, transactionType);
+    if (!candidate || candidate.baseDocNo != parsed.baseDocNo) continue;
+    if (candidate.revisionNo > maxRevision) {
+      maxRevision = candidate.revisionNo;
+    }
+  }
+
+  return `${parsed.baseDocNo}-${maxRevision + 1}`;
+}
+
 export async function GET(_req: Request, context: Params) {
   try {
     await requireAdmin();
@@ -122,7 +175,7 @@ export async function GET(_req: Request, context: Params) {
         cancelledByAdmin: { select: { id: true, name: true, email: true } },
         project: { select: { id: true, code: true, name: true } },
         department: { select: { id: true, code: true, name: true, projectId: true } },
-        revisedFrom: { select: { id: true, transactionNo: true } },
+        revisedFrom: { select: { id: true, docNo: true } },
         lines: {
           include: {
             inventoryProduct: { select: { id: true, code: true, description: true, baseUom: true } },
@@ -597,18 +650,12 @@ export async function PUT(req: Request, context: Params) {
 
       const existingDocNoValue = typeof current.docNo === "string" ? current.docNo.trim().toUpperCase() : "";
       const requestedDocNoValue = typeof requestedDocNo === "string" ? requestedDocNo.trim().toUpperCase() : "";
-      const isReusingCurrentDocNo = !!existingDocNoValue && requestedDocNoValue === existingDocNoValue;
+      const shouldAutoGenerateRevisionDocNo =
+        !requestedDocNoValue || (!!existingDocNoValue && requestedDocNoValue === existingDocNoValue);
 
-      if (isReusingCurrentDocNo) {
-        await tx.stockTransaction.update({
-          where: { id: current.id },
-          data: { docNo: null },
-        });
-      }
-
-      const docNo = isReusingCurrentDocNo
-        ? current.docNo!
-        : requestedDocNo || await generateStockDocumentNumber(tx, transactionType, docDate);
+      const docNo = shouldAutoGenerateRevisionDocNo
+        ? await generateStockRevisionDocumentNumber(tx, transactionType, current.docNo)
+        : requestedDocNoValue;
 
       const duplicateDocNo = await tx.stockTransaction.findFirst({
         where: {
@@ -860,7 +907,7 @@ export async function PUT(req: Request, context: Params) {
           createdByAdmin: { select: { id: true, name: true, email: true } },
           project: { select: { id: true, code: true, name: true } },
           department: { select: { id: true, code: true, name: true, projectId: true } },
-          revisedFrom: { select: { id: true, transactionNo: true } },
+          revisedFrom: { select: { id: true, docNo: true } },
           lines: {
             include: {
               inventoryProduct: { select: { id: true, code: true, description: true, baseUom: true } },

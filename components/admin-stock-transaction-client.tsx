@@ -1526,6 +1526,9 @@ export function AdminStockTransactionClient({
                     <td className="px-3 py-4 font-semibold text-white">
                       <div className="flex flex-col gap-1">
                         <span>{item.docNo || "-"}</span>
+                        {item.revisedFrom?.docNo ? (
+                          <span className="text-xs font-normal text-white/45">↳ Revision of {item.revisedFrom.docNo}</span>
+                        ) : null}
                       </div>
                     </td>
                     <td className="px-3 py-4">{formatDateInput(item.transactionDate)}</td>

@@ -26,6 +26,8 @@ export default async function AdminStockTransactionEditPage({ params }: Params) 
   const transaction = await db.stockTransaction.findUnique({
     where: { id },
     include: {
+      project: { select: { id: true, code: true, name: true } },
+      department: { select: { id: true, code: true, name: true, projectId: true } },
       lines: {
         include: {
           inventoryProduct: { select: { id: true, code: true, description: true, baseUom: true } },
