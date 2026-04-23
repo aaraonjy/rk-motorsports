@@ -45,6 +45,8 @@ export default async function AdminStockSettingsPage() {
               stockModuleEnabled: config?.stockModuleEnabled ?? false,
               multiLocationEnabled: config?.multiLocationEnabled ?? false,
               allowNegativeStock: config?.allowNegativeStock ?? false,
+              enableProject: config?.enableProject ?? false,
+              enableDepartment: config?.enableDepartment ?? false,
               costingMethod: config?.costingMethod ?? "AVERAGE",
               defaultLocationId: config?.defaultLocationId ?? "",
               qtyDecimalPlaces: normalizeQtyDecimalPlaces(
