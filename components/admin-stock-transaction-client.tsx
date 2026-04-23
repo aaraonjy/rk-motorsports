@@ -1527,16 +1527,13 @@ export function AdminStockTransactionClient({
                       <div className="flex flex-col gap-1">
                         <span>{item.docNo || "-"}</span>
                         {item.revisedFrom?.docNo ? (
-                          <span className="text-xs font-normal text-white/45">
-                            ↳ Revision of{" "}
-                            <Link
-                              href={`/admin/stock/transactions/${item.revisedFrom.id}`}
-                              className="text-blue-400 underline transition hover:text-blue-300"
-                              onClick={(event) => event.stopPropagation()}
-                            >
-                              {item.revisedFrom.docNo}
-                            </Link>
-                          </span>
+                          <Link
+                            href={`/admin/stock/transactions/${item.revisedFrom.id}`}
+                            className="mt-1 block w-fit rounded-lg px-2 py-1 text-xs font-normal text-white/40 transition hover:bg-white/5 hover:text-white/80"
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            ↳ Revision of {item.revisedFrom.docNo}
+                          </Link>
                         ) : null}
                       </div>
                     </td>
