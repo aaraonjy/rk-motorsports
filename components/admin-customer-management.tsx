@@ -192,17 +192,21 @@ function getInitialForm(customer: CustomerRecord | null): CustomerFormState {
   };
 }
 
-function getSequenceDigits(format: CustomerAccountNoFormat) {
+function getAccountSuffixLength(format: CustomerAccountNoFormat) {
   switch (format) {
     case "XXXX_XXXXX":
-      return 4;
+      return 5;
     case "XXXX_XXX":
-      return 2;
+      return 3;
     case "XXX_XXXX":
     case "XXXX_XXXX":
     default:
-      return 3;
+      return 4;
   }
+}
+
+function getSequenceDigits(format: CustomerAccountNoFormat) {
+  return Math.max(1, getAccountSuffixLength(format) - 1);
 }
 
 function getCustomerInitial(name: string) {
@@ -210,26 +214,27 @@ function getCustomerInitial(name: string) {
   return /^[A-Z]$/.test(initial) ? initial : "X";
 }
 
-function getAccountFixedPrefix(prefix: string, name: string) {
-  if (!name.trim()) return "";
-  return `${prefix.replace(/\/$/, "").toUpperCase()}/${getCustomerInitial(name)}`;
+function getAccountPrefix(prefix: string) {
+  return prefix.replace(/\/$/, "").toUpperCase();
 }
 
 function getNextAccountSuffix(args: {
-  fixedPrefix: string;
+  accountPrefix: string;
+  initial: string;
   sequenceDigits: number;
   existingCustomerAccountNos: string[];
 }) {
-  if (!args.fixedPrefix) return "";
+  if (!args.accountPrefix || !args.initial) return "";
 
+  const matchPrefix = `${args.accountPrefix}/${args.initial}`;
   const nextSequence =
     args.existingCustomerAccountNos.reduce((max, accountNo) => {
-      if (!accountNo.startsWith(args.fixedPrefix)) return max;
-      const sequence = Number(accountNo.slice(args.fixedPrefix.length));
+      if (!accountNo.startsWith(matchPrefix)) return max;
+      const sequence = Number(accountNo.slice(matchPrefix.length));
       return Number.isFinite(sequence) ? Math.max(max, sequence) : max;
     }, 0) + 1;
 
-  return String(nextSequence).padStart(args.sequenceDigits, "0");
+  return `${args.initial}${String(nextSequence).padStart(args.sequenceDigits, "0")}`;
 }
 
 function getSourceBadge(source: "PORTAL" | "ADMIN") {
@@ -277,6 +282,33 @@ function TextInput({
       placeholder={placeholder}
       className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 pr-10 text-sm text-white outline-none transition placeholder:text-white/30 hover:border-white/20 focus:border-white/25 disabled:cursor-not-allowed disabled:opacity-60"
     />
+  );
+}
+
+function SelectInput({
+  value,
+  onChange,
+  children,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  children: ReactNode;
+}) {
+  return (
+    <div className="relative">
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full appearance-none rounded-xl border border-white/10 bg-black/40 px-4 py-3 pr-14 text-sm text-white outline-none transition hover:border-white/20 focus:border-white/25"
+      >
+        {children}
+      </select>
+      <div className="pointer-events-none absolute inset-y-0 right-5 flex items-center text-white/55">
+        <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+          <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.17l3.71-3.94a.75.75 0 1 1 1.08 1.04l-4.25 4.51a.75.75 0 0 1-1.08 0l-4.25-4.51a.75.75 0 0 1 .02-1.06Z" clipRule="evenodd" />
+        </svg>
+      </div>
+    </div>
   );
 }
 
@@ -339,20 +371,23 @@ function CustomerModal({
     setIsSubmitting(false);
   }, [customer, isOpen]);
 
+  const accountSuffixLength = getAccountSuffixLength(accountConfiguration.customerAccountNoFormat);
   const sequenceDigits = getSequenceDigits(accountConfiguration.customerAccountNoFormat);
-  const accountFixedPrefix = getAccountFixedPrefix(accountConfiguration.customerAccountPrefix, form.name);
+  const accountPrefix = getAccountPrefix(accountConfiguration.customerAccountPrefix);
+  const customerInitial = form.name.trim() ? getCustomerInitial(form.name) : "";
   const defaultAccountSuffix = useMemo(
     () =>
       getNextAccountSuffix({
-        fixedPrefix: accountFixedPrefix,
+        accountPrefix,
+        initial: customerInitial,
         sequenceDigits,
         existingCustomerAccountNos,
       }),
-    [accountFixedPrefix, existingCustomerAccountNos, sequenceDigits]
+    [accountPrefix, customerInitial, existingCustomerAccountNos, sequenceDigits]
   );
   const rawAccountSuffix = accountSuffixTouched ? form.customerAccountNoSuffix : defaultAccountSuffix;
-  const accountSuffix = accountFixedPrefix && rawAccountSuffix ? rawAccountSuffix.padStart(sequenceDigits, "0") : "";
-  const previewAccountNo = accountFixedPrefix ? `${accountFixedPrefix}${accountSuffix}` : "";
+  const accountSuffix = customerInitial && rawAccountSuffix ? rawAccountSuffix.toUpperCase().slice(0, accountSuffixLength) : "";
+  const previewAccountNo = customerInitial && accountSuffix ? `${accountPrefix}/${accountSuffix}` : "";
 
   if (!isOpen) return null;
 
@@ -407,13 +442,13 @@ function CustomerModal({
   }
 
   function openAccountOverrideModal() {
-    if (mode !== "create" || !accountFixedPrefix) return;
+    if (mode !== "create" || !customerInitial) return;
     setAccountOverrideDraft(accountSuffix || defaultAccountSuffix || "");
     setIsAccountOverrideOpen(true);
   }
 
   function saveAccountOverride() {
-    const value = accountOverrideDraft.replace(/\D/g, "").slice(0, sequenceDigits).padStart(sequenceDigits, "0");
+    const value = accountOverrideDraft.replace(/[^A-Za-z0-9]/g, "").toUpperCase().slice(0, accountSuffixLength);
     setAccountSuffixTouched(true);
     updateField("customerAccountNoSuffix", value);
     setIsAccountOverrideOpen(false);
@@ -493,15 +528,15 @@ function CustomerModal({
                   <button
                     type="button"
                     onClick={openAccountOverrideModal}
-                    disabled={!accountFixedPrefix}
+                    disabled={!customerInitial}
                     className="flex w-full rounded-xl border border-white/10 bg-black/40 text-left text-sm text-white transition hover:border-white/20 disabled:cursor-not-allowed disabled:opacity-50"
                     title="Click to override A/C No suffix"
                   >
-                    <span className="flex min-w-[96px] items-center border-r border-white/10 px-4 text-white/50">
-                      {accountConfiguration.customerAccountPrefix.replace(/\/$/, "").toUpperCase()}
+                    <span className="flex w-1/2 items-center border-r border-white/10 px-4 text-white/50">
+                      {accountPrefix}
                     </span>
-                    <span className="flex min-w-0 flex-1 items-center px-4 py-3 font-semibold text-white">
-                      {accountFixedPrefix ? `${getCustomerInitial(form.name)}${accountSuffix}` : ""}
+                    <span className="flex w-1/2 min-w-0 items-center px-4 py-3 font-semibold text-white">
+                      {accountSuffix}
                     </span>
                   </button>
                 ) : (
@@ -538,7 +573,10 @@ function CustomerModal({
 
           <div className="grid gap-6 lg:grid-cols-2">
             <div className="rounded-2xl border border-white/10 bg-black/20 p-5">
-              <div className="text-sm font-semibold uppercase tracking-[0.18em] text-white/45">Billing Address</div>
+              <div className="flex min-h-[38px] items-center justify-between gap-3">
+                <div className="text-sm font-semibold uppercase tracking-[0.18em] text-white/45">Billing Address</div>
+                <div className="h-9 w-9" aria-hidden="true" />
+              </div>
               <div className="mt-4 space-y-4">
                 {[1, 2, 3, 4].map((line) => {
                   const key = `billingAddressLine${line}` as keyof CustomerFormState;
@@ -548,16 +586,16 @@ function CustomerModal({
                   <TextInput value={form.billingCity} onChange={(value) => updateField("billingCity", value)} placeholder="City" />
                   <TextInput value={form.billingPostCode} onChange={(value) => updateField("billingPostCode", value)} placeholder="Post Code" />
                 </div>
-                <select value={form.billingCountryCode} onChange={(e) => updateField("billingCountryCode", e.target.value)} className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 pr-10 text-sm text-white outline-none">
+                <SelectInput value={form.billingCountryCode} onChange={(value) => updateField("billingCountryCode", value)}>
                   {SEA_COUNTRIES.map((country) => <option key={country.code} value={country.code}>{country.code} - {country.name}</option>)}
-                </select>
+                </SelectInput>
               </div>
             </div>
 
             <div className="rounded-2xl border border-white/10 bg-black/20 p-5">
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex min-h-[38px] items-center justify-between gap-3">
                 <div className="text-sm font-semibold uppercase tracking-[0.18em] text-white/45">Default Delivery Address</div>
-                <button type="button" onClick={addDeliveryAddress} className="inline-flex items-center justify-center rounded-xl border border-white/15 px-3 py-2 text-sm text-white/70 transition hover:bg-white/10 hover:text-white" title="Add secondary delivery address">+ Add</button>
+                <button type="button" onClick={addDeliveryAddress} className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/15 text-lg text-white/70 transition hover:bg-white/10 hover:text-white" title="Add secondary delivery address">+</button>
               </div>
               <div className="mt-4 space-y-4">
                 {[1, 2, 3, 4].map((line) => {
@@ -568,9 +606,9 @@ function CustomerModal({
                   <TextInput value={form.deliveryCity} onChange={(value) => updateField("deliveryCity", value)} placeholder="City" />
                   <TextInput value={form.deliveryPostCode} onChange={(value) => updateField("deliveryPostCode", value)} placeholder="Post Code" />
                 </div>
-                <select value={form.deliveryCountryCode} onChange={(e) => updateField("deliveryCountryCode", e.target.value)} className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 pr-10 text-sm text-white outline-none">
+                <SelectInput value={form.deliveryCountryCode} onChange={(value) => updateField("deliveryCountryCode", value)}>
                   {SEA_COUNTRIES.map((country) => <option key={country.code} value={country.code}>{country.code} - {country.name}</option>)}
-                </select>
+                </SelectInput>
               </div>
             </div>
           </div>
@@ -605,25 +643,25 @@ function CustomerModal({
               <div><FieldLabel>Area</FieldLabel><TextInput value={form.area} onChange={(value) => updateField("area", value)} placeholder="Enter area" /></div>
               <div>
                 <FieldLabel>Currency</FieldLabel>
-                <select value={form.currency} onChange={(e) => updateField("currency", e.target.value)} className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 pr-10 text-sm text-white outline-none">
+                <SelectInput value={form.currency} onChange={(value) => updateField("currency", value)}>
                   {CUSTOMER_CURRENCIES.map((currency) => <option key={currency.code} value={currency.code}>{currency.code} - {currency.name}</option>)}
-                </select>
+                </SelectInput>
               </div>
               <div>
                 <FieldLabel>Agent</FieldLabel>
-                <select value={form.agentId} onChange={(e) => updateField("agentId", e.target.value)} className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 pr-10 text-sm text-white outline-none">
+                <SelectInput value={form.agentId} onChange={(value) => updateField("agentId", value)}>
                   <option value="">No Agent</option>
                   {agents.map((agent) => <option key={agent.id} value={agent.id}>{agent.code} - {agent.name}</option>)}
-                </select>
+                </SelectInput>
               </div>
               <div><FieldLabel>Nature of Business</FieldLabel><TextInput value={form.natureOfBusiness} onChange={(value) => updateField("natureOfBusiness", value)} placeholder="Enter nature of business" /></div>
               <div><FieldLabel>Attention</FieldLabel><TextInput value={form.attention} onChange={(value) => updateField("attention", value)} placeholder="Enter attention" /></div>
               <div><FieldLabel>Contact</FieldLabel><TextInput value={form.contactPerson} onChange={(value) => updateField("contactPerson", value)} placeholder="Enter contact person" /></div>
               <div>
                 <FieldLabel>Registration Type</FieldLabel>
-                <select value={form.registrationIdType} onChange={(e) => updateField("registrationIdType", e.target.value)} className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 pr-10 text-sm text-white outline-none">
+                <SelectInput value={form.registrationIdType} onChange={(value) => updateField("registrationIdType", value)}>
                   {CUSTOMER_REGISTRATION_ID_TYPES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
-                </select>
+                </SelectInput>
               </div>
               <div><FieldLabel>Business Registration No.</FieldLabel><TextInput value={form.registrationNo} onChange={(value) => updateField("registrationNo", value)} placeholder="Enter registration no." /></div>
               <div><FieldLabel>Tax Identification No.</FieldLabel><TextInput value={form.taxIdentificationNo} onChange={(value) => updateField("taxIdentificationNo", value)} placeholder="Enter TIN no." /></div>
@@ -646,7 +684,7 @@ function CustomerModal({
               <p className="text-sm font-semibold uppercase tracking-[0.24em] text-white/45">Customer A/C No</p>
               <h3 className="mt-3 text-2xl font-bold text-white">Override A/C No</h3>
               <p className="mt-3 text-sm leading-6 text-white/60">
-                Only the last {sequenceDigits} digit(s) can be changed. Prefix is locked by account configuration and customer name initial.
+                Only the right side suffix can be changed. Prefix is locked by account configuration.
               </p>
 
               <div className="mt-5">
@@ -660,18 +698,17 @@ function CustomerModal({
                 <div>
                   <FieldLabel>Locked Prefix</FieldLabel>
                   <div className="rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white/60">
-                    {accountConfiguration.customerAccountPrefix.replace(/\/$/, "").toUpperCase()}
+                    {accountPrefix}
                   </div>
                 </div>
                 <div>
                   <FieldLabel>Editable Suffix</FieldLabel>
                   <input
                     type="text"
-                    inputMode="numeric"
                     value={accountOverrideDraft}
-                    onChange={(e) => setAccountOverrideDraft(e.target.value.replace(/\D/g, "").slice(0, sequenceDigits))}
+                    onChange={(e) => setAccountOverrideDraft(e.target.value.replace(/[^A-Za-z0-9]/g, "").toUpperCase().slice(0, accountSuffixLength))}
                     className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/30 hover:border-white/20 focus:border-white/25"
-                    placeholder={"0".repeat(sequenceDigits)}
+                    placeholder={`${customerInitial || "A"}${"0".repeat(sequenceDigits)}`}
                   />
                 </div>
               </div>
@@ -701,9 +738,9 @@ function CustomerModal({
                 <TextInput value={deliveryAddressDraft.addressLine4} onChange={(value) => updateDeliveryAddressDraft("addressLine4", value)} placeholder="Address line 4" />
                 <TextInput value={deliveryAddressDraft.city} onChange={(value) => updateDeliveryAddressDraft("city", value)} placeholder="City" />
                 <TextInput value={deliveryAddressDraft.postCode} onChange={(value) => updateDeliveryAddressDraft("postCode", value)} placeholder="Post Code" />
-                <select value={deliveryAddressDraft.countryCode} onChange={(e) => updateDeliveryAddressDraft("countryCode", e.target.value)} className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 pr-10 text-sm text-white outline-none">
+                <SelectInput value={deliveryAddressDraft.countryCode} onChange={(value) => updateDeliveryAddressDraft("countryCode", value)}>
                   {SEA_COUNTRIES.map((country) => <option key={country.code} value={country.code}>{country.code} - {country.name}</option>)}
-                </select>
+                </SelectInput>
               </div>
               <div className="mt-6 flex items-center justify-end gap-3">
                 <button type="button" onClick={() => setIsDeliveryAddressModalOpen(false)} className="rounded-xl border border-white/15 px-4 py-2.5 text-sm text-white/75 transition hover:bg-white/10 hover:text-white">
