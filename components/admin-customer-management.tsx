@@ -68,6 +68,7 @@ function CustomerModal({
 }) {
   const [form, setForm] = useState<CustomerFormState>({
     name: customer?.name || "",
+    customerAccountNo: customer?.customerAccountNo || "",
     email: customer?.email || "",
     phone: customer?.phone || "",
   });
@@ -77,6 +78,7 @@ function CustomerModal({
   useMemo(() => {
     setForm({
       name: customer?.name || "",
+      customerAccountNo: customer?.customerAccountNo || "",
       email: customer?.email || "",
       phone: customer?.phone || "",
     });
@@ -101,6 +103,7 @@ function CustomerModal({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             name: form.name.trim(),
+            customerAccountNo: form.customerAccountNo?.trim() || null,
             email: form.email.trim(),
             phone: form.phone.trim(),
           }),
