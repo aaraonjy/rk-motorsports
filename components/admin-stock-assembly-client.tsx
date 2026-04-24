@@ -697,6 +697,10 @@ export function AdminStockAssemblyClient({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [submitSuccess, setSubmitSuccess] = useState("");
+  const [isNegativeStockAuthOpen, setIsNegativeStockAuthOpen] = useState(false);
+  const [negativeStockPendingPayload, setNegativeStockPendingPayload] = useState<any | null>(null);
+  const [overrideAdminEmail, setOverrideAdminEmail] = useState("");
+  const [overrideAdminPassword, setOverrideAdminPassword] = useState("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [cancelTarget, setCancelTarget] = useState<CancelTarget | null>(null);
   const [cancelReason, setCancelReason] = useState("");
@@ -1162,58 +1166,67 @@ export function AdminStockAssemblyClient({
     setIsSubmitting(true);
 
     try {
-      const lines = [
-        {
-          inventoryProductId: selectedFinishedGood.id,
-          qty: Number(normalizeQtyInput(assemblyQty, stockSettings.qtyDecimalPlaces)),
-          unitCost: Number(formatNumberByDecimalPlaces(fgUnitCost, stockSettings.unitCostDecimalPlaces)),
-          batchNo: selectedFinishedGood.batchTracking ? normalizeBatchNo(fgBatchNo) : null,
-          expiryDate: selectedFinishedGood.batchTracking && fgBatchExpiryDate.trim() ? fgBatchExpiryDate : null,
-          serialNos: selectedFinishedGood.serialNumberTracking ? uniqueSerialNos(parseSerialEntryText(fgSerialEntryText)) : [],
-          remarks: remarks.trim() || null,
-          locationId,
-          adjustmentDirection: "IN",
-        },
-        ...templateLines.map((line) => {
-          const product = productMap.get(line.componentProductId);
-          return {
-            inventoryProductId: line.componentProductId,
-            qty: Number(normalizeQtyInput(line.qty, stockSettings.qtyDecimalPlaces)),
-            unitCost: Number(formatNumberByDecimalPlaces(product?.unitCost || 0, stockSettings.unitCostDecimalPlaces)),
-            batchNo: product?.batchTracking ? normalizeBatchNo(line.batchNo) : null,
-            expiryDate: null,
-            serialNos: product?.serialNumberTracking ? uniqueSerialNos(parseSerialEntryText(line.serialEntryText)) : [],
-            remarks: line.remarks.trim() || null,
+      const payload = {
+        transactionType: "AS",
+        transactionDate: docDate,
+        docDate,
+        docNo: docNo.trim() || null,
+        docDesc: docDesc.trim() || null,
+        projectId: projectFeatureEnabled ? (projectId || null) : null,
+        departmentId: departmentFeatureEnabled ? (departmentId || null) : null,
+        reference: reference.trim() || null,
+        remarks: remarks.trim() || null,
+        lines: [
+          {
+            inventoryProductId: selectedFinishedGood.id,
+            qty: Number(normalizeQtyInput(assemblyQty, stockSettings.qtyDecimalPlaces)),
+            unitCost: Number(formatNumberByDecimalPlaces(fgUnitCost, stockSettings.unitCostDecimalPlaces)),
+            batchNo: selectedFinishedGood.batchTracking ? normalizeBatchNo(fgBatchNo) : null,
+            expiryDate: selectedFinishedGood.batchTracking && fgBatchExpiryDate.trim() ? fgBatchExpiryDate : null,
+            serialNos: selectedFinishedGood.serialNumberTracking ? uniqueSerialNos(parseSerialEntryText(fgSerialEntryText)) : [],
+            remarks: remarks.trim() || null,
             locationId,
-            adjustmentDirection: "OUT",
-          };
-        }),
-      ];
+            adjustmentDirection: "IN",
+          },
+          ...templateLines.map((line) => {
+            const product = productMap.get(line.componentProductId);
+            return {
+              inventoryProductId: line.componentProductId,
+              qty: Number(normalizeQtyInput(line.qty, stockSettings.qtyDecimalPlaces)),
+              unitCost: Number(formatNumberByDecimalPlaces(product?.unitCost || 0, stockSettings.unitCostDecimalPlaces)),
+              batchNo: product?.batchTracking ? normalizeBatchNo(line.batchNo) : null,
+              expiryDate: null,
+              serialNos: product?.serialNumberTracking ? uniqueSerialNos(parseSerialEntryText(line.serialEntryText)) : [],
+              remarks: line.remarks.trim() || null,
+              locationId,
+              adjustmentDirection: "OUT",
+            };
+          }),
+        ],
+      };
 
       const response = await fetch("/api/admin/stock/transactions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          transactionType: "AS",
-          transactionDate: docDate,
-          docDate,
-          docNo: docNo.trim() || null,
-          docDesc: docDesc.trim() || null,
-          projectId: projectFeatureEnabled ? (projectId || null) : null,
-          departmentId: departmentFeatureEnabled ? (departmentId || null) : null,
-          reference: reference.trim() || null,
-          remarks: remarks.trim() || null,
-          lines,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await response.json();
       if (!response.ok || !data.ok) {
+        if (data?.code === "NEGATIVE_STOCK_AUTH_REQUIRED") {
+          setNegativeStockPendingPayload(payload);
+          setOverrideAdminEmail("");
+          setOverrideAdminPassword("");
+          setIsNegativeStockAuthOpen(true);
+          return;
+        }
         setSubmitError(data.error || "Unable to create stock assembly.");
         return;
       }
 
       setSubmitSuccess("Stock assembly created successfully.");
+      setIsNegativeStockAuthOpen(false);
+      setNegativeStockPendingPayload(null);
       setIsCreateOpen(false);
       resetCreateForm();
       await loadTransactions();
@@ -1225,6 +1238,41 @@ export function AdminStockAssemblyClient({
   }
 
   async function handleCancelConfirm() {
+  async function handleNegativeStockAuthorization() {
+    if (!negativeStockPendingPayload) return;
+    setIsSubmitting(true);
+    setSubmitError("");
+    try {
+      const response = await fetch("/api/admin/stock/transactions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...negativeStockPendingPayload,
+          negativeStockOverride: true,
+          overrideAdminEmail: overrideAdminEmail.trim(),
+          overrideAdminPassword,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok || !data.ok) {
+        setSubmitError(data.error || "Unable to create stock assembly.");
+        return;
+      }
+
+      setSubmitSuccess("Stock assembly created successfully.");
+      setIsNegativeStockAuthOpen(false);
+      setNegativeStockPendingPayload(null);
+      setIsCreateOpen(false);
+      resetCreateForm();
+      await loadTransactions();
+    } catch {
+      setSubmitError("Unable to create stock assembly right now.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
     if (!cancelTarget) return;
     setIsCancelling(true);
     setSubmitError("");
@@ -1760,6 +1808,48 @@ export function AdminStockAssemblyClient({
       ) : null}
 
       {cancelTarget ? (
+      {isNegativeStockAuthOpen ? (
+        <div className="fixed inset-0 z-[116] flex items-center justify-center bg-black/70 p-4">
+          <div className="w-full max-w-lg rounded-[2rem] border border-white/10 bg-[#0b0b0f] p-6 shadow-2xl md:p-8">
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-amber-300/80">Admin Authorization Required</p>
+            <h3 className="mt-3 text-2xl font-bold text-white">Negative Stock Detected</h3>
+            <p className="mt-3 text-sm text-white/65">This stock assembly will cause negative stock. Please enter an admin email and password to continue.</p>
+            <div className="mt-6 space-y-4">
+              <div>
+                <label className="label-rk">Admin Email</label>
+                <input type="email" className="input-rk" value={overrideAdminEmail} onChange={(e) => setOverrideAdminEmail(e.target.value)} placeholder="Enter admin email" />
+              </div>
+              <div>
+                <label className="label-rk">Admin Password</label>
+                <input type="password" className="input-rk" value={overrideAdminPassword} onChange={(e) => setOverrideAdminPassword(e.target.value)} placeholder="Enter admin password" />
+              </div>
+            </div>
+            <div className="mt-6 flex flex-wrap justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsNegativeStockAuthOpen(false);
+                  setNegativeStockPendingPayload(null);
+                  setOverrideAdminEmail("");
+                  setOverrideAdminPassword("");
+                }}
+                className="rounded-xl border border-white/15 bg-white/5 px-5 py-3 text-sm text-white/80 transition hover:bg-white/10"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleNegativeStockAuthorization}
+                disabled={!overrideAdminEmail.trim() || !overrideAdminPassword.trim() || isSubmitting}
+                className="rounded-xl bg-red-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-red-400 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isSubmitting ? "Authorizing..." : "Authorize & Save"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/75 p-4">
           <div className="w-full max-w-lg rounded-[2rem] border border-white/10 bg-[#0b0b0f] p-6 shadow-2xl md:p-8">
             <div>

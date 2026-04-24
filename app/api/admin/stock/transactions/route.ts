@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { StockAdjustmentDirection, StockTransactionType } from "@prisma/client";
-import { requireAdmin } from "@/lib/auth";
+import { requireAdmin, verifyPassword } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { createAuditLogFromRequest } from "@/lib/audit";
 import {
@@ -74,6 +74,47 @@ function normalizeSerialNumbers(value: unknown) {
 }
 
 function normalizeUomCode(value: unknown) {
+class NegativeStockAuthorizationError extends Error {
+  code: string;
+  details: Array<{ inventoryProductId: string; locationId: string; batchNo?: string | null; balance: number; requiredQty: number; message: string }>;
+  constructor(
+    message: string,
+    details: Array<{ inventoryProductId: string; locationId: string; batchNo?: string | null; balance: number; requiredQty: number; message: string }>,
+    code = "NEGATIVE_STOCK_AUTH_REQUIRED"
+  ) {
+    super(message);
+    this.name = "NegativeStockAuthorizationError";
+    this.code = code;
+    this.details = details;
+  }
+}
+
+async function resolveNegativeStockOverrideAdmin(
+  tx: any,
+  body: any,
+  details: Array<{ inventoryProductId: string; locationId: string; batchNo?: string | null; balance: number; requiredQty: number; message: string }>
+) {
+  const requestedOverride = body?.negativeStockOverride === true;
+  const adminEmail = typeof body?.overrideAdminEmail === "string" ? body.overrideAdminEmail.trim() : "";
+  const adminPassword = typeof body?.overrideAdminPassword === "string" ? body.overrideAdminPassword : "";
+
+  if (!requestedOverride || !adminEmail || !adminPassword) {
+    throw new NegativeStockAuthorizationError("Admin authorization is required to continue with negative stock.", details);
+  }
+
+  const authorizingAdmin = await tx.user.findUnique({ where: { email: adminEmail } });
+  if (!authorizingAdmin || authorizingAdmin.role !== "ADMIN") {
+    throw new NegativeStockAuthorizationError("Invalid admin email or password.", details, "NEGATIVE_STOCK_AUTH_INVALID");
+  }
+
+  const passwordValid = await verifyPassword(adminPassword, authorizingAdmin.passwordHash);
+  if (!passwordValid) {
+    throw new NegativeStockAuthorizationError("Invalid admin email or password.", details, "NEGATIVE_STOCK_AUTH_INVALID");
+  }
+
+  return authorizingAdmin;
+}
+
   return typeof value === "string" ? value.trim().toUpperCase() : "";
 }
 
@@ -389,50 +430,61 @@ export async function POST(req: Request) {
 
       const batchKeyMap = new Map<string, string | null>();
 
-      if (!config.allowNegativeStock) {
-        for (const line of normalizedLines) {
-          const usesOutbound = isOutboundTransaction(transactionType, line.adjustmentDirection);
-          if (usesOutbound) {
-            const outboundLocationId = transactionUsesOutboundLocation(transactionType, line.adjustmentDirection, line)!;
+      const negativeStockDetails: Array<{ inventoryProductId: string; locationId: string; batchNo?: string | null; balance: number; requiredQty: number; message: string }> = [];
+      for (const line of normalizedLines) {
+        const usesOutbound = isOutboundTransaction(transactionType, line.adjustmentDirection);
+        if (!usesOutbound) continue;
 
-            if (line.product.serialNumberTracking) {
-              const availableCount = await tx.inventorySerial.count({
-                where: {
-                  inventoryProductId: line.inventoryProductId,
-                  currentLocationId: outboundLocationId,
-                  status: "IN_STOCK",
-                  serialNo: { in: line.serialNos },
-                  ...(line.batchNo
-                    ? {
-                        inventoryBatch: {
-                          is: { batchNo: line.batchNo },
-                        },
-                      }
-                    : {}),
-                },
-              });
+        const outboundLocationId = transactionUsesOutboundLocation(transactionType, line.adjustmentDirection, line)!;
 
-              if (availableCount !== line.serialNos.length) {
-                throw new Error("One or more selected serial numbers are unavailable at the selected location.");
-              }
-            } else {
-              const balance = await getStockBalance(tx, line.inventoryProductId, outboundLocationId, { batchNo: line.batchNo });
-              if (balance < line.qty) {
-                throw new Error(
-                  `Insufficient stock for ${
-                    transactionType === "SI"
-                      ? "Stock Issue"
-                      : transactionType === "ST"
-                        ? "Stock Transfer"
-                        : transactionType === "AS"
-                          ? "Stock Assembly OUT"
-                          : "Stock Adjustment OUT"
-                  }.`
-                );
-              }
-            }
+        if (line.product.serialNumberTracking) {
+          const availableCount = await tx.inventorySerial.count({
+            where: {
+              inventoryProductId: line.inventoryProductId,
+              currentLocationId: outboundLocationId,
+              status: "IN_STOCK",
+              serialNo: { in: line.serialNos },
+              ...(line.batchNo
+                ? {
+                    inventoryBatch: {
+                      is: { batchNo: line.batchNo },
+                    },
+                  }
+                : {}),
+            },
+          });
+
+          if (availableCount !== line.serialNos.length) {
+            throw new Error("One or more selected serial numbers are unavailable at the selected location.");
+          }
+        } else {
+          const balance = await getStockBalance(tx, line.inventoryProductId, outboundLocationId, { batchNo: line.batchNo });
+          if (balance < line.qty) {
+            negativeStockDetails.push({
+              inventoryProductId: line.inventoryProductId,
+              locationId: outboundLocationId,
+              batchNo: line.batchNo,
+              balance,
+              requiredQty: line.qty,
+              message:
+                transactionType === "SI"
+                  ? "Insufficient stock for Stock Issue."
+                  : transactionType === "ST"
+                    ? "Insufficient stock for Stock Transfer."
+                    : transactionType === "AS"
+                      ? "Insufficient stock for Stock Assembly OUT."
+                      : "Insufficient stock for Stock Adjustment OUT.",
+            });
           }
         }
+      }
+
+      let negativeStockAuthorizedBy: { id: string; name: string; email: string } | null = null;
+      if (negativeStockDetails.length > 0) {
+        if (!config.allowNegativeStock) {
+          throw new Error(negativeStockDetails[0].message);
+        }
+        negativeStockAuthorizedBy = await resolveNegativeStockOverrideAdmin(tx, body, negativeStockDetails);
       }
 
       const transactionNo = await generateStockTransactionNumber(tx, transactionType, transactionDate);
@@ -712,7 +764,7 @@ export async function POST(req: Request) {
         }
       }
 
-      return tx.stockTransaction.findUnique({
+      const resultTransaction = await tx.stockTransaction.findUnique({
         where: { id: transaction.id },
         include: {
           createdByAdmin: { select: { id: true, name: true, email: true } },
@@ -734,6 +786,8 @@ export async function POST(req: Request) {
           },
         },
       });
+
+      return { transaction: resultTransaction, negativeStockAuthorizedBy };
     });
 
     await createAuditLogFromRequest({
@@ -742,13 +796,13 @@ export async function POST(req: Request) {
       module: "Stock Transactions",
       action: "CREATE",
       entityType: "StockTransaction",
-      entityId: created?.id,
-      entityCode: created?.transactionNo,
-      description: `${admin.name} created stock transaction ${created?.transactionNo}.`,
+      entityId: created?.transaction?.id,
+      entityCode: created?.transaction?.transactionNo,
+      description: `${admin.name} created stock transaction ${created?.transaction?.transactionNo}${created?.negativeStockAuthorizedBy ? ` with negative stock override authorized by ${created.negativeStockAuthorizedBy.email}` : ""}.`,
       newValues: {
         transactionType,
         transactionDate: transactionDate.toISOString(),
-        docNo: created?.docNo ?? null,
+        docNo: created?.transaction?.docNo ?? null,
         docDate: docDate.toISOString(),
         docDesc,
         projectId: project?.id ?? null,
@@ -756,16 +810,36 @@ export async function POST(req: Request) {
         reference,
         remarks,
         lineCount: normalizedLines.length,
+        negativeStockOverrideAuthorizedBy: created?.negativeStockAuthorizedBy?.email ?? null,
       },
       status: "SUCCESS",
     });
 
-    return NextResponse.json({ ok: true, transaction: created });
+    return NextResponse.json({ ok: true, transaction: created?.transaction, negativeStockOverrideAuthorizedBy: created?.negativeStockAuthorizedBy ?? null });
   } catch (error: any) {
     const isUniqueDocNo = error?.code === "P2002" && Array.isArray(error?.meta?.target) && error.meta.target.includes("docNo");
+    const isNegativeStockAuth = error instanceof NegativeStockAuthorizationError;
     return NextResponse.json(
-      { ok: false, error: isUniqueDocNo ? "Document No already exists. Please save again so the system can generate the next available number." : error instanceof Error ? error.message : "Unable to create stock transaction." },
-      { status: error instanceof Error && error.message === "FORBIDDEN" ? 403 : isUniqueDocNo ? 409 : 500 }
+      {
+        ok: false,
+        code: isNegativeStockAuth ? error.code : undefined,
+        details: isNegativeStockAuth ? error.details : undefined,
+        error: isUniqueDocNo
+          ? "Document No already exists. Please save again so the system can generate the next available number."
+          : error instanceof Error
+            ? error.message
+            : "Unable to create stock transaction.",
+      },
+      {
+        status:
+          error instanceof Error && error.message === "FORBIDDEN"
+            ? 403
+            : isUniqueDocNo
+              ? 409
+              : isNegativeStockAuth
+                ? 403
+                : 500,
+      }
     );
   }
 }

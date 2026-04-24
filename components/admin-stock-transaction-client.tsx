@@ -655,6 +655,10 @@ export function AdminStockTransactionClient({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [submitSuccess, setSubmitSuccess] = useState("");
+  const [isNegativeStockAuthOpen, setIsNegativeStockAuthOpen] = useState(false);
+  const [negativeStockPendingPayload, setNegativeStockPendingPayload] = useState<any | null>(null);
+  const [overrideAdminEmail, setOverrideAdminEmail] = useState("");
+  const [overrideAdminPassword, setOverrideAdminPassword] = useState("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [cancelTarget, setCancelTarget] = useState<TransactionRecord | null>(null);
   const [cancelReason, setCancelReason] = useState("");
@@ -1366,6 +1370,81 @@ export function AdminStockTransactionClient({
     }
   }
 
+  function buildSubmitPayload(extra?: Record<string, unknown>) {
+    return {
+      transactionType,
+      transactionDate: docDate,
+      docDate,
+      docNo: docNo.trim() || null,
+      docDesc: docDesc.trim() || null,
+      projectId: projectFeatureEnabled ? (projectId || null) : null,
+      departmentId: departmentFeatureEnabled ? (departmentId || null) : null,
+      reference: reference.trim() || null,
+      remarks: remarks.trim() || null,
+      lines: lines.map((line) => ({
+        inventoryProductId: line.inventoryProductId || null,
+        qty: Number(line.qty || 0),
+        uomCode: line.uomCode || null,
+        unitCost: line.unitCost.trim() ? Number(line.unitCost) : null,
+        batchNo: line.batchNo.trim().toUpperCase() || null,
+        expiryDate: line.expiryDate || null,
+        serialNos: line.serialNos,
+        remarks: line.remarks.trim() || null,
+        locationId: line.locationId || null,
+        fromLocationId: line.fromLocationId || null,
+        toLocationId: line.toLocationId || null,
+        adjustmentDirection: line.adjustmentDirection || null,
+      })),
+      ...(extra || {}),
+    };
+  }
+
+  async function submitPayload(payload: any) {
+    const response = await fetch("/api/admin/stock/transactions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await response.json();
+    if (!response.ok || !data.ok) {
+      if (data?.code === "NEGATIVE_STOCK_AUTH_REQUIRED") {
+        setNegativeStockPendingPayload(payload);
+        setOverrideAdminEmail("");
+        setOverrideAdminPassword("");
+        setIsNegativeStockAuthOpen(true);
+        return { ok: false };
+      }
+      setSubmitError(data.error || `Unable to create ${title.toLowerCase()}.`);
+      return { ok: false };
+    }
+
+    setSubmitSuccess(`${title} created successfully.`);
+    await loadTransactions();
+    closeCreateModal();
+    setIsNegativeStockAuthOpen(false);
+    setNegativeStockPendingPayload(null);
+    return { ok: true };
+  }
+
+  async function handleNegativeStockAuthorization() {
+    if (!negativeStockPendingPayload) return;
+    setIsSubmitting(true);
+    setSubmitError("");
+    try {
+      await submitPayload({
+        ...negativeStockPendingPayload,
+        negativeStockOverride: true,
+        overrideAdminEmail: overrideAdminEmail.trim(),
+        overrideAdminPassword,
+      });
+    } catch {
+      setSubmitError(`Unable to create ${title.toLowerCase()} right now.`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setIsSubmitting(true);
@@ -1373,47 +1452,7 @@ export function AdminStockTransactionClient({
     setSubmitSuccess("");
 
     try {
-      const payload = {
-        transactionType,
-        transactionDate: docDate,
-        docDate,
-        docNo: docNo.trim() || null,
-        docDesc: docDesc.trim() || null,
-        projectId: projectFeatureEnabled ? (projectId || null) : null,
-        departmentId: departmentFeatureEnabled ? (departmentId || null) : null,
-        reference: reference.trim() || null,
-        remarks: remarks.trim() || null,
-        lines: lines.map((line) => ({
-          inventoryProductId: line.inventoryProductId || null,
-          qty: Number(line.qty || 0),
-          uomCode: line.uomCode || null,
-          unitCost: line.unitCost.trim() ? Number(line.unitCost) : null,
-          batchNo: line.batchNo.trim().toUpperCase() || null,
-          expiryDate: line.expiryDate || null,
-          serialNos: line.serialNos,
-          remarks: line.remarks.trim() || null,
-          locationId: line.locationId || null,
-          fromLocationId: line.fromLocationId || null,
-          toLocationId: line.toLocationId || null,
-          adjustmentDirection: line.adjustmentDirection || null,
-        })),
-      };
-
-      const response = await fetch("/api/admin/stock/transactions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await response.json();
-      if (!response.ok || !data.ok) {
-        setSubmitError(data.error || `Unable to create ${title.toLowerCase()}.`);
-        return;
-      }
-
-      setSubmitSuccess(`${title} created successfully.`);
-      await loadTransactions();
-      closeCreateModal();
+      await submitPayload(buildSubmitPayload());
     } catch {
       setSubmitError(`Unable to create ${title.toLowerCase()} right now.`);
     } finally {
@@ -1620,6 +1659,48 @@ export function AdminStockTransactionClient({
       </div>
 
       {isDocNoModalOpen ? (
+      {isNegativeStockAuthOpen ? (
+        <div className="fixed inset-0 z-[116] flex items-center justify-center bg-black/70 p-4">
+          <div className="w-full max-w-lg rounded-[2rem] border border-white/10 bg-[#0b0b0f] p-6 shadow-2xl md:p-8">
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-amber-300/80">Admin Authorization Required</p>
+            <h3 className="mt-3 text-2xl font-bold text-white">Negative Stock Detected</h3>
+            <p className="mt-3 text-sm text-white/65">This transaction will cause negative stock. Please enter an admin email and password to continue.</p>
+            <div className="mt-6 space-y-4">
+              <div>
+                <label className="label-rk">Admin Email</label>
+                <input type="email" className="input-rk" value={overrideAdminEmail} onChange={(e) => setOverrideAdminEmail(e.target.value)} placeholder="Enter admin email" />
+              </div>
+              <div>
+                <label className="label-rk">Admin Password</label>
+                <input type="password" className="input-rk" value={overrideAdminPassword} onChange={(e) => setOverrideAdminPassword(e.target.value)} placeholder="Enter admin password" />
+              </div>
+            </div>
+            <div className="mt-6 flex flex-wrap justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsNegativeStockAuthOpen(false);
+                  setNegativeStockPendingPayload(null);
+                  setOverrideAdminEmail("");
+                  setOverrideAdminPassword("");
+                }}
+                className="rounded-xl border border-white/15 bg-white/5 px-5 py-3 text-sm text-white/80 transition hover:bg-white/10"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleNegativeStockAuthorization}
+                disabled={!overrideAdminEmail.trim() || !overrideAdminPassword.trim() || isSubmitting}
+                className="rounded-xl bg-red-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-red-400 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isSubmitting ? "Authorizing..." : "Authorize & Save"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
         <div className="fixed inset-0 z-[115] flex items-center justify-center bg-black/70 p-4">
           <div className="w-full max-w-lg rounded-[2rem] border border-white/10 bg-[#0b0b0f] p-6 shadow-2xl md:p-8">
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/45">Manual Document No</p>
