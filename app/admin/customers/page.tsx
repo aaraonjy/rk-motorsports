@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { PaginationControls } from "@/components/pagination-controls";
 import { AdminCustomerManagement } from "@/components/admin-customer-management";
 import { db } from "@/lib/db";
+import { DEFAULT_ACCOUNT_CONFIGURATION_ID, DEFAULT_CUSTOMER_ACCOUNT_FORMAT, DEFAULT_CUSTOMER_ACCOUNT_PREFIX } from "@/lib/customer-account";
+import type { CustomerAccountNoFormat } from "@prisma/client";
 
 type CustomersPageProps = {
   searchParams?: Promise<{
@@ -18,6 +20,18 @@ type CustomerAgent = {
   id: string;
   code: string;
   name: string;
+};
+
+type CustomerDeliveryAddress = {
+  id: string;
+  label: string | null;
+  addressLine1: string;
+  addressLine2: string | null;
+  addressLine3: string | null;
+  addressLine4: string | null;
+  city: string | null;
+  postCode: string | null;
+  countryCode: string | null;
 };
 
 type CustomerRecord = {
@@ -53,6 +67,7 @@ type CustomerRecord = {
   registrationIdType: string | null;
   registrationNo: string | null;
   taxIdentificationNo: string | null;
+  deliveryAddresses: CustomerDeliveryAddress[];
   accountSource: "PORTAL" | "ADMIN";
   portalAccess: boolean;
   createdAt: Date;
@@ -74,7 +89,7 @@ export default async function AdminCustomersPage({
   const portalAccess = params.portalAccess || "ALL";
   const page = Math.max(1, Number(params.page || "1") || 1);
 
-  const [result, agents] = await Promise.all([
+  const [result, agents, accountConfig, existingAccountNos] = await Promise.all([
     getCustomers({
       search,
       source,
@@ -92,6 +107,14 @@ export default async function AdminCustomersPage({
       where: { isActive: true },
       orderBy: [{ code: "asc" }],
       select: { id: true, code: true, name: true },
+    }),
+    db.accountConfiguration.findUnique({
+      where: { id: DEFAULT_ACCOUNT_CONFIGURATION_ID },
+      select: { customerAccountPrefix: true, customerAccountNoFormat: true },
+    }),
+    db.user.findMany({
+      where: { role: "CUSTOMER", customerAccountNo: { not: null } },
+      select: { customerAccountNo: true },
     }),
   ]);
 
@@ -214,6 +237,13 @@ export default async function AdminCustomersPage({
               createdAt: customer.createdAt.toISOString(),
             }))}
             agents={agents}
+            accountConfiguration={{
+              customerAccountPrefix: accountConfig?.customerAccountPrefix || DEFAULT_CUSTOMER_ACCOUNT_PREFIX,
+              customerAccountNoFormat: (accountConfig?.customerAccountNoFormat || DEFAULT_CUSTOMER_ACCOUNT_FORMAT) as CustomerAccountNoFormat,
+            }}
+            existingCustomerAccountNos={existingAccountNos
+              .map((item) => item.customerAccountNo)
+              .filter((value): value is string => Boolean(value))}
             currentPage={result.currentPage}
             pageSize={result.pageSize}
           />
