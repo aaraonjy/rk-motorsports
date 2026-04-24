@@ -155,38 +155,43 @@ const SUMMARY_CARDS: Array<{
   toneClass: string;
   countClass: string;
   accentClass: string;
+  glowClass: string;
 }> = [
   {
     key: "pending_completion",
     label: "Pending Completion",
     toneClass:
-      "border-amber-500/35 bg-black/55 text-white shadow-lg shadow-black/25 hover:border-amber-400/55 hover:bg-black/65",
+      "border-amber-500/30 bg-black/60 text-white shadow-lg shadow-black/30 hover:border-amber-400/50 hover:bg-black/70",
     countClass: "text-amber-300",
-    accentClass: "bg-amber-400/70",
+    accentClass: "bg-amber-400/80",
+    glowClass: "bg-amber-400/10",
   },
   {
     key: "awaiting_payment",
     label: "Awaiting Payment",
     toneClass:
-      "border-orange-500/35 bg-black/55 text-white shadow-lg shadow-black/25 hover:border-orange-400/55 hover:bg-black/65",
+      "border-orange-500/30 bg-black/60 text-white shadow-lg shadow-black/30 hover:border-orange-400/50 hover:bg-black/70",
     countClass: "text-orange-300",
-    accentClass: "bg-orange-400/70",
+    accentClass: "bg-orange-400/80",
+    glowClass: "bg-orange-400/10",
   },
   {
     key: "new_orders",
     label: "New Orders",
     toneClass:
-      "border-sky-500/35 bg-black/55 text-white shadow-lg shadow-black/25 hover:border-sky-400/55 hover:bg-black/65",
+      "border-sky-500/30 bg-black/60 text-white shadow-lg shadow-black/30 hover:border-sky-400/50 hover:bg-black/70",
     countClass: "text-sky-300",
-    accentClass: "bg-sky-400/70",
+    accentClass: "bg-sky-400/80",
+    glowClass: "bg-sky-400/10",
   },
   {
     key: "partially_paid",
     label: "Partially Paid",
     toneClass:
-      "border-fuchsia-500/35 bg-black/55 text-white shadow-lg shadow-black/25 hover:border-fuchsia-400/55 hover:bg-black/65",
+      "border-fuchsia-500/30 bg-black/60 text-white shadow-lg shadow-black/30 hover:border-fuchsia-400/50 hover:bg-black/70",
     countClass: "text-fuchsia-300",
-    accentClass: "bg-fuchsia-400/70",
+    accentClass: "bg-fuchsia-400/80",
+    glowClass: "bg-fuchsia-400/10",
   },
 ];
 
@@ -343,14 +348,15 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                     isActive ? "ring-2 ring-white/20" : ""
                   }`}
                 >
-                  <div className={`absolute left-0 top-0 h-full w-1 ${card.accentClass}`} />
+                  <div className={`absolute left-0 top-0 h-full w-1.5 ${card.accentClass}`} />
+                  <div className={`absolute -right-10 -top-10 h-28 w-28 rounded-full blur-3xl transition duration-200 group-hover:opacity-100 ${card.glowClass}`} />
                   <div className="relative">
-                    <div className={`text-3xl font-bold leading-none drop-shadow-sm ${card.countClass}`}>{count}</div>
-                    <div className="mt-2 text-sm font-semibold tracking-[0.02em] text-white/90">
+                    <div className={`text-4xl font-bold leading-none tracking-tight drop-shadow-sm ${card.countClass}`}>{count}</div>
+                    <div className="mt-3 text-sm font-semibold tracking-[0.02em] text-white/95">
                       {card.label}
                     </div>
-                    <div className="mt-3 text-xs text-white/60">
-                      {isActive ? "Active filter" : "Click to view"}
+                    <div className="mt-2 text-xs text-white/65 transition group-hover:text-white/80">
+                      {isActive ? "Active filter" : "View details"}
                     </div>
                   </div>
                 </a>
