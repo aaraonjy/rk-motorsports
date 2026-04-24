@@ -532,11 +532,11 @@ function CustomerModal({
                     className="flex w-full rounded-xl border border-white/10 bg-black/40 text-left text-sm text-white transition hover:border-white/20 disabled:cursor-not-allowed disabled:opacity-50"
                     title="Click to override A/C No suffix"
                   >
-                    <span className="flex w-1/2 items-center border-r border-white/10 px-4 text-white/50">
+                    <span className="flex w-[120px] items-center border-r border-white/10 px-4 text-white/50">
                       {accountPrefix}
                     </span>
-                    <span className="flex w-1/2 min-w-0 items-center px-4 py-3 font-semibold text-white">
-                      {accountSuffix}
+                    <span className="flex flex-1 items-center px-4 py-3 font-semibold text-white">
+                      {accountSuffix || ""}
                     </span>
                   </button>
                 ) : (
