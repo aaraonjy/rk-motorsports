@@ -26,6 +26,7 @@ function formatDateTimeMY(value: Date | string | null | undefined) {
   if (!value) return "-";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "-";
+
   return date.toLocaleString("en-MY", {
     timeZone: "Asia/Kuala_Lumpur",
     day: "2-digit",
@@ -207,34 +208,23 @@ export default async function AdminStockTransactionDetailPage({ params, searchPa
               </Link>
             ) : null}
           </div>
-          <div className="flex flex-col items-end gap-4">
-            <div className="flex flex-wrap justify-end gap-3">
-              <Link
-                href={getBackHref(transaction.transactionType)}
-                className="rounded-xl border border-white/15 bg-white/5 px-5 py-3 text-sm text-white/80 transition hover:bg-white/10"
-              >
-                Back
-              </Link>
-              <Link
-                href={`/admin/stock/transactions/${transaction.id}/edit`}
-                className={`rounded-xl px-5 py-3 text-sm font-semibold text-white transition ${
-                  transaction.status === "CANCELLED"
-                    ? "pointer-events-none cursor-not-allowed border border-white/10 bg-white/5 opacity-50"
-                    : "border border-white/15 bg-white/5 hover:bg-white/10"
-                }`}
-              >
-                Edit
-              </Link>
-            </div>
-
-            <div className="min-w-[280px] rounded-2xl border border-white/10 bg-black/35 p-4 text-sm shadow-lg shadow-black/20">
-              <div className="grid grid-cols-[110px_minmax(0,1fr)] gap-x-4 gap-y-2">
-                <div className="text-white/45">Created By</div>
-                <div className="truncate text-right font-medium text-white/85">{transaction.createdByAdmin?.name || "-"}</div>
-                <div className="text-white/45">Created Date</div>
-                <div className="text-right font-medium text-white/85">{formatDateTimeMY(transaction.createdAt)}</div>
-              </div>
-            </div>
+          <div className="flex flex-wrap gap-3">
+            <Link
+              href={getBackHref(transaction.transactionType)}
+              className="rounded-xl border border-white/15 bg-white/5 px-5 py-3 text-sm text-white/80 transition hover:bg-white/10"
+            >
+              Back
+            </Link>
+            <Link
+              href={`/admin/stock/transactions/${transaction.id}/edit`}
+              className={`rounded-xl px-5 py-3 text-sm font-semibold text-white transition ${
+                transaction.status === "CANCELLED"
+                  ? "pointer-events-none cursor-not-allowed border border-white/10 bg-white/5 opacity-50"
+                  : "border border-white/15 bg-white/5 hover:bg-white/10"
+              }`}
+            >
+              Edit
+            </Link>
           </div>
         </div>
 
@@ -248,11 +238,25 @@ export default async function AdminStockTransactionDetailPage({ params, searchPa
         ) : null}
 
         <div className="rounded-[2rem] border border-white/10 bg-black/45 p-5 backdrop-blur-md md:p-6">
-          <p className="text-sm font-semibold uppercase tracking-[0.24em] text-white/40">{title}</p>
-          <h2 className="mt-4 text-4xl font-bold">View {title}</h2>
-          <p className="mt-4 max-w-3xl text-white/70">
-            Use the same transaction layout in read-only mode for easier review and checking.
-          </p>
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.24em] text-white/40">{title}</p>
+              <h2 className="mt-4 text-4xl font-bold">View {title}</h2>
+              <p className="mt-4 max-w-3xl text-white/70">
+                Use the same transaction layout in read-only mode for easier review and checking.
+              </p>
+            </div>
+            <div className="min-w-[240px] text-right text-xs leading-6 text-white/45">
+              <div>
+                <span>Created By</span>
+                <span className="ml-3 text-white/65">{transaction.createdByAdmin?.name || "-"}</span>
+              </div>
+              <div>
+                <span>Created Date</span>
+                <span className="ml-3 text-white/65">{formatDateTimeMY(transaction.createdAt)}</span>
+              </div>
+            </div>
+          </div>
 
           <div className="mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
             <ReadonlyField label="Transaction Date" value={formatDateDisplay(transaction.transactionDate)} />
