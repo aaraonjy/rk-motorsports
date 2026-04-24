@@ -865,8 +865,8 @@ export function AdminCustomerManagement({ customers, agents, accountConfiguratio
           <thead className="bg-black/50 text-white/65">
             <tr>
               <th className="w-[70px] px-4 py-4">No.</th>
-              <th className="w-[220px] px-4 py-4">Customer</th>
               <th className="w-[150px] px-4 py-4">A/C No.</th>
+              <th className="w-[220px] px-4 py-4">Customer</th>
               <th className="w-[180px] px-4 py-4">Phone</th>
               <th className="w-[260px] px-4 py-4">Email</th>
               <th className="w-[150px] px-4 py-4">Source</th>
@@ -880,8 +880,8 @@ export function AdminCustomerManagement({ customers, agents, accountConfiguratio
             {customers.length > 0 ? customers.map((customer, index) => (
               <tr key={customer.id} onClick={() => handleRowClick(customer.id)} className="cursor-pointer border-t border-white/10 align-top transition-colors hover:bg-white/[0.03]">
                 <td className="px-4 py-4 text-white/55">{(currentPage - 1) * pageSize + index + 1}</td>
-                <td className="px-4 py-4"><div className="break-words font-semibold text-white/90">{customer.name}</div></td>
                 <td className="break-words px-4 py-4 text-white/85">{customer.customerAccountNo || "-"}</td>
+                <td className="px-4 py-4"><div className="break-words font-semibold text-white/90">{customer.name}</div></td>
                 <td className="break-words px-4 py-4 text-white/85">{customer.phone || "-"}</td>
                 <td className="break-words px-4 py-4 text-white/85">{customer.email}</td>
                 <td className="px-4 py-4"><span className={getSourceBadge(customer.accountSource)}>{getSourceLabel(customer.accountSource)}</span></td>
