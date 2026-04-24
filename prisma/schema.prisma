@@ -136,7 +136,7 @@ model User {
   passwordHash           String
   role                   Role                @default(CUSTOMER)
   phone                  String?             @unique
-  customerAccountNo      String?
+  customerAccountNo      String?             @unique
   accountSource          AccountSource       @default(PORTAL)
   portalAccess           Boolean             @default(true)
   resetToken             String?
