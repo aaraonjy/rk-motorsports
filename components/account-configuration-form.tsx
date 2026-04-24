@@ -101,7 +101,7 @@ export function AccountConfigurationForm({
             >
               {CUSTOMER_ACCOUNT_FORMAT_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
-                  {option.label} - {option.example}
+                  {option.label}
                 </option>
               ))}
             </select>
