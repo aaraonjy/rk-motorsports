@@ -246,14 +246,14 @@ export default async function AdminStockTransactionDetailPage({ params, searchPa
                 Use the same transaction layout in read-only mode for easier review and checking.
               </p>
             </div>
-            <div className="min-w-[240px] text-right text-xs leading-6 text-white/45">
-              <div>
-                <span>Created By</span>
-                <span className="ml-3 text-white/65">{transaction.createdByAdmin?.name || "-"}</span>
+            <div className="min-w-[260px] text-xs leading-6 text-white/45">
+              <div className="flex justify-end gap-3">
+                <span className="text-right w-[110px]">Created By:</span>
+                <span className="text-left text-white/65 w-[140px]">{transaction.createdByAdmin?.name || "-"}</span>
               </div>
-              <div>
-                <span>Created Date</span>
-                <span className="ml-3 text-white/65">{formatDateTimeMY(transaction.createdAt)}</span>
+              <div className="flex justify-end gap-3">
+                <span className="text-right w-[110px]">Created Date:</span>
+                <span className="text-left text-white/65 w-[140px]">{formatDateTimeMY(transaction.createdAt)}</span>
               </div>
             </div>
           </div>
