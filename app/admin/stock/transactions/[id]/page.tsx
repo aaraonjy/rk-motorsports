@@ -22,6 +22,21 @@ function formatDateDisplay(value: Date | string | null | undefined) {
   return formatted || "-";
 }
 
+function formatDateTimeMY(value: Date | string | null | undefined) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleString("en-MY", {
+    timeZone: "Asia/Kuala_Lumpur",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
+
 function getBackHref(type: "OB" | "SR" | "SI" | "SA" | "ST" | "AS") {
   switch (type) {
     case "OB":
@@ -192,30 +207,41 @@ export default async function AdminStockTransactionDetailPage({ params, searchPa
               </Link>
             ) : null}
           </div>
-          <div className="flex flex-wrap gap-3">
-            <Link
-              href={getBackHref(transaction.transactionType)}
-              className="rounded-xl border border-white/15 bg-white/5 px-5 py-3 text-sm text-white/80 transition hover:bg-white/10"
-            >
-              Back
-            </Link>
-            <Link
-              href={`/admin/stock/transactions/${transaction.id}/edit`}
-              className={`rounded-xl px-5 py-3 text-sm font-semibold text-white transition ${
-                transaction.status === "CANCELLED"
-                  ? "pointer-events-none cursor-not-allowed border border-white/10 bg-white/5 opacity-50"
-                  : "border border-white/15 bg-white/5 hover:bg-white/10"
-              }`}
-            >
-              Edit
-            </Link>
+          <div className="flex flex-col items-end gap-4">
+            <div className="flex flex-wrap justify-end gap-3">
+              <Link
+                href={getBackHref(transaction.transactionType)}
+                className="rounded-xl border border-white/15 bg-white/5 px-5 py-3 text-sm text-white/80 transition hover:bg-white/10"
+              >
+                Back
+              </Link>
+              <Link
+                href={`/admin/stock/transactions/${transaction.id}/edit`}
+                className={`rounded-xl px-5 py-3 text-sm font-semibold text-white transition ${
+                  transaction.status === "CANCELLED"
+                    ? "pointer-events-none cursor-not-allowed border border-white/10 bg-white/5 opacity-50"
+                    : "border border-white/15 bg-white/5 hover:bg-white/10"
+                }`}
+              >
+                Edit
+              </Link>
+            </div>
+
+            <div className="min-w-[280px] rounded-2xl border border-white/10 bg-black/35 p-4 text-sm shadow-lg shadow-black/20">
+              <div className="grid grid-cols-[110px_minmax(0,1fr)] gap-x-4 gap-y-2">
+                <div className="text-white/45">Created By</div>
+                <div className="truncate text-right font-medium text-white/85">{transaction.createdByAdmin?.name || "-"}</div>
+                <div className="text-white/45">Created Date</div>
+                <div className="text-right font-medium text-white/85">{formatDateTimeMY(transaction.createdAt)}</div>
+              </div>
+            </div>
           </div>
         </div>
 
         {transaction.status === "CANCELLED" ? (
           <div className="rounded-2xl border border-red-500/25 bg-red-500/10 p-5 text-sm text-red-100">
             <div className="font-semibold">This transaction has been cancelled.</div>
-            <div className="mt-2">Cancelled At: {formatDateDisplay(transaction.cancelledAt)}</div>
+            <div className="mt-2">Cancelled At: {formatDateTimeMY(transaction.cancelledAt)}</div>
             <div className="mt-1">Cancelled By: {transaction.cancelledByAdmin?.name || "-"}</div>
             <div className="mt-1">Reason: {transaction.cancelReason || "-"}</div>
           </div>
