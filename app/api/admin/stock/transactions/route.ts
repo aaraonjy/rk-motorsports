@@ -29,6 +29,52 @@ import {
   STOCK_STORAGE_DECIMAL_PLACES,
 } from "@/lib/stock-format";
 
+class NegativeStockAuthorizationError extends Error {
+  code: string;
+  details: Array<{ inventoryProductId: string; locationId: string; batchNo?: string | null; balance: number; requiredQty: number; message: string }>;
+
+  constructor(
+    message: string,
+    details: Array<{ inventoryProductId: string; locationId: string; batchNo?: string | null; balance: number; requiredQty: number; message: string }>,
+    code = "NEGATIVE_STOCK_AUTH_REQUIRED"
+  ) {
+    super(message);
+    this.name = "NegativeStockAuthorizationError";
+    this.code = code;
+    this.details = details;
+  }
+}
+
+async function resolveNegativeStockOverrideAdmin(
+  tx: any,
+  body: any,
+  details: Array<{ inventoryProductId: string; locationId: string; batchNo?: string | null; balance: number; requiredQty: number; message: string }>
+) {
+  const requestedOverride = body?.negativeStockOverride === true;
+  const adminEmail = typeof body?.overrideAdminEmail === "string" ? body.overrideAdminEmail.trim() : "";
+  const adminPassword = typeof body?.overrideAdminPassword === "string" ? body.overrideAdminPassword : "";
+
+  if (!requestedOverride || !adminEmail || !adminPassword) {
+    throw new NegativeStockAuthorizationError("Admin authorization is required to continue with negative stock.", details);
+  }
+
+  const authorizingAdmin = await tx.user.findUnique({ where: { email: adminEmail } });
+  if (!authorizingAdmin || authorizingAdmin.role !== "ADMIN") {
+    throw new NegativeStockAuthorizationError("Invalid admin email or password.", details, "NEGATIVE_STOCK_AUTH_INVALID");
+  }
+
+  const passwordValid = await verifyPassword(adminPassword, authorizingAdmin.passwordHash);
+  if (!passwordValid) {
+    throw new NegativeStockAuthorizationError("Invalid admin email or password.", details, "NEGATIVE_STOCK_AUTH_INVALID");
+  }
+
+  return {
+    id: authorizingAdmin.id,
+    name: authorizingAdmin.name,
+    email: authorizingAdmin.email,
+  };
+}
+
 type StockLinePayload = {
   inventoryProductId?: string;
   qty?: number;
@@ -74,47 +120,6 @@ function normalizeSerialNumbers(value: unknown) {
 }
 
 function normalizeUomCode(value: unknown) {
-class NegativeStockAuthorizationError extends Error {
-  code: string;
-  details: Array<{ inventoryProductId: string; locationId: string; batchNo?: string | null; balance: number; requiredQty: number; message: string }>;
-  constructor(
-    message: string,
-    details: Array<{ inventoryProductId: string; locationId: string; batchNo?: string | null; balance: number; requiredQty: number; message: string }>,
-    code = "NEGATIVE_STOCK_AUTH_REQUIRED"
-  ) {
-    super(message);
-    this.name = "NegativeStockAuthorizationError";
-    this.code = code;
-    this.details = details;
-  }
-}
-
-async function resolveNegativeStockOverrideAdmin(
-  tx: any,
-  body: any,
-  details: Array<{ inventoryProductId: string; locationId: string; batchNo?: string | null; balance: number; requiredQty: number; message: string }>
-) {
-  const requestedOverride = body?.negativeStockOverride === true;
-  const adminEmail = typeof body?.overrideAdminEmail === "string" ? body.overrideAdminEmail.trim() : "";
-  const adminPassword = typeof body?.overrideAdminPassword === "string" ? body.overrideAdminPassword : "";
-
-  if (!requestedOverride || !adminEmail || !adminPassword) {
-    throw new NegativeStockAuthorizationError("Admin authorization is required to continue with negative stock.", details);
-  }
-
-  const authorizingAdmin = await tx.user.findUnique({ where: { email: adminEmail } });
-  if (!authorizingAdmin || authorizingAdmin.role !== "ADMIN") {
-    throw new NegativeStockAuthorizationError("Invalid admin email or password.", details, "NEGATIVE_STOCK_AUTH_INVALID");
-  }
-
-  const passwordValid = await verifyPassword(adminPassword, authorizingAdmin.passwordHash);
-  if (!passwordValid) {
-    throw new NegativeStockAuthorizationError("Invalid admin email or password.", details, "NEGATIVE_STOCK_AUTH_INVALID");
-  }
-
-  return authorizingAdmin;
-}
-
   return typeof value === "string" ? value.trim().toUpperCase() : "";
 }
 
@@ -764,7 +769,7 @@ export async function POST(req: Request) {
         }
       }
 
-      const resultTransaction = await tx.stockTransaction.findUnique({
+      return tx.stockTransaction.findUnique({
         where: { id: transaction.id },
         include: {
           createdByAdmin: { select: { id: true, name: true, email: true } },
@@ -786,8 +791,6 @@ export async function POST(req: Request) {
           },
         },
       });
-
-      return { transaction: resultTransaction, negativeStockAuthorizedBy };
     });
 
     await createAuditLogFromRequest({
@@ -796,13 +799,13 @@ export async function POST(req: Request) {
       module: "Stock Transactions",
       action: "CREATE",
       entityType: "StockTransaction",
-      entityId: created?.transaction?.id,
-      entityCode: created?.transaction?.transactionNo,
-      description: `${admin.name} created stock transaction ${created?.transaction?.transactionNo}${created?.negativeStockAuthorizedBy ? ` with negative stock override authorized by ${created.negativeStockAuthorizedBy.email}` : ""}.`,
+      entityId: created?.id,
+      entityCode: created?.transactionNo,
+      description: `${admin.name} created stock transaction ${created?.transactionNo}.`,
       newValues: {
         transactionType,
         transactionDate: transactionDate.toISOString(),
-        docNo: created?.transaction?.docNo ?? null,
+        docNo: created?.docNo ?? null,
         docDate: docDate.toISOString(),
         docDesc,
         projectId: project?.id ?? null,
@@ -810,12 +813,11 @@ export async function POST(req: Request) {
         reference,
         remarks,
         lineCount: normalizedLines.length,
-        negativeStockOverrideAuthorizedBy: created?.negativeStockAuthorizedBy?.email ?? null,
       },
       status: "SUCCESS",
     });
 
-    return NextResponse.json({ ok: true, transaction: created?.transaction, negativeStockOverrideAuthorizedBy: created?.negativeStockAuthorizedBy ?? null });
+    return NextResponse.json({ ok: true, transaction: created });
   } catch (error: any) {
     const isUniqueDocNo = error?.code === "P2002" && Array.isArray(error?.meta?.target) && error.meta.target.includes("docNo");
     const isNegativeStockAuth = error instanceof NegativeStockAuthorizationError;
