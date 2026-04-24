@@ -1,6 +1,3 @@
-// FIXED VERSION: Added null guard for password before clipboard write
-// Only change: handleCopy() now checks if (!password) return;
-
 "use client";
 
 import { useMemo, useState, type ReactNode } from "react";
@@ -214,6 +211,7 @@ function getCustomerInitial(name: string) {
 }
 
 function getAccountFixedPrefix(prefix: string, name: string) {
+  if (!name.trim()) return "";
   return `${prefix.replace(/\/$/, "").toUpperCase()}/${getCustomerInitial(name)}`;
 }
 
@@ -222,6 +220,8 @@ function getNextAccountSuffix(args: {
   sequenceDigits: number;
   existingCustomerAccountNos: string[];
 }) {
+  if (!args.fixedPrefix) return "";
+
   const nextSequence =
     args.existingCustomerAccountNos.reduce((max, accountNo) => {
       if (!accountNo.startsWith(args.fixedPrefix)) return max;
@@ -322,15 +322,21 @@ function CustomerModal({
       }),
     [accountFixedPrefix, existingCustomerAccountNos, sequenceDigits]
   );
-  const accountSuffix = (accountSuffixTouched ? form.customerAccountNoSuffix : defaultAccountSuffix).padStart(sequenceDigits, "0");
-  const previewAccountNo = `${accountFixedPrefix}${accountSuffix}`;
+  const rawAccountSuffix = accountSuffixTouched ? form.customerAccountNoSuffix : defaultAccountSuffix;
+  const accountSuffix = accountFixedPrefix && rawAccountSuffix ? rawAccountSuffix.padStart(sequenceDigits, "0") : "";
+  const previewAccountNo = accountFixedPrefix ? `${accountFixedPrefix}${accountSuffix}` : "";
 
   if (!isOpen) return null;
 
   const isPortalCustomer = customer?.accountSource === "PORTAL";
 
   function updateField<K extends keyof CustomerFormState>(key: K, value: CustomerFormState[K]) {
-    setForm((prev) => ({ ...prev, [key]: value }));
+    setForm((prev) => ({
+      ...prev,
+      [key]: value,
+      ...(key === "name" && mode === "create" ? { customerAccountNoSuffix: "" } : {}),
+    }));
+
     if (key === "name" && mode === "create") {
       setAccountSuffixTouched(false);
     }
@@ -384,7 +390,7 @@ function CustomerModal({
         body: JSON.stringify({
           ...form,
           name: form.name.trim(),
-          customerAccountNo: mode === "create" ? previewAccountNo : customer?.customerAccountNo,
+          customerAccountNo: mode === "create" ? previewAccountNo || null : customer?.customerAccountNo,
           email: form.email.trim(),
           phone: form.phone.trim(),
           agentId: form.agentId || null,
@@ -434,6 +440,30 @@ function CustomerModal({
             <div className="text-sm font-semibold uppercase tracking-[0.18em] text-white/45">Basic Info</div>
             <div className="mt-4 grid gap-4 md:grid-cols-2">
               <div>
+                <FieldLabel>A/C No.</FieldLabel>
+                {mode === "create" ? (
+                  <div className="flex rounded-xl border border-white/10 bg-black/40 text-sm text-white">
+                    <div className="flex min-w-[96px] items-center border-r border-white/10 px-4 text-white/50">
+                      {accountFixedPrefix || "-"}
+                    </div>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={accountSuffix}
+                      disabled={!accountFixedPrefix}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/\D/g, "").slice(0, sequenceDigits);
+                        setAccountSuffixTouched(true);
+                        updateField("customerAccountNoSuffix", value);
+                      }}
+                      className="min-w-0 flex-1 rounded-r-xl bg-transparent px-4 py-3 text-white outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                    />
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white/70">{customer?.customerAccountNo || "-"}</div>
+                )}
+              </div>
+              <div>
                 <FieldLabel>Customer Name <span className="text-red-300">*</span></FieldLabel>
                 <TextInput value={form.name} onChange={(value) => updateField("name", value)} required placeholder="Enter customer name" />
               </div>
@@ -441,28 +471,6 @@ function CustomerModal({
                 <FieldLabel>Email <span className="text-red-300">*</span></FieldLabel>
                 <TextInput type="email" value={form.email} onChange={(value) => updateField("email", value)} required disabled={mode === "edit" && isPortalCustomer} placeholder="Enter email address" />
                 {mode === "edit" && isPortalCustomer ? <p className="mt-2 text-xs text-white/45">Email is locked for self-registered customers to avoid unexpected login issues.</p> : null}
-              </div>
-              <div>
-                <FieldLabel>A/C No.</FieldLabel>
-                {mode === "create" ? (
-                  <div className="flex rounded-xl border border-white/10 bg-black/40 text-sm text-white">
-                    <div className="flex items-center border-r border-white/10 px-4 text-white/50">{accountFixedPrefix}</div>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      value={accountSuffix}
-                      onChange={(e) => {
-                        const value = e.target.value.replace(/\D/g, "").slice(0, sequenceDigits);
-                        setAccountSuffixTouched(true);
-                        updateField("customerAccountNoSuffix", value.padStart(sequenceDigits, "0"));
-                      }}
-                      className="min-w-0 flex-1 rounded-r-xl bg-transparent px-4 py-3 text-white outline-none"
-                    />
-                  </div>
-                ) : (
-                  <div className="rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white/70">{customer?.customerAccountNo || "-"}</div>
-                )}
-                {mode === "create" ? <p className="mt-2 text-xs text-white/45">Preview: {previewAccountNo}. You may override the last {sequenceDigits} digits only.</p> : null}
               </div>
               <div>
                 <FieldLabel>Phone 1</FieldLabel>
@@ -504,7 +512,7 @@ function CustomerModal({
             <div className="rounded-2xl border border-white/10 bg-black/20 p-5">
               <div className="flex items-center justify-between gap-3">
                 <div className="text-sm font-semibold uppercase tracking-[0.18em] text-white/45">Default Delivery Address</div>
-                <button type="button" onClick={addDeliveryAddress} className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/15 text-lg text-white/70 transition hover:bg-white/10 hover:text-white" title="Add secondary delivery address">+</button>
+                <button type="button" onClick={addDeliveryAddress} className="inline-flex items-center justify-center rounded-xl border border-white/15 px-3 py-2 text-sm text-white/70 transition hover:bg-white/10 hover:text-white" title="Add secondary delivery address">+ Add</button>
               </div>
               <div className="mt-4 space-y-4">
                 {[1, 2, 3, 4].map((line) => {
