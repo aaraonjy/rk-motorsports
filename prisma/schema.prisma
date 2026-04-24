@@ -17,6 +17,13 @@ enum AccountSource {
   ADMIN
 }
 
+enum CustomerAccountNoFormat {
+  XXXX_XXXX
+  XXXX_XXXXX
+  XXXX_XXX
+  XXX_XXXX
+}
+
 enum ProductType {
   READY_MAP
   CUSTOM_TUNE
@@ -129,6 +136,7 @@ model User {
   passwordHash           String
   role                   Role                @default(CUSTOMER)
   phone                  String?             @unique
+  customerAccountNo      String?             @unique
   accountSource          AccountSource       @default(PORTAL)
   portalAccess           Boolean             @default(true)
   resetToken             String?
@@ -228,6 +236,13 @@ model TaxConfiguration {
   @@index([defaultAdminTaxCodeId])
 }
 
+model AccountConfiguration {
+  id                       String                  @id
+  customerAccountPrefix    String                  @default("3000")
+  customerAccountNoFormat  CustomerAccountNoFormat @default(XXXX_XXXX)
+  createdAt                DateTime                @default(now())
+  updatedAt                DateTime                @updatedAt
+}
 
 
 model StockConfiguration {

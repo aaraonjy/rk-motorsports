@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 const settingsItems = [
   { label: "Audit Logs", href: "/admin/settings/audit-logs" },
   { label: "Tax Configuration", href: "/admin/settings/tax-configuration" },
+  { label: "Account Configuration", href: "/admin/settings/account-configuration" },
   { label: "Stock Settings", href: "/admin/settings/stock" },
   { label: "Misc", href: "/admin/settings/misc" },
 ] as const;

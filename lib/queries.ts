@@ -266,6 +266,12 @@ function buildOrderWhere(
                     },
                   },
                   {
+                    customerAccountNo: {
+                      contains: filters.customerKeyword,
+                      mode: "insensitive",
+                    },
+                  },
+                  {
                     phone: {
                       contains: filters.customerKeyword,
                       mode: "insensitive",
@@ -477,6 +483,12 @@ export async function getCustomers(filters?: CustomersOptions) {
               },
             },
             {
+              customerAccountNo: {
+                contains: filters.search,
+                mode: "insensitive",
+              },
+            },
+            {
               phone: {
                 contains: filters.search,
                 mode: "insensitive",
@@ -507,6 +519,7 @@ export async function getCustomers(filters?: CustomersOptions) {
       select: {
         id: true,
         name: true,
+        customerAccountNo: true,
         email: true,
         phone: true,
         accountSource: true,
@@ -582,6 +595,12 @@ export async function getCustomersReport(filters?: CustomersReportOptions) {
               },
             },
             {
+              customerAccountNo: {
+                contains: filters.search,
+                mode: "insensitive",
+              },
+            },
+            {
               phone: {
                 contains: filters.search,
                 mode: "insensitive",
@@ -611,6 +630,7 @@ export async function getCustomersReport(filters?: CustomersReportOptions) {
     select: {
       id: true,
       name: true,
+      customerAccountNo: true,
       email: true,
       phone: true,
       accountSource: true,
@@ -660,6 +680,7 @@ export async function getCustomerById(customerId: string) {
     select: {
       id: true,
       name: true,
+      customerAccountNo: true,
       email: true,
       phone: true,
       accountSource: true,
@@ -683,6 +704,7 @@ export async function getCustomerByIdWithIntelligence(customerId: string) {
     select: {
       id: true,
       name: true,
+      customerAccountNo: true,
       email: true,
       phone: true,
       accountSource: true,

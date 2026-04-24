@@ -7,6 +7,7 @@ import Link from "next/link";
 type CustomerRecord = {
   id: string;
   name: string;
+  customerAccountNo: string | null;
   email: string;
   phone: string | null;
   accountSource: "PORTAL" | "ADMIN";
@@ -25,6 +26,7 @@ type Props = {
 
 type CustomerFormState = {
   name: string;
+  customerAccountNo: string | null;
   email: string;
   phone: string;
 };
@@ -421,6 +423,7 @@ export function AdminCustomerManagement({ customers, currentPage, pageSize }: Pr
             <tr>
               <th className="px-4 py-4 w-[70px]">No.</th>
               <th className="px-4 py-4 w-[220px]">Customer</th>
+              <th className="px-4 py-4 w-[150px]">A/C No.</th>
               <th className="px-4 py-4 w-[180px]">Phone</th>
               <th className="px-4 py-4 w-[260px]">Email</th>
               <th className="px-4 py-4 w-[150px]">Source</th>
@@ -447,6 +450,10 @@ export function AdminCustomerManagement({ customers, currentPage, pageSize }: Pr
                     <div className="font-semibold break-words text-white/90">
                       {customer.name}
                     </div>
+                  </td>
+
+                  <td className="px-4 py-4 text-white/85 break-words">
+                    {customer.customerAccountNo || "-"}
                   </td>
 
                   <td className="px-4 py-4 text-white/85 break-words">{customer.phone || "-"}</td>
@@ -516,7 +523,7 @@ export function AdminCustomerManagement({ customers, currentPage, pageSize }: Pr
               ))
             ) : (
               <tr>
-                <td colSpan={9} className="px-4 py-10 text-center text-white/45">
+                <td colSpan={10} className="px-4 py-10 text-center text-white/45">
                   No customers found for the selected filters.
                 </td>
               </tr>

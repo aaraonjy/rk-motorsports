@@ -1,5 +1,6 @@
 import { requireAdmin, hashPassword } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { generateNextCustomerAccountNo } from "@/lib/customer-account";
 
 function generateTempPassword() {
   return Math.random().toString(36).slice(-10);
@@ -29,13 +30,25 @@ export async function POST(req: Request) {
     );
   }
 
+  if (phone) {
+    const existingPhone = await db.user.findUnique({ where: { phone } });
+    if (existingPhone) {
+      return Response.json(
+        { ok: false, error: "This phone number is already used by another customer." },
+        { status: 409 }
+      );
+    }
+  }
+
   const passwordHash = await hashPassword(generateTempPassword());
+  const customerAccountNo = await generateNextCustomerAccountNo(db, name);
 
   await db.user.create({
     data: {
       name,
       email,
       phone: phone || null,
+      customerAccountNo,
       passwordHash,
       role: "CUSTOMER",
       accountSource: "ADMIN",

@@ -16,6 +16,7 @@ type CustomersPageProps = {
 type CustomerRecord = {
   id: string;
   name: string;
+  customerAccountNo: string | null;
   email: string;
   phone: string | null;
   accountSource: "PORTAL" | "ADMIN";
@@ -64,7 +65,7 @@ export default async function AdminCustomersPage({
         <div className="mt-8 space-y-4">
           <div className="card-rk p-6 text-white/75">
             <p>
-              Search by customer name, phone number, or email, then filter by account
+              Search by customer name, A/C No., phone number, or email, then filter by account
               source and portal access status.
             </p>
           </div>
@@ -72,13 +73,13 @@ export default async function AdminCustomersPage({
           <form method="get" className="card-rk grid gap-4 p-6 md:grid-cols-2 xl:grid-cols-4">
             <div>
               <label className="mb-2 block text-sm text-white/65">
-                Customer Name / Phone Number / Email
+                Customer Name / A/C No. / Phone Number / Email
               </label>
               <input
                 type="text"
                 name="search"
                 defaultValue={search}
-                placeholder="Search name, phone, or email"
+                placeholder="Search name, A/C No., phone, or email"
                 className="w-full rounded-xl border border-white/15 bg-black/50 px-4 py-3 text-white outline-none placeholder:text-white/35"
               />
             </div>
