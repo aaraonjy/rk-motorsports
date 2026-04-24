@@ -153,30 +153,40 @@ const SUMMARY_CARDS: Array<{
   key: AdminSummaryKey;
   label: string;
   toneClass: string;
+  countClass: string;
+  accentClass: string;
 }> = [
   {
     key: "pending_completion",
     label: "Pending Completion",
     toneClass:
-      "border-amber-400/35 bg-gradient-to-br from-amber-500/45 via-amber-600/30 to-black/40 text-white shadow-lg shadow-amber-950/25 hover:border-amber-300/55 hover:from-amber-500/55 hover:via-amber-600/38 hover:to-black/35",
+      "border-amber-500/35 bg-black/55 text-white shadow-lg shadow-black/25 hover:border-amber-400/55 hover:bg-black/65",
+    countClass: "text-amber-300",
+    accentClass: "bg-amber-400/70",
   },
   {
     key: "awaiting_payment",
     label: "Awaiting Payment",
     toneClass:
-      "border-orange-400/35 bg-gradient-to-br from-orange-500/45 via-orange-700/30 to-black/40 text-white shadow-lg shadow-orange-950/25 hover:border-orange-300/55 hover:from-orange-500/55 hover:via-orange-700/38 hover:to-black/35",
+      "border-orange-500/35 bg-black/55 text-white shadow-lg shadow-black/25 hover:border-orange-400/55 hover:bg-black/65",
+    countClass: "text-orange-300",
+    accentClass: "bg-orange-400/70",
   },
   {
     key: "new_orders",
     label: "New Orders",
     toneClass:
-      "border-sky-400/35 bg-gradient-to-br from-sky-500/45 via-cyan-700/30 to-black/40 text-white shadow-lg shadow-sky-950/25 hover:border-sky-300/55 hover:from-sky-500/55 hover:via-cyan-700/38 hover:to-black/35",
+      "border-sky-500/35 bg-black/55 text-white shadow-lg shadow-black/25 hover:border-sky-400/55 hover:bg-black/65",
+    countClass: "text-sky-300",
+    accentClass: "bg-sky-400/70",
   },
   {
     key: "partially_paid",
     label: "Partially Paid",
     toneClass:
-      "border-fuchsia-400/35 bg-gradient-to-br from-fuchsia-500/45 via-purple-700/30 to-black/40 text-white shadow-lg shadow-fuchsia-950/25 hover:border-fuchsia-300/55 hover:from-fuchsia-500/55 hover:via-purple-700/38 hover:to-black/35",
+      "border-fuchsia-500/35 bg-black/55 text-white shadow-lg shadow-black/25 hover:border-fuchsia-400/55 hover:bg-black/65",
+    countClass: "text-fuchsia-300",
+    accentClass: "bg-fuchsia-400/70",
   },
 ];
 
@@ -329,16 +339,19 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 <a
                   key={card.key}
                   href={buildSummaryHref(params, isActive ? null : card.key)}
-                  className={`group rounded-2xl border p-5 transition duration-200 hover:-translate-y-0.5 ${card.toneClass} ${
+                  className={`group relative overflow-hidden rounded-2xl border p-5 transition duration-200 hover:-translate-y-0.5 ${card.toneClass} ${
                     isActive ? "ring-2 ring-white/20" : ""
                   }`}
                 >
-                  <div className="text-3xl font-bold leading-none text-white drop-shadow-sm">{count}</div>
-                  <div className="mt-2 text-sm font-semibold tracking-[0.02em] text-white/95">
-                    {card.label}
-                  </div>
-                  <div className="mt-3 text-xs text-white/75">
-                    {isActive ? "Active filter" : "Click to view"}
+                  <div className={`absolute left-0 top-0 h-full w-1 ${card.accentClass}`} />
+                  <div className="relative">
+                    <div className={`text-3xl font-bold leading-none drop-shadow-sm ${card.countClass}`}>{count}</div>
+                    <div className="mt-2 text-sm font-semibold tracking-[0.02em] text-white/90">
+                      {card.label}
+                    </div>
+                    <div className="mt-3 text-xs text-white/60">
+                      {isActive ? "Active filter" : "Click to view"}
+                    </div>
                   </div>
                 </a>
               );
