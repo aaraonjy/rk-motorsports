@@ -73,7 +73,7 @@ export default async function AdminCustomersPage({
           <form method="get" className="card-rk grid gap-4 p-6 md:grid-cols-2 xl:grid-cols-4">
             <div>
               <label className="mb-2 block text-sm text-white/65">
-                Customer Name / A/C No. / Phone Number / Email
+                Name / A/C No. / Phone Number / Email
               </label>
               <input
                 type="text"

@@ -505,7 +505,7 @@ export function AdminCustomerManagement({ customers, currentPage, pageSize }: Pr
                       <Link
                         href={`/admin/customers/${customer.id}/create-order`}
                         onClick={(e) => e.stopPropagation()}
-                        className="inline-flex items-center justify-center rounded-xl border border-white/15 bg-black/30 px-4 py-2 text-white transition hover:bg-white/10"
+                        className="inline-flex w-full items-center justify-center rounded-xl border border-white/15 bg-black/30 px-4 py-2 text-center text-white transition hover:bg-white/10"
                       >
                         Create Order
                       </Link>

@@ -125,21 +125,6 @@ export function AccountConfigurationForm({
         </div>
       </div>
 
-      <div className="rounded-2xl border border-white/10 bg-black/30 p-5 text-sm text-white/65">
-        <div className="font-semibold text-white">Available formats</div>
-        <div className="mt-3 grid gap-3 md:grid-cols-2">
-          {CUSTOMER_ACCOUNT_FORMAT_OPTIONS.map((option) => (
-            <div
-              key={option.value}
-              className="rounded-xl border border-white/10 bg-white/[0.03] p-4"
-            >
-              <div className="font-medium text-white/90">{option.label}</div>
-              <div className="mt-1 text-white/50">Example: {option.example}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-
       {message ? (
         <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm text-emerald-200">
           {message}
