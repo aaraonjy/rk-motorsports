@@ -5,6 +5,7 @@ import { AdminNotificationBell } from "@/components/admin-notification-bell";
 import { SiteHeaderClient } from "@/components/site-header-client";
 import { AdminGlobalSettingsMenu } from "@/components/admin-global-settings-menu";
 import { AdminStockMenu } from "@/components/admin-stock-menu";
+import { AdminCustomerMenu } from "@/components/admin-customer-menu";
 
 const publicNav = [
   ["Services", "/#services"],
@@ -16,7 +17,6 @@ const publicNav = [
 
 const adminNav = [
   ["Dashboard", "/admin"],
-  ["Customers", "/admin/customers"],
   ["Report", "/admin/reports"],
 ] as const;
 
@@ -49,6 +49,7 @@ export async function SiteHeader() {
                 {label}
               </Link>
             ))}
+            {user?.role === "ADMIN" ? <AdminCustomerMenu /> : null}
             {user?.role === "ADMIN" ? <AdminStockMenu /> : null}
             {user?.role === "ADMIN" ? <AdminGlobalSettingsMenu /> : null}
           </nav>
