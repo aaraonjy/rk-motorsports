@@ -1090,8 +1090,6 @@ export function AdminStockTransactionEditClient({
         <p className="mt-3 max-w-3xl text-sm leading-6 text-white/65">{intro}</p>
         <p className="mt-3 text-sm text-white/50">Current Document No: {initialTransaction.docNo || "-"}</p>
       </div>
-
-      {isDocNoModalOpen ? (
       {isNegativeStockAuthOpen ? (
         <div className="fixed inset-0 z-[116] flex items-center justify-center bg-black/70 p-4">
           <div className="w-full max-w-lg rounded-[2rem] border border-white/10 bg-[#0b0b0f] p-6 shadow-2xl md:p-8">
@@ -1134,6 +1132,9 @@ export function AdminStockTransactionEditClient({
         </div>
       ) : null}
 
+
+
+      {isDocNoModalOpen ? (
         <div className="fixed inset-0 z-[115] flex items-center justify-center bg-black/70 p-4">
           <div className="w-full max-w-lg rounded-[2rem] border border-white/10 bg-[#0b0b0f] p-6 shadow-2xl md:p-8">
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/45">Manual Document No</p>

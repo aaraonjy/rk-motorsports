@@ -1806,8 +1806,6 @@ export function AdminStockAssemblyClient({
           </div>
         </div>
       ) : null}
-
-      {cancelTarget ? (
       {isNegativeStockAuthOpen ? (
         <div className="fixed inset-0 z-[116] flex items-center justify-center bg-black/70 p-4">
           <div className="w-full max-w-lg rounded-[2rem] border border-white/10 bg-[#0b0b0f] p-6 shadow-2xl md:p-8">
@@ -1850,6 +1848,9 @@ export function AdminStockAssemblyClient({
         </div>
       ) : null}
 
+
+
+      {cancelTarget ? (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/75 p-4">
           <div className="w-full max-w-lg rounded-[2rem] border border-white/10 bg-[#0b0b0f] p-6 shadow-2xl md:p-8">
             <div>
