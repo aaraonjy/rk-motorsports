@@ -463,6 +463,19 @@ model Project {
   @@index([name])
 }
 
+
+model Agent {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, code])
+  @@index([name])
+}
+
 model Department {
   id                String             @id @default(cuid())
   code              String             @unique

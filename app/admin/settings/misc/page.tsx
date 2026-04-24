@@ -13,6 +13,11 @@ const cards = [
     description: "Manage department master data under each project for stock transaction filtering and reporting.",
     href: "/admin/settings/misc/departments",
   },
+  {
+    title: "Agent Maintenance",
+    description: "Manage sales or service agents for customer profile assignment and future reporting.",
+    href: "/admin/settings/misc/agents",
+  },
 ] as const;
 
 export default async function AdminSettingsMiscPage() {
