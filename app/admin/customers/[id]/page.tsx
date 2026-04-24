@@ -188,10 +188,31 @@ export default async function AdminCustomerDetailPage({
               </p>
               <div className="mt-4 space-y-2 text-sm text-white/75">
                 <p>
+                  <span className="text-white/45">A/C No.:</span>{" "}
+                  {customer.customerAccountNo || "-"}
+                </p>
+                <p>
                   <span className="text-white/45">Email:</span> {customer.email}
                 </p>
                 <p>
-                  <span className="text-white/45">Phone:</span> {customer.phone || "-"}
+                  <span className="text-white/45">Email CC:</span>{" "}
+                  {customer.emailCc || "-"}
+                </p>
+                <p>
+                  <span className="text-white/45">Phone 1:</span> {customer.phone || "-"}
+                </p>
+                <p>
+                  <span className="text-white/45">Phone 2:</span> {customer.phone2 || "-"}
+                </p>
+                <p>
+                  <span className="text-white/45">Agent:</span>{" "}
+                  {customer.agent ? `${customer.agent.code} - ${customer.agent.name}` : "-"}
+                </p>
+                <p>
+                  <span className="text-white/45">Area:</span> {customer.area || "-"}
+                </p>
+                <p>
+                  <span className="text-white/45">Currency:</span> {customer.currency || "MYR"}
                 </p>
                 <p>
                   <span className="text-white/45">Account Source:</span>{" "}
@@ -204,6 +225,75 @@ export default async function AdminCustomerDetailPage({
                 <p>
                   <span className="text-white/45">Created Date:</span>{" "}
                   {formatDateTime(customer.createdAt)}
+                </p>
+              </div>
+            </div>
+          </div>
+
+
+
+          <div className="mt-8 grid gap-4 md:grid-cols-2">
+            <div className="rounded-2xl border border-white/10 bg-black/30 p-5">
+              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-white/45">
+                Billing Address
+              </p>
+              <div className="mt-4 space-y-1 text-sm text-white/70">
+                <p>{customer.billingAddressLine1 || "-"}</p>
+                {customer.billingAddressLine2 ? <p>{customer.billingAddressLine2}</p> : null}
+                {customer.billingAddressLine3 ? <p>{customer.billingAddressLine3}</p> : null}
+                {customer.billingAddressLine4 ? <p>{customer.billingAddressLine4}</p> : null}
+                <p>
+                  {[customer.billingPostCode, customer.billingCity].filter(Boolean).join(" ") || "-"}
+                </p>
+                <p>{customer.billingCountryCode || "-"}</p>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-black/30 p-5">
+              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-white/45">
+                Delivery Address
+              </p>
+              <div className="mt-4 space-y-1 text-sm text-white/70">
+                <p>{customer.deliveryAddressLine1 || "-"}</p>
+                {customer.deliveryAddressLine2 ? <p>{customer.deliveryAddressLine2}</p> : null}
+                {customer.deliveryAddressLine3 ? <p>{customer.deliveryAddressLine3}</p> : null}
+                {customer.deliveryAddressLine4 ? <p>{customer.deliveryAddressLine4}</p> : null}
+                <p>
+                  {[customer.deliveryPostCode, customer.deliveryCity].filter(Boolean).join(" ") || "-"}
+                </p>
+                <p>{customer.deliveryCountryCode || "-"}</p>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-black/30 p-5 md:col-span-2">
+              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-white/45">
+                Business Details
+              </p>
+              <div className="mt-4 grid gap-3 text-sm text-white/70 md:grid-cols-2">
+                <p>
+                  <span className="text-white/45">Nature of Business:</span>{" "}
+                  {customer.natureOfBusiness || "-"}
+                </p>
+                <p>
+                  <span className="text-white/45">Registration Type:</span>{" "}
+                  {customer.registrationIdType || "-"}
+                </p>
+                <p>
+                  <span className="text-white/45">Business Registration No.:</span>{" "}
+                  {customer.registrationNo || "-"}
+                </p>
+                <p>
+                  <span className="text-white/45">Tax Identification No.:</span>{" "}
+                  {customer.taxIdentificationNo || "-"}
+                </p>
+                <p>
+                  <span className="text-white/45">Attention:</span> {customer.attention || "-"}
+                </p>
+                <p>
+                  <span className="text-white/45">Contact:</span> {customer.contactPerson || "-"}
+                </p>
+                <p>
+                  <span className="text-white/45">Fax:</span> {customer.fax || "-"}
                 </p>
               </div>
             </div>

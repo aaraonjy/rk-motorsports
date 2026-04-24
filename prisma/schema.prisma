@@ -24,6 +24,13 @@ enum CustomerAccountNoFormat {
   XXX_XXXX
 }
 
+enum CustomerRegistrationIdType {
+  BRN
+  NRIC
+  PASSPORT
+  ARMY
+}
+
 enum ProductType {
   READY_MAP
   CUSTOM_TUNE
@@ -136,9 +143,35 @@ model User {
   passwordHash           String
   role                   Role                @default(CUSTOMER)
   phone                  String?             @unique
+  phone2                 String?
+  fax                    String?
   customerAccountNo      String?             @unique
   accountSource          AccountSource       @default(PORTAL)
   portalAccess           Boolean             @default(true)
+  billingAddressLine1    String?
+  billingAddressLine2    String?
+  billingAddressLine3    String?
+  billingAddressLine4    String?
+  billingCity            String?
+  billingPostCode        String?
+  billingCountryCode     String?
+  deliveryAddressLine1   String?
+  deliveryAddressLine2   String?
+  deliveryAddressLine3   String?
+  deliveryAddressLine4   String?
+  deliveryCity           String?
+  deliveryPostCode       String?
+  deliveryCountryCode    String?
+  area                   String?
+  attention              String?
+  contactPerson          String?
+  emailCc                String?
+  currency               String              @default("MYR")
+  agentId                String?
+  natureOfBusiness       String?
+  registrationIdType     CustomerRegistrationIdType?
+  registrationNo         String?
+  taxIdentificationNo    String?
   resetToken             String?
   resetTokenExpiry       DateTime?
   createdAt              DateTime            @default(now())
@@ -150,6 +183,9 @@ model User {
   notifications           Notification[]
   createdStockTransactions StockTransaction[] @relation("CreatedStockTransactions")
   cancelledStockTransactions StockTransaction[] @relation("CancelledStockTransactions")
+  agent                  Agent?              @relation(fields: [agentId], references: [id], onDelete: SetNull)
+
+  @@index([agentId])
 }
 
 model VehicleBrand {
@@ -471,6 +507,7 @@ model Agent {
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  customers User[]
 
   @@index([isActive, code])
   @@index([name])

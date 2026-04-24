@@ -3,6 +3,7 @@ import { getCustomers } from "@/lib/queries";
 import { redirect } from "next/navigation";
 import { PaginationControls } from "@/components/pagination-controls";
 import { AdminCustomerManagement } from "@/components/admin-customer-management";
+import { db } from "@/lib/db";
 
 type CustomersPageProps = {
   searchParams?: Promise<{
@@ -13,12 +14,45 @@ type CustomersPageProps = {
   }>;
 };
 
+type CustomerAgent = {
+  id: string;
+  code: string;
+  name: string;
+};
+
 type CustomerRecord = {
   id: string;
   name: string;
   customerAccountNo: string | null;
   email: string;
   phone: string | null;
+  phone2: string | null;
+  fax: string | null;
+  billingAddressLine1: string | null;
+  billingAddressLine2: string | null;
+  billingAddressLine3: string | null;
+  billingAddressLine4: string | null;
+  billingCity: string | null;
+  billingPostCode: string | null;
+  billingCountryCode: string | null;
+  deliveryAddressLine1: string | null;
+  deliveryAddressLine2: string | null;
+  deliveryAddressLine3: string | null;
+  deliveryAddressLine4: string | null;
+  deliveryCity: string | null;
+  deliveryPostCode: string | null;
+  deliveryCountryCode: string | null;
+  area: string | null;
+  attention: string | null;
+  contactPerson: string | null;
+  emailCc: string | null;
+  currency: string;
+  agentId: string | null;
+  agent: CustomerAgent | null;
+  natureOfBusiness: string | null;
+  registrationIdType: string | null;
+  registrationNo: string | null;
+  taxIdentificationNo: string | null;
   accountSource: "PORTAL" | "ADMIN";
   portalAccess: boolean;
   createdAt: Date;
@@ -40,19 +74,26 @@ export default async function AdminCustomersPage({
   const portalAccess = params.portalAccess || "ALL";
   const page = Math.max(1, Number(params.page || "1") || 1);
 
-  const result = (await getCustomers({
-    search,
-    source,
-    portalAccess,
-    page,
-    pageSize: 10,
-  })) as {
-    customers: CustomerRecord[];
-    totalCount: number;
-    currentPage: number;
-    pageSize: number;
-    totalPages: number;
-  };
+  const [result, agents] = await Promise.all([
+    getCustomers({
+      search,
+      source,
+      portalAccess,
+      page,
+      pageSize: 10,
+    }) as Promise<{
+      customers: CustomerRecord[];
+      totalCount: number;
+      currentPage: number;
+      pageSize: number;
+      totalPages: number;
+    }>,
+    db.agent.findMany({
+      where: { isActive: true },
+      orderBy: [{ code: "asc" }],
+      select: { id: true, code: true, name: true },
+    }),
+  ]);
 
   return (
     <section className="section-pad">
@@ -172,6 +213,7 @@ export default async function AdminCustomersPage({
               ...customer,
               createdAt: customer.createdAt.toISOString(),
             }))}
+            agents={agents}
             currentPage={result.currentPage}
             pageSize={result.pageSize}
           />

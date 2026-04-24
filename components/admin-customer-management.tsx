@@ -1,8 +1,19 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import {
+  CUSTOMER_CURRENCIES,
+  CUSTOMER_REGISTRATION_ID_TYPES,
+  SEA_COUNTRIES,
+} from "@/lib/customer-profile-options";
+
+type CustomerAgent = {
+  id: string;
+  code: string;
+  name: string;
+};
 
 type CustomerRecord = {
   id: string;
@@ -10,6 +21,33 @@ type CustomerRecord = {
   customerAccountNo: string | null;
   email: string;
   phone: string | null;
+  phone2: string | null;
+  fax: string | null;
+  billingAddressLine1: string | null;
+  billingAddressLine2: string | null;
+  billingAddressLine3: string | null;
+  billingAddressLine4: string | null;
+  billingCity: string | null;
+  billingPostCode: string | null;
+  billingCountryCode: string | null;
+  deliveryAddressLine1: string | null;
+  deliveryAddressLine2: string | null;
+  deliveryAddressLine3: string | null;
+  deliveryAddressLine4: string | null;
+  deliveryCity: string | null;
+  deliveryPostCode: string | null;
+  deliveryCountryCode: string | null;
+  area: string | null;
+  attention: string | null;
+  contactPerson: string | null;
+  emailCc: string | null;
+  currency: string;
+  agentId: string | null;
+  agent: CustomerAgent | null;
+  natureOfBusiness: string | null;
+  registrationIdType: string | null;
+  registrationNo: string | null;
+  taxIdentificationNo: string | null;
   accountSource: "PORTAL" | "ADMIN";
   portalAccess: boolean;
   createdAt: string;
@@ -20,15 +58,41 @@ type CustomerRecord = {
 
 type Props = {
   customers: CustomerRecord[];
+  agents: CustomerAgent[];
   currentPage: number;
   pageSize: number;
 };
 
 type CustomerFormState = {
   name: string;
-  customerAccountNo: string | null;
   email: string;
   phone: string;
+  phone2: string;
+  fax: string;
+  billingAddressLine1: string;
+  billingAddressLine2: string;
+  billingAddressLine3: string;
+  billingAddressLine4: string;
+  billingCity: string;
+  billingPostCode: string;
+  billingCountryCode: string;
+  deliveryAddressLine1: string;
+  deliveryAddressLine2: string;
+  deliveryAddressLine3: string;
+  deliveryAddressLine4: string;
+  deliveryCity: string;
+  deliveryPostCode: string;
+  deliveryCountryCode: string;
+  area: string;
+  attention: string;
+  contactPerson: string;
+  emailCc: string;
+  currency: string;
+  agentId: string;
+  natureOfBusiness: string;
+  registrationIdType: string;
+  registrationNo: string;
+  taxIdentificationNo: string;
 };
 
 type CustomerApiResponse = {
@@ -36,6 +100,40 @@ type CustomerApiResponse = {
   error?: string;
   tempPassword?: string;
 };
+
+function getInitialForm(customer: CustomerRecord | null): CustomerFormState {
+  return {
+    name: customer?.name || "",
+    email: customer?.email || "",
+    phone: customer?.phone || "",
+    phone2: customer?.phone2 || "",
+    fax: customer?.fax || "",
+    billingAddressLine1: customer?.billingAddressLine1 || "",
+    billingAddressLine2: customer?.billingAddressLine2 || "",
+    billingAddressLine3: customer?.billingAddressLine3 || "",
+    billingAddressLine4: customer?.billingAddressLine4 || "",
+    billingCity: customer?.billingCity || "",
+    billingPostCode: customer?.billingPostCode || "",
+    billingCountryCode: customer?.billingCountryCode || "MY",
+    deliveryAddressLine1: customer?.deliveryAddressLine1 || "",
+    deliveryAddressLine2: customer?.deliveryAddressLine2 || "",
+    deliveryAddressLine3: customer?.deliveryAddressLine3 || "",
+    deliveryAddressLine4: customer?.deliveryAddressLine4 || "",
+    deliveryCity: customer?.deliveryCity || "",
+    deliveryPostCode: customer?.deliveryPostCode || "",
+    deliveryCountryCode: customer?.deliveryCountryCode || "MY",
+    area: customer?.area || "",
+    attention: customer?.attention || "",
+    contactPerson: customer?.contactPerson || "",
+    emailCc: customer?.emailCc || "",
+    currency: customer?.currency || "MYR",
+    agentId: customer?.agentId || "",
+    natureOfBusiness: customer?.natureOfBusiness || "",
+    registrationIdType: customer?.registrationIdType || "BRN",
+    registrationNo: customer?.registrationNo || "",
+    taxIdentificationNo: customer?.taxIdentificationNo || "",
+  };
+}
 
 function getSourceBadge(source: "PORTAL" | "ADMIN") {
   return source === "ADMIN"
@@ -53,35 +151,59 @@ function getPortalAccessBadge(enabled: boolean) {
     : "inline-flex min-w-[88px] items-center justify-center rounded-full border border-white/15 bg-white/10 px-3 py-1 text-center text-xs font-semibold text-white/75 transition hover:bg-white/15";
 }
 
+function FieldLabel({ children }: { children: ReactNode }) {
+  return <label className="mb-2 block text-sm text-white/70">{children}</label>;
+}
+
+function TextInput({
+  value,
+  onChange,
+  placeholder,
+  type = "text",
+  required = false,
+  disabled = false,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  type?: string;
+  required?: boolean;
+  disabled?: boolean;
+}) {
+  return (
+    <input
+      type={type}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      required={required}
+      disabled={disabled}
+      placeholder={placeholder}
+      className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/30 hover:border-white/20 focus:border-white/25 disabled:cursor-not-allowed disabled:opacity-60"
+    />
+  );
+}
+
 function CustomerModal({
   isOpen,
   mode,
   customer,
+  agents,
   onClose,
   onSaved,
 }: {
   isOpen: boolean;
   mode: "create" | "edit";
   customer: CustomerRecord | null;
+  agents: CustomerAgent[];
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const [form, setForm] = useState<CustomerFormState>({
-    name: customer?.name || "",
-    customerAccountNo: customer?.customerAccountNo || "",
-    email: customer?.email || "",
-    phone: customer?.phone || "",
-  });
+  const [form, setForm] = useState<CustomerFormState>(() => getInitialForm(customer));
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useMemo(() => {
-    setForm({
-      name: customer?.name || "",
-      customerAccountNo: customer?.customerAccountNo || "",
-      email: customer?.email || "",
-      phone: customer?.phone || "",
-    });
+    setForm(getInitialForm(customer));
     setError(null);
     setIsSubmitting(false);
   }, [customer, isOpen]);
@@ -89,6 +211,13 @@ function CustomerModal({
   if (!isOpen) return null;
 
   const isPortalCustomer = customer?.accountSource === "PORTAL";
+
+  function updateField<K extends keyof CustomerFormState>(
+    key: K,
+    value: CustomerFormState[K]
+  ) {
+    setForm((prev) => ({ ...prev, [key]: value }));
+  }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -102,10 +231,11 @@ function CustomerModal({
           method: mode === "create" ? "POST" : "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
+            ...form,
             name: form.name.trim(),
-            customerAccountNo: form.customerAccountNo?.trim() || null,
             email: form.email.trim(),
             phone: form.phone.trim(),
+            agentId: form.agentId || null,
           }),
         }
       );
@@ -127,8 +257,8 @@ function CustomerModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 px-4">
-      <div className="w-full max-w-xl rounded-2xl border border-white/10 bg-zinc-950 p-6 shadow-2xl">
+    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 px-4 py-6">
+      <div className="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-2xl border border-white/10 bg-zinc-950 p-6 shadow-2xl">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h3 className="text-lg font-semibold text-white">
@@ -136,56 +266,271 @@ function CustomerModal({
             </h3>
             <p className="mt-1 text-sm text-white/50">
               {mode === "create"
-                ? "Create a new customer record for walk-in or admin-managed jobs."
-                : "Update the customer details below."}
+                ? "Create a full customer profile for walk-in or admin-managed jobs."
+                : "Update the customer profile details below."}
             </p>
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-          <div>
-            <label className="mb-2 block text-sm text-white/70">Customer Name</label>
-            <input
-              type="text"
-              value={form.name}
-              onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
-              required
-              placeholder="Enter customer name"
-              className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/30 hover:border-white/20 focus:border-white/25"
-            />
+        {mode === "edit" && customer?.customerAccountNo ? (
+          <div className="mt-5 rounded-2xl border border-white/10 bg-black/30 p-4 text-sm text-white/70">
+            <span className="text-white/45">A/C No.:</span>{" "}
+            <span className="font-semibold text-white">{customer.customerAccountNo}</span>
+          </div>
+        ) : null}
+
+        <form onSubmit={handleSubmit} className="mt-6 space-y-6">
+          <div className="rounded-2xl border border-white/10 bg-black/20 p-5">
+            <div className="text-sm font-semibold uppercase tracking-[0.18em] text-white/45">
+              Basic Info
+            </div>
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <div>
+                <FieldLabel>Customer Name</FieldLabel>
+                <TextInput
+                  value={form.name}
+                  onChange={(value) => updateField("name", value)}
+                  required
+                  placeholder="Enter customer name"
+                />
+              </div>
+              <div>
+                <FieldLabel>
+                  Email <span className="text-white/40">(required)</span>
+                </FieldLabel>
+                <TextInput
+                  type="email"
+                  value={form.email}
+                  onChange={(value) => updateField("email", value)}
+                  required
+                  disabled={mode === "edit" && isPortalCustomer}
+                  placeholder="Enter email address"
+                />
+                {mode === "edit" && isPortalCustomer ? (
+                  <p className="mt-2 text-xs text-white/45">
+                    Email is locked for self-registered customers to avoid unexpected login issues.
+                  </p>
+                ) : null}
+              </div>
+              <div>
+                <FieldLabel>Phone 1</FieldLabel>
+                <TextInput
+                  value={form.phone}
+                  onChange={(value) => updateField("phone", value)}
+                  placeholder="Enter phone number"
+                />
+              </div>
+              <div>
+                <FieldLabel>Phone 2</FieldLabel>
+                <TextInput
+                  value={form.phone2}
+                  onChange={(value) => updateField("phone2", value)}
+                  placeholder="Enter secondary phone number"
+                />
+              </div>
+              <div>
+                <FieldLabel>Fax</FieldLabel>
+                <TextInput
+                  value={form.fax}
+                  onChange={(value) => updateField("fax", value)}
+                  placeholder="Enter fax number"
+                />
+              </div>
+              <div>
+                <FieldLabel>Email CC</FieldLabel>
+                <TextInput
+                  type="email"
+                  value={form.emailCc}
+                  onChange={(value) => updateField("emailCc", value)}
+                  placeholder="Enter CC email"
+                />
+              </div>
+            </div>
           </div>
 
-          <div>
-            <label className="mb-2 block text-sm text-white/70">
-              Email <span className="text-white/40">(required)</span>
-            </label>
-            <input
-              type="email"
-              value={form.email}
-              onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
-              required
-              disabled={mode === "edit" && isPortalCustomer}
-              placeholder="Enter email address"
-              className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/30 hover:border-white/20 focus:border-white/25 disabled:cursor-not-allowed disabled:opacity-60"
-            />
-            {mode === "edit" && isPortalCustomer ? (
-              <p className="mt-2 text-xs text-white/45">
-                Email is locked for self-registered customers to avoid unexpected login issues.
-              </p>
-            ) : null}
+          <div className="grid gap-6 lg:grid-cols-2">
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-5">
+              <div className="text-sm font-semibold uppercase tracking-[0.18em] text-white/45">
+                Billing Address
+              </div>
+              <div className="mt-4 space-y-4">
+                {[1, 2, 3, 4].map((line) => {
+                  const key = `billingAddressLine${line}` as keyof CustomerFormState;
+                  return (
+                    <TextInput
+                      key={key}
+                      value={String(form[key] || "")}
+                      onChange={(value) => updateField(key, value)}
+                      placeholder={`Billing address line ${line}`}
+                    />
+                  );
+                })}
+                <div className="grid gap-4 md:grid-cols-2">
+                  <TextInput
+                    value={form.billingCity}
+                    onChange={(value) => updateField("billingCity", value)}
+                    placeholder="City"
+                  />
+                  <TextInput
+                    value={form.billingPostCode}
+                    onChange={(value) => updateField("billingPostCode", value)}
+                    placeholder="Post Code"
+                  />
+                </div>
+                <select
+                  value={form.billingCountryCode}
+                  onChange={(e) => updateField("billingCountryCode", e.target.value)}
+                  className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white outline-none"
+                >
+                  {SEA_COUNTRIES.map((country) => (
+                    <option key={country.code} value={country.code}>
+                      {country.code} - {country.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-5">
+              <div className="text-sm font-semibold uppercase tracking-[0.18em] text-white/45">
+                Default Delivery Address
+              </div>
+              <div className="mt-4 space-y-4">
+                {[1, 2, 3, 4].map((line) => {
+                  const key = `deliveryAddressLine${line}` as keyof CustomerFormState;
+                  return (
+                    <TextInput
+                      key={key}
+                      value={String(form[key] || "")}
+                      onChange={(value) => updateField(key, value)}
+                      placeholder={`Delivery address line ${line}`}
+                    />
+                  );
+                })}
+                <div className="grid gap-4 md:grid-cols-2">
+                  <TextInput
+                    value={form.deliveryCity}
+                    onChange={(value) => updateField("deliveryCity", value)}
+                    placeholder="City"
+                  />
+                  <TextInput
+                    value={form.deliveryPostCode}
+                    onChange={(value) => updateField("deliveryPostCode", value)}
+                    placeholder="Post Code"
+                  />
+                </div>
+                <select
+                  value={form.deliveryCountryCode}
+                  onChange={(e) => updateField("deliveryCountryCode", e.target.value)}
+                  className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white outline-none"
+                >
+                  {SEA_COUNTRIES.map((country) => (
+                    <option key={country.code} value={country.code}>
+                      {country.code} - {country.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
           </div>
 
-          <div>
-            <label className="mb-2 block text-sm text-white/70">
-              Phone <span className="text-white/40">(optional)</span>
-            </label>
-            <input
-              type="text"
-              value={form.phone}
-              onChange={(e) => setForm((prev) => ({ ...prev, phone: e.target.value }))}
-              placeholder="Enter phone number"
-              className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/30 hover:border-white/20 focus:border-white/25"
-            />
+          <div className="rounded-2xl border border-white/10 bg-black/20 p-5">
+            <div className="text-sm font-semibold uppercase tracking-[0.18em] text-white/45">
+              Business Info
+            </div>
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <div>
+                <FieldLabel>Area</FieldLabel>
+                <TextInput
+                  value={form.area}
+                  onChange={(value) => updateField("area", value)}
+                  placeholder="Enter area"
+                />
+              </div>
+              <div>
+                <FieldLabel>Currency</FieldLabel>
+                <select
+                  value={form.currency}
+                  onChange={(e) => updateField("currency", e.target.value)}
+                  className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white outline-none"
+                >
+                  {CUSTOMER_CURRENCIES.map((currency) => (
+                    <option key={currency.code} value={currency.code}>
+                      {currency.code} - {currency.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <FieldLabel>Agent</FieldLabel>
+                <select
+                  value={form.agentId}
+                  onChange={(e) => updateField("agentId", e.target.value)}
+                  className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white outline-none"
+                >
+                  <option value="">No Agent</option>
+                  {agents.map((agent) => (
+                    <option key={agent.id} value={agent.id}>
+                      {agent.code} - {agent.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <FieldLabel>Nature of Business</FieldLabel>
+                <TextInput
+                  value={form.natureOfBusiness}
+                  onChange={(value) => updateField("natureOfBusiness", value)}
+                  placeholder="Enter nature of business"
+                />
+              </div>
+              <div>
+                <FieldLabel>Attention</FieldLabel>
+                <TextInput
+                  value={form.attention}
+                  onChange={(value) => updateField("attention", value)}
+                  placeholder="Enter attention"
+                />
+              </div>
+              <div>
+                <FieldLabel>Contact</FieldLabel>
+                <TextInput
+                  value={form.contactPerson}
+                  onChange={(value) => updateField("contactPerson", value)}
+                  placeholder="Enter contact person"
+                />
+              </div>
+              <div>
+                <FieldLabel>Registration Type</FieldLabel>
+                <select
+                  value={form.registrationIdType}
+                  onChange={(e) => updateField("registrationIdType", e.target.value)}
+                  className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white outline-none"
+                >
+                  {CUSTOMER_REGISTRATION_ID_TYPES.map((item) => (
+                    <option key={item.value} value={item.value}>
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <FieldLabel>Business Registration No.</FieldLabel>
+                <TextInput
+                  value={form.registrationNo}
+                  onChange={(value) => updateField("registrationNo", value)}
+                  placeholder="Enter registration no."
+                />
+              </div>
+              <div>
+                <FieldLabel>Tax Identification No.</FieldLabel>
+                <TextInput
+                  value={form.taxIdentificationNo}
+                  onChange={(value) => updateField("taxIdentificationNo", value)}
+                  placeholder="Enter TIN no."
+                />
+              </div>
+            </div>
           </div>
 
           {error ? (
@@ -358,7 +703,7 @@ function PortalAccessConfirmModal({
   );
 }
 
-export function AdminCustomerManagement({ customers, currentPage, pageSize }: Props) {
+export function AdminCustomerManagement({ customers, agents, currentPage, pageSize }: Props) {
   const router = useRouter();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<CustomerRecord | null>(null);
@@ -429,6 +774,7 @@ export function AdminCustomerManagement({ customers, currentPage, pageSize }: Pr
               <th className="px-4 py-4 w-[150px]">A/C No.</th>
               <th className="px-4 py-4 w-[180px]">Phone</th>
               <th className="px-4 py-4 w-[260px]">Email</th>
+              <th className="px-4 py-4 w-[150px]">Agent</th>
               <th className="px-4 py-4 w-[150px]">Source</th>
               <th className="px-4 py-4 w-[140px]">Portal Access</th>
               <th className="px-4 py-4 w-[110px]">Orders</th>
@@ -462,6 +808,10 @@ export function AdminCustomerManagement({ customers, currentPage, pageSize }: Pr
                   <td className="px-4 py-4 text-white/85 break-words">{customer.phone || "-"}</td>
 
                   <td className="px-4 py-4 text-white/85 break-words">{customer.email}</td>
+
+                  <td className="px-4 py-4 text-white/85 break-words">
+                    {customer.agent ? customer.agent.name : "-"}
+                  </td>
 
                   <td className="px-4 py-4">
                     <span className={getSourceBadge(customer.accountSource)}>
@@ -526,7 +876,7 @@ export function AdminCustomerManagement({ customers, currentPage, pageSize }: Pr
               ))
             ) : (
               <tr>
-                <td colSpan={10} className="px-4 py-10 text-center text-white/45">
+                <td colSpan={11} className="px-4 py-10 text-center text-white/45">
                   No customers found for the selected filters.
                 </td>
               </tr>
@@ -539,6 +889,7 @@ export function AdminCustomerManagement({ customers, currentPage, pageSize }: Pr
         isOpen={isCreateOpen}
         mode="create"
         customer={null}
+        agents={agents}
         onClose={() => setIsCreateOpen(false)}
         onSaved={handleSaved}
       />
@@ -547,6 +898,7 @@ export function AdminCustomerManagement({ customers, currentPage, pageSize }: Pr
         isOpen={editingCustomer !== null}
         mode="edit"
         customer={editingCustomer}
+        agents={agents}
         onClose={() => setEditingCustomer(null)}
         onSaved={handleSaved}
       />
