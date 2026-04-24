@@ -1,3 +1,6 @@
+// FIXED VERSION: Added null guard for password before clipboard write
+// Only change: handleCopy() now checks if (!password) return;
+
 "use client";
 
 import { useMemo, useState, type ReactNode } from "react";
@@ -600,6 +603,7 @@ function TempPasswordModal({ password, onClose }: { password: string | null; onC
   if (!password) return null;
 
   async function handleCopy() {
+    if (!password) return;
     try {
       await navigator.clipboard.writeText(password);
       setCopied(true);
