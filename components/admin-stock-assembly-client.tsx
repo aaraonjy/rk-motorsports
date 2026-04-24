@@ -1237,7 +1237,6 @@ export function AdminStockAssemblyClient({
     }
   }
 
-  async function handleCancelConfirm() {
   async function handleNegativeStockAuthorization() {
     if (!negativeStockPendingPayload) return;
     setIsSubmitting(true);
@@ -1272,6 +1271,8 @@ export function AdminStockAssemblyClient({
       setIsSubmitting(false);
     }
   }
+
+  async function handleCancelConfirm() {
 
     if (!cancelTarget) return;
     setIsCancelling(true);
