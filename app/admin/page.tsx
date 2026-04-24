@@ -158,25 +158,25 @@ const SUMMARY_CARDS: Array<{
     key: "pending_completion",
     label: "Pending Completion",
     toneClass:
-      "border-amber-500/30 bg-amber-500/15 text-amber-100 hover:border-amber-400/50 hover:bg-amber-500/20",
+      "border-amber-500/30 bg-amber-500/40 text-amber-100 hover:border-amber-400/50 hover:bg-amber-500/50",
   },
   {
     key: "awaiting_payment",
     label: "Awaiting Payment",
     toneClass:
-      "border-orange-500/30 bg-orange-500/15 text-orange-100 hover:border-orange-400/50 hover:bg-orange-500/20",
+      "border-orange-500/30 bg-orange-500/40 text-orange-100 hover:border-orange-400/50 hover:bg-orange-500/50",
   },
   {
     key: "new_orders",
     label: "New Orders",
     toneClass:
-      "border-sky-500/30 bg-sky-500/15 text-sky-100 hover:border-sky-400/50 hover:bg-sky-500/20",
+      "border-sky-500/30 bg-sky-500/40 text-sky-100 hover:border-sky-400/50 hover:bg-sky-500/50",
   },
   {
     key: "partially_paid",
     label: "Partially Paid",
     toneClass:
-      "border-fuchsia-500/30 bg-fuchsia-500/15 text-fuchsia-100 hover:border-fuchsia-400/50 hover:bg-fuchsia-500/20",
+      "border-fuchsia-500/30 bg-fuchsia-500/40 text-fuchsia-100 hover:border-fuchsia-400/50 hover:bg-fuchsia-500/50",
   },
 ];
 
