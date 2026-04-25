@@ -433,13 +433,15 @@ export async function POST(req: Request) {
         },
       });
 
-      const sourceQuotationIds = Array.isArray(body.sourceQuotationIds)
-        ? body.sourceQuotationIds.filter((value: unknown) => typeof value === "string" && value.trim()).map((value: string) => value.trim())
+      const sourceQuotationIds: string[] = Array.isArray(body.sourceQuotationIds)
+        ? body.sourceQuotationIds
+            .filter((value: unknown): value is string => typeof value === "string" && value.trim().length > 0)
+            .map((value: string) => value.trim())
         : normalizeText(body.sourceQuotationId)
           ? [normalizeText(body.sourceQuotationId) as string]
           : [];
 
-      const uniqueSourceQuotationIds = Array.from(new Set(sourceQuotationIds));
+      const uniqueSourceQuotationIds: string[] = Array.from(new Set<string>(sourceQuotationIds));
 
       if (uniqueSourceQuotationIds.length > 0) {
         const quotations = await tx.salesTransaction.findMany({
