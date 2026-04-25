@@ -80,7 +80,7 @@ export default async function AdminSalesOrderPage() {
         lines: { orderBy: { lineNo: "asc" } },
         targetLinks: {
           include: {
-            targetTransaction: { select: { id: true, docNo: true, status: true } },
+            targetTransaction: { select: { id: true, docType: true, docNo: true, status: true } },
           },
         },
       },
@@ -137,6 +137,7 @@ export default async function AdminSalesOrderPage() {
             targetLinks: quotation.targetLinks.map((link) => ({
               targetTransaction: link.targetTransaction ? {
                 id: link.targetTransaction.id,
+                docType: link.targetTransaction.docType,
                 docNo: link.targetTransaction.docNo,
                 status: link.targetTransaction.status,
               } : null,

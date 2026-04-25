@@ -108,7 +108,7 @@ type SourceQuotationRecord = {
   revisedFrom?: { id: string; docNo?: string | null } | null;
   revisions?: Array<{ id: string; docNo?: string | null; status?: string | null }>;
   targetLinks?: Array<{
-    targetTransaction?: { id: string; docNo?: string | null; status?: string | null } | null;
+    targetTransaction?: { id: string; docType?: string | null; docNo?: string | null; status?: string | null } | null;
   }>;
   lines?: Array<{
     inventoryProductId?: string | null;
@@ -758,10 +758,12 @@ export function AdminSalesOrderClient({
       if (quotation.customerId !== customerId) return false;
       if (quotation.status !== "PENDING") return false;
 
-      const hasActiveTarget = (quotation.targetLinks || []).some(
-        (link) => link.targetTransaction && link.targetTransaction.status !== "CANCELLED"
-      );
-      if (hasActiveTarget) return false;
+      const hasActiveDownstreamSalesDocument = (quotation.targetLinks || []).some((link) => {
+        const target = link.targetTransaction;
+        if (!target || target.status === "CANCELLED") return false;
+        return ["SO", "DO", "INV", "CS"].includes(String(target.docType || "").toUpperCase());
+      });
+      if (hasActiveDownstreamSalesDocument) return false;
 
       return true;
     });
