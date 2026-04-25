@@ -155,23 +155,24 @@ function getProductUomOptions(product: ProductOption | null | undefined) {
   const seen = new Set<string>();
   const options: SearchableSelectOption[] = [];
 
-  function pushOption(uomCode: string, conversionRate: number) {
+  function pushOption(uomCode: string, conversionRate: number, baseUom: string) {
     const normalized = String(uomCode || "").trim().toUpperCase();
+    const normalizedBaseUom = String(baseUom || "").trim().toUpperCase();
     if (!normalized || seen.has(normalized)) return;
 
     seen.add(normalized);
     options.push({
       id: normalized,
-      label: normalized === product.baseUom.toUpperCase() ? `${normalized} (Base UOM)` : `${normalized} (1 = ${conversionRate} ${product.baseUom})`,
-      searchText: `${normalized} ${product.baseUom} ${conversionRate}`.toLowerCase(),
+      label: normalized === normalizedBaseUom ? `${normalized} (Base UOM)` : `${normalized} (1 = ${conversionRate} ${baseUom})`,
+      searchText: `${normalized} ${baseUom} ${conversionRate}`.toLowerCase(),
     });
   }
 
-  pushOption(product.baseUom, 1);
+  pushOption(product.baseUom, 1, product.baseUom);
 
   for (const item of product.uomConversions || []) {
     if (Number(item.conversionRate) > 0) {
-      pushOption(item.uomCode, Number(item.conversionRate));
+      pushOption(item.uomCode, Number(item.conversionRate), product.baseUom);
     }
   }
 
