@@ -432,11 +432,12 @@ function buildQuotationDocNoPreview(value: string, transactions: Array<{ docNo?:
   if (!matchDate) return "Auto Generated";
 
   const prefix = `QO-${matchDate[1]}${matchDate[2]}${matchDate[3]}`;
+  const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   let maxSeq = 0;
 
   for (const item of transactions) {
     const effectiveDocNo = String(item.docNo || "");
-    const match = effectiveDocNo.match(new RegExp(`^${prefix}-(\\d{4})$`));
+    const match = effectiveDocNo.match(new RegExp(`^${escapedPrefix}-(\\d{4})$`));
     if (!match) continue;
 
     const seq = Number(match[1]);
@@ -1080,6 +1081,13 @@ export function AdminSalesQuotationClient({
     }
   }
 
+  const filteredTransactions = useMemo(() => {
+    return transactions.filter((item) => {
+      const hasRevisionChildren = Array.isArray(item.revisions) && item.revisions.length > 0;
+      return !hasRevisionChildren;
+    });
+  }, [transactions]);
+
   async function cancelQuotation() {
     if (!cancelTarget) return;
     try {
@@ -1146,16 +1154,19 @@ export function AdminSalesQuotationClient({
             <tbody className="divide-y divide-white/10">
               {isLoading ? (
                 <tr><td colSpan={6} className="px-4 py-8 text-center text-white/50">Loading quotations...</td></tr>
-              ) : transactions.length === 0 ? (
+              ) : filteredTransactions.length === 0 ? (
                 <tr><td colSpan={6} className="px-4 py-8 text-center text-white/50">No quotation found.</td></tr>
               ) : (
-                transactions.map((item) => (
+                filteredTransactions.map((item) => (
                   <tr
                     key={item.id}
                     onClick={() => router.push(`/admin/sales/quotation/${item.id}`)}
                     className="cursor-pointer text-white/80 transition hover:bg-white/[0.04]"
                   >
-                    <td className="px-4 py-4 font-semibold text-white">{item.docNo}</td>
+                    <td className="px-4 py-4">
+                      <div className="font-semibold text-white">{item.docNo}</div>
+                      {item.revisedFrom?.docNo ? <div className="mt-2 text-xs text-white/40">↳ Revision of {item.revisedFrom.docNo}</div> : null}
+                    </td>
                     <td className="px-4 py-4">{formatDate(item.docDate)}</td>
                     <td className="px-4 py-4">
                       <div className="font-medium text-white/90">{item.customerName}</div>

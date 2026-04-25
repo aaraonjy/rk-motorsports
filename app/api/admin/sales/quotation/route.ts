@@ -96,7 +96,7 @@ function buildSalesDocumentNumberLockKey(docType: string, documentDate: Date) {
 async function generateQuotationNo(tx: Prisma.TransactionClient, docDate: Date) {
   const { year, month, day } = getMalaysiaDateParts(docDate);
   const prefix = `QO-${year}${month}${day}`;
-  const baseDocNoPattern = new RegExp(`^${prefix}-(\d{4})$`);
+  const baseDocNoPattern = new RegExp(`^${prefix}-(\\d{4})$`);
 
   const existing = await tx.salesTransaction.findMany({
     where: { docType: "QO", docNo: { startsWith: `${prefix}-` } },
