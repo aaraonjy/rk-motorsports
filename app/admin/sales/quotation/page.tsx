@@ -8,7 +8,7 @@ export default async function AdminSalesQuotationPage() {
   if (!user) redirect("/login");
   if (user.role !== "ADMIN") redirect("/dashboard");
 
-  const [customers, products, agents, projects, departments, stockConfig] = await Promise.all([
+  const [customers, products, agents, projects, departments, stockConfig, taxConfig, taxCodes] = await Promise.all([
     db.user.findMany({
       where: { role: "CUSTOMER" },
       orderBy: [{ customerAccountNo: "asc" }, { name: "asc" }],
@@ -46,6 +46,18 @@ export default async function AdminSalesQuotationPage() {
     db.project.findMany({ where: { isActive: true }, orderBy: [{ code: "asc" }], select: { id: true, code: true, name: true, isActive: true } }),
     db.department.findMany({ where: { isActive: true }, orderBy: [{ code: "asc" }], select: { id: true, code: true, name: true, projectId: true, isActive: true } }),
     db.stockConfiguration.findUnique({ where: { id: "default" } }),
+    db.taxConfiguration.findUnique({ where: { id: "default" } }),
+    db.taxCode.findMany({
+      where: { isActive: true },
+      orderBy: [{ sortOrder: "asc" }, { code: "asc" }],
+      select: {
+        id: true,
+        code: true,
+        description: true,
+        rate: true,
+        calculationMethod: true,
+      },
+    }),
   ]);
 
   return (
@@ -65,6 +77,18 @@ export default async function AdminSalesQuotationPage() {
           initialDepartments={departments}
           projectFeatureEnabled={Boolean(stockConfig?.enableProject)}
           departmentFeatureEnabled={Boolean(stockConfig?.enableProject && stockConfig?.enableDepartment)}
+          taxConfig={{
+            taxModuleEnabled: Boolean(taxConfig?.taxModuleEnabled),
+            taxCalculationMode: taxConfig?.taxCalculationMode ?? "TRANSACTION",
+            defaultAdminTaxCodeId: taxConfig?.defaultAdminTaxCodeId ?? "",
+            taxCodes: taxCodes.map((taxCode) => ({
+              id: taxCode.id,
+              code: taxCode.code,
+              description: taxCode.description,
+              rate: Number(taxCode.rate ?? 0),
+              calculationMethod: taxCode.calculationMethod,
+            })),
+          }}
         />
       </div>
     </section>

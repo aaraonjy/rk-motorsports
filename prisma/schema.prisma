@@ -601,6 +601,15 @@ model SalesTransaction {
   departmentId         String?
   subtotal             Decimal                @default(0) @db.Decimal(14, 2)
   discountTotal        Decimal                @default(0) @db.Decimal(14, 2)
+  taxableSubtotal      Decimal                @default(0) @db.Decimal(14, 2)
+  taxCodeId            String?
+  taxCode              String?
+  taxDescription       String?
+  taxDisplayLabel      String?
+  taxRate              Decimal?               @db.Decimal(5, 2)
+  taxCalculationMethod TaxCalculationMethod?
+  taxCalculationModeSnapshot TaxCalculationMode @default(TRANSACTION)
+  isTaxEnabledSnapshot Boolean                @default(false)
   taxTotal             Decimal                @default(0) @db.Decimal(14, 2)
   grandTotal           Decimal                @default(0) @db.Decimal(14, 2)
   termsAndConditions   String?
@@ -631,6 +640,7 @@ model SalesTransaction {
   @@index([agentId])
   @@index([projectId])
   @@index([departmentId])
+  @@index([taxCodeId])
 }
 
 model SalesTransactionLine {
@@ -645,7 +655,12 @@ model SalesTransactionLine {
   unitPrice           Decimal           @db.Decimal(14, 2)
   discountRate        Decimal           @default(0) @db.Decimal(5, 2)
   discountAmount      Decimal           @default(0) @db.Decimal(14, 2)
+  taxCodeId           String?
+  taxCode             String?
+  taxDescription      String?
+  taxDisplayLabel     String?
   taxRate             Decimal           @default(0) @db.Decimal(5, 2)
+  taxCalculationMethod TaxCalculationMethod?
   taxAmount           Decimal           @default(0) @db.Decimal(14, 2)
   lineSubtotal        Decimal           @default(0) @db.Decimal(14, 2)
   lineTotal           Decimal           @default(0) @db.Decimal(14, 2)
@@ -659,6 +674,7 @@ model SalesTransactionLine {
   @@unique([transactionId, lineNo])
   @@index([transactionId])
   @@index([inventoryProductId])
+  @@index([taxCodeId])
 }
 
 model SalesTransactionLink {

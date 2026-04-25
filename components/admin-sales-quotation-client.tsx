@@ -2,6 +2,15 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+  calculateLineItemTaxBreakdown,
+  calculateTaxBreakdown,
+  getTaxDisplayLabel,
+  normalizeTaxCalculationMode,
+  roundMoney,
+  type TaxCalculationMethodValue,
+  type TaxCalculationModeValue,
+} from "@/lib/tax";
 
 type CustomerOption = {
   id: string;
@@ -40,6 +49,14 @@ type AgentOption = { id: string; code: string; name: string; isActive: boolean }
 type ProjectOption = { id: string; code: string; name: string; isActive: boolean };
 type DepartmentOption = { id: string; code: string; name: string; projectId: string; isActive: boolean };
 
+type TaxCodeOption = {
+  id: string;
+  code: string;
+  description: string;
+  rate: number;
+  calculationMethod: TaxCalculationMethodValue;
+};
+
 type QuotationRecord = {
   id: string;
   docNo: string;
@@ -58,6 +75,12 @@ type Props = {
   initialDepartments: DepartmentOption[];
   projectFeatureEnabled: boolean;
   departmentFeatureEnabled: boolean;
+  taxConfig: {
+    taxModuleEnabled: boolean;
+    taxCalculationMode: TaxCalculationModeValue;
+    defaultAdminTaxCodeId?: string | null;
+    taxCodes: TaxCodeOption[];
+  };
 };
 
 type LineForm = {
@@ -69,10 +92,11 @@ type LineForm = {
   unitPrice: string;
   discountRate: string;
   taxRate: string;
+  taxCodeId: string;
   remarks: string;
 };
 
-function emptyLine(): LineForm {
+function emptyLine(defaultTaxCodeId = ""): LineForm {
   return {
     inventoryProductId: "",
     productCode: "",
@@ -82,6 +106,7 @@ function emptyLine(): LineForm {
     unitPrice: "0.00",
     discountRate: "0",
     taxRate: "0",
+    taxCodeId: defaultTaxCodeId,
     remarks: "",
   };
 }
@@ -105,6 +130,14 @@ function getStatusClass(status: string) {
   if (status === "CANCELLED") return "border-red-500/25 bg-red-500/10 text-red-200";
   if (status === "CONFIRMED") return "border-sky-500/25 bg-sky-500/10 text-sky-200";
   return "border-amber-500/25 bg-amber-500/10 text-amber-200";
+}
+
+function formatTaxOptionLabel(taxCode: TaxCodeOption) {
+  return getTaxDisplayLabel({
+    code: taxCode.code,
+    description: taxCode.description,
+    rate: taxCode.rate,
+  });
 }
 
 type SearchableSelectOption = {
@@ -246,6 +279,7 @@ export function AdminSalesQuotationClient({
   initialDepartments,
   projectFeatureEnabled,
   departmentFeatureEnabled,
+  taxConfig,
 }: Props) {
   const router = useRouter();
   const [transactions, setTransactions] = useState<QuotationRecord[]>([]);
@@ -294,7 +328,8 @@ export function AdminSalesQuotationClient({
   const [termsAndConditions, setTermsAndConditions] = useState("");
   const [bankAccount, setBankAccount] = useState("");
   const [footerRemarks, setFooterRemarks] = useState("");
-  const [lines, setLines] = useState<LineForm[]>([emptyLine()]);
+  const [selectedTaxCodeId, setSelectedTaxCodeId] = useState(taxConfig.taxModuleEnabled ? taxConfig.defaultAdminTaxCodeId || "" : "");
+  const [lines, setLines] = useState<LineForm[]>([emptyLine(taxConfig.taxModuleEnabled && normalizeTaxCalculationMode(taxConfig.taxCalculationMode) === "LINE_ITEM" ? taxConfig.defaultAdminTaxCodeId || "" : "")]);
 
   const filteredDepartments = useMemo(
     () => initialDepartments.filter((item) => item.projectId === projectId && item.isActive),
@@ -362,6 +397,26 @@ export function AdminSalesQuotationClient({
     [docDate, transactions]
   );
 
+  const taxCalculationMode = normalizeTaxCalculationMode(taxConfig.taxCalculationMode);
+  const isTaxEnabled = Boolean(taxConfig.taxModuleEnabled);
+  const isLineItemTaxMode = Boolean(isTaxEnabled && taxCalculationMode === "LINE_ITEM");
+  const availableTaxCodes = useMemo(() => taxConfig.taxCodes || [], [taxConfig.taxCodes]);
+  const taxCodeOptions = useMemo<SearchableSelectOption[]>(
+    () => [
+      { id: "", label: "No Tax", searchText: "no tax" },
+      ...availableTaxCodes.map((taxCode) => ({
+        id: taxCode.id,
+        label: formatTaxOptionLabel(taxCode),
+        searchText: `${taxCode.code} ${taxCode.description} ${taxCode.rate}`.toLowerCase(),
+      })),
+    ],
+    [availableTaxCodes]
+  );
+  const selectedTaxCode = useMemo(
+    () => availableTaxCodes.find((item) => item.id === selectedTaxCodeId) || null,
+    [availableTaxCodes, selectedTaxCodeId]
+  );
+
   function openDocNoModal() {
     setDocNoDraft(docNo);
     setIsDocNoModalOpen(true);
@@ -372,28 +427,59 @@ export function AdminSalesQuotationClient({
     setIsDocNoModalOpen(false);
   }
 
+  const normalizedLines = useMemo(() => {
+    return lines.map((line) => {
+      const qty = Math.max(0, Number(line.qty || 0));
+      const unitPrice = Math.max(0, Number(line.unitPrice || 0));
+      const discountRate = Math.max(0, Number(line.discountRate || 0));
+      const lineSubtotal = roundMoney(qty * unitPrice);
+      const discountAmount = roundMoney(lineSubtotal * (discountRate / 100));
+      const taxableAmount = Math.max(0, roundMoney(lineSubtotal - discountAmount));
+      const lineTaxCode = isLineItemTaxMode ? availableTaxCodes.find((item) => item.id === line.taxCodeId) || null : null;
+      const lineTaxBreakdown = calculateLineItemTaxBreakdown({
+        lineTotal: taxableAmount,
+        taxRate: lineTaxCode?.rate ?? null,
+        calculationMethod: lineTaxCode?.calculationMethod ?? null,
+        taxEnabled: Boolean(isLineItemTaxMode && lineTaxCode),
+      });
+
+      return {
+        ...line,
+        qtyNumber: qty,
+        unitPriceNumber: unitPrice,
+        discountRateNumber: discountRate,
+        lineSubtotal,
+        discountAmount,
+        taxableAmount,
+        lineTaxCode,
+        taxAmount: lineTaxBreakdown.taxAmount,
+        lineTotal: lineTaxBreakdown.lineGrandTotalAfterTax,
+      };
+    });
+  }, [availableTaxCodes, isLineItemTaxMode, lines]);
+
   const totals = useMemo(() => {
-    return lines.reduce(
-      (acc, line) => {
-        const qty = Number(line.qty || 0);
-        const unitPrice = Number(line.unitPrice || 0);
-        const discountRate = Number(line.discountRate || 0);
-        const taxRate = Number(line.taxRate || 0);
-        const subtotal = Number.isFinite(qty * unitPrice) ? qty * unitPrice : 0;
-        const discount = subtotal * ((Number.isFinite(discountRate) ? discountRate : 0) / 100);
-        const taxable = subtotal - discount;
-        const tax = taxable * ((Number.isFinite(taxRate) ? taxRate : 0) / 100);
-        const total = taxable + tax;
-        return {
-          subtotal: acc.subtotal + subtotal,
-          discountTotal: acc.discountTotal + discount,
-          taxTotal: acc.taxTotal + tax,
-          grandTotal: acc.grandTotal + total,
-        };
-      },
-      { subtotal: 0, discountTotal: 0, taxTotal: 0, grandTotal: 0 }
-    );
-  }, [lines]);
+    const subtotal = roundMoney(normalizedLines.reduce((sum, line) => sum + line.lineSubtotal, 0));
+    const discountTotal = roundMoney(normalizedLines.reduce((sum, line) => sum + line.discountAmount, 0));
+    const taxableSubtotal = Math.max(0, roundMoney(subtotal - discountTotal));
+    const lineTaxTotal = roundMoney(normalizedLines.reduce((sum, line) => sum + line.taxAmount, 0));
+    const lineGrandTotal = roundMoney(normalizedLines.reduce((sum, line) => sum + line.lineTotal, 0));
+    const transactionTaxBreakdown = calculateTaxBreakdown({
+      subtotal,
+      discount: discountTotal,
+      taxRate: selectedTaxCode?.rate ?? null,
+      calculationMethod: selectedTaxCode?.calculationMethod ?? null,
+      taxEnabled: Boolean(isTaxEnabled && !isLineItemTaxMode && selectedTaxCode),
+    });
+
+    return {
+      subtotal,
+      discountTotal,
+      taxableSubtotal,
+      taxTotal: isLineItemTaxMode ? lineTaxTotal : transactionTaxBreakdown.taxAmount,
+      grandTotal: isLineItemTaxMode ? lineGrandTotal : transactionTaxBreakdown.grandTotalAfterTax,
+    };
+  }, [isLineItemTaxMode, isTaxEnabled, normalizedLines, selectedTaxCode]);
 
   async function loadTransactions() {
     setIsLoading(true);
@@ -451,7 +537,8 @@ export function AdminSalesQuotationClient({
     setTermsAndConditions("");
     setBankAccount("");
     setFooterRemarks("");
-    setLines([emptyLine()]);
+    setSelectedTaxCodeId(taxConfig.taxModuleEnabled ? taxConfig.defaultAdminTaxCodeId || "" : "");
+    setLines([emptyLine(taxConfig.taxModuleEnabled && normalizeTaxCalculationMode(taxConfig.taxCalculationMode) === "LINE_ITEM" ? taxConfig.defaultAdminTaxCodeId || "" : "")]);
     setSubmitError("");
     setSubmitSuccess("");
   }
@@ -543,7 +630,12 @@ export function AdminSalesQuotationClient({
         termsAndConditions,
         bankAccount,
         footerRemarks,
-        lines,
+        taxCalculationMode,
+        transactionTaxCodeId: isTaxEnabled && !isLineItemTaxMode ? selectedTaxCodeId : "",
+        lines: lines.map((line) => ({
+          ...line,
+          taxCodeId: isTaxEnabled && isLineItemTaxMode ? line.taxCodeId : "",
+        })),
       };
       const response = await fetch("/api/admin/sales/quotation", {
         method: "POST",
@@ -771,14 +863,9 @@ export function AdminSalesQuotationClient({
             {activeTab === "BODY" ? (
               <div className="mt-6 space-y-5">
                 {lines.map((line, index) => {
-                  const qty = Number(line.qty || 0);
-                  const price = Number(line.unitPrice || 0);
-                  const discountRate = Number(line.discountRate || 0);
-                  const taxRate = Number(line.taxRate || 0);
-                  const subtotal = qty * price;
-                  const discount = subtotal * (discountRate / 100);
-                  const tax = (subtotal - discount) * (taxRate / 100);
-                  const total = subtotal - discount + tax;
+                  const normalizedLine = normalizedLines[index];
+                  const total = normalizedLine?.lineTotal || 0;
+                  const taxAmount = normalizedLine?.taxAmount || 0;
                   return (
                     <div key={index} className="rounded-[1.75rem] border border-white/10 p-5">
                       <div className="mb-5 flex items-center justify-between gap-3">
@@ -799,7 +886,16 @@ export function AdminSalesQuotationClient({
                         <Input label="UOM" value={line.uom} onChange={(value) => updateLine(index, { uom: value.toUpperCase() })} />
                         <Input label="Unit Price" value={line.unitPrice} onChange={(value) => updateLine(index, { unitPrice: value })} />
                         <Input label="Discount %" value={line.discountRate} onChange={(value) => updateLine(index, { discountRate: value })} />
-                        <Input label="Tax %" value={line.taxRate} onChange={(value) => updateLine(index, { taxRate: value })} />
+                        {isLineItemTaxMode ? (
+                          <SearchableSelect
+                            label="Tax Code"
+                            placeholder="No Tax"
+                            options={taxCodeOptions}
+                            value={line.taxCodeId}
+                            onChange={(option) => updateLine(index, { taxCodeId: option?.id || "" })}
+                          />
+                        ) : null}
+                        {isLineItemTaxMode ? <ReadonlyLike label="Tax Amount" value={money(taxAmount || 0)} /> : null}
                         <ReadonlyLike label="Line Total" value={money(total || 0)} />
                         <div className="md:col-span-2 xl:col-span-4">
                           <label className="label-rk">Product Remarks</label>
@@ -809,7 +905,7 @@ export function AdminSalesQuotationClient({
                     </div>
                   );
                 })}
-                <button type="button" onClick={() => setLines((prev) => [...prev, emptyLine()])} className="rounded-xl border border-white/15 px-4 py-3 text-sm text-white/75 transition hover:bg-white/10 hover:text-white">+ Add Product</button>
+                <button type="button" onClick={() => setLines((prev) => [...prev, emptyLine(isLineItemTaxMode ? taxConfig.defaultAdminTaxCodeId || "" : "")])} className="rounded-xl border border-white/15 px-4 py-3 text-sm text-white/75 transition hover:bg-white/10 hover:text-white">+ Add Product</button>
               </div>
             ) : null}
 
@@ -833,7 +929,23 @@ export function AdminSalesQuotationClient({
                   <h3 className="text-xl font-semibold text-white">Quotation Summary</h3>
                   <SummaryRow label="Subtotal" value={money(totals.subtotal)} />
                   <SummaryRow label="Discount" value={money(totals.discountTotal)} />
-                  <SummaryRow label="Tax" value={money(totals.taxTotal)} />
+                  {isTaxEnabled && !isLineItemTaxMode ? (
+                    <div className="mt-4">
+                      <SearchableSelect
+                        label="Tax Code"
+                        placeholder="No Tax"
+                        options={taxCodeOptions}
+                        value={selectedTaxCodeId}
+                        onChange={(option) => setSelectedTaxCodeId(option?.id || "")}
+                      />
+                    </div>
+                  ) : null}
+                  {isTaxEnabled && isLineItemTaxMode ? (
+                    <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-xs leading-6 text-white/60">
+                      Tax Code is controlled inside each product row. Quotation Summary shows the combined tax amount from all rows.
+                    </div>
+                  ) : null}
+                  {isTaxEnabled ? <SummaryRow label="Tax" value={money(totals.taxTotal)} /> : null}
                   <div className="mt-4 border-t border-white/10 pt-4">
                     <SummaryRow label="Grand Total" value={money(totals.grandTotal)} strong />
                   </div>

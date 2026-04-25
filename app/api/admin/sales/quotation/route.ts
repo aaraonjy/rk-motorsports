@@ -3,6 +3,12 @@ import { Prisma, SalesTransactionStatus } from "@prisma/client";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { createAuditLogFromRequest } from "@/lib/audit";
+import {
+  calculateLineItemTaxBreakdown,
+  calculateTaxBreakdown,
+  normalizeTaxCalculationMode,
+  type TaxCalculationModeValue,
+} from "@/lib/tax";
 
 type QuotationLinePayload = {
   inventoryProductId?: string | null;
@@ -12,8 +18,18 @@ type QuotationLinePayload = {
   qty?: number | string | null;
   unitPrice?: number | string | null;
   discountRate?: number | string | null;
+  taxCodeId?: string | null;
   taxRate?: number | string | null;
   remarks?: string | null;
+};
+
+type TaxCodeSnapshot = {
+  id: string;
+  code: string;
+  description: string;
+  displayLabel?: string | null;
+  rate: Prisma.Decimal | number | string;
+  calculationMethod: "EXCLUSIVE" | "INCLUSIVE";
 };
 
 function normalizeDate(value: unknown) {
@@ -36,6 +52,10 @@ function qtyDecimal(value: number | string | null | undefined) {
 }
 
 function normalizeText(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function normalizeTaxCodeId(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
@@ -65,7 +85,43 @@ async function generateQuotationNo(tx: Prisma.TransactionClient, docDate: Date) 
   return `${prefix}-${String(next).padStart(4, "0")}`;
 }
 
-function calculateLine(line: QuotationLinePayload, lineNo: number, productMap: Map<string, any>) {
+function toNumber(value: Prisma.Decimal | number | string | null | undefined) {
+  const numeric = Number(value ?? 0);
+  return Number.isFinite(numeric) ? numeric : 0;
+}
+
+function taxSnapshot(taxCode: TaxCodeSnapshot | null) {
+  if (!taxCode) {
+    return {
+      taxCodeId: null,
+      taxCode: null,
+      taxDescription: null,
+      taxDisplayLabel: null,
+      taxRate: new Prisma.Decimal(0),
+      taxCalculationMethod: null,
+    };
+  }
+
+  return {
+    taxCodeId: taxCode.id,
+    taxCode: taxCode.code,
+    taxDescription: taxCode.description,
+    taxDisplayLabel: taxCode.displayLabel || null,
+    taxRate: decimal(toNumber(taxCode.rate), 0),
+    taxCalculationMethod: taxCode.calculationMethod,
+  };
+}
+
+function calculateLine(
+  line: QuotationLinePayload,
+  lineNo: number,
+  productMap: Map<string, any>,
+  taxCodeMap: Map<string, TaxCodeSnapshot>,
+  options: {
+    taxModuleEnabled: boolean;
+    taxCalculationMode: TaxCalculationModeValue;
+  }
+) {
   const inventoryProductId = typeof line.inventoryProductId === "string" && line.inventoryProductId.trim() ? line.inventoryProductId.trim() : null;
   const product = inventoryProductId ? productMap.get(inventoryProductId) : null;
 
@@ -78,13 +134,21 @@ function calculateLine(line: QuotationLinePayload, lineNo: number, productMap: M
   const qty = qtyDecimal(line.qty);
   const unitPrice = decimal(line.unitPrice, product ? Number(product.sellingPrice ?? 0) : 0);
   const discountRate = decimal(line.discountRate, 0);
-  const taxRate = decimal(line.taxRate, 0);
-
   const lineSubtotal = qty.mul(unitPrice).toDecimalPlaces(2);
   const discountAmount = lineSubtotal.mul(discountRate).div(100).toDecimalPlaces(2);
   const taxableAmount = lineSubtotal.minus(discountAmount).toDecimalPlaces(2);
-  const taxAmount = taxableAmount.mul(taxRate).div(100).toDecimalPlaces(2);
-  const lineTotal = taxableAmount.plus(taxAmount).toDecimalPlaces(2);
+
+  const lineTaxCode =
+    options.taxModuleEnabled && options.taxCalculationMode === "LINE_ITEM"
+      ? taxCodeMap.get(normalizeTaxCodeId(line.taxCodeId) || "") || null
+      : null;
+
+  const lineTaxBreakdown = calculateLineItemTaxBreakdown({
+    lineTotal: Number(taxableAmount),
+    taxRate: lineTaxCode ? toNumber(lineTaxCode.rate) : null,
+    calculationMethod: lineTaxCode?.calculationMethod ?? null,
+    taxEnabled: Boolean(lineTaxCode),
+  });
 
   return {
     lineNo,
@@ -96,10 +160,10 @@ function calculateLine(line: QuotationLinePayload, lineNo: number, productMap: M
     unitPrice,
     discountRate,
     discountAmount,
-    taxRate,
-    taxAmount,
+    ...taxSnapshot(lineTaxCode),
+    taxAmount: decimal(lineTaxBreakdown.taxAmount, 0),
     lineSubtotal,
-    lineTotal,
+    lineTotal: decimal(lineTaxBreakdown.lineGrandTotalAfterTax, Number(taxableAmount)),
     remarks: normalizeText(line.remarks),
   };
 }
@@ -159,15 +223,31 @@ export async function POST(req: Request) {
     const rawLines = Array.isArray(body.lines) ? (body.lines as QuotationLinePayload[]) : [];
     if (rawLines.length === 0) return NextResponse.json({ ok: false, error: "Please add at least one product line." }, { status: 400 });
 
-    const [customer, config] = await Promise.all([
+    const [customer, config, taxConfig, activeTaxCodes] = await Promise.all([
       db.user.findFirst({
         where: { id: customerId, role: "CUSTOMER" },
         include: { agent: true },
       }),
       db.stockConfiguration.findUnique({ where: { id: "default" } }),
+      db.taxConfiguration.findUnique({ where: { id: "default" } }),
+      db.taxCode.findMany({
+        where: { isActive: true },
+        select: {
+          id: true,
+          code: true,
+          description: true,
+          displayLabel: true,
+          rate: true,
+          calculationMethod: true,
+        },
+      }),
     ]);
 
     if (!customer) return NextResponse.json({ ok: false, error: "Selected customer is invalid." }, { status: 400 });
+
+    const taxModuleEnabled = Boolean(taxConfig?.taxModuleEnabled);
+    const taxCalculationMode = normalizeTaxCalculationMode(taxConfig?.taxCalculationMode);
+    const taxCodeMap = new Map(activeTaxCodes.map((item) => [item.id, item as TaxCodeSnapshot]));
 
     const productIds = Array.from(new Set(rawLines.map((line) => normalizeText(line.inventoryProductId)).filter(Boolean))) as string[];
     const products = productIds.length
@@ -177,17 +257,49 @@ export async function POST(req: Request) {
         })
       : [];
     const productMap = new Map(products.map((item) => [item.id, item]));
-    const normalizedLines = rawLines.map((line, index) => calculateLine(line, index + 1, productMap));
+
+    const normalizedLines = rawLines.map((line, index) =>
+      calculateLine(line, index + 1, productMap, taxCodeMap, {
+        taxModuleEnabled,
+        taxCalculationMode,
+      })
+    );
 
     const subtotal = normalizedLines.reduce((sum, line) => sum.plus(line.lineSubtotal), new Prisma.Decimal(0)).toDecimalPlaces(2);
     const discountTotal = normalizedLines.reduce((sum, line) => sum.plus(line.discountAmount), new Prisma.Decimal(0)).toDecimalPlaces(2);
-    const taxTotal = normalizedLines.reduce((sum, line) => sum.plus(line.taxAmount), new Prisma.Decimal(0)).toDecimalPlaces(2);
-    const grandTotal = normalizedLines.reduce((sum, line) => sum.plus(line.lineTotal), new Prisma.Decimal(0)).toDecimalPlaces(2);
+
+    const transactionTaxCode =
+      taxModuleEnabled && taxCalculationMode === "TRANSACTION"
+        ? taxCodeMap.get(normalizeTaxCodeId(body.transactionTaxCodeId) || "") || null
+        : null;
+
+    const transactionTaxBreakdown = calculateTaxBreakdown({
+      subtotal: Number(subtotal),
+      discount: Number(discountTotal),
+      taxRate: transactionTaxCode ? toNumber(transactionTaxCode.rate) : null,
+      calculationMethod: transactionTaxCode?.calculationMethod ?? null,
+      taxEnabled: Boolean(transactionTaxCode),
+    });
+
+    const lineItemTaxTotal = normalizedLines.reduce((sum, line) => sum.plus(line.taxAmount), new Prisma.Decimal(0)).toDecimalPlaces(2);
+    const lineItemGrandTotal = normalizedLines.reduce((sum, line) => sum.plus(line.lineTotal), new Prisma.Decimal(0)).toDecimalPlaces(2);
+
+    const taxTotal =
+      taxModuleEnabled && taxCalculationMode === "LINE_ITEM"
+        ? lineItemTaxTotal
+        : decimal(transactionTaxBreakdown.taxAmount, 0);
+
+    const grandTotal =
+      taxModuleEnabled && taxCalculationMode === "LINE_ITEM"
+        ? lineItemGrandTotal
+        : decimal(transactionTaxBreakdown.grandTotalAfterTax, Number(subtotal.minus(discountTotal)));
 
     const projectFeatureEnabled = Boolean(config?.enableProject);
     const departmentFeatureEnabled = projectFeatureEnabled && Boolean(config?.enableDepartment);
     const projectId = projectFeatureEnabled ? normalizeText(body.projectId) : null;
     const departmentId = departmentFeatureEnabled ? normalizeText(body.departmentId) : null;
+
+    const transactionTaxSnapshot = taxSnapshot(transactionTaxCode);
 
     const created = await db.$transaction(async (tx) => {
       const docNo = requestedDocNo || (await generateQuotationNo(tx, docDate));
@@ -231,7 +343,11 @@ export async function POST(req: Request) {
           subtotal,
           discountTotal,
           taxTotal,
+          taxableSubtotal: decimal(transactionTaxBreakdown.taxableSubtotal, Number(subtotal.minus(discountTotal))),
           grandTotal,
+          isTaxEnabledSnapshot: taxModuleEnabled,
+          taxCalculationModeSnapshot: taxCalculationMode,
+          ...transactionTaxSnapshot,
           termsAndConditions: normalizeText(body.termsAndConditions),
           bankAccount: normalizeText(body.bankAccount),
           footerRemarks: normalizeText(body.footerRemarks),
@@ -256,6 +372,8 @@ export async function POST(req: Request) {
         customerId: customer.id,
         customerName: customer.name,
         lineCount: normalizedLines.length,
+        taxCalculationMode,
+        taxTotal: taxTotal.toString(),
         grandTotal: grandTotal.toString(),
       },
       status: "SUCCESS",
