@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 type CustomerOption = {
@@ -107,6 +107,136 @@ function getStatusClass(status: string) {
   return "border-amber-500/25 bg-amber-500/10 text-amber-200";
 }
 
+type SearchableSelectOption = {
+  id: string;
+  label: string;
+  searchText: string;
+};
+
+function SearchableSelect({
+  label,
+  placeholder,
+  options,
+  value,
+  disabled = false,
+  onChange,
+}: {
+  label: string;
+  placeholder: string;
+  options: SearchableSelectOption[];
+  value: string;
+  disabled?: boolean;
+  onChange: (option: SearchableSelectOption | null) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const selectedOption = useMemo(() => options.find((item) => item.id === value) || null, [options, value]);
+
+  useEffect(() => {
+    setSearch(selectedOption?.label || "");
+  }, [selectedOption?.label]);
+
+  useEffect(() => {
+    function handleOutsideClick(event: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, []);
+
+  const filteredOptions = useMemo(() => {
+    const keyword = search.trim().toLowerCase();
+    if (!keyword) return options;
+    return options.filter((item) => item.searchText.includes(keyword));
+  }, [options, search]);
+
+  return (
+    <div ref={containerRef} className="relative">
+      <label className="label-rk">{label}</label>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => {
+          if (disabled) return;
+          setIsOpen((prev) => !prev);
+          setSearch("");
+        }}
+        className={`input-rk flex items-center justify-between gap-3 pr-14 text-left ${disabled ? "cursor-not-allowed opacity-60" : ""}`}
+      >
+        <span className={selectedOption ? "truncate text-white" : "truncate text-white/45"}>
+          {selectedOption ? selectedOption.label : placeholder}
+        </span>
+        <span className="pointer-events-none absolute inset-y-0 right-5 flex items-center text-white/60">▾</span>
+      </button>
+
+      {isOpen ? (
+        <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-[140] overflow-hidden rounded-2xl border border-white/10 bg-[#0b0b0f] shadow-2xl">
+          <div className="border-b border-white/10 p-3">
+            <input
+              autoFocus
+              className="input-rk"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={`Search ${label.toLowerCase()}`}
+            />
+          </div>
+
+          <div className="max-h-56 overflow-y-auto p-2">
+            {filteredOptions.length === 0 ? (
+              <div className="rounded-xl px-3 py-3 text-sm text-white/45">No matching {label.toLowerCase()} found.</div>
+            ) : (
+              filteredOptions.map((option) => {
+                const isSelected = selectedOption?.id === option.id;
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => {
+                      onChange(option);
+                      setSearch(option.label);
+                      setIsOpen(false);
+                    }}
+                    className={`flex w-full items-center rounded-xl px-3 py-3 text-left text-sm transition ${
+                      isSelected ? "bg-white/10 text-white" : "text-white/85 hover:bg-white/10 hover:text-white"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function normalizeDocNoInput(value: string) {
+  return value.toUpperCase().replace(/\s+/g, "").slice(0, 30);
+}
+
+function buildQuotationDocNoPreview(value: string, transactions: Array<{ docNo?: string | null }>) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Auto Generated";
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  const prefix = `QO-${y}${m}${d}`;
+  let maxSeq = 0;
+  for (const item of transactions) {
+    const effectiveDocNo = String(item.docNo || "");
+    const match = effectiveDocNo.match(new RegExp(`^${prefix}-(\\d{4})$`));
+    if (!match) continue;
+    const seq = Number(match[1]);
+    if (Number.isFinite(seq) && seq > maxSeq) maxSeq = seq;
+  }
+  return `${prefix}-${String(maxSeq + 1).padStart(4, "0")}`;
+}
+
 export function AdminSalesQuotationClient({
   initialCustomers,
   initialProducts,
@@ -131,6 +261,8 @@ export function AdminSalesQuotationClient({
 
   const [docDate, setDocDate] = useState(todayInput());
   const [docNo, setDocNo] = useState("");
+  const [isDocNoModalOpen, setIsDocNoModalOpen] = useState(false);
+  const [docNoDraft, setDocNoDraft] = useState("");
   const [docDesc, setDocDesc] = useState("");
   const [customerId, setCustomerId] = useState("");
   const [customerAccountNo, setCustomerAccountNo] = useState("");
@@ -167,6 +299,77 @@ export function AdminSalesQuotationClient({
     () => initialDepartments.filter((item) => item.projectId === projectId && item.isActive),
     [initialDepartments, projectId]
   );
+
+  const customerOptions = useMemo<SearchableSelectOption[]>(
+    () =>
+      initialCustomers.map((customer) => ({
+        id: customer.id,
+        label: `${customer.customerAccountNo || "-"} — ${customer.name}`,
+        searchText: `${customer.customerAccountNo || ""} ${customer.name} ${customer.email || ""} ${customer.phone || ""}`.toLowerCase(),
+      })),
+    [initialCustomers]
+  );
+
+  const agentOptions = useMemo<SearchableSelectOption[]>(
+    () => [
+      { id: "", label: "No Agent", searchText: "no agent" },
+      ...initialAgents.map((agent) => ({
+        id: agent.id,
+        label: `${agent.code} — ${agent.name}`,
+        searchText: `${agent.code} ${agent.name}`.toLowerCase(),
+      })),
+    ],
+    [initialAgents]
+  );
+
+  const projectOptions = useMemo<SearchableSelectOption[]>(
+    () => [
+      { id: "", label: "No Project", searchText: "no project" },
+      ...initialProjects.map((project) => ({
+        id: project.id,
+        label: `${project.code} — ${project.name}`,
+        searchText: `${project.code} ${project.name}`.toLowerCase(),
+      })),
+    ],
+    [initialProjects]
+  );
+
+  const departmentOptions = useMemo<SearchableSelectOption[]>(
+    () => [
+      { id: "", label: "No Department", searchText: "no department" },
+      ...filteredDepartments.map((department) => ({
+        id: department.id,
+        label: `${department.code} — ${department.name}`,
+        searchText: `${department.code} ${department.name}`.toLowerCase(),
+      })),
+    ],
+    [filteredDepartments]
+  );
+
+  const productOptions = useMemo<SearchableSelectOption[]>(
+    () =>
+      initialProducts.map((product) => ({
+        id: product.id,
+        label: `${product.code} — ${product.description}`,
+        searchText: `${product.code} ${product.description} ${product.baseUom}`.toLowerCase(),
+      })),
+    [initialProducts]
+  );
+
+  const autoGeneratedDocNoPreview = useMemo(
+    () => buildQuotationDocNoPreview(docDate, transactions),
+    [docDate, transactions]
+  );
+
+  function openDocNoModal() {
+    setDocNoDraft(docNo);
+    setIsDocNoModalOpen(true);
+  }
+
+  function saveDocNoOverride() {
+    setDocNo(normalizeDocNoInput(docNoDraft));
+    setIsDocNoModalOpen(false);
+  }
 
   const totals = useMemo(() => {
     return lines.reduce(
@@ -215,6 +418,8 @@ export function AdminSalesQuotationClient({
     setActiveTab("HEADER");
     setDocDate(todayInput());
     setDocNo("");
+    setDocNoDraft("");
+    setIsDocNoModalOpen(false);
     setDocDesc("");
     setCustomerId("");
     setCustomerAccountNo("");
@@ -380,26 +585,37 @@ export function AdminSalesQuotationClient({
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.24em] text-red-400/80">Sales</p>
           <h1 className="mt-3 text-4xl font-bold">Quotation</h1>
           <p className="mt-4 max-w-3xl text-white/70">Create and manage quotation documents. Quotation does not affect stock or sales figures.</p>
         </div>
-        <button type="button" onClick={openCreate} className="rounded-xl bg-red-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-red-500">
-          Create Quotation
-        </button>
       </div>
 
       {submitSuccess ? <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">{submitSuccess}</div> : null}
 
-      <div className="rounded-[2rem] border border-white/10 bg-black/45 p-5 backdrop-blur-md md:p-6">
-        <div className="grid gap-4 md:grid-cols-3">
-          <input className="input-rk" value={searchKeyword} onChange={(e) => setSearchKeyword(e.target.value)} placeholder="Search quotation no, customer, reference" />
-          <select className="input-rk" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-            <option value="ALL">All Status</option>
-            <option value="PENDING">Pending</option>
-            <option value="CONFIRMED">Confirmed</option>
-            <option value="CANCELLED">Cancelled</option>
-          </select>
+      <div className="rounded-[2rem] border border-white/10 bg-black/45 p-5 backdrop-blur-md md:p-8">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-red-400/80">Sales Quotation</p>
+            <h2 className="mt-4 text-2xl font-bold">Existing Quotation Records</h2>
+            <p className="mt-4 max-w-3xl text-sm leading-6 text-white/70">
+              Use Quotation to prepare customer price offers before creating sales order, delivery order, or invoice.
+            </p>
+          </div>
+          <button type="button" onClick={openCreate} className="rounded-xl bg-red-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-red-500">
+            Create Quotation
+          </button>
+        </div>
+
+        <div className="mt-8 rounded-2xl border border-white/10 bg-black/20 p-4">
+          <div className="grid gap-4 md:grid-cols-3">
+            <input className="input-rk" value={searchKeyword} onChange={(e) => setSearchKeyword(e.target.value)} placeholder="Search quotation no / customer / reference" />
+            <select className="input-rk pr-14" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+              <option value="ALL">All Status</option>
+              <option value="PENDING">Pending</option>
+              <option value="CONFIRMED">Confirmed</option>
+              <option value="CANCELLED">Cancelled</option>
+            </select>
+          </div>
         </div>
 
         <div className="mt-6 overflow-x-auto">
@@ -493,7 +709,14 @@ export function AdminSalesQuotationClient({
                   </div>
                   <div>
                     <label className="label-rk">Quotation No Override</label>
-                    <input className="input-rk" value={docNo} onChange={(e) => setDocNo(e.target.value.toUpperCase())} placeholder="Auto Generated" />
+                    <button
+                      type="button"
+                      onClick={openDocNoModal}
+                      className="input-rk flex items-center justify-between gap-3 pr-14 text-left"
+                    >
+                      <span className={docNo ? "text-white" : "text-white/45"}>{docNo || autoGeneratedDocNoPreview}</span>
+                      <span className="pointer-events-none absolute inset-y-0 right-5 flex items-center text-white/60">▾</span>
+                    </button>
                   </div>
                   <div className="xl:col-span-2">
                     <label className="label-rk">Document Description</label>
@@ -620,6 +843,38 @@ export function AdminSalesQuotationClient({
               <button type="button" onClick={submitQuotation} disabled={isSubmitting} className="rounded-xl bg-red-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-60">
                 {isSubmitting ? "Saving..." : "Save Quotation"}
               </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+
+      {isDocNoModalOpen ? (
+        <div className="fixed inset-0 z-[160] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-[2rem] border border-white/10 bg-[#0b0b0f] p-6 shadow-2xl">
+            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-white/40">Manual Document No</p>
+            <h3 className="mt-3 text-2xl font-bold">Override Document No</h3>
+            <p className="mt-3 text-sm leading-6 text-white/65">Leave empty to use the auto generated document number. Maximum 30 characters.</p>
+
+            <div className="mt-6 space-y-5">
+              <div>
+                <label className="label-rk">Auto Generated Preview</label>
+                <div className="input-rk flex items-center text-white">{autoGeneratedDocNoPreview}</div>
+              </div>
+              <div>
+                <label className="label-rk">Custom Document No</label>
+                <input
+                  className="input-rk"
+                  value={docNoDraft}
+                  onChange={(e) => setDocNoDraft(normalizeDocNoInput(e.target.value))}
+                  placeholder="Enter custom document no"
+                />
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button type="button" onClick={() => setIsDocNoModalOpen(false)} className="rounded-xl border border-white/15 px-4 py-3 text-white/75 transition hover:bg-white/10">Cancel</button>
+              <button type="button" onClick={saveDocNoOverride} className="rounded-xl bg-red-600 px-5 py-3 font-semibold text-white transition hover:bg-red-500">OK</button>
             </div>
           </div>
         </div>
