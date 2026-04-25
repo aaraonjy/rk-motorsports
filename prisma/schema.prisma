@@ -81,6 +81,33 @@ enum DocType {
   INV
 }
 
+enum SalesDocType {
+  QO
+  SO
+  DO
+  INV
+  CS
+  CN
+  DN
+  DR
+}
+
+enum SalesTransactionStatus {
+  PENDING
+  OPEN
+  CONFIRMED
+  PARTIAL
+  COMPLETED
+  INVOICED
+  POSTED
+  CANCELLED
+}
+
+enum SalesLinkType {
+  GENERATED_FROM
+  GENERATED_TO
+}
+
 enum TaxCalculationMethod {
   EXCLUSIVE
   INCLUSIVE
@@ -180,9 +207,12 @@ model User {
   adminCreatedOrders     Order[]             @relation("AdminCreatedOrders")
   creditNotes            CreditNote[]        @relation("CustomerCreditNotes")
   adminCreatedCreditNotes CreditNote[]       @relation("AdminCreatedCreditNotes")
+  customerSalesTransactions SalesTransaction[] @relation("CustomerSalesTransactions")
   notifications           Notification[]
   createdStockTransactions StockTransaction[] @relation("CreatedStockTransactions")
   cancelledStockTransactions StockTransaction[] @relation("CancelledStockTransactions")
+  createdSalesTransactions SalesTransaction[] @relation("CreatedSalesTransactions")
+  cancelledSalesTransactions SalesTransaction[] @relation("CancelledSalesTransactions")
   agent                  Agent?              @relation(fields: [agentId], references: [id], onDelete: SetNull)
   deliveryAddresses      CustomerDeliveryAddress[]
 
@@ -355,6 +385,7 @@ model InventoryProduct {
   productBrand         ProductBrand?          @relation(fields: [brandId], references: [id], onDelete: SetNull)
   customOrderItems     CustomOrderItem[]
   stockTransactionLines StockTransactionLine[]
+  salesTransactionLines SalesTransactionLine[]
   stockLedgerEntries   StockLedger[]
   batches              InventoryBatch[]
   serials              InventorySerial[]
@@ -495,6 +526,7 @@ model Project {
   updatedAt         DateTime           @updatedAt
   departments       Department[]
   stockTransactions StockTransaction[]
+  salesTransactions SalesTransaction[]
 
   @@index([isActive, code])
   @@index([name])
@@ -509,6 +541,7 @@ model Agent {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   customers User[]
+  salesTransactions SalesTransaction[]
 
   @@index([isActive, code])
   @@index([name])
@@ -532,6 +565,117 @@ model CustomerDeliveryAddress {
   @@index([customerId])
 }
 
+
+model SalesTransaction {
+  id                   String                 @id @default(cuid())
+  docType              SalesDocType
+  docNo                String                 @unique
+  docDate              DateTime               @default(now())
+  docDesc              String?
+  status               SalesTransactionStatus @default(PENDING)
+  customerId           String
+  customerAccountNo    String?
+  customerName         String
+  billingAddressLine1  String?
+  billingAddressLine2  String?
+  billingAddressLine3  String?
+  billingAddressLine4  String?
+  billingCity          String?
+  billingPostCode      String?
+  billingCountryCode   String?
+  deliveryAddressLine1 String?
+  deliveryAddressLine2 String?
+  deliveryAddressLine3 String?
+  deliveryAddressLine4 String?
+  deliveryCity         String?
+  deliveryPostCode     String?
+  deliveryCountryCode  String?
+  attention            String?
+  contactNo            String?
+  email                String?
+  currency             String                 @default("MYR")
+  reference            String?
+  remarks              String?
+  agentId              String?
+  projectId            String?
+  departmentId         String?
+  subtotal             Decimal                @default(0) @db.Decimal(14, 2)
+  discountTotal        Decimal                @default(0) @db.Decimal(14, 2)
+  taxTotal             Decimal                @default(0) @db.Decimal(14, 2)
+  grandTotal           Decimal                @default(0) @db.Decimal(14, 2)
+  termsAndConditions   String?
+  bankAccount          String?
+  footerRemarks        String?
+  createdByAdminId     String
+  cancelledByAdminId   String?
+  cancelReason         String?
+  cancelledAt          DateTime?
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+
+  customer             User                   @relation("CustomerSalesTransactions", fields: [customerId], references: [id], onDelete: Restrict)
+  agent                Agent?                 @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  project              Project?               @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  department           Department?            @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  createdByAdmin       User                   @relation("CreatedSalesTransactions", fields: [createdByAdminId], references: [id], onDelete: Restrict)
+  cancelledByAdmin     User?                  @relation("CancelledSalesTransactions", fields: [cancelledByAdminId], references: [id], onDelete: SetNull)
+  lines                SalesTransactionLine[]
+  sourceLinks          SalesTransactionLink[] @relation("SalesTransactionSourceLinks")
+  targetLinks          SalesTransactionLink[] @relation("SalesTransactionTargetLinks")
+
+  @@index([docType, docDate])
+  @@index([status, docDate])
+  @@index([customerId, docDate])
+  @@index([createdByAdminId, createdAt])
+  @@index([cancelledByAdminId])
+  @@index([agentId])
+  @@index([projectId])
+  @@index([departmentId])
+}
+
+model SalesTransactionLine {
+  id                  String            @id @default(cuid())
+  transactionId       String
+  lineNo              Int
+  inventoryProductId  String?
+  productCode         String
+  productDescription  String
+  uom                 String
+  qty                 Decimal           @db.Decimal(12, 3)
+  unitPrice           Decimal           @db.Decimal(14, 2)
+  discountRate        Decimal           @default(0) @db.Decimal(5, 2)
+  discountAmount      Decimal           @default(0) @db.Decimal(14, 2)
+  taxRate             Decimal           @default(0) @db.Decimal(5, 2)
+  taxAmount           Decimal           @default(0) @db.Decimal(14, 2)
+  lineSubtotal        Decimal           @default(0) @db.Decimal(14, 2)
+  lineTotal           Decimal           @default(0) @db.Decimal(14, 2)
+  remarks             String?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  transaction         SalesTransaction  @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  inventoryProduct    InventoryProduct? @relation(fields: [inventoryProductId], references: [id], onDelete: SetNull)
+
+  @@unique([transactionId, lineNo])
+  @@index([transactionId])
+  @@index([inventoryProductId])
+}
+
+model SalesTransactionLink {
+  id                  String           @id @default(cuid())
+  sourceTransactionId String
+  targetTransactionId String
+  linkType            SalesLinkType
+  createdAt           DateTime         @default(now())
+
+  sourceTransaction   SalesTransaction @relation("SalesTransactionSourceLinks", fields: [sourceTransactionId], references: [id], onDelete: Cascade)
+  targetTransaction   SalesTransaction @relation("SalesTransactionTargetLinks", fields: [targetTransactionId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceTransactionId, targetTransactionId, linkType])
+  @@index([sourceTransactionId])
+  @@index([targetTransactionId])
+}
+
 model Department {
   id                String             @id @default(cuid())
   code              String             @unique
@@ -542,6 +686,7 @@ model Department {
   updatedAt         DateTime           @updatedAt
   project           Project            @relation(fields: [projectId], references: [id], onDelete: Restrict)
   stockTransactions StockTransaction[]
+  salesTransactions SalesTransaction[]
 
   @@index([projectId, isActive])
   @@index([name])

@@ -6,6 +6,7 @@ import { SiteHeaderClient } from "@/components/site-header-client";
 import { AdminGlobalSettingsMenu } from "@/components/admin-global-settings-menu";
 import { AdminStockMenu } from "@/components/admin-stock-menu";
 import { AdminCustomerMenu } from "@/components/admin-customer-menu";
+import { AdminSalesMenu } from "@/components/admin-sales-menu";
 
 const publicNav = [
   ["Services", "/#services"],
@@ -50,6 +51,7 @@ export async function SiteHeader() {
               </Link>
             ))}
             {user?.role === "ADMIN" ? <AdminCustomerMenu /> : null}
+            {user?.role === "ADMIN" ? <AdminSalesMenu /> : null}
             {user?.role === "ADMIN" ? <AdminStockMenu /> : null}
             {user?.role === "ADMIN" ? <AdminGlobalSettingsMenu /> : null}
           </nav>
