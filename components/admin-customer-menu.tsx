@@ -59,7 +59,7 @@ export function AdminCustomerMenu() {
       </button>
 
       {isOpen ? (
-        <div className="absolute left-0 top-[calc(100%+12px)] z-[70] min-w-[220px] rounded-2xl border border-white/10 bg-[#0b0b0c]/95 shadow-2xl backdrop-blur-xl">
+        <div className="absolute left-0 top-[calc(100%+12px)] z-[70] min-w-[250px] max-h-[70vh] overflow-y-auto rounded-2xl border border-white/10 bg-[#0b0b0c]/95 shadow-2xl backdrop-blur-xl">
           {items.map((item) => {
             const active = pathname === item.href;
 
