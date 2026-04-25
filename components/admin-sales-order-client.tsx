@@ -581,6 +581,7 @@ export function AdminSalesOrderClient({
   const [sourceQuotationIds, setSourceQuotationIds] = useState<string[]>([]);
   const [isGenerateFromOpen, setIsGenerateFromOpen] = useState(false);
   const [quotationSearch, setQuotationSearch] = useState("");
+  const [generateFromError, setGenerateFromError] = useState("");
 
   const [docDate, setDocDate] = useState(todayInput());
   const [docNo, setDocNo] = useState("");
@@ -750,11 +751,13 @@ export function AdminSalesOrderClient({
 
   const availableSourceQuotations = useMemo(() => {
     return initialQuotations.filter((quotation) => {
-      if (quotation.status === "CANCELLED") return false;
+      if (!customerId) return false;
+      if (quotation.customerId !== customerId) return false;
+      if (quotation.status !== "PENDING") return false;
       const hasActiveTarget = (quotation.targetLinks || []).some((link) => link.targetTransaction && link.targetTransaction.status !== "CANCELLED");
       return !hasActiveTarget;
     });
-  }, [initialQuotations]);
+  }, [customerId, initialQuotations]);
 
   const filteredSourceQuotations = useMemo(() => {
     const keyword = quotationSearch.trim().toLowerCase();
@@ -958,6 +961,7 @@ export function AdminSalesOrderClient({
     ]);
     setSubmitError("");
     setSubmitSuccess("");
+    setGenerateFromError("");
   }
 
   function fillFormFromTransaction(transaction: SalesOrderRecord, mode: "edit" | "revise") {
@@ -1023,18 +1027,23 @@ export function AdminSalesOrderClient({
     setIsCreateOpen(true);
   }
 
-  function startGenerateFromQuotation() {
-    setFormMode("create");
-    setEditTarget(null);
-    setSourceQuotationId("");
-    setSourceQuotationIds([]);
-    resetForm();
-    setIsCreateOpen(true);
-    setActiveTab("HEADER");
-    setIsGenerateFromOpen(true);
+  function openGenerateFromQuotation() {
+    setGenerateFromError("");
     setSubmitError("");
-    setSubmitSuccess("");
-    void loadNextSalesOrderDocNoPreview(todayInput());
+
+    if (!customerId) {
+      setGenerateFromError("Please select customer profile first before using Generate From.");
+      setActiveTab("HEADER");
+      return;
+    }
+
+    setSourceQuotationIds([]);
+    setQuotationSearch("");
+    setIsGenerateFromOpen(true);
+  }
+
+  function startGenerateFromQuotation() {
+    void openCreate();
   }
 
   function toggleSourceQuotation(quotationId: string) {
@@ -1044,6 +1053,13 @@ export function AdminSalesOrderClient({
   }
 
   function importSelectedQuotations() {
+    if (!customerId) {
+      setGenerateFromError("Please select customer profile first before using Generate From.");
+      setIsGenerateFromOpen(false);
+      setActiveTab("HEADER");
+      return;
+    }
+
     if (selectedSourceQuotations.length === 0) {
       setSubmitError("Please select at least one quotation.");
       return;
@@ -1111,6 +1127,7 @@ export function AdminSalesOrderClient({
     setLines(importedLines.length > 0 ? importedLines : [emptyLine(isLineItemTaxMode ? taxConfig.defaultAdminTaxCodeId || "" : "", defaultLocationId)]);
     setSourceQuotationId(first.id);
     setIsGenerateFromOpen(false);
+    setGenerateFromError("");
     setActiveTab("BODY");
     setSubmitError("");
     setSubmitSuccess(`Imported ${selectedSourceQuotations.length} quotation(s). Please review and save the Sales Order.`);
@@ -1177,10 +1194,14 @@ export function AdminSalesOrderClient({
     setSourceQuotationIds([]);
     setFormMode("create");
     setSubmitError("");
+    setGenerateFromError("");
   }
 
   function handleCustomerChange(nextCustomerId: string) {
     setCustomerId(nextCustomerId);
+    setSourceQuotationId("");
+    setSourceQuotationIds([]);
+    setGenerateFromError("");
     const customer = initialCustomers.find((item) => item.id === nextCustomerId);
     if (!customer) return;
     setCustomerAccountNo(customer.customerAccountNo || "");
@@ -1342,14 +1363,9 @@ export function AdminSalesOrderClient({
               Use Sales Order to prepare customer price offers before creating sales order, delivery order, or invoice.
             </p>
           </div>
-          <div className="flex flex-wrap gap-3">
-            <button type="button" onClick={startGenerateFromQuotation} className="inline-flex items-center justify-center rounded-xl border border-sky-500/30 bg-sky-500/10 px-5 py-3 font-semibold text-sky-100 transition hover:bg-sky-500/20">
-              Generate From
-            </button>
-            <button type="button" onClick={openCreate} className="inline-flex items-center justify-center rounded-xl bg-red-500 px-5 py-3 font-semibold text-white transition hover:bg-red-400">
-              Create Sales Order
-            </button>
-          </div>
+          <button type="button" onClick={openCreate} className="inline-flex items-center justify-center rounded-xl bg-red-500 px-5 py-3 font-semibold text-white transition hover:bg-red-400">
+            Create Sales Order
+          </button>
         </div>
 
         <div className="mt-8 rounded-2xl border border-white/10 bg-black/20 p-4">
@@ -1437,8 +1453,21 @@ export function AdminSalesOrderClient({
               <div>
                 <p className="text-sm font-semibold uppercase tracking-[0.24em] text-red-400/80">Sales Order</p>
                 <h2 className="mt-3 text-3xl font-bold">{formMode === "revise" ? "Revise Sales Order" : formMode === "edit" ? "Edit Sales Order" : "Create Sales Order"}</h2>
-                
+                {formMode === "create" && sourceQuotationIds.length > 0 ? (
+                  <p className="mt-3 text-sm text-sky-200">
+                    Generated from: {selectedSourceQuotations.map((quotation) => quotation.docNo).join(", ")}
+                  </p>
+                ) : null}
               </div>
+              {formMode === "create" ? (
+                <button
+                  type="button"
+                  onClick={openGenerateFromQuotation}
+                  className="rounded-xl border border-sky-500/30 bg-sky-500/10 px-5 py-3 text-sm font-semibold text-sky-100 transition hover:bg-sky-500/20"
+                >
+                  Generate From
+                </button>
+              ) : null}
             </div>
 
             <div className="mt-6 flex flex-wrap gap-2 border-b border-white/10 pb-4">
@@ -1453,6 +1482,12 @@ export function AdminSalesOrderClient({
                 </button>
               ))}
             </div>
+
+            {generateFromError ? (
+              <div className="mt-5 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+                {generateFromError}
+              </div>
+            ) : null}
 
             {submitError ? <div className="mt-5 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{submitError}</div> : null}
 
@@ -1683,7 +1718,7 @@ export function AdminSalesOrderClient({
               <div>
                 <p className="text-sm font-semibold uppercase tracking-[0.24em] text-white/40">Generate From</p>
                 <h3 className="mt-3 text-2xl font-bold">Select Quotation</h3>
-                <p className="mt-3 text-sm leading-6 text-white/60">Select one or more pending quotations from the same customer, then import them into this Sales Order.</p>
+                <p className="mt-3 text-sm leading-6 text-white/60">Select one or more pending quotations for the selected customer, then import them into this Sales Order.</p>
               </div>
               <button type="button" onClick={() => setIsGenerateFromOpen(false)} className="rounded-xl border border-white/15 px-4 py-2.5 text-sm text-white/75 transition hover:bg-white/10">Close</button>
             </div>
@@ -1694,7 +1729,7 @@ export function AdminSalesOrderClient({
 
             <div className="mt-5 max-h-[420px] overflow-y-auto rounded-2xl border border-white/10">
               {filteredSourceQuotations.length === 0 ? (
-                <div className="px-4 py-8 text-center text-sm text-white/50">No available quotation found.</div>
+                <div className="px-4 py-8 text-center text-sm text-white/50">No pending quotation found for this customer.</div>
               ) : (
                 filteredSourceQuotations.map((quotation) => {
                   const checked = sourceQuotationIds.includes(quotation.id);
