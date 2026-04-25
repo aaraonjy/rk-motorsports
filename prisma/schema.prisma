@@ -654,7 +654,11 @@ model SalesTransactionLine {
   qty                 Decimal           @db.Decimal(12, 3)
   unitPrice           Decimal           @db.Decimal(14, 2)
   discountRate        Decimal           @default(0) @db.Decimal(5, 2)
+  discountType        String            @default("PERCENT")
   discountAmount      Decimal           @default(0) @db.Decimal(14, 2)
+  locationId          String?
+  locationCode        String?
+  locationName        String?
   taxCodeId           String?
   taxCode             String?
   taxDescription      String?
@@ -674,6 +678,7 @@ model SalesTransactionLine {
   @@unique([transactionId, lineNo])
   @@index([transactionId])
   @@index([inventoryProductId])
+  @@index([locationId])
   @@index([taxCodeId])
 }
 
@@ -807,6 +812,9 @@ model CustomOrderItem {
   uom                 String?
   unitPrice           Decimal            @db.Decimal(12, 2)
   lineTotal           Decimal            @db.Decimal(12, 2)
+  locationId          String?
+  locationCode        String?
+  locationName        String?
   taxCodeId           String?
   taxCode             String?
   taxRate             Decimal?           @db.Decimal(5, 2)

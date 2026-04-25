@@ -18,6 +18,8 @@ type QuotationLinePayload = {
   qty?: number | string | null;
   unitPrice?: number | string | null;
   discountRate?: number | string | null;
+  discountType?: string | null;
+  locationId?: string | null;
   taxCodeId?: string | null;
   taxRate?: number | string | null;
   remarks?: string | null;
@@ -116,6 +118,7 @@ function calculateLine(
   line: QuotationLinePayload,
   lineNo: number,
   productMap: Map<string, any>,
+  locationMap: Map<string, { id: string; code: string; name: string }>,
   taxCodeMap: Map<string, TaxCodeSnapshot>,
   options: {
     taxModuleEnabled: boolean;
@@ -124,6 +127,8 @@ function calculateLine(
 ) {
   const inventoryProductId = typeof line.inventoryProductId === "string" && line.inventoryProductId.trim() ? line.inventoryProductId.trim() : null;
   const product = inventoryProductId ? productMap.get(inventoryProductId) : null;
+  const locationId = typeof line.locationId === "string" && line.locationId.trim() ? line.locationId.trim() : null;
+  const location = locationId ? locationMap.get(locationId) || null : null;
 
   const productCode = normalizeText(line.productCode) || product?.code || "";
   const productDescription = normalizeText(line.productDescription) || product?.description || "";
@@ -133,9 +138,13 @@ function calculateLine(
 
   const qty = qtyDecimal(line.qty);
   const unitPrice = decimal(line.unitPrice, product ? Number(product.sellingPrice ?? 0) : 0);
-  const discountRate = decimal(line.discountRate, 0);
+  const rawDiscountValue = decimal(line.discountRate, 0);
+  const discountType = String(line.discountType || "PERCENT").toUpperCase() === "AMOUNT" ? "AMOUNT" : "PERCENT";
+  const discountRate = discountType === "PERCENT" ? rawDiscountValue : new Prisma.Decimal(0);
   const lineSubtotal = qty.mul(unitPrice).toDecimalPlaces(2);
-  const discountAmount = lineSubtotal.mul(discountRate).div(100).toDecimalPlaces(2);
+  const discountAmount = discountType === "AMOUNT"
+    ? Prisma.Decimal.min(rawDiscountValue, lineSubtotal).toDecimalPlaces(2)
+    : lineSubtotal.mul(rawDiscountValue).div(100).toDecimalPlaces(2);
   const taxableAmount = lineSubtotal.minus(discountAmount).toDecimalPlaces(2);
 
   const lineTaxCode =
@@ -159,7 +168,11 @@ function calculateLine(
     qty,
     unitPrice,
     discountRate,
+    discountType,
     discountAmount,
+    locationId: location?.id || null,
+    locationCode: location?.code || null,
+    locationName: location?.name || null,
     ...taxSnapshot(lineTaxCode),
     taxAmount: decimal(lineTaxBreakdown.taxAmount, 0),
     lineSubtotal,
@@ -250,16 +263,26 @@ export async function POST(req: Request) {
     const taxCodeMap = new Map(activeTaxCodes.map((item) => [item.id, item as TaxCodeSnapshot]));
 
     const productIds = Array.from(new Set(rawLines.map((line) => normalizeText(line.inventoryProductId)).filter(Boolean))) as string[];
-    const products = productIds.length
-      ? await db.inventoryProduct.findMany({
-          where: { id: { in: productIds }, isActive: true },
-          select: { id: true, code: true, description: true, baseUom: true, sellingPrice: true },
-        })
-      : [];
+    const locationIds = Array.from(new Set(rawLines.map((line) => normalizeText(line.locationId)).filter(Boolean))) as string[];
+    const [products, locations] = await Promise.all([
+      productIds.length
+        ? db.inventoryProduct.findMany({
+            where: { id: { in: productIds }, isActive: true },
+            select: { id: true, code: true, description: true, baseUom: true, sellingPrice: true },
+          })
+        : Promise.resolve([]),
+      locationIds.length
+        ? db.stockLocation.findMany({
+            where: { id: { in: locationIds }, isActive: true },
+            select: { id: true, code: true, name: true },
+          })
+        : Promise.resolve([]),
+    ]);
     const productMap = new Map(products.map((item) => [item.id, item]));
+    const locationMap = new Map(locations.map((item) => [item.id, item]));
 
     const normalizedLines = rawLines.map((line, index) =>
-      calculateLine(line, index + 1, productMap, taxCodeMap, {
+      calculateLine(line, index + 1, productMap, locationMap, taxCodeMap, {
         taxModuleEnabled,
         taxCalculationMode,
       })

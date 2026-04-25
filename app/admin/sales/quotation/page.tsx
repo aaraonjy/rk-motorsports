@@ -8,7 +8,7 @@ export default async function AdminSalesQuotationPage() {
   if (!user) redirect("/login");
   if (user.role !== "ADMIN") redirect("/dashboard");
 
-  const [customers, products, agents, projects, departments, stockConfig, taxConfig, taxCodes] = await Promise.all([
+  const [customers, products, locations, agents, projects, departments, stockConfig, taxConfig, taxCodes] = await Promise.all([
     db.user.findMany({
       where: { role: "CUSTOMER" },
       orderBy: [{ customerAccountNo: "asc" }, { name: "asc" }],
@@ -54,6 +54,7 @@ export default async function AdminSalesQuotationPage() {
         },
       },
     }),
+    db.stockLocation.findMany({ where: { isActive: true }, orderBy: [{ code: "asc" }], select: { id: true, code: true, name: true, isActive: true } }),
     db.agent.findMany({ where: { isActive: true }, orderBy: [{ code: "asc" }], select: { id: true, code: true, name: true, isActive: true } }),
     db.project.findMany({ where: { isActive: true }, orderBy: [{ code: "asc" }], select: { id: true, code: true, name: true, isActive: true } }),
     db.department.findMany({ where: { isActive: true }, orderBy: [{ code: "asc" }], select: { id: true, code: true, name: true, projectId: true, isActive: true } }),
@@ -91,6 +92,7 @@ export default async function AdminSalesQuotationPage() {
               conversionRate: Number(item.conversionRate ?? 0),
             })),
           }))}
+          initialLocations={locations}
           initialAgents={agents}
           initialProjects={projects}
           initialDepartments={departments}
