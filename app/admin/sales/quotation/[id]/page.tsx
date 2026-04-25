@@ -22,6 +22,21 @@ function formatDate(value: Date | string | null | undefined) {
   });
 }
 
+function formatDateTime(value: Date | string | null | undefined) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleString("en-MY", {
+    timeZone: "Asia/Kuala_Lumpur",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).replace(/am|pm/i, (value) => value.toLowerCase());
+}
+
 function getStatusClass(status: string) {
   if (status === "CANCELLED") return "border-red-500/25 bg-red-500/10 text-red-200";
   if (status === "CONFIRMED" || status === "COMPLETED") return "border-sky-500/25 bg-sky-500/10 text-sky-200";
@@ -180,7 +195,7 @@ export default async function AdminSalesQuotationDetailPage({ params, searchPara
               <div className="text-right">Created By:</div>
               <div className="text-left font-semibold text-white/75">{transaction.createdByAdmin?.name || "-"}</div>
               <div className="text-right">Created Date:</div>
-              <div className="text-left font-semibold text-white/75">{formatDate(transaction.createdAt)}</div>
+              <div className="text-left font-semibold text-white/75">{formatDateTime(transaction.createdAt)}</div>
             </div>
           </div>
 

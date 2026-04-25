@@ -96,15 +96,16 @@ function buildSalesDocumentNumberLockKey(docType: string, documentDate: Date) {
 async function generateQuotationNo(tx: Prisma.TransactionClient, docDate: Date) {
   const { year, month, day } = getMalaysiaDateParts(docDate);
   const prefix = `QO-${year}${month}${day}`;
+  const baseDocNoPattern = new RegExp(`^${prefix}-(\d{4})$`);
 
   const existing = await tx.salesTransaction.findMany({
-    where: { docNo: { startsWith: `${prefix}-` } },
+    where: { docType: "QO", docNo: { startsWith: `${prefix}-` } },
     select: { docNo: true },
   });
 
   let maxSeq = 0;
   for (const item of existing) {
-    const match = item.docNo?.match(new RegExp(`^${prefix}-(\\d{4})$`));
+    const match = item.docNo?.match(baseDocNoPattern);
     if (!match) continue;
 
     const seq = Number(match[1]);

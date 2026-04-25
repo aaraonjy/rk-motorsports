@@ -89,19 +89,29 @@ function buildSalesRevisionLockKey(baseDocNo: string) {
   return `sales-revision:${baseDocNo}`;
 }
 
-function stripRevisionSuffix(docNo: string) {
-  return docNo.replace(/-\d+$/, "").trim().toUpperCase();
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function getBaseRevisionDocNo(docNo: string | null | undefined) {
+  const value = String(docNo || "").trim().toUpperCase();
+  if (!value) throw new Error("Current Quotation No is invalid for revision.");
+
+  const match = value.match(/^(QO-\d{8}-\d{4})(?:-(\d+))?$/);
+  if (!match) throw new Error("Current Quotation No is invalid for revision.");
+
+  return match[1];
 }
 
 async function generateRevisionDocNo(tx: Prisma.TransactionClient, originalDocNo: string) {
-  const baseDocNo = stripRevisionSuffix(originalDocNo);
+  const baseDocNo = getBaseRevisionDocNo(originalDocNo);
   const existing = await tx.salesTransaction.findMany({
     where: { docNo: { startsWith: `${baseDocNo}-` } },
     select: { docNo: true },
   });
 
   let maxRevision = 0;
-  const pattern = new RegExp(`^${baseDocNo.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}-(\\d+)$`);
+  const pattern = new RegExp(`^${escapeRegExp(baseDocNo)}-(\\d+)$`);
   for (const row of existing) {
     const match = row.docNo?.match(pattern);
     if (!match) continue;
@@ -485,7 +495,7 @@ export async function PATCH(req: Request, { params }: Params) {
 
       const rootId = existing.revisedFromId || existing.id;
       const rootDocNo = existing.revisedFrom?.docNo || existing.docNo;
-      const baseDocNo = stripRevisionSuffix(rootDocNo);
+      const baseDocNo = getBaseRevisionDocNo(rootDocNo);
       await acquireAdvisoryLock(tx, buildSalesRevisionLockKey(baseDocNo));
       const newDocNo = await generateRevisionDocNo(tx, rootDocNo);
 
