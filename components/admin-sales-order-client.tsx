@@ -551,6 +551,12 @@ function getBalanceDisplay(value: number | undefined, isLoading: boolean) {
   return `Current Balance: ${money(value)}`;
 }
 
+
+function isLatestSelectableQuotationRevision(quotation: SourceQuotationRecord) {
+  const hasChildRevision = (quotation.revisions || []).some((revision) => revision.status !== "CANCELLED");
+  return !hasChildRevision;
+}
+
 export function AdminSalesOrderClient({
   initialQuotations,
   initialCustomers,
@@ -762,8 +768,7 @@ export function AdminSalesOrderClient({
       );
       if (hasActiveTarget) return false;
 
-      const hasActiveRevision = (quotation.revisions || []).some((revision) => revision.status !== "CANCELLED");
-      if (hasActiveRevision) return false;
+      if (!isLatestSelectableQuotationRevision(quotation)) return false;
 
       return true;
     });
