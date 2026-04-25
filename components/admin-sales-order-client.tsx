@@ -552,9 +552,28 @@ function getBalanceDisplay(value: number | undefined, isLoading: boolean) {
 }
 
 
-function isLatestSelectableQuotationRevision(quotation: SourceQuotationRecord) {
-  const hasChildRevision = (quotation.revisions || []).some((revision) => revision.status !== "CANCELLED");
-  return !hasChildRevision;
+function getBaseQuotationDocNo(docNo: string | null | undefined) {
+  const value = String(docNo || "").trim().toUpperCase();
+  const match = value.match(/^(QO-\d{8}-\d{4})(?:-(\d+))?$/);
+  return match ? match[1] : value;
+}
+
+function getQuotationRevisionNo(docNo: string | null | undefined) {
+  const value = String(docNo || "").trim().toUpperCase();
+  const match = value.match(/^QO-\d{8}-\d{4}-(\d+)$/);
+  return match ? Number(match[1]) || 0 : 0;
+}
+
+function isLatestSelectableQuotationRevision(quotation: SourceQuotationRecord, allQuotations: SourceQuotationRecord[]) {
+  const baseDocNo = getBaseQuotationDocNo(quotation.docNo);
+  const currentRevisionNo = getQuotationRevisionNo(quotation.docNo);
+
+  const latestActiveRevisionNo = allQuotations
+    .filter((item) => getBaseQuotationDocNo(item.docNo) === baseDocNo)
+    .filter((item) => item.status !== "CANCELLED")
+    .reduce((maxRevision, item) => Math.max(maxRevision, getQuotationRevisionNo(item.docNo)), 0);
+
+  return currentRevisionNo === latestActiveRevisionNo;
 }
 
 export function AdminSalesOrderClient({
@@ -757,10 +776,22 @@ export function AdminSalesOrderClient({
     []
   );
 
+  const selectedCustomer = useMemo(
+    () => initialCustomers.find((customer) => customer.id === customerId) || null,
+    [customerId, initialCustomers]
+  );
+
   const availableSourceQuotations = useMemo(() => {
     return initialQuotations.filter((quotation) => {
       if (!customerId) return false;
-      if (quotation.customerId !== customerId) return false;
+
+      const selectedCustomerAccountNo = String(selectedCustomer?.customerAccountNo || "").trim();
+      const quotationCustomerAccountNo = String(quotation.customerAccountNo || "").trim();
+      const sameCustomer =
+        quotation.customerId === customerId ||
+        Boolean(selectedCustomerAccountNo && quotationCustomerAccountNo && selectedCustomerAccountNo === quotationCustomerAccountNo);
+
+      if (!sameCustomer) return false;
       if (quotation.status !== "PENDING") return false;
 
       const hasActiveTarget = (quotation.targetLinks || []).some(
@@ -768,11 +799,11 @@ export function AdminSalesOrderClient({
       );
       if (hasActiveTarget) return false;
 
-      if (!isLatestSelectableQuotationRevision(quotation)) return false;
+      if (!isLatestSelectableQuotationRevision(quotation, initialQuotations)) return false;
 
       return true;
     });
-  }, [customerId, initialQuotations]);
+  }, [customerId, initialQuotations, selectedCustomer]);
 
   const filteredSourceQuotations = useMemo(() => {
     const keyword = quotationSearch.trim().toLowerCase();
@@ -784,8 +815,8 @@ export function AdminSalesOrderClient({
 
   const selectedSourceQuotations = useMemo(() => {
     const selected = new Set(sourceQuotationIds);
-    return initialQuotations.filter((quotation) => selected.has(quotation.id));
-  }, [initialQuotations, sourceQuotationIds]);
+    return availableSourceQuotations.filter((quotation) => selected.has(quotation.id));
+  }, [availableSourceQuotations, sourceQuotationIds]);
 
 
   function openDocNoModal() {

@@ -72,7 +72,7 @@ export default async function AdminSalesOrderPage() {
       },
     }),
     db.salesTransaction.findMany({
-      where: { docType: "QO", status: "PENDING" },
+      where: { docType: "QO" },
       orderBy: [{ docDate: "desc" }, { docNo: "desc" }],
       include: {
         revisedFrom: { select: { id: true, docNo: true } },
