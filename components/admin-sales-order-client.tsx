@@ -1091,8 +1091,8 @@ export function AdminSalesOrderClient({
     setFooterRemarks(first.footerRemarks || "");
     setSelectedTaxCodeId(first.taxCodeId || (taxConfig.taxModuleEnabled ? taxConfig.defaultAdminTaxCodeId || "" : ""));
 
-    const importedLines = selectedSourceQuotations.flatMap((quotation) =>
-      (quotation.lines || []).map((line) => ({
+    const importedLines: LineForm[] = selectedSourceQuotations.flatMap((quotation) =>
+      (quotation.lines || []).map((line): LineForm => ({
         inventoryProductId: line.inventoryProductId || "",
         productCode: line.productCode || "",
         productDescription: line.productDescription || "",
