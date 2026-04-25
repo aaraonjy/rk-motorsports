@@ -248,6 +248,13 @@ export async function GET(req: Request) {
         customer: { select: { id: true, name: true, email: true, customerAccountNo: true } },
         createdByAdmin: { select: { id: true, name: true, email: true } },
         cancelledByAdmin: { select: { id: true, name: true, email: true } },
+        revisedFrom: { select: { id: true, docNo: true } },
+        revisions: { select: { id: true, docNo: true, status: true } },
+        targetLinks: {
+          include: {
+            targetTransaction: { select: { id: true, docType: true, docNo: true, status: true } },
+          },
+        },
         lines: { orderBy: { lineNo: "asc" } },
       },
     });
@@ -298,7 +305,7 @@ export async function POST(req: Request) {
 
     const taxModuleEnabled = Boolean(taxConfig?.taxModuleEnabled);
     const taxCalculationMode = normalizeTaxCalculationMode(taxConfig?.taxCalculationMode);
-    const taxCodeMap = new Map(activeTaxCodes.map((item) => [item.id, item as TaxCodeSnapshot]));
+    const taxCodeMap = new Map<string, TaxCodeSnapshot>(activeTaxCodes.map((item) => [item.id, item as TaxCodeSnapshot]));
 
     const productIds = Array.from(new Set(rawLines.map((line) => normalizeText(line.inventoryProductId)).filter(Boolean))) as string[];
     const locationIds = Array.from(new Set(rawLines.map((line) => normalizeText(line.locationId)).filter(Boolean))) as string[];
@@ -316,8 +323,8 @@ export async function POST(req: Request) {
           })
         : Promise.resolve([]),
     ]);
-    const productMap = new Map(products.map((item) => [item.id, item]));
-    const locationMap = new Map(locations.map((item) => [item.id, item]));
+    const productMap = new Map<string, any>(products.map((item: any) => [item.id, item]));
+    const locationMap = new Map<string, { id: string; code: string; name: string }>(locations.map((item: any) => [item.id, item]));
 
     const normalizedLines = rawLines.map((line, index) =>
       calculateLine(line, index + 1, productMap, locationMap, taxCodeMap, {

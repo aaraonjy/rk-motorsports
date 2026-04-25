@@ -619,6 +619,7 @@ model SalesTransaction {
   cancelledByAdminId   String?
   cancelReason         String?
   cancelledAt          DateTime?
+  revisedFromId        String?
   createdAt            DateTime               @default(now())
   updatedAt            DateTime               @updatedAt
 
@@ -628,6 +629,8 @@ model SalesTransaction {
   department           Department?            @relation(fields: [departmentId], references: [id], onDelete: SetNull)
   createdByAdmin       User                   @relation("CreatedSalesTransactions", fields: [createdByAdminId], references: [id], onDelete: Restrict)
   cancelledByAdmin     User?                  @relation("CancelledSalesTransactions", fields: [cancelledByAdminId], references: [id], onDelete: SetNull)
+  revisedFrom          SalesTransaction?      @relation("SalesTransactionRevision", fields: [revisedFromId], references: [id], onDelete: SetNull)
+  revisions            SalesTransaction[]     @relation("SalesTransactionRevision")
   lines                SalesTransactionLine[]
   sourceLinks          SalesTransactionLink[] @relation("SalesTransactionSourceLinks")
   targetLinks          SalesTransactionLink[] @relation("SalesTransactionTargetLinks")
@@ -637,6 +640,7 @@ model SalesTransaction {
   @@index([customerId, docDate])
   @@index([createdByAdminId, createdAt])
   @@index([cancelledByAdminId])
+  @@index([revisedFromId])
   @@index([agentId])
   @@index([projectId])
   @@index([departmentId])
