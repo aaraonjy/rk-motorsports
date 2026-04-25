@@ -74,6 +74,7 @@ type QuotationRecord = {
   docDate: string;
   customerName: string;
   customerAccountNo?: string | null;
+  currency?: string | null;
   status: "PENDING" | "CONFIRMED" | "CANCELLED";
   grandTotal: string | number;
 };
@@ -915,7 +916,7 @@ export function AdminSalesQuotationClient({
                 <th className="px-4 py-3">Date</th>
                 <th className="px-4 py-3">Customer</th>
                 <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3 text-right">Grand Total (MYR)</th>
+                <th className="px-4 py-3 text-right">Grand Total</th>
                 <th className="px-4 py-3 text-right">Action</th>
               </tr>
             </thead>
@@ -934,7 +935,7 @@ export function AdminSalesQuotationClient({
                       <div className="text-xs text-white/45">{item.customerAccountNo || "-"}</div>
                     </td>
                     <td className="px-4 py-4"><span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getStatusClass(item.status)}`}>{item.status}</span></td>
-                    <td className="px-4 py-4 text-right">{money(Number(item.grandTotal || 0))}</td>
+                    <td className="px-4 py-4 text-right">{`${item.currency || "MYR"} ${money(Number(item.grandTotal || 0))}`}</td>
                     <td className="px-4 py-4 text-right">
                       {item.status !== "CANCELLED" ? (
                         <button type="button" onClick={() => setCancelTarget(item)} className="rounded-xl border border-red-500/30 px-3 py-2 text-xs text-red-200 transition hover:bg-red-500/10">
@@ -1018,7 +1019,6 @@ export function AdminSalesQuotationClient({
                 <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
                   <Input label="Attention" value={attention} onChange={setAttention} />
                   <Input label="Contact No" value={contactNo} onChange={setContactNo} />
-                  <Input label="Currency" value={currency} onChange={setCurrency} />
                   <SearchableSelect
                     label="Agent"
                     placeholder="No Agent"
@@ -1179,7 +1179,7 @@ export function AdminSalesQuotationClient({
                   ) : null}
                   {isTaxEnabled ? <SummaryRow label="Tax" value={money(totals.taxTotal)} /> : null}
                   <div className="mt-4 border-t border-white/10 pt-4">
-                    <SummaryRow label="Grand Total" value={money(totals.grandTotal)} strong />
+                    <SummaryRow label={`Grand Total (${currency || "MYR"})`} value={money(totals.grandTotal)} strong />
                   </div>
                 </div>
               </div>
