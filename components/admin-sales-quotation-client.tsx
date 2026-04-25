@@ -1165,7 +1165,18 @@ export function AdminSalesQuotationClient({
                   >
                     <td className="px-4 py-4">
                       <div className="font-semibold text-white">{item.docNo}</div>
-                      {item.revisedFrom?.docNo ? <div className="mt-2 text-xs text-white/40">↳ Revision of {item.revisedFrom.docNo}</div> : null}
+                      {item.revisedFrom?.docNo ? (
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            if (item.revisedFrom?.id) router.push(`/admin/sales/quotation/${item.revisedFrom.id}`);
+                          }}
+                          className="mt-2 rounded-md px-1 py-0.5 text-left text-xs text-white/40 transition hover:bg-white/10 hover:text-white/80"
+                        >
+                          ↳ Revision of {item.revisedFrom.docNo}
+                        </button>
+                      ) : null}
                     </td>
                     <td className="px-4 py-4">{formatDate(item.docDate)}</td>
                     <td className="px-4 py-4">
