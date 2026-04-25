@@ -754,8 +754,16 @@ export function AdminSalesOrderClient({
       if (!customerId) return false;
       if (quotation.customerId !== customerId) return false;
       if (quotation.status !== "PENDING") return false;
-      const hasActiveTarget = (quotation.targetLinks || []).some((link) => link.targetTransaction && link.targetTransaction.status !== "CANCELLED");
-      return !hasActiveTarget;
+
+      const hasActiveTarget = (quotation.targetLinks || []).some(
+        (link) => link.targetTransaction && link.targetTransaction.status !== "CANCELLED"
+      );
+      if (hasActiveTarget) return false;
+
+      const hasActiveRevision = (quotation.revisions || []).some((revision) => revision.status !== "CANCELLED");
+      if (hasActiveRevision) return false;
+
+      return true;
     });
   }, [customerId, initialQuotations]);
 
@@ -1125,7 +1133,7 @@ export function AdminSalesOrderClient({
     );
 
     setLines(importedLines.length > 0 ? importedLines : [emptyLine(isLineItemTaxMode ? taxConfig.defaultAdminTaxCodeId || "" : "", defaultLocationId)]);
-    setSourceQuotationId(first.id);
+    setSourceQuotationId(selectedSourceQuotations.length === 1 ? first.id : "");
     setIsGenerateFromOpen(false);
     setGenerateFromError("");
     setActiveTab("BODY");

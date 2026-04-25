@@ -163,16 +163,6 @@ export default async function AdminSalesQuotationDetailPage({ params, searchPara
               Back
             </Link>
             <Link
-              href={`/admin/sales/sales-order?sourceQuotationId=${transaction.id}`}
-              className={`rounded-xl px-5 py-3 text-sm font-semibold text-white transition ${
-                transaction.status === "CANCELLED"
-                  ? "pointer-events-none cursor-not-allowed border border-white/10 bg-white/5 opacity-50"
-                  : "border border-sky-500/30 bg-sky-500/10 text-sky-100 hover:bg-sky-500/20"
-              }`}
-            >
-              Generate Sales Order
-            </Link>
-            <Link
               href={`/admin/sales/quotation?edit=${transaction.id}`}
               className={`rounded-xl px-5 py-3 text-sm font-semibold text-white transition ${
                 transaction.status === "CANCELLED"

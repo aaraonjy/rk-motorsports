@@ -75,6 +75,8 @@ export default async function AdminSalesOrderPage() {
       where: { docType: "QO", status: "PENDING" },
       orderBy: [{ docDate: "desc" }, { docNo: "desc" }],
       include: {
+        revisedFrom: { select: { id: true, docNo: true } },
+        revisions: { select: { id: true, docNo: true, status: true } },
         lines: { orderBy: { lineNo: "asc" } },
         targetLinks: {
           include: {
@@ -126,6 +128,12 @@ export default async function AdminSalesOrderPage() {
             footerRemarks: quotation.footerRemarks,
             status: quotation.status as "PENDING" | "CONFIRMED" | "CANCELLED",
             grandTotal: Number(quotation.grandTotal ?? 0),
+            revisedFrom: quotation.revisedFrom ? { id: quotation.revisedFrom.id, docNo: quotation.revisedFrom.docNo } : null,
+            revisions: quotation.revisions.map((revision) => ({
+              id: revision.id,
+              docNo: revision.docNo,
+              status: revision.status,
+            })),
             targetLinks: quotation.targetLinks.map((link) => ({
               targetTransaction: link.targetTransaction ? {
                 id: link.targetTransaction.id,
