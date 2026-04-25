@@ -90,7 +90,7 @@ function AddressPanel({
   );
 }
 
-export default async function AdminSalesQuotationDetailPage({ params, searchParams }: Params) {
+export default async function AdminSalesOrderDetailPage({ params, searchParams }: Params) {
   const user = await getSessionUser();
   if (!user) redirect("/login");
   if (user.role !== "ADMIN") redirect("/dashboard");
@@ -123,11 +123,11 @@ export default async function AdminSalesQuotationDetailPage({ params, searchPara
     },
   });
 
-  if (!transaction || transaction.docType !== "QO") {
+  if (!transaction || transaction.docType !== "SO") {
     return (
       <section className="section-pad">
         <div className="container-rk max-w-5xl">
-          <p className="text-white/70">Quotation not found.</p>
+          <p className="text-white/70">Sales Order not found.</p>
         </div>
       </section>
     );
@@ -146,12 +146,12 @@ export default async function AdminSalesQuotationDetailPage({ params, searchPara
 
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-red-400/80">Sales Quotation</p>
+            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-red-400/80">Sales Order</p>
             <h1 className="mt-3 text-4xl font-bold">{transaction.docNo}</h1>
-            <p className="mt-4 max-w-3xl text-white/70">View quotation details in read-only mode.</p>
+            <p className="mt-4 max-w-3xl text-white/70">View sales order details in read-only mode.</p>
             {transaction.revisedFrom?.docNo ? (
               <Link
-                href={`/admin/sales/quotation/${transaction.revisedFrom.id}`}
+                href={`/admin/sales/sales order/${transaction.revisedFrom.id}`}
                 className="mt-3 block w-fit rounded-lg px-2 py-1 text-sm text-white/45 transition hover:bg-white/5 hover:text-white/80"
               >
                 ↳ Revision of {transaction.revisedFrom.docNo}
@@ -159,21 +159,11 @@ export default async function AdminSalesQuotationDetailPage({ params, searchPara
             ) : null}
           </div>
           <div className="flex flex-wrap gap-3">
-            <Link href="/admin/sales/quotation" className="rounded-xl border border-white/15 bg-white/5 px-5 py-3 text-sm text-white/80 transition hover:bg-white/10">
+            <Link href="/admin/sales/sales order" className="rounded-xl border border-white/15 bg-white/5 px-5 py-3 text-sm text-white/80 transition hover:bg-white/10">
               Back
             </Link>
             <Link
-              href={`/admin/sales/sales-order?sourceQuotationId=${transaction.id}`}
-              className={`rounded-xl px-5 py-3 text-sm font-semibold text-white transition ${
-                transaction.status === "CANCELLED"
-                  ? "pointer-events-none cursor-not-allowed border border-white/10 bg-white/5 opacity-50"
-                  : "border border-sky-500/30 bg-sky-500/10 text-sky-100 hover:bg-sky-500/20"
-              }`}
-            >
-              Generate Sales Order
-            </Link>
-            <Link
-              href={`/admin/sales/quotation?edit=${transaction.id}`}
+              href={`/admin/sales/sales order?edit=${transaction.id}`}
               className={`rounded-xl px-5 py-3 text-sm font-semibold text-white transition ${
                 transaction.status === "CANCELLED"
                   ? "pointer-events-none cursor-not-allowed border border-white/10 bg-white/5 opacity-50"
@@ -187,7 +177,7 @@ export default async function AdminSalesQuotationDetailPage({ params, searchPara
 
         {transaction.status === "CANCELLED" ? (
           <div className="rounded-2xl border border-red-500/25 bg-red-500/10 p-5 text-sm text-red-100">
-            <div className="font-semibold">This quotation has been cancelled.</div>
+            <div className="font-semibold">This sales order has been cancelled.</div>
             <div className="mt-2">Cancelled At: {formatDate(transaction.cancelledAt)}</div>
             <div className="mt-1">Cancelled By: {transaction.cancelledByAdmin?.name || "-"}</div>
             <div className="mt-1">Reason: {transaction.cancelReason || "-"}</div>
@@ -197,9 +187,9 @@ export default async function AdminSalesQuotationDetailPage({ params, searchPara
         <div className="rounded-[2rem] border border-white/10 bg-black/45 p-5 backdrop-blur-md md:p-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.24em] text-white/40">Sales Quotation</p>
-              <h2 className="mt-4 text-4xl font-bold">View Quotation</h2>
-              <p className="mt-4 max-w-3xl text-white/70">Use the same quotation layout in read-only mode for easier review and checking.</p>
+              <p className="text-sm font-semibold uppercase tracking-[0.24em] text-white/40">Sales Order</p>
+              <h2 className="mt-4 text-4xl font-bold">View Sales Order</h2>
+              <p className="mt-4 max-w-3xl text-white/70">Use the same sales order layout in read-only mode for easier review and checking.</p>
             </div>
             <div className="grid min-w-[250px] grid-cols-[110px_1fr] gap-x-3 gap-y-2 text-xs text-white/55">
               <div className="text-right">Created By:</div>
@@ -283,7 +273,7 @@ export default async function AdminSalesQuotationDetailPage({ params, searchPara
               <ReadonlyTextArea label="Bank Account" value={transaction.bankAccount || ""} />
             </div>
             <div className="rounded-[1.5rem] border border-white/10 p-5">
-              <h3 className="text-xl font-bold">Quotation Summary</h3>
+              <h3 className="text-xl font-bold">Sales Order Summary</h3>
               <div className="mt-5 space-y-4 text-sm">
                 <div className="flex justify-between gap-4"><span className="text-white/65">Subtotal</span><span>{money(transaction.subtotal)}</span></div>
                 <div className="flex justify-between gap-4"><span className="text-white/65">Discount</span><span>{money(transaction.discountTotal)}</span></div>
@@ -303,7 +293,7 @@ export default async function AdminSalesQuotationDetailPage({ params, searchPara
               <h3 className="text-lg font-bold">Revision History</h3>
               <div className="mt-3 space-y-2">
                 {transaction.revisions.map((revision) => (
-                  <Link key={revision.id} href={`/admin/sales/quotation/${revision.id}`} className="block rounded-xl border border-white/10 px-4 py-3 text-sm text-white/70 transition hover:bg-white/5 hover:text-white">
+                  <Link key={revision.id} href={`/admin/sales/sales order/${revision.id}`} className="block rounded-xl border border-white/10 px-4 py-3 text-sm text-white/70 transition hover:bg-white/5 hover:text-white">
                     ↳ Revised to {revision.docNo} ({revision.status})
                   </Link>
                 ))}

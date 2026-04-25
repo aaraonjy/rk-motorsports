@@ -93,7 +93,7 @@ export function AdminSalesMenu() {
 
               {section.items.map((item) => {
                 const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
-                const phaseTwoEnabled = item.href === "/admin/sales/quotation";
+                const phaseTwoEnabled = item.href === "/admin/sales/quotation" || item.href === "/admin/sales/sales-order";
 
                 if (!phaseTwoEnabled) {
                   return (
