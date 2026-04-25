@@ -105,6 +105,8 @@ type SourceQuotationRecord = {
   footerRemarks?: string | null;
   status: "PENDING" | "CONFIRMED" | "CANCELLED";
   grandTotal: string | number;
+  revisedFrom?: { id: string; docNo?: string | null } | null;
+  revisions?: Array<{ id: string; docNo?: string | null; status?: string | null }>;
   targetLinks?: Array<{
     targetTransaction?: { id: string; docNo?: string | null; status?: string | null } | null;
   }>;
