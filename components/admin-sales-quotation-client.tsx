@@ -303,6 +303,65 @@ function SearchableSelect({
   );
 }
 
+
+function CompactSelect({
+  options,
+  value,
+  onChange,
+  className = "",
+}: {
+  options: SearchableSelectOption[];
+  value: string;
+  onChange: (value: string) => void;
+  className?: string;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const selectedOption = useMemo(() => options.find((item) => item.id === value) || null, [options, value]);
+
+  useEffect(() => {
+    function handleOutsideClick(event: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, []);
+
+  return (
+    <div ref={containerRef} className={`relative ${className}`}>
+      <button type="button" onClick={() => setIsOpen((prev) => !prev)} className="input-rk flex items-center justify-between gap-3 pr-20 text-left">
+        <span className={selectedOption ? "truncate text-white" : "truncate text-white/45"}>{selectedOption?.label || ""}</span>
+        <span className="shrink-0 pr-5 text-white/60">▾</span>
+      </button>
+
+      {isOpen ? (
+        <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-[140] overflow-hidden rounded-2xl border border-white/10 bg-[#0b0b0f] p-2 shadow-2xl">
+          {options.map((option) => {
+            const isSelected = option.id === value;
+            return (
+              <button
+                key={option.id}
+                type="button"
+                onClick={() => {
+                  onChange(option.id);
+                  setIsOpen(false);
+                }}
+                className={`flex w-full items-center rounded-xl px-3 py-3 text-left text-sm transition ${
+                  isSelected ? "bg-white/10 text-white" : "text-white/85 hover:bg-white/10 hover:text-white"
+                }`}
+              >
+                {option.label}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function normalizeDocNoInput(value: string) {
   return value.toUpperCase().replace(/\s+/g, "").slice(0, 30);
 }
@@ -510,6 +569,24 @@ export function AdminSalesQuotationClient({
   const selectedTaxCode = useMemo(
     () => availableTaxCodes.find((item) => item.id === selectedTaxCodeId) || null,
     [availableTaxCodes, selectedTaxCodeId]
+  );
+
+  const statusOptions = useMemo<SearchableSelectOption[]>(
+    () => [
+      { id: "ALL", label: "All Status", searchText: "all status" },
+      { id: "PENDING", label: "Pending", searchText: "pending" },
+      { id: "CONFIRMED", label: "Confirmed", searchText: "confirmed" },
+      { id: "CANCELLED", label: "Cancelled", searchText: "cancelled" },
+    ],
+    []
+  );
+
+  const discountTypeOptions = useMemo<SearchableSelectOption[]>(
+    () => [
+      { id: "PERCENT", label: "%", searchText: "percent %" },
+      { id: "AMOUNT", label: "RM", searchText: "amount rm" },
+    ],
+    []
   );
 
   function openDocNoModal() {
@@ -826,12 +903,7 @@ export function AdminSalesQuotationClient({
         <div className="mt-8 rounded-2xl border border-white/10 bg-black/20 p-4">
           <div className="grid gap-4 md:grid-cols-3">
             <input className="input-rk" value={searchKeyword} onChange={(e) => setSearchKeyword(e.target.value)} placeholder="Search quotation no / customer" />
-            <select className="input-rk pr-20" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-              <option value="ALL">All Status</option>
-              <option value="PENDING">Pending</option>
-              <option value="CONFIRMED">Confirmed</option>
-              <option value="CANCELLED">Cancelled</option>
-            </select>
+            <CompactSelect options={statusOptions} value={statusFilter} onChange={setStatusFilter} />
           </div>
         </div>
 
@@ -843,7 +915,7 @@ export function AdminSalesQuotationClient({
                 <th className="px-4 py-3">Date</th>
                 <th className="px-4 py-3">Customer</th>
                 <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3 text-right">Grand Total</th>
+                <th className="px-4 py-3 text-right">Grand Total (MYR)</th>
                 <th className="px-4 py-3 text-right">Action</th>
               </tr>
             </thead>
@@ -1024,10 +1096,11 @@ export function AdminSalesQuotationClient({
                           <label className="label-rk">Discount</label>
                           <div className="grid grid-cols-[minmax(0,1fr)_120px] gap-3">
                             <input className="input-rk" value={line.discountRate} onChange={(e) => updateLine(index, { discountRate: e.target.value })} />
-                            <select className="input-rk pr-16" value={line.discountType} onChange={(e) => updateLine(index, { discountType: e.target.value as "PERCENT" | "AMOUNT" })}>
-                              <option value="PERCENT">%</option>
-                              <option value="AMOUNT">RM</option>
-                            </select>
+                            <CompactSelect
+                              options={discountTypeOptions}
+                              value={line.discountType}
+                              onChange={(value) => updateLine(index, { discountType: value as "PERCENT" | "AMOUNT" })}
+                            />
                           </div>
                         </div>
                         <div className="md:col-span-2">
