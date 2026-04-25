@@ -453,8 +453,8 @@ export async function POST(req: Request) {
           throw new Error("One or more selected quotations are invalid.");
         }
 
-        if (quotations.some((quotation) => quotation.status === "CANCELLED")) {
-          throw new Error("Cancelled quotation cannot be generated to Sales Order.");
+        if (quotations.some((quotation) => quotation.status !== "PENDING")) {
+          throw new Error("Only pending quotation can be generated to Sales Order.");
         }
 
         const firstCustomerId = quotations[0]?.customerId || "";
