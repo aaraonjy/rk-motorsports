@@ -433,30 +433,56 @@ export async function POST(req: Request) {
         },
       });
 
-      const sourceQuotationId = normalizeText(body.sourceQuotationId);
-      if (sourceQuotationId) {
-        const quotation = await tx.salesTransaction.findUnique({
-          where: { id: sourceQuotationId },
-          select: { id: true, docType: true, status: true },
+      const sourceQuotationIds = Array.isArray(body.sourceQuotationIds)
+        ? body.sourceQuotationIds.filter((value: unknown) => typeof value === "string" && value.trim()).map((value: string) => value.trim())
+        : normalizeText(body.sourceQuotationId)
+          ? [normalizeText(body.sourceQuotationId) as string]
+          : [];
+
+      const uniqueSourceQuotationIds = Array.from(new Set(sourceQuotationIds));
+
+      if (uniqueSourceQuotationIds.length > 0) {
+        const quotations = await tx.salesTransaction.findMany({
+          where: { id: { in: uniqueSourceQuotationIds } },
+          select: { id: true, docType: true, status: true, customerId: true },
         });
 
-        if (!quotation || quotation.docType !== "QO") {
-          throw new Error("Selected quotation is invalid.");
+        if (quotations.length !== uniqueSourceQuotationIds.length || quotations.some((quotation) => quotation.docType !== "QO")) {
+          throw new Error("One or more selected quotations are invalid.");
         }
-        if (quotation.status === "CANCELLED") {
+
+        if (quotations.some((quotation) => quotation.status === "CANCELLED")) {
           throw new Error("Cancelled quotation cannot be generated to Sales Order.");
         }
 
-        await tx.salesTransactionLink.create({
-          data: {
-            sourceTransactionId: quotation.id,
-            targetTransactionId: createdSalesOrder.id,
-            linkType: "GENERATED_TO",
+        const firstCustomerId = quotations[0]?.customerId || "";
+        if (quotations.some((quotation) => quotation.customerId !== firstCustomerId)) {
+          throw new Error("Selected quotations must belong to the same customer.");
+        }
+
+        const activeExistingLink = await tx.salesTransactionLink.findFirst({
+          where: {
+            sourceTransactionId: { in: uniqueSourceQuotationIds },
+            targetTransaction: { status: { not: "CANCELLED" } },
           },
+          select: { id: true },
         });
 
-        await tx.salesTransaction.update({
-          where: { id: quotation.id },
+        if (activeExistingLink) {
+          throw new Error("One or more selected quotations already have active downstream sales transactions.");
+        }
+
+        await tx.salesTransactionLink.createMany({
+          data: uniqueSourceQuotationIds.map((quotationId) => ({
+            sourceTransactionId: quotationId,
+            targetTransactionId: createdSalesOrder.id,
+            linkType: "GENERATED_TO" as const,
+          })),
+          skipDuplicates: true,
+        });
+
+        await tx.salesTransaction.updateMany({
+          where: { id: { in: uniqueSourceQuotationIds }, docType: "QO" },
           data: { status: "CONFIRMED" },
         });
       }

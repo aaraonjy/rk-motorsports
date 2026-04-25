@@ -8,7 +8,7 @@ export default async function AdminSalesOrderPage() {
   if (!user) redirect("/login");
   if (user.role !== "ADMIN") redirect("/dashboard");
 
-  const [customers, products, locations, agents, projects, departments, stockConfig, taxConfig, taxCodes] = await Promise.all([
+  const [customers, products, locations, agents, projects, departments, stockConfig, taxConfig, taxCodes, quotations] = await Promise.all([
     db.user.findMany({
       where: { role: "CUSTOMER" },
       orderBy: [{ customerAccountNo: "asc" }, { name: "asc" }],
@@ -71,12 +71,82 @@ export default async function AdminSalesOrderPage() {
         calculationMethod: true,
       },
     }),
+    db.salesTransaction.findMany({
+      where: { docType: "QO", status: "PENDING" },
+      orderBy: [{ docDate: "desc" }, { docNo: "desc" }],
+      include: {
+        lines: { orderBy: { lineNo: "asc" } },
+        targetLinks: {
+          include: {
+            targetTransaction: { select: { id: true, docNo: true, status: true } },
+          },
+        },
+      },
+    }),
   ]);
 
   return (
     <section className="section-pad">
       <div className="container-rk max-w-7xl">
         <AdminSalesOrderClient
+          initialQuotations={quotations.map((quotation) => ({
+            id: quotation.id,
+            docNo: quotation.docNo,
+            docDate: quotation.docDate.toISOString(),
+            docDesc: quotation.docDesc,
+            customerId: quotation.customerId,
+            customerName: quotation.customerName,
+            customerAccountNo: quotation.customerAccountNo,
+            billingAddressLine1: quotation.billingAddressLine1,
+            billingAddressLine2: quotation.billingAddressLine2,
+            billingAddressLine3: quotation.billingAddressLine3,
+            billingAddressLine4: quotation.billingAddressLine4,
+            billingCity: quotation.billingCity,
+            billingPostCode: quotation.billingPostCode,
+            billingCountryCode: quotation.billingCountryCode,
+            deliveryAddressLine1: quotation.deliveryAddressLine1,
+            deliveryAddressLine2: quotation.deliveryAddressLine2,
+            deliveryAddressLine3: quotation.deliveryAddressLine3,
+            deliveryAddressLine4: quotation.deliveryAddressLine4,
+            deliveryCity: quotation.deliveryCity,
+            deliveryPostCode: quotation.deliveryPostCode,
+            deliveryCountryCode: quotation.deliveryCountryCode,
+            attention: quotation.attention,
+            contactNo: quotation.contactNo,
+            email: quotation.email,
+            currency: quotation.currency,
+            reference: quotation.reference,
+            remarks: quotation.remarks,
+            agentId: quotation.agentId,
+            projectId: quotation.projectId,
+            departmentId: quotation.departmentId,
+            taxCodeId: quotation.taxCodeId,
+            termsAndConditions: quotation.termsAndConditions,
+            bankAccount: quotation.bankAccount,
+            footerRemarks: quotation.footerRemarks,
+            status: quotation.status as "PENDING" | "CONFIRMED" | "CANCELLED",
+            grandTotal: Number(quotation.grandTotal ?? 0),
+            targetLinks: quotation.targetLinks.map((link) => ({
+              targetTransaction: link.targetTransaction ? {
+                id: link.targetTransaction.id,
+                docNo: link.targetTransaction.docNo,
+                status: link.targetTransaction.status,
+              } : null,
+            })),
+            lines: quotation.lines.map((line) => ({
+              inventoryProductId: line.inventoryProductId,
+              productCode: line.productCode,
+              productDescription: line.productDescription,
+              uom: line.uom,
+              qty: Number(line.qty ?? 0),
+              unitPrice: Number(line.unitPrice ?? 0),
+              discountRate: Number(line.discountRate ?? 0),
+              discountType: line.discountType,
+              locationId: line.locationId,
+              taxCodeId: line.taxCodeId,
+              remarks: line.remarks,
+            })),
+          }))}
           initialCustomers={customers}
           initialProducts={products.map((product) => ({
             id: product.id,

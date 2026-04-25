@@ -68,6 +68,61 @@ type TaxCodeOption = {
   calculationMethod: TaxCalculationMethodValue;
 };
 
+type SourceQuotationRecord = {
+  id: string;
+  docNo: string;
+  docDate: string;
+  docDesc?: string | null;
+  customerId?: string | null;
+  customerName: string;
+  customerAccountNo?: string | null;
+  billingAddressLine1?: string | null;
+  billingAddressLine2?: string | null;
+  billingAddressLine3?: string | null;
+  billingAddressLine4?: string | null;
+  billingCity?: string | null;
+  billingPostCode?: string | null;
+  billingCountryCode?: string | null;
+  deliveryAddressLine1?: string | null;
+  deliveryAddressLine2?: string | null;
+  deliveryAddressLine3?: string | null;
+  deliveryAddressLine4?: string | null;
+  deliveryCity?: string | null;
+  deliveryPostCode?: string | null;
+  deliveryCountryCode?: string | null;
+  attention?: string | null;
+  contactNo?: string | null;
+  email?: string | null;
+  currency?: string | null;
+  reference?: string | null;
+  remarks?: string | null;
+  agentId?: string | null;
+  projectId?: string | null;
+  departmentId?: string | null;
+  taxCodeId?: string | null;
+  termsAndConditions?: string | null;
+  bankAccount?: string | null;
+  footerRemarks?: string | null;
+  status: "PENDING" | "CONFIRMED" | "CANCELLED";
+  grandTotal: string | number;
+  targetLinks?: Array<{
+    targetTransaction?: { id: string; docNo?: string | null; status?: string | null } | null;
+  }>;
+  lines?: Array<{
+    inventoryProductId?: string | null;
+    productCode?: string | null;
+    productDescription?: string | null;
+    uom?: string | null;
+    qty?: string | number | null;
+    unitPrice?: string | number | null;
+    discountRate?: string | number | null;
+    discountType?: string | null;
+    locationId?: string | null;
+    taxCodeId?: string | null;
+    remarks?: string | null;
+  }>;
+};
+
 type SalesOrderRecord = {
   id: string;
   docNo: string;
@@ -123,6 +178,7 @@ type SalesOrderRecord = {
 };
 
 type Props = {
+  initialQuotations: SourceQuotationRecord[];
   initialCustomers: CustomerOption[];
   initialProducts: ProductOption[];
   initialAgents: AgentOption[];
@@ -452,14 +508,14 @@ function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-function getBaseSales OrderDocNo(docNo: string | null | undefined) {
+function getBaseSalesOrderDocNo(docNo: string | null | undefined) {
   const value = String(docNo || "").trim().toUpperCase();
   const match = value.match(/^(SO-\d{8}-\d{4})(?:-(\d+))?$/);
   return match ? match[1] : value;
 }
 
 function buildSalesOrderRevisionDocNoPreview(transaction: SalesOrderRecord) {
-  const baseDocNo = getBaseSales OrderDocNo(transaction.revisedFrom?.docNo || transaction.docNo);
+  const baseDocNo = getBaseSalesOrderDocNo(transaction.revisedFrom?.docNo || transaction.docNo);
   let maxRevision = 0;
 
   for (const revision of transaction.revisions || []) {
@@ -494,6 +550,7 @@ function getBalanceDisplay(value: number | undefined, isLoading: boolean) {
 }
 
 export function AdminSalesOrderClient({
+  initialQuotations,
   initialCustomers,
   initialProducts,
   initialAgents,
@@ -521,6 +578,9 @@ export function AdminSalesOrderClient({
   const [formMode, setFormMode] = useState<"create" | "edit" | "revise">("create");
   const [editTarget, setEditTarget] = useState<SalesOrderRecord | null>(null);
   const [sourceQuotationId, setSourceQuotationId] = useState("");
+  const [sourceQuotationIds, setSourceQuotationIds] = useState<string[]>([]);
+  const [isGenerateFromOpen, setIsGenerateFromOpen] = useState(false);
+  const [quotationSearch, setQuotationSearch] = useState("");
 
   const [docDate, setDocDate] = useState(todayInput());
   const [docNo, setDocNo] = useState("");
@@ -671,8 +731,10 @@ export function AdminSalesOrderClient({
   const statusOptions = useMemo<SearchableSelectOption[]>(
     () => [
       { id: "ALL", label: "All Status", searchText: "all status" },
-      { id: "PENDING", label: "Pending", searchText: "pending" },
+      { id: "OPEN", label: "Open", searchText: "open" },
       { id: "CONFIRMED", label: "Confirmed", searchText: "confirmed" },
+      { id: "PARTIAL", label: "Partial", searchText: "partial" },
+      { id: "COMPLETED", label: "Completed", searchText: "completed" },
       { id: "CANCELLED", label: "Cancelled", searchText: "cancelled" },
     ],
     []
@@ -685,6 +747,28 @@ export function AdminSalesOrderClient({
     ],
     []
   );
+
+  const availableSourceQuotations = useMemo(() => {
+    return initialQuotations.filter((quotation) => {
+      if (quotation.status === "CANCELLED") return false;
+      const hasActiveTarget = (quotation.targetLinks || []).some((link) => link.targetTransaction && link.targetTransaction.status !== "CANCELLED");
+      return !hasActiveTarget;
+    });
+  }, [initialQuotations]);
+
+  const filteredSourceQuotations = useMemo(() => {
+    const keyword = quotationSearch.trim().toLowerCase();
+    if (!keyword) return availableSourceQuotations;
+    return availableSourceQuotations.filter((quotation) =>
+      `${quotation.docNo} ${quotation.customerName} ${quotation.customerAccountNo || ""}`.toLowerCase().includes(keyword)
+    );
+  }, [availableSourceQuotations, quotationSearch]);
+
+  const selectedSourceQuotations = useMemo(() => {
+    const selected = new Set(sourceQuotationIds);
+    return initialQuotations.filter((quotation) => selected.has(quotation.id));
+  }, [initialQuotations, sourceQuotationIds]);
+
 
   function openDocNoModal() {
     setDocNoDraft(docNo);
@@ -939,10 +1023,104 @@ export function AdminSalesOrderClient({
     setIsCreateOpen(true);
   }
 
+  function startGenerateFromQuotation() {
+    setFormMode("create");
+    setEditTarget(null);
+    setSourceQuotationId("");
+    setSourceQuotationIds([]);
+    resetForm();
+    setIsCreateOpen(true);
+    setActiveTab("HEADER");
+    setIsGenerateFromOpen(true);
+    setSubmitError("");
+    setSubmitSuccess("");
+    void loadNextSalesOrderDocNoPreview(todayInput());
+  }
+
+  function toggleSourceQuotation(quotationId: string) {
+    setSourceQuotationIds((prev) =>
+      prev.includes(quotationId) ? prev.filter((id) => id !== quotationId) : [...prev, quotationId]
+    );
+  }
+
+  function importSelectedQuotations() {
+    if (selectedSourceQuotations.length === 0) {
+      setSubmitError("Please select at least one quotation.");
+      return;
+    }
+
+    const first = selectedSourceQuotations[0];
+    const hasDifferentCustomer = selectedSourceQuotations.some((quotation) => quotation.customerId !== first.customerId);
+    if (hasDifferentCustomer) {
+      setSubmitError("Selected quotations must belong to the same customer.");
+      return;
+    }
+
+    setDocDate(todayInput());
+    setDocNo("");
+    setDocNoDraft("");
+    setDocDesc(selectedSourceQuotations.length === 1 ? `Generated from ${first.docNo}` : `Generated from ${selectedSourceQuotations.length} quotations`);
+    setCustomerId(first.customerId || "");
+    setCustomerAccountNo(first.customerAccountNo || "");
+    setCustomerName(first.customerName || "");
+    setBillingAddressLine1(first.billingAddressLine1 || "");
+    setBillingAddressLine2(first.billingAddressLine2 || "");
+    setBillingAddressLine3(first.billingAddressLine3 || "");
+    setBillingAddressLine4(first.billingAddressLine4 || "");
+    setBillingCity(first.billingCity || "");
+    setBillingPostCode(first.billingPostCode || "");
+    setBillingCountryCode(first.billingCountryCode || "MY");
+    setDeliveryAddressLine1(first.deliveryAddressLine1 || "");
+    setDeliveryAddressLine2(first.deliveryAddressLine2 || "");
+    setDeliveryAddressLine3(first.deliveryAddressLine3 || "");
+    setDeliveryAddressLine4(first.deliveryAddressLine4 || "");
+    setDeliveryCity(first.deliveryCity || "");
+    setDeliveryPostCode(first.deliveryPostCode || "");
+    setDeliveryCountryCode(first.deliveryCountryCode || "MY");
+    setAttention(first.attention || "");
+    setContactNo(first.contactNo || "");
+    setEmail(first.email || "");
+    setCurrency(first.currency || "MYR");
+    setReference(selectedSourceQuotations.map((quotation) => quotation.docNo).join(", "));
+    setRemarks(first.remarks || "");
+    setAgentId(first.agentId || "");
+    setProjectId(first.projectId || "");
+    setDepartmentId(first.departmentId || "");
+    setTermsAndConditions(first.termsAndConditions || "");
+    setBankAccount(first.bankAccount || "");
+    setFooterRemarks(first.footerRemarks || "");
+    setSelectedTaxCodeId(first.taxCodeId || (taxConfig.taxModuleEnabled ? taxConfig.defaultAdminTaxCodeId || "" : ""));
+
+    const importedLines = selectedSourceQuotations.flatMap((quotation) =>
+      (quotation.lines || []).map((line) => ({
+        inventoryProductId: line.inventoryProductId || "",
+        productCode: line.productCode || "",
+        productDescription: line.productDescription || "",
+        uom: line.uom || "",
+        qty: String(line.qty ?? "1"),
+        unitPrice: String(line.unitPrice ?? "0.00"),
+        discountRate: String(line.discountRate ?? "0"),
+        discountType: line.discountType === "AMOUNT" ? "AMOUNT" : "PERCENT",
+        locationId: line.locationId || defaultLocationId,
+        taxRate: "0",
+        taxCodeId: line.taxCodeId || "",
+        remarks: line.remarks || "",
+      }))
+    );
+
+    setLines(importedLines.length > 0 ? importedLines : [emptyLine(isLineItemTaxMode ? taxConfig.defaultAdminTaxCodeId || "" : "", defaultLocationId)]);
+    setSourceQuotationId(first.id);
+    setIsGenerateFromOpen(false);
+    setActiveTab("BODY");
+    setSubmitError("");
+    setSubmitSuccess(`Imported ${selectedSourceQuotations.length} quotation(s). Please review and save the Sales Order.`);
+  }
+
   async function openCreate() {
     setFormMode("create");
     setEditTarget(null);
     setSourceQuotationId("");
+    setSourceQuotationIds([]);
     resetForm();
     setIsCreateOpen(true);
     await loadTransactions();
@@ -967,6 +1145,7 @@ export function AdminSalesOrderClient({
       setFormMode("create");
       setEditTarget(null);
       setSourceQuotationId(transactionId);
+      setSourceQuotationIds([transactionId]);
       fillFormFromTransaction(quotation, "edit");
       setFormMode("create");
       setEditTarget(null);
@@ -995,6 +1174,7 @@ export function AdminSalesOrderClient({
     setIsCreateOpen(false);
     setEditTarget(null);
     setSourceQuotationId("");
+    setSourceQuotationIds([]);
     setFormMode("create");
     setSubmitError("");
   }
@@ -1083,6 +1263,7 @@ export function AdminSalesOrderClient({
         bankAccount,
         footerRemarks,
         taxCalculationMode,
+        sourceQuotationIds: formMode === "create" ? sourceQuotationIds : [],
         sourceQuotationId: formMode === "create" ? sourceQuotationId : "",
         transactionTaxCodeId: isTaxEnabled && !isLineItemTaxMode ? selectedTaxCodeId : "",
         lines: lines.map((line) => ({
@@ -1104,6 +1285,7 @@ export function AdminSalesOrderClient({
       setIsCreateOpen(false);
       setEditTarget(null);
       setSourceQuotationId("");
+      setSourceQuotationIds([]);
       setFormMode("create");
       await loadTransactions();
       router.refresh();
@@ -1160,9 +1342,14 @@ export function AdminSalesOrderClient({
               Use Sales Order to prepare customer price offers before creating sales order, delivery order, or invoice.
             </p>
           </div>
-          <button type="button" onClick={openCreate} className="inline-flex items-center justify-center rounded-xl bg-red-500 px-5 py-3 font-semibold text-white transition hover:bg-red-400">
-            Create Sales Order
-          </button>
+          <div className="flex flex-wrap gap-3">
+            <button type="button" onClick={startGenerateFromQuotation} className="inline-flex items-center justify-center rounded-xl border border-sky-500/30 bg-sky-500/10 px-5 py-3 font-semibold text-sky-100 transition hover:bg-sky-500/20">
+              Generate From
+            </button>
+            <button type="button" onClick={openCreate} className="inline-flex items-center justify-center rounded-xl bg-red-500 px-5 py-3 font-semibold text-white transition hover:bg-red-400">
+              Create Sales Order
+            </button>
+          </div>
         </div>
 
         <div className="mt-8 rounded-2xl border border-white/10 bg-black/20 p-4">
@@ -1488,6 +1675,61 @@ export function AdminSalesOrderClient({
         </div>
       ) : null}
 
+
+      {isGenerateFromOpen ? (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-4xl rounded-[2rem] border border-white/10 bg-[#08080c] p-6 shadow-2xl">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-[0.24em] text-white/40">Generate From</p>
+                <h3 className="mt-3 text-2xl font-bold">Select Quotation</h3>
+                <p className="mt-3 text-sm leading-6 text-white/60">Select one or more pending quotations from the same customer, then import them into this Sales Order.</p>
+              </div>
+              <button type="button" onClick={() => setIsGenerateFromOpen(false)} className="rounded-xl border border-white/15 px-4 py-2.5 text-sm text-white/75 transition hover:bg-white/10">Close</button>
+            </div>
+
+            <div className="mt-5">
+              <input className="input-rk" value={quotationSearch} onChange={(event) => setQuotationSearch(event.target.value)} placeholder="Search quotation no / customer" />
+            </div>
+
+            <div className="mt-5 max-h-[420px] overflow-y-auto rounded-2xl border border-white/10">
+              {filteredSourceQuotations.length === 0 ? (
+                <div className="px-4 py-8 text-center text-sm text-white/50">No available quotation found.</div>
+              ) : (
+                filteredSourceQuotations.map((quotation) => {
+                  const checked = sourceQuotationIds.includes(quotation.id);
+                  return (
+                    <label key={quotation.id} className={`flex cursor-pointer items-center gap-4 border-b border-white/10 px-4 py-4 transition last:border-b-0 hover:bg-white/[0.04] ${checked ? "bg-sky-500/10" : ""}`}>
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleSourceQuotation(quotation.id)}
+                        className="h-4 w-4 rounded border-white/20 bg-black/40"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-3">
+                          <span className="font-semibold text-white">{quotation.docNo}</span>
+                          <span className="rounded-full border border-amber-500/25 bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-200">{quotation.status}</span>
+                        </div>
+                        <div className="mt-1 text-sm text-white/70">{quotation.customerName}</div>
+                        <div className="mt-1 text-xs text-white/45">{quotation.customerAccountNo || "-"} • {formatDate(quotation.docDate)} • {quotation.currency || "MYR"} {money(Number(quotation.grandTotal || 0))}</div>
+                      </div>
+                    </label>
+                  );
+                })
+              )}
+            </div>
+
+            <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm text-white/55">{sourceQuotationIds.length} quotation(s) selected</p>
+              <div className="flex gap-3">
+                <button type="button" onClick={() => setSourceQuotationIds([])} className="rounded-xl border border-white/15 px-4 py-2.5 text-sm text-white/75 transition hover:bg-white/10">Clear</button>
+                <button type="button" onClick={importSelectedQuotations} className="rounded-xl bg-red-500 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-red-400">Import Selected</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {isDocNoModalOpen ? (
         <div className="fixed inset-0 z-[160] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
