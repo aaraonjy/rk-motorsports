@@ -37,12 +37,21 @@ type CustomerOption = {
   agentId?: string | null;
 };
 
+type ProductUomConversionOption = {
+  id?: string;
+  uomCode: string;
+  conversionRate: number;
+};
+
 type ProductOption = {
   id: string;
   code: string;
   description: string;
   baseUom: string;
   sellingPrice: number;
+  batchTracking: boolean;
+  serialNumberTracking: boolean;
+  uomConversions?: ProductUomConversionOption[];
 };
 
 type AgentOption = { id: string; code: string; name: string; isActive: boolean };
@@ -138,6 +147,46 @@ function formatTaxOptionLabel(taxCode: TaxCodeOption) {
     description: taxCode.description,
     rate: taxCode.rate,
   });
+}
+
+function getProductUomOptions(product: ProductOption | null | undefined) {
+  if (!product) return [];
+
+  const seen = new Set<string>();
+  const options: SearchableSelectOption[] = [];
+
+  function pushOption(uomCode: string, conversionRate: number) {
+    const normalized = String(uomCode || "").trim().toUpperCase();
+    if (!normalized || seen.has(normalized)) return;
+
+    seen.add(normalized);
+    options.push({
+      id: normalized,
+      label: normalized === product.baseUom.toUpperCase() ? `${normalized} (Base UOM)` : `${normalized} (1 = ${conversionRate} ${product.baseUom})`,
+      searchText: `${normalized} ${product.baseUom} ${conversionRate}`.toLowerCase(),
+    });
+  }
+
+  pushOption(product.baseUom, 1);
+
+  for (const item of product.uomConversions || []) {
+    if (Number(item.conversionRate) > 0) {
+      pushOption(item.uomCode, Number(item.conversionRate));
+    }
+  }
+
+  return options;
+}
+
+function getProductTrackingInfo(product: ProductOption | null | undefined) {
+  if (!product) return "";
+
+  const info = [`UOM: ${product.baseUom}`];
+
+  if (product.batchTracking) info.push("Batch Tracked");
+  if (product.serialNumberTracking) info.push("Serial Tracked");
+
+  return info.join(" • ");
 }
 
 type SearchableSelectOption = {
@@ -866,6 +915,9 @@ export function AdminSalesQuotationClient({
                   const normalizedLine = normalizedLines[index];
                   const total = normalizedLine?.lineTotal || 0;
                   const taxAmount = normalizedLine?.taxAmount || 0;
+                  const selectedProduct = initialProducts.find((item) => item.id === line.inventoryProductId) || null;
+                  const uomOptions = getProductUomOptions(selectedProduct);
+                  const trackingInfo = getProductTrackingInfo(selectedProduct);
                   return (
                     <div key={index} className="rounded-[1.75rem] border border-white/10 p-5">
                       <div className="mb-5 flex items-center justify-between gap-3">
@@ -881,9 +933,17 @@ export function AdminSalesQuotationClient({
                             value={line.inventoryProductId}
                             onChange={(option) => handleProductChange(index, option?.id || "")}
                           />
+                          {trackingInfo ? <p className="mt-2 text-xs text-white/45">{trackingInfo}</p> : null}
                         </div>
+                        <SearchableSelect
+                          label="UOM"
+                          placeholder="Select UOM"
+                          options={uomOptions}
+                          value={line.uom}
+                          disabled={!selectedProduct}
+                          onChange={(option) => updateLine(index, { uom: option?.id || selectedProduct?.baseUom || "" })}
+                        />
                         <Input label="Qty" value={line.qty} onChange={(value) => updateLine(index, { qty: value })} />
-                        <Input label="UOM" value={line.uom} onChange={(value) => updateLine(index, { uom: value.toUpperCase() })} />
                         <Input label="Unit Price" value={line.unitPrice} onChange={(value) => updateLine(index, { unitPrice: value })} />
                         <Input label="Discount %" value={line.discountRate} onChange={(value) => updateLine(index, { discountRate: value })} />
                         {isLineItemTaxMode ? (

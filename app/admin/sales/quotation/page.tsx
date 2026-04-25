@@ -40,7 +40,19 @@ export default async function AdminSalesQuotationPage() {
     db.inventoryProduct.findMany({
       where: { isActive: true },
       orderBy: [{ code: "asc" }],
-      select: { id: true, code: true, description: true, baseUom: true, sellingPrice: true },
+      select: {
+        id: true,
+        code: true,
+        description: true,
+        baseUom: true,
+        sellingPrice: true,
+        batchTracking: true,
+        serialNumberTracking: true,
+        uomConversions: {
+          select: { id: true, uomCode: true, conversionRate: true },
+          orderBy: [{ uomCode: "asc" }],
+        },
+      },
     }),
     db.agent.findMany({ where: { isActive: true }, orderBy: [{ code: "asc" }], select: { id: true, code: true, name: true, isActive: true } }),
     db.project.findMany({ where: { isActive: true }, orderBy: [{ code: "asc" }], select: { id: true, code: true, name: true, isActive: true } }),
@@ -71,6 +83,13 @@ export default async function AdminSalesQuotationPage() {
             description: product.description,
             baseUom: product.baseUom,
             sellingPrice: Number(product.sellingPrice ?? 0),
+            batchTracking: Boolean(product.batchTracking),
+            serialNumberTracking: Boolean(product.serialNumberTracking),
+            uomConversions: product.uomConversions.map((item) => ({
+              id: item.id,
+              uomCode: item.uomCode,
+              conversionRate: Number(item.conversionRate ?? 0),
+            })),
           }))}
           initialAgents={agents}
           initialProjects={projects}
