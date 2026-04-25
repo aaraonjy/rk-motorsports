@@ -5,11 +5,11 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 
 const settingsItems = [
-  { label: "Audit Logs", href: "/admin/settings/audit-logs" },
-  { label: "Tax Configuration", href: "/admin/settings/tax-configuration" },
   { label: "Account Configuration", href: "/admin/settings/account-configuration" },
-  { label: "Stock Settings", href: "/admin/settings/stock" },
+  { label: "Audit Logs", href: "/admin/settings/audit-logs" },
   { label: "Misc", href: "/admin/settings/misc" },
+  { label: "Stock Settings", href: "/admin/settings/stock" },
+  { label: "Tax Configuration", href: "/admin/settings/tax-configuration" },
 ] as const;
 
 export function AdminGlobalSettingsMenu() {
