@@ -85,6 +85,7 @@ type Props = {
   initialProjects: ProjectOption[];
   initialDepartments: DepartmentOption[];
   initialLocations: StockLocationOption[];
+  defaultLocationId: string;
   projectFeatureEnabled: boolean;
   departmentFeatureEnabled: boolean;
   taxConfig: {
@@ -110,7 +111,7 @@ type LineForm = {
   remarks: string;
 };
 
-function emptyLine(defaultTaxCodeId = ""): LineForm {
+function emptyLine(defaultTaxCodeId = "", defaultLocationId = ""): LineForm {
   return {
     inventoryProductId: "",
     productCode: "",
@@ -120,7 +121,7 @@ function emptyLine(defaultTaxCodeId = ""): LineForm {
     unitPrice: "0.00",
     discountRate: "0",
     discountType: "PERCENT",
-    locationId: "",
+    locationId: defaultLocationId,
     taxRate: "0",
     taxCodeId: defaultTaxCodeId,
     remarks: "",
@@ -251,12 +252,12 @@ function SearchableSelect({
           setIsOpen((prev) => !prev);
           setSearch("");
         }}
-        className={`input-rk flex items-center justify-between gap-3 pr-16 text-left ${disabled ? "cursor-not-allowed opacity-60" : ""}`}
+        className={`input-rk flex items-center justify-between gap-3 pr-20 text-left ${disabled ? "cursor-not-allowed opacity-60" : ""}`}
       >
         <span className={selectedOption ? "truncate text-white" : "truncate text-white/45"}>
           {selectedOption ? selectedOption.label : placeholder}
         </span>
-        <span className="shrink-0 pr-3 text-white/60">▾</span>
+        <span className="shrink-0 pr-5 text-white/60">▾</span>
       </button>
 
       {isOpen ? (
@@ -344,6 +345,7 @@ export function AdminSalesQuotationClient({
   initialProjects,
   initialDepartments,
   initialLocations,
+  defaultLocationId,
   projectFeatureEnabled,
   departmentFeatureEnabled,
   taxConfig,
@@ -396,7 +398,12 @@ export function AdminSalesQuotationClient({
   const [bankAccount, setBankAccount] = useState("");
   const [footerRemarks, setFooterRemarks] = useState("");
   const [selectedTaxCodeId, setSelectedTaxCodeId] = useState(taxConfig.taxModuleEnabled ? taxConfig.defaultAdminTaxCodeId || "" : "");
-  const [lines, setLines] = useState<LineForm[]>([emptyLine(taxConfig.taxModuleEnabled && normalizeTaxCalculationMode(taxConfig.taxCalculationMode) === "LINE_ITEM" ? taxConfig.defaultAdminTaxCodeId || "" : "")]);
+  const [lines, setLines] = useState<LineForm[]>([
+    emptyLine(
+      taxConfig.taxModuleEnabled && normalizeTaxCalculationMode(taxConfig.taxCalculationMode) === "LINE_ITEM" ? taxConfig.defaultAdminTaxCodeId || "" : "",
+      defaultLocationId
+    ),
+  ]);
   const [balances, setBalances] = useState<Record<string, number>>({});
   const [loadingBalances, setLoadingBalances] = useState<Record<string, boolean>>({});
 
@@ -407,11 +414,18 @@ export function AdminSalesQuotationClient({
 
   const customerOptions = useMemo<SearchableSelectOption[]>(
     () =>
-      initialCustomers.map((customer) => ({
-        id: customer.id,
-        label: `${customer.customerAccountNo || "-"} — ${customer.name}`,
-        searchText: `${customer.customerAccountNo || ""} ${customer.name} ${customer.email || ""} ${customer.phone || ""}`.toLowerCase(),
-      })),
+      [...initialCustomers]
+        .sort((a, b) => {
+          const accountA = (a.customerAccountNo || "").toLowerCase();
+          const accountB = (b.customerAccountNo || "").toLowerCase();
+          if (accountA !== accountB) return accountA.localeCompare(accountB);
+          return a.name.localeCompare(b.name);
+        })
+        .map((customer) => ({
+          id: customer.id,
+          label: `${customer.customerAccountNo || "-"} — ${customer.name}`,
+          searchText: `${customer.customerAccountNo || ""} ${customer.name} ${customer.email || ""} ${customer.phone || ""}`.toLowerCase(),
+        })),
     [initialCustomers]
   );
 
@@ -642,7 +656,12 @@ export function AdminSalesQuotationClient({
     setBankAccount("");
     setFooterRemarks("");
     setSelectedTaxCodeId(taxConfig.taxModuleEnabled ? taxConfig.defaultAdminTaxCodeId || "" : "");
-    setLines([emptyLine(taxConfig.taxModuleEnabled && normalizeTaxCalculationMode(taxConfig.taxCalculationMode) === "LINE_ITEM" ? taxConfig.defaultAdminTaxCodeId || "" : "")]);
+    setLines([
+      emptyLine(
+        taxConfig.taxModuleEnabled && normalizeTaxCalculationMode(taxConfig.taxCalculationMode) === "LINE_ITEM" ? taxConfig.defaultAdminTaxCodeId || "" : "",
+        defaultLocationId
+      ),
+    ]);
     setSubmitError("");
     setSubmitSuccess("");
   }
@@ -695,6 +714,7 @@ export function AdminSalesQuotationClient({
       productDescription: product.description,
       uom: product.baseUom,
       unitPrice: String(product.sellingPrice.toFixed(2)),
+      locationId: lines[index]?.locationId || defaultLocationId,
     });
   }
 
@@ -806,7 +826,7 @@ export function AdminSalesQuotationClient({
         <div className="mt-8 rounded-2xl border border-white/10 bg-black/20 p-4">
           <div className="grid gap-4 md:grid-cols-3">
             <input className="input-rk" value={searchKeyword} onChange={(e) => setSearchKeyword(e.target.value)} placeholder="Search quotation no / customer" />
-            <select className="input-rk pr-14" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+            <select className="input-rk pr-20" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
               <option value="ALL">All Status</option>
               <option value="PENDING">Pending</option>
               <option value="CONFIRMED">Confirmed</option>
@@ -1004,7 +1024,7 @@ export function AdminSalesQuotationClient({
                           <label className="label-rk">Discount</label>
                           <div className="grid grid-cols-[minmax(0,1fr)_120px] gap-3">
                             <input className="input-rk" value={line.discountRate} onChange={(e) => updateLine(index, { discountRate: e.target.value })} />
-                            <select className="input-rk pr-10" value={line.discountType} onChange={(e) => updateLine(index, { discountType: e.target.value as "PERCENT" | "AMOUNT" })}>
+                            <select className="input-rk pr-16" value={line.discountType} onChange={(e) => updateLine(index, { discountType: e.target.value as "PERCENT" | "AMOUNT" })}>
                               <option value="PERCENT">%</option>
                               <option value="AMOUNT">RM</option>
                             </select>
@@ -1035,7 +1055,7 @@ export function AdminSalesQuotationClient({
                           />
                         ) : null}
                         {isLineItemTaxMode ? <ReadonlyLike label="Tax Amount" value={money(taxAmount || 0)} /> : null}
-                        <ReadonlyLike label="Line Total" value={money(total || 0)} />
+                        <ReadonlyLike label="Product Total" value={money(total || 0)} />
                         <div className="md:col-span-2 xl:col-span-4">
                           <label className="label-rk">Product Remarks</label>
                           <textarea className="input-rk min-h-[80px]" value={line.remarks} onChange={(e) => updateLine(index, { remarks: e.target.value })} />
@@ -1044,7 +1064,7 @@ export function AdminSalesQuotationClient({
                     </div>
                   );
                 })}
-                <button type="button" onClick={() => setLines((prev) => [...prev, emptyLine(isLineItemTaxMode ? taxConfig.defaultAdminTaxCodeId || "" : "")])} className="rounded-xl border border-white/15 px-4 py-3 text-sm text-white/75 transition hover:bg-white/10 hover:text-white">+ Add Product</button>
+                <button type="button" onClick={() => setLines((prev) => [...prev, emptyLine(isLineItemTaxMode ? taxConfig.defaultAdminTaxCodeId || "" : "", defaultLocationId)])} className="rounded-xl border border-white/15 px-4 py-3 text-sm text-white/75 transition hover:bg-white/10 hover:text-white">+ Add Product</button>
               </div>
             ) : null}
 

@@ -93,6 +93,7 @@ export default async function AdminSalesQuotationPage() {
             })),
           }))}
           initialLocations={locations}
+          defaultLocationId={stockConfig?.defaultLocationId ?? ""}
           initialAgents={agents}
           initialProjects={projects}
           initialDepartments={departments}
