@@ -364,6 +364,50 @@ async function buildQuotationData(body: any) {
   };
 }
 
+
+export async function GET(_req: Request, { params }: Params) {
+  try {
+    await requireAdmin();
+    const { id } = await params;
+
+    const transaction = await db.salesTransaction.findUnique({
+      where: { id },
+      include: {
+        customer: { select: { id: true, name: true, email: true, customerAccountNo: true } },
+        createdByAdmin: { select: { id: true, name: true, email: true } },
+        cancelledByAdmin: { select: { id: true, name: true, email: true } },
+        agent: { select: { id: true, code: true, name: true } },
+        project: { select: { id: true, code: true, name: true } },
+        department: { select: { id: true, code: true, name: true, projectId: true } },
+        revisedFrom: { select: { id: true, docNo: true } },
+        revisions: { select: { id: true, docNo: true, status: true } },
+        sourceLinks: {
+          include: {
+            sourceTransaction: { select: { id: true, docType: true, docNo: true, status: true } },
+          },
+        },
+        targetLinks: {
+          include: {
+            targetTransaction: { select: { id: true, docType: true, docNo: true, status: true } },
+          },
+        },
+        lines: { orderBy: { lineNo: "asc" } },
+      },
+    });
+
+    if (!transaction || transaction.docType !== "QO") {
+      return NextResponse.json({ ok: false, error: "Quotation not found." }, { status: 404 });
+    }
+
+    return NextResponse.json({ ok: true, transaction });
+  } catch (error) {
+    return NextResponse.json(
+      { ok: false, error: error instanceof Error ? error.message : "Unable to load quotation." },
+      { status: error instanceof Error && error.message === "FORBIDDEN" ? 403 : 500 }
+    );
+  }
+}
+
 export async function PATCH(req: Request, { params }: Params) {
   try {
     const admin = await requireAdmin();

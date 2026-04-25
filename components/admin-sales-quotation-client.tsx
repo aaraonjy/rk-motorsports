@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   calculateLineItemTaxBreakdown,
   calculateTaxBreakdown,
@@ -472,6 +472,7 @@ export function AdminSalesQuotationClient({
   taxConfig,
 }: Props) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [transactions, setTransactions] = useState<QuotationRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchKeyword, setSearchKeyword] = useState("");
@@ -754,6 +755,12 @@ export function AdminSalesQuotationClient({
   }, [searchKeyword, statusFilter]);
 
   useEffect(() => {
+    const editId = searchParams.get("edit");
+    if (!editId) return;
+    void openEditById(editId);
+  }, [searchParams]);
+
+  useEffect(() => {
     if (!isCreateOpen || docNo) return;
     void loadNextQuotationDocNoPreview(docDate);
   }, [docDate, isCreateOpen, docNo]);
@@ -906,6 +913,18 @@ export function AdminSalesQuotationClient({
 
   function openRevise(transaction: QuotationRecord) {
     fillFormFromTransaction(transaction, "revise");
+  }
+
+  async function openEditById(transactionId: string) {
+    setSubmitError("");
+    try {
+      const response = await fetch(`/api/admin/sales/quotation/${transactionId}`, { cache: "no-store" });
+      const data = await response.json();
+      if (!response.ok || !data.ok || !data.transaction) throw new Error(data.error || "Unable to load quotation.");
+      fillFormFromTransaction(data.transaction, "edit");
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : "Unable to load quotation.");
+    }
   }
 
   function closeForm() {
@@ -1098,7 +1117,11 @@ export function AdminSalesQuotationClient({
                 <tr><td colSpan={6} className="px-4 py-8 text-center text-white/50">No quotation found.</td></tr>
               ) : (
                 transactions.map((item) => (
-                  <tr key={item.id} className="text-white/80">
+                  <tr
+                    key={item.id}
+                    onClick={() => router.push(`/admin/sales/quotation/${item.id}`)}
+                    className="cursor-pointer text-white/80 transition hover:bg-white/[0.04]"
+                  >
                     <td className="px-4 py-4 font-semibold text-white">{item.docNo}</td>
                     <td className="px-4 py-4">{formatDate(item.docDate)}</td>
                     <td className="px-4 py-4">
@@ -1110,13 +1133,13 @@ export function AdminSalesQuotationClient({
                     <td className="px-4 py-4 text-right">
                       {item.status !== "CANCELLED" ? (
                         <div className="flex flex-wrap justify-end gap-2">
-                          <button type="button" onClick={() => openEdit(item)} className="rounded-xl border border-white/15 px-3 py-2 text-xs text-white/75 transition hover:bg-white/10">
+                          <button type="button" onClick={(event) => { event.stopPropagation(); openEdit(item); }} className="rounded-xl border border-white/15 px-3 py-2 text-xs text-white/75 transition hover:bg-white/10">
                             Edit
                           </button>
-                          <button type="button" onClick={() => openRevise(item)} className="rounded-xl border border-sky-500/30 px-3 py-2 text-xs text-sky-200 transition hover:bg-sky-500/10">
+                          <button type="button" onClick={(event) => { event.stopPropagation(); openRevise(item); }} className="rounded-xl border border-sky-500/30 px-3 py-2 text-xs text-sky-200 transition hover:bg-sky-500/10">
                             Edit Revise
                           </button>
-                          <button type="button" onClick={() => setCancelTarget(item)} className="rounded-xl border border-red-500/30 px-3 py-2 text-xs text-red-200 transition hover:bg-red-500/10">
+                          <button type="button" onClick={(event) => { event.stopPropagation(); setCancelTarget(item); }} className="rounded-xl border border-red-500/30 px-3 py-2 text-xs text-red-200 transition hover:bg-red-500/10">
                             Cancel
                           </button>
                         </div>
