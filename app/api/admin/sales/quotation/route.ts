@@ -3,6 +3,7 @@ import { Prisma, SalesTransactionStatus } from "@prisma/client";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { createAuditLogFromRequest } from "@/lib/audit";
+import { acquireAdvisoryLock } from "@/lib/stock";
 import {
   calculateLineItemTaxBreakdown,
   calculateTaxBreakdown,
@@ -87,12 +88,17 @@ function getMalaysiaDateParts(date: Date) {
   return { year, month, day };
 }
 
+function buildSalesDocumentNumberLockKey(docType: string, documentDate: Date) {
+  const { year, month, day } = getMalaysiaDateParts(documentDate);
+  return `sales-docno:${docType}:${year}${month}${day}`;
+}
+
 async function generateQuotationNo(tx: Prisma.TransactionClient, docDate: Date) {
   const { year, month, day } = getMalaysiaDateParts(docDate);
   const prefix = `QO-${year}${month}${day}`;
 
   const existing = await tx.salesTransaction.findMany({
-    where: { docType: "QO", docNo: { startsWith: `${prefix}-` } },
+    where: { docNo: { startsWith: `${prefix}-` } },
     select: { docNo: true },
   });
 
@@ -206,6 +212,17 @@ export async function GET(req: Request) {
   try {
     await requireAdmin();
     const { searchParams } = new URL(req.url);
+
+    if (searchParams.get("nextDocNo") === "1") {
+      const docDate = normalizeDate(searchParams.get("docDate"));
+      const docNo = await db.$transaction(async (tx) => {
+        await acquireAdvisoryLock(tx, buildSalesDocumentNumberLockKey("QO", docDate));
+        return generateQuotationNo(tx, docDate);
+      });
+
+      return NextResponse.json({ ok: true, docNo });
+    }
+
     const q = searchParams.get("q")?.trim() || undefined;
     const status = searchParams.get("status")?.trim() || "ALL";
 
@@ -346,6 +363,7 @@ export async function POST(req: Request) {
     const transactionTaxSnapshot = taxSnapshot(transactionTaxCode);
 
     const created = await db.$transaction(async (tx) => {
+      await acquireAdvisoryLock(tx, buildSalesDocumentNumberLockKey("QO", docDate));
       let docNo = requestedDocNo || (await generateQuotationNo(tx, docDate));
 
       for (let attempt = 0; attempt < 5; attempt += 1) {
