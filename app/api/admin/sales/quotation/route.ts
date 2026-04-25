@@ -70,21 +70,42 @@ function assertValidManualDocNo(value: unknown) {
   return docNo;
 }
 
-async function generateQuotationNo(tx: Prisma.TransactionClient, docDate: Date) {
-  const yyyy = String(docDate.getFullYear());
-  const mm = String(docDate.getMonth() + 1).padStart(2, "0");
-  const dd = String(docDate.getDate()).padStart(2, "0");
-  const prefix = `QO-${yyyy}${mm}${dd}`;
+function getMalaysiaDateParts(date: Date) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kuala_Lumpur",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
 
-  const latest = await tx.salesTransaction.findFirst({
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  const day = parts.find((part) => part.type === "day")?.value;
+
+  if (!year || !month || !day) throw new Error("Unable to generate quotation date prefix.");
+
+  return { year, month, day };
+}
+
+async function generateQuotationNo(tx: Prisma.TransactionClient, docDate: Date) {
+  const { year, month, day } = getMalaysiaDateParts(docDate);
+  const prefix = `QO-${year}${month}${day}`;
+
+  const existing = await tx.salesTransaction.findMany({
     where: { docType: "QO", docNo: { startsWith: `${prefix}-` } },
-    orderBy: { docNo: "desc" },
     select: { docNo: true },
   });
 
-  const match = latest?.docNo?.match(/-(\d{4})$/);
-  const next = (match ? Number(match[1]) : 0) + 1;
-  return `${prefix}-${String(next).padStart(4, "0")}`;
+  let maxSeq = 0;
+  for (const item of existing) {
+    const match = item.docNo?.match(new RegExp(`^${prefix}-(\\d{4})$`));
+    if (!match) continue;
+
+    const seq = Number(match[1]);
+    if (Number.isFinite(seq) && seq > maxSeq) maxSeq = seq;
+  }
+
+  return `${prefix}-${String(maxSeq + 1).padStart(4, "0")}`;
 }
 
 function toNumber(value: Prisma.Decimal | number | string | null | undefined) {
@@ -325,7 +346,14 @@ export async function POST(req: Request) {
     const transactionTaxSnapshot = taxSnapshot(transactionTaxCode);
 
     const created = await db.$transaction(async (tx) => {
-      const docNo = requestedDocNo || (await generateQuotationNo(tx, docDate));
+      let docNo = requestedDocNo || (await generateQuotationNo(tx, docDate));
+
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        const existing = await tx.salesTransaction.findUnique({ where: { docNo }, select: { id: true } });
+        if (!existing) break;
+        if (requestedDocNo) throw new Error("Quotation No already exists.");
+        docNo = await generateQuotationNo(tx, docDate);
+      }
 
       const existing = await tx.salesTransaction.findUnique({ where: { docNo }, select: { id: true } });
       if (existing) throw new Error("Quotation No already exists.");

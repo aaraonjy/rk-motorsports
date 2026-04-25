@@ -368,20 +368,22 @@ function normalizeDocNoInput(value: string) {
 }
 
 function buildQuotationDocNoPreview(value: string, transactions: Array<{ docNo?: string | null }>) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Auto Generated";
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  const prefix = `QO-${y}${m}${d}`;
+  const normalizedDate = String(value || "").trim();
+  const matchDate = normalizedDate.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!matchDate) return "Auto Generated";
+
+  const prefix = `QO-${matchDate[1]}${matchDate[2]}${matchDate[3]}`;
   let maxSeq = 0;
+
   for (const item of transactions) {
     const effectiveDocNo = String(item.docNo || "");
     const match = effectiveDocNo.match(new RegExp(`^${prefix}-(\\d{4})$`));
     if (!match) continue;
+
     const seq = Number(match[1]);
     if (Number.isFinite(seq) && seq > maxSeq) maxSeq = seq;
   }
+
   return `${prefix}-${String(maxSeq + 1).padStart(4, "0")}`;
 }
 
@@ -1014,8 +1016,6 @@ export function AdminSalesQuotationClient({
                   </div>
                 </div>
 
-                <AddressPanel title="Billing Address" values={[billingAddressLine1, billingAddressLine2, billingAddressLine3, billingAddressLine4, billingCity, billingPostCode, billingCountryCode]} setters={[setBillingAddressLine1, setBillingAddressLine2, setBillingAddressLine3, setBillingAddressLine4, setBillingCity, setBillingPostCode, setBillingCountryCode]} />
-
                 <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
                   <Input label="Attention" value={attention} onChange={setAttention} />
                   <Input label="Contact No" value={contactNo} onChange={setContactNo} />
@@ -1048,10 +1048,13 @@ export function AdminSalesQuotationClient({
                       onChange={(option) => setDepartmentId(option?.id || "")}
                     />
                   ) : null}
-                  <div className="xl:col-span-4">
-                    <label className="label-rk">Remarks</label>
-                    <textarea className="input-rk min-h-[90px]" value={remarks} onChange={(e) => setRemarks(e.target.value)} />
-                  </div>
+                </div>
+
+                <AddressPanel title="Billing Address" values={[billingAddressLine1, billingAddressLine2, billingAddressLine3, billingAddressLine4, billingCity, billingPostCode, billingCountryCode]} setters={[setBillingAddressLine1, setBillingAddressLine2, setBillingAddressLine3, setBillingAddressLine4, setBillingCity, setBillingPostCode, setBillingCountryCode]} />
+
+                <div>
+                  <label className="label-rk">Remarks</label>
+                  <textarea className="input-rk min-h-[90px]" value={remarks} onChange={(e) => setRemarks(e.target.value)} />
                 </div>
               </div>
             ) : null}
@@ -1262,14 +1265,27 @@ function ReadonlyLike({ label, value }: { label: string; value: string }) {
   );
 }
 
-function AddressPanel({ title, values, setters }: { title: string; values: string[]; setters: Array<(value: string) => void> }) {
+function AddressPanel({
+  title,
+  values,
+  setters,
+  showCountry = false,
+}: {
+  title: string;
+  values: string[];
+  setters: Array<(value: string) => void>;
+  showCountry?: boolean;
+}) {
   const labels = ["Address Line 1", "Address Line 2", "Address Line 3", "Address Line 4", "City", "Post Code", "Country"];
+  const visibleValues = showCountry ? values : values.slice(0, 6);
+  const visibleSetters = showCountry ? setters : setters.slice(0, 6);
+
   return (
     <div className="rounded-[1.75rem] border border-white/10 p-5">
       <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-white/45">{title}</h3>
       <div className="mt-5 grid gap-4 md:grid-cols-2">
-        {values.map((value, index) => (
-          <Input key={labels[index]} label={labels[index]} value={value} onChange={setters[index]} />
+        {visibleValues.map((value, index) => (
+          <Input key={labels[index]} label={labels[index]} value={value} onChange={visibleSetters[index]} />
         ))}
       </div>
     </div>
