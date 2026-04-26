@@ -1204,6 +1204,7 @@ export function AdminSalesOrderClient({
     setSourceQuotationIds([]);
     setFormMode("create");
     setSubmitError("");
+    setSubmitSuccess("");
     setGenerateFromError("");
   }
 
@@ -1346,6 +1347,7 @@ export function AdminSalesOrderClient({
       if (!response.ok || !data.ok) throw new Error(data.error || "Unable to cancel sales order.");
       setCancelTarget(null);
       setCancelReason("");
+      setSubmitSuccess("");
       await loadTransactions();
       router.refresh();
     } catch (error) {
@@ -1361,8 +1363,6 @@ export function AdminSalesOrderClient({
           <p className="mt-4 max-w-3xl text-white/70">Create and manage sales order documents. Sales Order does not affect stock or sales figures.</p>
         </div>
       </div>
-
-      {submitSuccess ? <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">{submitSuccess}</div> : null}
 
       <div className="rounded-[2rem] border border-white/10 bg-black/45 p-5 backdrop-blur-md md:p-8">
         <div className="flex flex-wrap items-start justify-between gap-4">
@@ -1500,6 +1500,12 @@ export function AdminSalesOrderClient({
             ) : null}
 
             {submitError ? <div className="mt-5 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{submitError}</div> : null}
+
+            {submitSuccess ? (
+              <div className="mt-5 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+                {submitSuccess}
+              </div>
+            ) : null}
 
             {activeTab === "HEADER" ? (
               <div className="mt-6 space-y-6">
