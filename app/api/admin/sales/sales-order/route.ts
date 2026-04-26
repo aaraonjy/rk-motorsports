@@ -154,7 +154,7 @@ function getSalesOrderProgressStatus(lines: Array<{ orderedQty: number; delivere
   const isFullyDelivered = lines.every((line) => line.deliveredQty >= line.orderedQty);
   const isFullyInvoiced = lines.every((line) => line.invoicedQty >= line.orderedQty);
 
-  if (isFullyDelivered && isFullyInvoiced) return "COMPLETED";
+  if (isFullyDelivered || isFullyInvoiced) return "COMPLETED";
   if (hasAnyProgress) return "PARTIAL";
   return "OPEN";
 }

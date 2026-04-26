@@ -17,11 +17,11 @@ function toNumber(value: unknown) {
 
 function getLinkedQty(
   line: {
-    targetLineLinks?: Array<{ linkType?: string | null; qty?: unknown; targetTransaction?: { status?: string | null } | null }>;
+    sourceLineLinks?: Array<{ linkType?: string | null; qty?: unknown; targetTransaction?: { status?: string | null } | null }>;
   },
   linkType: "DELIVERED_TO" | "INVOICED_TO"
 ) {
-  return (line.targetLineLinks || [])
+  return (line.sourceLineLinks || [])
     .filter((link) => link.linkType === linkType)
     .filter((link) => link.targetTransaction?.status !== "CANCELLED")
     .reduce((sum, link) => sum + toNumber(link.qty), 0);
@@ -160,18 +160,18 @@ export default async function AdminSalesOrderDetailPage({ params, searchParams }
       revisions: { select: { id: true, docNo: true, status: true } },
       sourceLinks: {
         include: {
-          sourceTransaction: { select: { id: true, docType: true, docNo: true, status: true } },
+          targetTransaction: { select: { id: true, docType: true, docNo: true, status: true } },
         },
       },
       targetLinks: {
         include: {
-          targetTransaction: { select: { id: true, docType: true, docNo: true, status: true } },
+          sourceTransaction: { select: { id: true, docType: true, docNo: true, status: true } },
         },
       },
       lines: {
         orderBy: { lineNo: "asc" },
         include: {
-          targetLineLinks: {
+          sourceLineLinks: {
             include: {
               targetTransaction: { select: { id: true, docType: true, docNo: true, status: true } },
             },
@@ -192,15 +192,11 @@ export default async function AdminSalesOrderDetailPage({ params, searchParams }
   }
 
   const currency = transaction.currency || "MYR";
-  const generatedFromLinks = await db.salesTransactionLink.findMany({
-    where: { targetTransactionId: transaction.id },
-    include: {
-      sourceTransaction: { select: { id: true, docType: true, docNo: true, status: true } },
-    },
-    orderBy: { createdAt: "asc" },
-  });
-  const activeGeneratedFromDocuments = generatedFromLinks
+  const activeGeneratedFromDocuments = transaction.targetLinks
     .map((link) => link.sourceTransaction)
+    .filter((item) => item && isActiveSalesTrace(item.status));
+  const activeGeneratedToDocuments = transaction.sourceLinks
+    .map((link) => link.targetTransaction)
     .filter((item) => item && isActiveSalesTrace(item.status));
 
   return (
@@ -229,6 +225,22 @@ export default async function AdminSalesOrderDetailPage({ params, searchParams }
                     </Link>
                   ) : (
                     <span key={source?.id} className="text-sky-200">{content}</span>
+                  );
+                })}
+              </div>
+            ) : null}
+            {activeGeneratedToDocuments.length > 0 ? (
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+                <span className="text-sky-200">Generated to:</span>
+                {activeGeneratedToDocuments.map((target, index) => {
+                  const route = getSalesRouteByDocType(target?.docType);
+                  const content = `${target?.docNo || "-"}${activeGeneratedToDocuments.length > 1 && index < activeGeneratedToDocuments.length - 1 ? "," : ""}`;
+                  return route ? (
+                    <Link key={target?.id} href={`/admin/sales/${route}/${target?.id}`} className="text-sky-200 underline-offset-4 hover:underline">
+                      {content}
+                    </Link>
+                  ) : (
+                    <span key={target?.id} className="text-sky-200">{content}</span>
                   );
                 })}
               </div>

@@ -129,11 +129,11 @@ function toNumber(value: Prisma.Decimal | number | string | null | undefined) {
 
 function sumLinkedQty(
   line: {
-    targetLineLinks?: Array<{ linkType?: string | null; qty?: Prisma.Decimal | number | string | null; targetTransaction?: { status?: string | null } | null }>;
+    sourceLineLinks?: Array<{ linkType?: string | null; qty?: Prisma.Decimal | number | string | null; targetTransaction?: { status?: string | null } | null }>;
   },
   linkType: "DELIVERED_TO" | "INVOICED_TO"
 ) {
-  return (line.targetLineLinks || [])
+  return (line.sourceLineLinks || [])
     .filter((link) => link.linkType === linkType)
     .filter((link) => link.targetTransaction?.status !== "CANCELLED")
     .reduce((sum, link) => sum + toNumber(link.qty), 0);
@@ -161,7 +161,7 @@ function getSalesOrderProgressStatus(lines: Array<{ orderedQty: number; delivere
   const isFullyDelivered = lines.every((line) => line.deliveredQty >= line.orderedQty);
   const isFullyInvoiced = lines.every((line) => line.invoicedQty >= line.orderedQty);
 
-  if (isFullyDelivered && isFullyInvoiced) return "COMPLETED";
+  if (isFullyDelivered || isFullyInvoiced) return "COMPLETED";
   if (hasAnyProgress) return "PARTIAL";
   return "OPEN";
 }
@@ -444,7 +444,7 @@ export async function GET(_req: Request, { params }: Params) {
         lines: {
           orderBy: { lineNo: "asc" },
           include: {
-            targetLineLinks: {
+            sourceLineLinks: {
               include: {
                 targetTransaction: { select: { id: true, docType: true, docNo: true, status: true } },
               },

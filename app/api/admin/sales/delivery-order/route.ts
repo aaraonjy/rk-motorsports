@@ -145,7 +145,7 @@ function calculateSalesOrderStatus(lines: Array<{ orderedQty: number; deliveredQ
   const isFullyDelivered = lines.every((line) => line.deliveredQty >= line.orderedQty);
   const isFullyInvoiced = lines.every((line) => line.invoicedQty >= line.orderedQty);
 
-  if (isFullyDelivered && isFullyInvoiced) return "COMPLETED" as SalesTransactionStatus;
+  if (isFullyDelivered || isFullyInvoiced) return "COMPLETED" as SalesTransactionStatus;
   if (hasAnyProgress) return "PARTIAL" as SalesTransactionStatus;
   return "OPEN" as SalesTransactionStatus;
 }
@@ -192,7 +192,7 @@ async function getTrackedSourceLines(tx: Prisma.TransactionClient, sourceLineIds
     where: { id: { in: sourceLineIds } },
     include: {
       transaction: { select: { id: true, docType: true, docNo: true, status: true, customerId: true } },
-      targetLineLinks: {
+      sourceLineLinks: {
         include: {
           targetTransaction: { select: { id: true, status: true } },
         },
@@ -497,7 +497,14 @@ export async function GET(req: Request) {
       },
     });
 
-    return NextResponse.json({ ok: true, transactions: rows });
+    const transactions = rows.map((row) => ({
+      ...row,
+      sourceLinks: row.targetLinks.map((link) => ({
+        sourceTransaction: link.sourceTransaction,
+      })),
+    }));
+
+    return NextResponse.json({ ok: true, transactions });
   } catch (error) {
     return NextResponse.json(
       { ok: false, error: error instanceof Error ? error.message : "Unable to load delivery orders." },
