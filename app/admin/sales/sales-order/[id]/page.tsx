@@ -151,7 +151,7 @@ export default async function AdminSalesOrderDetailPage({ params, searchParams }
             <p className="mt-4 max-w-3xl text-white/70">View sales order details in read-only mode.</p>
             {transaction.revisedFrom?.docNo ? (
               <Link
-                href={`/admin/sales/sales order/${transaction.revisedFrom.id}`}
+                href={`/admin/sales/sales-order/${transaction.revisedFrom.id}`}
                 className="mt-3 block w-fit rounded-lg px-2 py-1 text-sm text-white/45 transition hover:bg-white/5 hover:text-white/80"
               >
                 ↳ Revision of {transaction.revisedFrom.docNo}
@@ -159,11 +159,11 @@ export default async function AdminSalesOrderDetailPage({ params, searchParams }
             ) : null}
           </div>
           <div className="flex flex-wrap gap-3">
-            <Link href="/admin/sales/sales order" className="rounded-xl border border-white/15 bg-white/5 px-5 py-3 text-sm text-white/80 transition hover:bg-white/10">
+            <Link href="/admin/sales/sales-order" className="rounded-xl border border-white/15 bg-white/5 px-5 py-3 text-sm text-white/80 transition hover:bg-white/10">
               Back
             </Link>
             <Link
-              href={`/admin/sales/sales order?edit=${transaction.id}`}
+              href={`/admin/sales/sales-order?edit=${transaction.id}`}
               className={`rounded-xl px-5 py-3 text-sm font-semibold text-white transition ${
                 transaction.status === "CANCELLED"
                   ? "pointer-events-none cursor-not-allowed border border-white/10 bg-white/5 opacity-50"
@@ -293,7 +293,7 @@ export default async function AdminSalesOrderDetailPage({ params, searchParams }
               <h3 className="text-lg font-bold">Revision History</h3>
               <div className="mt-3 space-y-2">
                 {transaction.revisions.map((revision) => (
-                  <Link key={revision.id} href={`/admin/sales/sales order/${revision.id}`} className="block rounded-xl border border-white/10 px-4 py-3 text-sm text-white/70 transition hover:bg-white/5 hover:text-white">
+                  <Link key={revision.id} href={`/admin/sales/sales-order/${revision.id}`} className="block rounded-xl border border-white/10 px-4 py-3 text-sm text-white/70 transition hover:bg-white/5 hover:text-white">
                     ↳ Revised to {revision.docNo} ({revision.status})
                   </Link>
                 ))}
