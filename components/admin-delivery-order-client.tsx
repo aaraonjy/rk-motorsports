@@ -981,20 +981,16 @@ export function AdminDeliveryOrderClient({
       {isGenerateFromOpen ? (
         <div className="fixed inset-0 z-[150] overflow-y-auto bg-black/75 px-4 py-8 backdrop-blur-sm">
           <div className="mx-auto max-w-6xl rounded-[2rem] border border-white/10 bg-[#08080c] p-6 shadow-2xl">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.24em] text-sky-300/80">Generate From</p>
-                <h2 className="mt-3 text-3xl font-bold">Pick From Sales Order</h2>
-                <p className="mt-3 text-sm text-white/60">Only Sales Orders with remaining delivery qty are shown.</p>
-              </div>
-              <button type="button" onClick={() => setIsGenerateFromOpen(false)} className="rounded-xl border border-white/15 px-5 py-3 text-sm text-white/75 transition hover:bg-white/10">Close</button>
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.24em] text-sky-300/80">Generate From</p>
+              <h2 className="mt-3 text-3xl font-bold">Pick From Sales Order</h2>
+              <p className="mt-3 text-sm text-white/60">Only Sales Orders with remaining delivery qty are shown.</p>
             </div>
 
             {generateFromError ? <div className="mt-5 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">{generateFromError}</div> : null}
 
-            <div className="mt-6 grid gap-4 md:grid-cols-[1fr_auto]">
+            <div className="mt-6">
               <input className="input-rk" value={sourceSearch} onChange={(e) => setSourceSearch(e.target.value)} placeholder="Search Sales Order" />
-              <button type="button" onClick={preparePickLines} className="rounded-xl border border-sky-500/30 bg-sky-500/10 px-5 py-3 text-sm font-semibold text-sky-100 transition hover:bg-sky-500/20">Load Lines</button>
             </div>
 
             <div className="mt-5 max-h-64 overflow-y-auto rounded-2xl border border-white/10">
@@ -1044,7 +1040,15 @@ export function AdminDeliveryOrderClient({
 
             <div className="mt-6 flex justify-end gap-3">
               <button type="button" onClick={() => setIsGenerateFromOpen(false)} className="rounded-xl border border-white/15 px-5 py-3 text-sm text-white/75 transition hover:bg-white/10">Close</button>
-              <button type="button" onClick={importPickLines} className="rounded-xl bg-red-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-red-500">Import</button>
+              {pickLines.length > 0 ? (
+                <button type="button" onClick={importPickLines} className="rounded-xl bg-red-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-red-500">
+                  Import
+                </button>
+              ) : (
+                <button type="button" onClick={preparePickLines} className="rounded-xl border border-sky-500/30 bg-sky-500/10 px-5 py-3 text-sm font-semibold text-sky-100 transition hover:bg-sky-500/20">
+                  Load Product
+                </button>
+              )}
             </div>
           </div>
         </div>
