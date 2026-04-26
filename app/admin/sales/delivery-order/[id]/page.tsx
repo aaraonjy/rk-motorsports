@@ -73,12 +73,12 @@ export default async function AdminDeliveryOrderDetailPage({ params }: Params) {
       department: { select: { id: true, code: true, name: true } },
       sourceLinks: {
         include: {
-          sourceTransaction: { select: { id: true, docType: true, docNo: true, status: true } },
+          targetTransaction: { select: { id: true, docType: true, docNo: true, status: true } },
         },
       },
       targetLinks: {
         include: {
-          targetTransaction: { select: { id: true, docType: true, docNo: true, status: true } },
+          sourceTransaction: { select: { id: true, docType: true, docNo: true, status: true } },
         },
       },
       lines: {
@@ -106,8 +106,8 @@ export default async function AdminDeliveryOrderDetailPage({ params }: Params) {
   }
 
   const currency = transaction.currency || "MYR";
-  const generatedFrom = transaction.sourceLinks.map((link) => link.sourceTransaction).filter(Boolean);
-  const generatedTo = transaction.targetLinks.map((link) => link.targetTransaction).filter((item) => item && item.status !== "CANCELLED");
+  const generatedFrom = transaction.targetLinks.map((link) => link.sourceTransaction).filter(Boolean);
+  const generatedTo = transaction.sourceLinks.map((link) => link.targetTransaction).filter((item) => item && item.status !== "CANCELLED");
 
   return (
     <section className="section-pad">

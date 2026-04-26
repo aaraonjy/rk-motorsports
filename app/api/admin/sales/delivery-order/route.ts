@@ -113,11 +113,11 @@ function assertValidManualDocNo(value: unknown) {
 
 function sumLinkedQty(
   line: {
-    targetLineLinks?: Array<{ linkType?: string | null; qty?: Prisma.Decimal | number | string | null; targetTransaction?: { status?: string | null } | null }>;
+    sourceLineLinks?: Array<{ linkType?: string | null; qty?: Prisma.Decimal | number | string | null; targetTransaction?: { status?: string | null } | null }>;
   },
   linkType: "DELIVERED_TO" | "INVOICED_TO"
 ) {
-  return (line.targetLineLinks || [])
+  return (line.sourceLineLinks || [])
     .filter((link) => link.linkType === linkType)
     .filter((link) => link.targetTransaction?.status !== "CANCELLED")
     .reduce((sum, link) => sum + toNumber(link.qty), 0);
@@ -162,7 +162,7 @@ async function refreshSalesOrderStatuses(tx: Prisma.TransactionClient, sourceTra
         lines: {
           orderBy: { lineNo: "asc" },
           include: {
-            targetLineLinks: {
+            sourceLineLinks: {
               include: {
                 targetTransaction: { select: { id: true, status: true } },
               },
@@ -485,12 +485,12 @@ export async function GET(req: Request) {
         revisions: { select: { id: true, docNo: true, status: true } },
         sourceLinks: {
           include: {
-            sourceTransaction: { select: { id: true, docType: true, docNo: true, status: true } },
+            targetTransaction: { select: { id: true, docType: true, docNo: true, status: true } },
           },
         },
         targetLinks: {
           include: {
-            targetTransaction: { select: { id: true, docType: true, docNo: true, status: true } },
+            sourceTransaction: { select: { id: true, docType: true, docNo: true, status: true } },
           },
         },
         lines: { orderBy: { lineNo: "asc" } },

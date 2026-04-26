@@ -122,11 +122,11 @@ function toNumber(value: Prisma.Decimal | number | string | null | undefined) {
 
 function sumLinkedQty(
   line: {
-    targetLineLinks?: Array<{ linkType?: string | null; qty?: Prisma.Decimal | number | string | null; targetTransaction?: { status?: string | null } | null }>;
+    sourceLineLinks?: Array<{ linkType?: string | null; qty?: Prisma.Decimal | number | string | null; targetTransaction?: { status?: string | null } | null }>;
   },
   linkType: "DELIVERED_TO" | "INVOICED_TO"
 ) {
-  return (line.targetLineLinks || [])
+  return (line.sourceLineLinks || [])
     .filter((link) => link.linkType === linkType)
     .filter((link) => link.targetTransaction?.status !== "CANCELLED")
     .reduce((sum, link) => sum + toNumber(link.qty), 0);
@@ -299,7 +299,7 @@ export async function GET(req: Request) {
         lines: {
           orderBy: { lineNo: "asc" },
           include: {
-            targetLineLinks: {
+            sourceLineLinks: {
               include: {
                 targetTransaction: { select: { id: true, docType: true, docNo: true, status: true } },
               },
@@ -311,10 +311,12 @@ export async function GET(req: Request) {
 
     const transactions = rows.map((row) => {
       const lines = row.lines.map((line) => withSalesOrderLineProgress(line));
+      const progressStatus = getSalesOrderProgressStatus(lines);
       return {
         ...row,
+        status: row.status === "CANCELLED" ? row.status : progressStatus,
         lines,
-        progressStatus: getSalesOrderProgressStatus(lines),
+        progressStatus,
       };
     });
 

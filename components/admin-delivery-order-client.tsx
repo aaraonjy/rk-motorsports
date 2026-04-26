@@ -108,7 +108,7 @@ type DeliveryOrderRecord = {
   status: "OPEN" | "PARTIAL" | "COMPLETED" | "CANCELLED";
   grandTotal: string | number;
   currency?: string | null;
-  sourceLinks?: Array<{ sourceTransaction?: { id: string; docNo?: string | null } | null }>;
+  targetLinks?: Array<{ sourceTransaction?: { id: string; docNo?: string | null } | null }>;
 };
 
 type Props = {
@@ -828,7 +828,7 @@ export function AdminDeliveryOrderClient({
                       <div className="font-medium text-white/90">{item.customerName}</div>
                       <div className="text-xs text-white/45">{item.customerAccountNo || "-"}</div>
                     </td>
-                    <td className="px-4 py-4 text-white/65">{(item.sourceLinks || []).map((link) => link.sourceTransaction?.docNo).filter(Boolean).join(", ") || "-"}</td>
+                    <td className="px-4 py-4 text-white/65">{(item.targetLinks || []).map((link) => link.sourceTransaction?.docNo).filter(Boolean).join(", ") || "-"}</td>
                     <td className="px-4 py-4"><span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getStatusClass(item.status)}`}>{item.status}</span></td>
                     <td className="px-4 py-4 text-right">{`${item.currency || "MYR"} ${money(Number(item.grandTotal || 0))}`}</td>
                     <td className="px-4 py-4 text-right">
