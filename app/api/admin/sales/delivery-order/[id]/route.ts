@@ -273,6 +273,7 @@ export async function PATCH(req: Request, context: Params) {
     await createAuditLogFromRequest({
       req,
       user: admin,
+      module: "SALES",
       action: "CANCEL",
       entityType: "SALES_DELIVERY_ORDER",
       entityId: cancelled.id,

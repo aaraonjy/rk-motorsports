@@ -628,6 +628,7 @@ export async function POST(req: Request) {
     await createAuditLogFromRequest({
       req,
       user: admin,
+      module: "SALES",
       action: "CREATE",
       entityType: "SALES_DELIVERY_ORDER",
       entityId: created.id,
