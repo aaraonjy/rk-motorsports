@@ -43,6 +43,37 @@ function getStatusClass(status: string) {
   return "border-amber-500/25 bg-amber-500/10 text-amber-200";
 }
 
+
+function getSalesRouteByDocType(docType: string | null | undefined) {
+  const value = String(docType || "").toUpperCase();
+  if (value === "QO") return "quotation";
+  if (value === "SO") return "sales-order";
+  if (value === "DO") return "delivery-order";
+  if (value === "INV") return "sales-invoice";
+  if (value === "CS") return "cash-sales";
+  if (value === "CN") return "credit-note";
+  if (value === "DN") return "debit-note";
+  if (value === "DR") return "delivery-return";
+  return "";
+}
+
+function getSalesDocTypeLabel(docType: string | null | undefined) {
+  const value = String(docType || "").toUpperCase();
+  if (value === "QO") return "Quotation";
+  if (value === "SO") return "Sales Order";
+  if (value === "DO") return "Delivery Order";
+  if (value === "INV") return "Sales Invoice";
+  if (value === "CS") return "Cash Sales";
+  if (value === "CN") return "Credit Note";
+  if (value === "DN") return "Debit Note";
+  if (value === "DR") return "Delivery Return";
+  return value || "Transaction";
+}
+
+function isActiveSalesTrace(status: string | null | undefined) {
+  return String(status || "").toUpperCase() !== "CANCELLED";
+}
+
 function ReadonlyField({ label, value, className = "" }: { label: string; value: string; className?: string }) {
   return (
     <div className={className}>
@@ -134,6 +165,9 @@ export default async function AdminSalesQuotationDetailPage({ params, searchPara
   }
 
   const currency = transaction.currency || "MYR";
+  const generatedToLinks = transaction.targetLinks
+    .map((link) => link.targetTransaction)
+    .filter((item) => item && isActiveSalesTrace(item.status));
 
   return (
     <section className="section-pad">
@@ -181,6 +215,31 @@ export default async function AdminSalesQuotationDetailPage({ params, searchPara
             <div className="mt-2">Cancelled At: {formatDate(transaction.cancelledAt)}</div>
             <div className="mt-1">Cancelled By: {transaction.cancelledByAdmin?.name || "-"}</div>
             <div className="mt-1">Reason: {transaction.cancelReason || "-"}</div>
+          </div>
+        ) : null}
+
+
+        {generatedToLinks.length > 0 ? (
+          <div className="rounded-2xl border border-sky-500/25 bg-sky-500/10 p-5 text-sm text-sky-100">
+            <div className="font-semibold">Generated To</div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {generatedToLinks.map((target) => {
+                const route = getSalesRouteByDocType(target?.docType);
+                return route ? (
+                  <Link
+                    key={target?.id}
+                    href={`/admin/sales/${route}/${target?.id}`}
+                    className="rounded-xl border border-sky-500/30 bg-black/20 px-3 py-2 transition hover:bg-sky-500/15"
+                  >
+                    {getSalesDocTypeLabel(target?.docType)}: {target?.docNo} ({target?.status})
+                  </Link>
+                ) : (
+                  <span key={target?.id} className="rounded-xl border border-sky-500/30 bg-black/20 px-3 py-2">
+                    {target?.docNo} ({target?.status})
+                  </span>
+                );
+              })}
+            </div>
           </div>
         ) : null}
 
