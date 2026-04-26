@@ -351,6 +351,11 @@ async function buildDeliveryOrderData(body: any, tx: Prisma.TransactionClient) {
     termsAndConditions: normalizeText(body.termsAndConditions),
     bankAccount: normalizeText(body.bankAccount),
     footerRemarks: normalizeText(body.footerRemarks),
+    subtotal,
+    discountTotal,
+    taxableSubtotal,
+    taxTotal,
+    grandTotal,
     lines,
     sourceTransactionIds: Array.from(new Set(lines.map((line) => line.sourceTransactionId).filter(Boolean))) as string[],
   };
