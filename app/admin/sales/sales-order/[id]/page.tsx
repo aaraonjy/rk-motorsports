@@ -165,7 +165,14 @@ export default async function AdminSalesOrderDetailPage({ params, searchParams }
   }
 
   const currency = transaction.currency || "MYR";
-  const generatedFromLinks = transaction.sourceLinks
+  const generatedFromLinks = await db.salesTransactionLink.findMany({
+    where: { targetTransactionId: transaction.id },
+    include: {
+      sourceTransaction: { select: { id: true, docType: true, docNo: true, status: true } },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+  const activeGeneratedFromDocuments = generatedFromLinks
     .map((link) => link.sourceTransaction)
     .filter((item) => item && isActiveSalesTrace(item.status));
 
@@ -183,6 +190,22 @@ export default async function AdminSalesOrderDetailPage({ params, searchParams }
             <p className="text-sm font-semibold uppercase tracking-[0.24em] text-red-400/80">Sales Order</p>
             <h1 className="mt-3 text-4xl font-bold">{transaction.docNo}</h1>
             <p className="mt-4 max-w-3xl text-white/70">View sales order details in read-only mode.</p>
+            {activeGeneratedFromDocuments.length > 0 ? (
+              <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+                <span className="text-sky-200">Generated from:</span>
+                {activeGeneratedFromDocuments.map((source, index) => {
+                  const route = getSalesRouteByDocType(source?.docType);
+                  const content = `${source?.docNo || "-"}${activeGeneratedFromDocuments.length > 1 && index < activeGeneratedFromDocuments.length - 1 ? "," : ""}`;
+                  return route ? (
+                    <Link key={source?.id} href={`/admin/sales/${route}/${source?.id}`} className="text-sky-200 underline-offset-4 hover:underline">
+                      {content}
+                    </Link>
+                  ) : (
+                    <span key={source?.id} className="text-sky-200">{content}</span>
+                  );
+                })}
+              </div>
+            ) : null}
             {transaction.revisedFrom?.docNo ? (
               <Link
                 href={`/admin/sales/sales-order/${transaction.revisedFrom.id}`}
@@ -215,31 +238,6 @@ export default async function AdminSalesOrderDetailPage({ params, searchParams }
             <div className="mt-2">Cancelled At: {formatDate(transaction.cancelledAt)}</div>
             <div className="mt-1">Cancelled By: {transaction.cancelledByAdmin?.name || "-"}</div>
             <div className="mt-1">Reason: {transaction.cancelReason || "-"}</div>
-          </div>
-        ) : null}
-
-
-        {generatedFromLinks.length > 0 ? (
-          <div className="rounded-2xl border border-sky-500/25 bg-sky-500/10 p-5 text-sm text-sky-100">
-            <div className="font-semibold">Generated From</div>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {generatedFromLinks.map((source) => {
-                const route = getSalesRouteByDocType(source?.docType);
-                return route ? (
-                  <Link
-                    key={source?.id}
-                    href={`/admin/sales/${route}/${source?.id}`}
-                    className="rounded-xl border border-sky-500/30 bg-black/20 px-3 py-2 transition hover:bg-sky-500/15"
-                  >
-                    {getSalesDocTypeLabel(source?.docType)}: {source?.docNo} ({source?.status})
-                  </Link>
-                ) : (
-                  <span key={source?.id} className="rounded-xl border border-sky-500/30 bg-black/20 px-3 py-2">
-                    {source?.docNo} ({source?.status})
-                  </span>
-                );
-              })}
-            </div>
           </div>
         ) : null}
 

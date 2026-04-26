@@ -165,7 +165,14 @@ export default async function AdminSalesQuotationDetailPage({ params, searchPara
   }
 
   const currency = transaction.currency || "MYR";
-  const generatedToLinks = transaction.targetLinks
+  const generatedToLinks = await db.salesTransactionLink.findMany({
+    where: { sourceTransactionId: transaction.id },
+    include: {
+      targetTransaction: { select: { id: true, docType: true, docNo: true, status: true } },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+  const activeGeneratedToDocuments = generatedToLinks
     .map((link) => link.targetTransaction)
     .filter((item) => item && isActiveSalesTrace(item.status));
 
@@ -183,6 +190,22 @@ export default async function AdminSalesQuotationDetailPage({ params, searchPara
             <p className="text-sm font-semibold uppercase tracking-[0.24em] text-red-400/80">Sales Quotation</p>
             <h1 className="mt-3 text-4xl font-bold">{transaction.docNo}</h1>
             <p className="mt-4 max-w-3xl text-white/70">View quotation details in read-only mode.</p>
+            {activeGeneratedToDocuments.length > 0 ? (
+              <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+                <span className="text-sky-200">Generated to:</span>
+                {activeGeneratedToDocuments.map((target, index) => {
+                  const route = getSalesRouteByDocType(target?.docType);
+                  const content = `${target?.docNo || "-"}${activeGeneratedToDocuments.length > 1 && index < activeGeneratedToDocuments.length - 1 ? "," : ""}`;
+                  return route ? (
+                    <Link key={target?.id} href={`/admin/sales/${route}/${target?.id}`} className="text-sky-200 underline-offset-4 hover:underline">
+                      {content}
+                    </Link>
+                  ) : (
+                    <span key={target?.id} className="text-sky-200">{content}</span>
+                  );
+                })}
+              </div>
+            ) : null}
             {transaction.revisedFrom?.docNo ? (
               <Link
                 href={`/admin/sales/quotation/${transaction.revisedFrom.id}`}
@@ -215,31 +238,6 @@ export default async function AdminSalesQuotationDetailPage({ params, searchPara
             <div className="mt-2">Cancelled At: {formatDate(transaction.cancelledAt)}</div>
             <div className="mt-1">Cancelled By: {transaction.cancelledByAdmin?.name || "-"}</div>
             <div className="mt-1">Reason: {transaction.cancelReason || "-"}</div>
-          </div>
-        ) : null}
-
-
-        {generatedToLinks.length > 0 ? (
-          <div className="rounded-2xl border border-sky-500/25 bg-sky-500/10 p-5 text-sm text-sky-100">
-            <div className="font-semibold">Generated To</div>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {generatedToLinks.map((target) => {
-                const route = getSalesRouteByDocType(target?.docType);
-                return route ? (
-                  <Link
-                    key={target?.id}
-                    href={`/admin/sales/${route}/${target?.id}`}
-                    className="rounded-xl border border-sky-500/30 bg-black/20 px-3 py-2 transition hover:bg-sky-500/15"
-                  >
-                    {getSalesDocTypeLabel(target?.docType)}: {target?.docNo} ({target?.status})
-                  </Link>
-                ) : (
-                  <span key={target?.id} className="rounded-xl border border-sky-500/30 bg-black/20 px-3 py-2">
-                    {target?.docNo} ({target?.status})
-                  </span>
-                );
-              })}
-            </div>
           </div>
         ) : null}
 
