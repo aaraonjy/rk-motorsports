@@ -188,7 +188,7 @@ export async function GET(_req: Request, context: Params) {
                 sourceLine: { select: { id: true, lineNo: true, qty: true } },
               },
             },
-            sourceLineLinks: {
+            targetLineLinks: {
               include: {
                 targetTransaction: { select: { id: true, docType: true, docNo: true, status: true } },
               },
