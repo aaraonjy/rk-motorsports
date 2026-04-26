@@ -10,6 +10,24 @@ function money(value: unknown) {
   return Number.isFinite(numeric) ? numeric.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0.00";
 }
 
+function toNumber(value: unknown) {
+  const numeric = Number(value ?? 0);
+  return Number.isFinite(numeric) ? numeric : 0;
+}
+
+function getLinkedQty(
+  line: {
+    targetLineLinks?: Array<{ linkType?: string | null; qty?: unknown; targetTransaction?: { status?: string | null } | null }>;
+  },
+  linkType: "DELIVERED_TO" | "INVOICED_TO"
+) {
+  return (line.targetLineLinks || [])
+    .filter((link) => link.linkType === linkType)
+    .filter((link) => link.targetTransaction?.status !== "CANCELLED")
+    .reduce((sum, link) => sum + toNumber(link.qty), 0);
+}
+
+
 function formatDate(value: Date | string | null | undefined) {
   if (!value) return "-";
   const date = new Date(value);
@@ -150,7 +168,16 @@ export default async function AdminSalesOrderDetailPage({ params, searchParams }
           targetTransaction: { select: { id: true, docType: true, docNo: true, status: true } },
         },
       },
-      lines: { orderBy: { lineNo: "asc" } },
+      lines: {
+        orderBy: { lineNo: "asc" },
+        include: {
+          targetLineLinks: {
+            include: {
+              targetTransaction: { select: { id: true, docType: true, docNo: true, status: true } },
+            },
+          },
+        },
+      },
     },
   });
 
@@ -282,6 +309,7 @@ export default async function AdminSalesOrderDetailPage({ params, searchParams }
 
           <div className="mt-8 rounded-[1.5rem] border border-white/10 p-4">
             <h3 className="text-lg font-bold">Products</h3>
+            <p className="mt-2 text-xs text-white/45">Delivery and invoice progress will be updated by future DO / Invoice documents using line-level links.</p>
             <div className="mt-4 overflow-x-auto">
               <table className="min-w-full divide-y divide-white/10 text-sm">
                 <thead className="text-left text-white/45">
@@ -289,6 +317,10 @@ export default async function AdminSalesOrderDetailPage({ params, searchParams }
                     <th className="px-4 py-3">Product</th>
                     <th className="px-4 py-3">UOM</th>
                     <th className="px-4 py-3 text-right">Qty</th>
+                    <th className="px-4 py-3 text-right">Delivered</th>
+                    <th className="px-4 py-3 text-right">Remaining DO</th>
+                    <th className="px-4 py-3 text-right">Invoiced</th>
+                    <th className="px-4 py-3 text-right">Remaining INV</th>
                     <th className="px-4 py-3 text-right">Unit Price</th>
                     <th className="px-4 py-3 text-right">Discount</th>
                     <th className="px-4 py-3">Location</th>
@@ -298,7 +330,7 @@ export default async function AdminSalesOrderDetailPage({ params, searchParams }
                 </thead>
                 <tbody className="divide-y divide-white/10 text-white/80">
                   {transaction.lines.length === 0 ? (
-                    <tr><td colSpan={8} className="px-4 py-8 text-center text-white/50">No product line found.</td></tr>
+                    <tr><td colSpan={12} className="px-4 py-8 text-center text-white/50">No product line found.</td></tr>
                   ) : (
                     transaction.lines.map((line) => (
                       <tr key={line.id}>
@@ -309,6 +341,10 @@ export default async function AdminSalesOrderDetailPage({ params, searchParams }
                         </td>
                         <td className="px-4 py-4">{line.uom}</td>
                         <td className="px-4 py-4 text-right">{money(line.qty)}</td>
+                        <td className="px-4 py-4 text-right">{money(getLinkedQty(line, "DELIVERED_TO"))}</td>
+                        <td className="px-4 py-4 text-right">{money(Math.max(0, toNumber(line.qty) - getLinkedQty(line, "DELIVERED_TO")))}</td>
+                        <td className="px-4 py-4 text-right">{money(getLinkedQty(line, "INVOICED_TO"))}</td>
+                        <td className="px-4 py-4 text-right">{money(Math.max(0, toNumber(line.qty) - getLinkedQty(line, "INVOICED_TO")))}</td>
                         <td className="px-4 py-4 text-right">{money(line.unitPrice)}</td>
                         <td className="px-4 py-4 text-right">
                           {line.discountType === "AMOUNT" ? `${currency} ${money(line.discountAmount)}` : `${money(line.discountRate)}%`}

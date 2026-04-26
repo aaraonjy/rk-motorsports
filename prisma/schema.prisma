@@ -108,6 +108,11 @@ enum SalesLinkType {
   GENERATED_TO
 }
 
+enum SalesLineLinkType {
+  DELIVERED_TO
+  INVOICED_TO
+}
+
 enum TaxCalculationMethod {
   EXCLUSIVE
   INCLUSIVE
@@ -645,7 +650,10 @@ model SalesTransaction {
   @@index([projectId])
   @@index([departmentId])
   @@index([taxCodeId])
+  sourceLineLinks SalesTransactionLineLink[] @relation("SalesLineSourceTransaction")
+  targetLineLinks SalesTransactionLineLink[] @relation("SalesLineTargetTransaction")
 }
+
 
 model SalesTransactionLine {
   id                  String            @id @default(cuid())
@@ -684,7 +692,33 @@ model SalesTransactionLine {
   @@index([inventoryProductId])
   @@index([locationId])
   @@index([taxCodeId])
+  sourceLineLinks SalesTransactionLineLink[] @relation("SalesLineSource")
+  targetLineLinks SalesTransactionLineLink[] @relation("SalesLineTarget")
 }
+
+model SalesTransactionLineLink {
+  id                   String                  @id @default(cuid())
+  sourceLineId          String
+  targetLineId          String
+  sourceTransactionId   String
+  targetTransactionId   String
+  linkType              SalesLineLinkType
+  qty                   Decimal                 @db.Decimal(12, 3)
+  createdAt             DateTime                @default(now())
+
+  sourceLine            SalesTransactionLine     @relation("SalesLineSource", fields: [sourceLineId], references: [id], onDelete: Cascade)
+  targetLine            SalesTransactionLine     @relation("SalesLineTarget", fields: [targetLineId], references: [id], onDelete: Cascade)
+  sourceTransaction     SalesTransaction         @relation("SalesLineSourceTransaction", fields: [sourceTransactionId], references: [id], onDelete: Cascade)
+  targetTransaction     SalesTransaction         @relation("SalesLineTargetTransaction", fields: [targetTransactionId], references: [id], onDelete: Cascade)
+
+  @@index([sourceLineId])
+  @@index([targetLineId])
+  @@index([sourceTransactionId])
+  @@index([targetTransactionId])
+  @@index([linkType])
+}
+
+
 
 model SalesTransactionLink {
   id                  String           @id @default(cuid())

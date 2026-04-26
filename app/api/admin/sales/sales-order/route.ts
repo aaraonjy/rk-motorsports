@@ -120,6 +120,46 @@ function toNumber(value: Prisma.Decimal | number | string | null | undefined) {
   return Number.isFinite(numeric) ? numeric : 0;
 }
 
+function sumLinkedQty(
+  line: {
+    targetLineLinks?: Array<{ linkType?: string | null; qty?: Prisma.Decimal | number | string | null; targetTransaction?: { status?: string | null } | null }>;
+  },
+  linkType: "DELIVERED_TO" | "INVOICED_TO"
+) {
+  return (line.targetLineLinks || [])
+    .filter((link) => link.linkType === linkType)
+    .filter((link) => link.targetTransaction?.status !== "CANCELLED")
+    .reduce((sum, link) => sum + toNumber(link.qty), 0);
+}
+
+function withSalesOrderLineProgress(line: any) {
+  const orderedQty = toNumber(line.qty);
+  const deliveredQty = sumLinkedQty(line, "DELIVERED_TO");
+  const invoicedQty = sumLinkedQty(line, "INVOICED_TO");
+
+  return {
+    ...line,
+    orderedQty,
+    deliveredQty,
+    invoicedQty,
+    remainingDeliveryQty: Math.max(0, orderedQty - deliveredQty),
+    remainingInvoiceQty: Math.max(0, orderedQty - invoicedQty),
+  };
+}
+
+function getSalesOrderProgressStatus(lines: Array<{ orderedQty: number; deliveredQty: number; invoicedQty: number }>) {
+  if (lines.length === 0) return "OPEN";
+
+  const hasAnyProgress = lines.some((line) => line.deliveredQty > 0 || line.invoicedQty > 0);
+  const isFullyDelivered = lines.every((line) => line.deliveredQty >= line.orderedQty);
+  const isFullyInvoiced = lines.every((line) => line.invoicedQty >= line.orderedQty);
+
+  if (isFullyDelivered && isFullyInvoiced) return "COMPLETED";
+  if (hasAnyProgress) return "PARTIAL";
+  return "OPEN";
+}
+
+
 function taxSnapshot(taxCode: TaxCodeSnapshot | null) {
   if (!taxCode) {
     return {
@@ -256,11 +296,29 @@ export async function GET(req: Request) {
             targetTransaction: { select: { id: true, docType: true, docNo: true, status: true } },
           },
         },
-        lines: { orderBy: { lineNo: "asc" } },
+        lines: {
+          orderBy: { lineNo: "asc" },
+          include: {
+            targetLineLinks: {
+              include: {
+                targetTransaction: { select: { id: true, docType: true, docNo: true, status: true } },
+              },
+            },
+          },
+        },
       },
     });
 
-    return NextResponse.json({ ok: true, transactions: rows });
+    const transactions = rows.map((row) => {
+      const lines = row.lines.map((line) => withSalesOrderLineProgress(line));
+      return {
+        ...row,
+        lines,
+        progressStatus: getSalesOrderProgressStatus(lines),
+      };
+    });
+
+    return NextResponse.json({ ok: true, transactions });
   } catch (error) {
     return NextResponse.json(
       { ok: false, error: error instanceof Error ? error.message : "Unable to load sales orders." },
