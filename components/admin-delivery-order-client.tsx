@@ -216,6 +216,26 @@ function formatDecimalInput(value: unknown, decimalPlaces: number) {
   return numeric.toFixed(decimalPlaces);
 }
 
+function limitDecimalInputValue(value: string, decimalPlaces: number) {
+  const raw = String(value ?? "");
+  if (!raw) return "";
+
+  const sanitized = raw.replace(/[^0-9.]/g, "");
+  const [wholePart, ...decimalParts] = sanitized.split(".");
+  const whole = wholePart || "0";
+
+  if (decimalPlaces <= 0) {
+    return whole;
+  }
+
+  if (decimalParts.length === 0) {
+    return whole;
+  }
+
+  const decimal = decimalParts.join("").slice(0, decimalPlaces);
+  return `${whole}.${decimal}`;
+}
+
 function normalizeDecimalInputValue(value: string, decimalPlaces: number) {
   const numeric = Number(value || 0);
   if (!Number.isFinite(numeric)) return "";
@@ -1065,7 +1085,7 @@ export function AdminDeliveryOrderClient({
             {submitSuccess ? <div className="mt-5 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">{submitSuccess}</div> : null}
 
             {activeTab === "HEADER" ? (
-              <div className="mt-6 space-y-6">
+              <div className="mt-6 space-y-5">
                 <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
                   <div>
                     <label className="label-rk">Doc Date</label>
@@ -1083,15 +1103,15 @@ export function AdminDeliveryOrderClient({
                   <div><label className="label-rk">Customer Name</label><input className="input-rk" value={customerName} readOnly /></div>
                   <div><label className="label-rk">Email</label><input className="input-rk" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
                   <div><label className="label-rk">Contact No</label><input className="input-rk" value={contactNo} onChange={(e) => setContactNo(e.target.value)} /></div>
-                  <div className="xl:col-span-2"><label className="label-rk">Document Description</label><input className="input-rk" value={docDesc} onChange={(e) => setDocDesc(e.target.value)} /></div>
+                  <div className="md:col-span-2"><label className="label-rk">Document Description</label><input className="input-rk" value={docDesc} onChange={(e) => setDocDesc(e.target.value)} /></div>
                   <div><label className="label-rk">Attention</label><input className="input-rk" value={attention} onChange={(e) => setAttention(e.target.value)} /></div>
                   <SearchableSelect label="Agent" placeholder="No Agent" options={agentOptions} value={agentId} onChange={(option) => setAgentId(option?.id || "")} />
                   {projectFeatureEnabled ? <SearchableSelect label="Project" placeholder="No Project" options={projectOptions} value={projectId} onChange={(option) => { setProjectId(option?.id || ""); setDepartmentId(""); }} /> : null}
                   {departmentFeatureEnabled ? <SearchableSelect label="Department" placeholder="No Department" options={departmentOptions} value={departmentId} onChange={(option) => setDepartmentId(option?.id || "")} /> : null}
                 </div>
 
-                <div className="rounded-[1.5rem] border border-white/10 p-5">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="rounded-[1.75rem] border border-white/10 p-5">
+                  <div className="mb-5 flex items-center justify-between gap-3">
                     <div>
                       <p className="text-sm font-semibold uppercase tracking-[0.24em] text-white/40">Delivery Address</p>
                       <p className="mt-2 text-sm text-white/55">Select default or secondary delivery address for this Delivery Order.</p>
@@ -1125,13 +1145,13 @@ export function AdminDeliveryOrderClient({
             ) : null}
 
             {activeTab === "BODY" ? (
-              <div className="mt-6 space-y-6">
+              <div className="mt-6 space-y-5">
                 {lines.map((line, index) => {
                   const normalizedLine = normalizedLines[index];
                   return (
-                    <div key={index} className="rounded-[1.5rem] border border-white/10 p-5">
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <h3 className="text-lg font-bold">Product {index + 1}</h3>
+                    <div key={index} className="rounded-[1.75rem] border border-white/10 p-5">
+                      <div className="mb-5 flex items-center justify-between gap-3">
+                        <h3 className="text-lg font-semibold text-white">Product {index + 1}</h3>
                         {lines.length > 1 ? (
                           <button type="button" onClick={() => setLines((prev) => prev.filter((_, lineIndex) => lineIndex !== index))} className="rounded-xl border border-red-500/30 px-4 py-2 text-sm text-red-200 transition hover:bg-red-500/10">
                             Remove
@@ -1139,23 +1159,23 @@ export function AdminDeliveryOrderClient({
                         ) : null}
                       </div>
 
-                      <div className="mt-5 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-                        <div className="xl:col-span-2">
+                      <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+                        <div className="md:col-span-2">
                           <SearchableSelect label="Product" placeholder="Search or select product" options={productOptions} value={line.inventoryProductId} onChange={(option) => handleProductChange(index, option?.id || "")} disabled={Boolean(line.sourceLineId)} />
                           {line.productDescription ? <div className="mt-2 text-xs text-white/45">{line.productDescription}</div> : null}
                         </div>
                         <div><label className="label-rk">UOM</label><input className="input-rk" value={line.uom} onChange={(e) => updateLine(index, { uom: e.target.value.toUpperCase() })} readOnly={Boolean(line.sourceLineId)} /></div>
-                        <div><label className="label-rk">Qty</label><input className="input-rk text-right" type="number" min="0" step={qtyInputStep} value={line.qty} onChange={(e) => updateLine(index, { qty: e.target.value })} onBlur={(e) => updateLine(index, { qty: normalizeDecimalInputValue(e.target.value, qtyDecimalPlaces) })} /></div>
-                        <div><label className="label-rk">Selling Price</label><input className="input-rk text-right" type="number" min="0" step={priceInputStep} value={line.unitPrice} onChange={(e) => updateLine(index, { unitPrice: e.target.value })} onBlur={(e) => updateLine(index, { unitPrice: normalizeDecimalInputValue(e.target.value, priceDecimalPlaces) })} /></div>
-                        <div><label className="label-rk">Discount</label><div className="grid grid-cols-[1fr_120px] gap-3"><input className="input-rk" type="number" min="0" step={priceInputStep} value={line.discountRate} onChange={(e) => updateLine(index, { discountRate: e.target.value })} /><CompactSelect options={[{ id: "PERCENT", label: "%", searchText: "percent %" }, { id: "AMOUNT", label: "RM", searchText: "amount rm" }]} value={line.discountType} onChange={(value) => updateLine(index, { discountType: value === "AMOUNT" ? "AMOUNT" : "PERCENT" })} /></div></div>
-                        <div className="xl:col-span-2">
+                        <div><label className="label-rk">Qty</label><input className="input-rk text-right" type="number" min="0" step={qtyInputStep} value={line.qty} onChange={(e) => updateLine(index, { qty: limitDecimalInputValue(e.target.value, qtyDecimalPlaces) })} onBlur={(e) => updateLine(index, { qty: normalizeDecimalInputValue(e.target.value, qtyDecimalPlaces) })} /></div>
+                        <div><label className="label-rk">Selling Price</label><input className="input-rk text-right" type="number" min="0" step={priceInputStep} value={line.unitPrice} onChange={(e) => updateLine(index, { unitPrice: limitDecimalInputValue(e.target.value, priceDecimalPlaces) })} onBlur={(e) => updateLine(index, { unitPrice: normalizeDecimalInputValue(e.target.value, priceDecimalPlaces) })} /></div>
+                        <div><label className="label-rk">Discount</label><div className="grid grid-cols-[1fr_120px] gap-3"><input className="input-rk" type="number" min="0" step={priceInputStep} value={line.discountRate} onChange={(e) => updateLine(index, { discountRate: limitDecimalInputValue(e.target.value, priceDecimalPlaces) })} /><CompactSelect options={[{ id: "PERCENT", label: "%", searchText: "percent %" }, { id: "AMOUNT", label: "RM", searchText: "amount rm" }]} value={line.discountType} onChange={(value) => updateLine(index, { discountType: value === "AMOUNT" ? "AMOUNT" : "PERCENT" })} /></div></div>
+                        <div className="md:col-span-2">
                           <SearchableSelect label="Location" placeholder="Select location" options={locationOptions} value={line.locationId} onChange={(option) => updateLine(index, { locationId: option?.id || "" })} />
                           <div className="mt-2 text-xs text-white/45">
                             {getBalanceDisplay(balances[balanceKey(line.inventoryProductId, line.locationId)], Boolean(loadingBalances[balanceKey(line.inventoryProductId, line.locationId)]), qtyDecimalPlaces)}
                           </div>
                         </div>
                         <div><label className="label-rk">Gross Amount</label><input className="input-rk text-right" value={moneyWithPlaces(normalizedLine?.lineTotal || 0, priceDecimalPlaces)} readOnly /></div>
-                        <div className="xl:col-span-4"><label className="label-rk">Product Remarks</label><textarea className="input-rk min-h-[80px]" value={line.remarks} onChange={(e) => updateLine(index, { remarks: e.target.value })} /></div>
+                        <div className="md:col-span-4"><label className="label-rk">Product Remarks</label><textarea className="input-rk min-h-[80px]" value={line.remarks} onChange={(e) => updateLine(index, { remarks: e.target.value })} /></div>
                       </div>
                     </div>
                   );
@@ -1175,7 +1195,7 @@ export function AdminDeliveryOrderClient({
                   <div><label className="label-rk">Bank Account</label><textarea className="input-rk min-h-[96px]" value={bankAccount} onChange={(e) => setBankAccount(e.target.value)} /></div>
                   <div><label className="label-rk">Footer Remarks</label><textarea className="input-rk min-h-[96px]" value={footerRemarks} onChange={(e) => setFooterRemarks(e.target.value)} /></div>
                 </div>
-                <div className="rounded-[1.5rem] border border-white/10 p-5">
+                <div className="rounded-[1.75rem] border border-white/10 p-5">
                   <h3 className="text-xl font-bold">Delivery Order Summary</h3>
                   <div className="mt-5 space-y-4 text-sm">
                     <div className="flex justify-between gap-4"><span className="text-white/65">Subtotal</span><span>{moneyWithPlaces(totals.subtotal, priceDecimalPlaces)}</span></div>
@@ -1190,7 +1210,7 @@ export function AdminDeliveryOrderClient({
             <div className="mt-8 flex flex-wrap justify-end gap-3 border-t border-white/10 pt-5">
               <button type="button" onClick={closeForm} className="rounded-xl border border-white/15 px-5 py-3 text-sm text-white/75 transition hover:bg-white/10">Close</button>
               <button type="button" disabled={!canSubmitDeliveryOrder} onClick={submitDeliveryOrder} className="rounded-xl bg-red-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-red-500 disabled:opacity-60">
-                {isSubmitting ? "Saving..." : formValidationMessage || "Create Delivery Order"}
+                {isSubmitting ? "Saving..." : "Create Delivery Order"}
               </button>
             </div>
           </div>

@@ -203,6 +203,26 @@ function formatDecimalInput(value: unknown, decimalPlaces: number) {
   return numeric.toFixed(decimalPlaces);
 }
 
+function limitDecimalInputValue(value: string, decimalPlaces: number) {
+  const raw = String(value ?? "");
+  if (!raw) return "";
+
+  const sanitized = raw.replace(/[^0-9.]/g, "");
+  const [wholePart, ...decimalParts] = sanitized.split(".");
+  const whole = wholePart || "0";
+
+  if (decimalPlaces <= 0) {
+    return whole;
+  }
+
+  if (decimalParts.length === 0) {
+    return whole;
+  }
+
+  const decimal = decimalParts.join("").slice(0, decimalPlaces);
+  return `${whole}.${decimal}`;
+}
+
 function normalizeDecimalInputValue(value: string, decimalPlaces: number) {
   const numeric = Number(value || 0);
   if (!Number.isFinite(numeric)) return "";
@@ -1390,12 +1410,12 @@ export function AdminSalesQuotationClient({
                           disabled={!selectedProduct}
                           onChange={(option) => updateLine(index, { uom: option?.id || selectedProduct?.baseUom || "" })}
                         />
-                        <Input label="Qty" type="number" min="0" step={qtyInputStep} value={line.qty} onChange={(value) => updateLine(index, { qty: value })} onBlur={(value) => updateLine(index, { qty: normalizeDecimalInputValue(value, qtyDecimalPlaces) })} />
-                        <Input label="Selling Price" type="number" min="0" step={priceInputStep} value={line.unitPrice} onChange={(value) => updateLine(index, { unitPrice: value })} onBlur={(value) => updateLine(index, { unitPrice: normalizeDecimalInputValue(value, priceDecimalPlaces) })} />
+                        <Input label="Qty" type="number" min="0" step={qtyInputStep} value={line.qty} onChange={(value) => updateLine(index, { qty: limitDecimalInputValue(value, qtyDecimalPlaces) })} onBlur={(value) => updateLine(index, { qty: normalizeDecimalInputValue(value, qtyDecimalPlaces) })} />
+                        <Input label="Selling Price" type="number" min="0" step={priceInputStep} value={line.unitPrice} onChange={(value) => updateLine(index, { unitPrice: limitDecimalInputValue(value, priceDecimalPlaces) })} onBlur={(value) => updateLine(index, { unitPrice: normalizeDecimalInputValue(value, priceDecimalPlaces) })} />
                         <div>
                           <label className="label-rk">Discount</label>
                           <div className="grid grid-cols-[minmax(0,1fr)_120px] gap-3">
-                            <input className="input-rk" type="number" min="0" step={priceInputStep} value={line.discountRate} onChange={(e) => updateLine(index, { discountRate: e.target.value })} />
+                            <input className="input-rk" type="number" min="0" step={priceInputStep} value={line.discountRate} onChange={(e) => updateLine(index, { discountRate: limitDecimalInputValue(e.target.value, priceDecimalPlaces) })} />
                             <CompactSelect
                               options={discountTypeOptions}
                               value={line.discountType}
@@ -1414,8 +1434,7 @@ export function AdminSalesQuotationClient({
                           <p className="mt-2 text-xs text-white/45">
                             {getBalanceDisplay(
                               line.inventoryProductId && line.locationId ? balances[balanceKey(line.inventoryProductId, line.locationId)] : undefined,
-                              line.inventoryProductId && line.locationId ? Boolean(loadingBalances[balanceKey(line.inventoryProductId, line.locationId)]) : false
-                            ,
+                              line.inventoryProductId && line.locationId ? Boolean(loadingBalances[balanceKey(line.inventoryProductId, line.locationId)]) : false,
                               qtyDecimalPlaces
                             )}
                           </p>
