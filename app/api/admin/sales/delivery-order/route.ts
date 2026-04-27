@@ -507,7 +507,7 @@ async function createStockIssueForDeliveryOrder(
         })),
       },
     },
-    include: { lines: true },
+    include: { lines: { include: { serialEntries: true } } },
   });
 
   for (const stockLine of stockTransaction.lines) {
