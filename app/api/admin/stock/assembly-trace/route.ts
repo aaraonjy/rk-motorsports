@@ -12,7 +12,24 @@ function mapLocationLabel(location?: { code?: string | null; name?: string | nul
   return [location.code, location.name].filter(Boolean).join(" — ") || null;
 }
 
-function mapLine(line: any) {
+function batchKey(productId?: string | null, batchNo?: string | null) {
+  const normalizedProductId = String(productId || "").trim();
+  const normalizedBatchNo = String(batchNo || "").trim().toUpperCase();
+  if (!normalizedProductId || !normalizedBatchNo) return "";
+  return `${normalizedProductId}__${normalizedBatchNo}`;
+}
+
+function toIsoDate(value: unknown) {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(String(value));
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString();
+}
+
+function mapLine(line: any, batchExpiryMap: Map<string, string | null>) {
+  const currentBatchKey = batchKey(line.inventoryProductId, line.batchNo);
+  const resolvedExpiryDate = toIsoDate(line.expiryDate) || (currentBatchKey ? batchExpiryMap.get(currentBatchKey) || null : null);
+
   return {
     id: line.id,
     productId: line.inventoryProductId,
@@ -21,7 +38,7 @@ function mapLine(line: any) {
     qty: toNumber(line.qty),
     uom: line.inventoryProduct?.baseUom ?? "",
     batchNo: line.batchNo ?? null,
-    expiryDate: line.expiryDate ? line.expiryDate.toISOString() : null,
+    expiryDate: resolvedExpiryDate,
     adjustmentDirection: line.adjustmentDirection ?? null,
     locationLabel:
       mapLocationLabel(line.location) ||
@@ -33,12 +50,20 @@ function mapLine(line: any) {
       ? line.serialEntries.map((entry: any) => entry.serialNo).filter(Boolean)
       : [],
     serialEntries: Array.isArray(line.serialEntries)
-      ? line.serialEntries.map((entry: any) => ({
-          id: entry.id,
-          serialNo: entry.serialNo,
-          batchNo: entry.inventoryBatch?.batchNo ?? line.batchNo ?? null,
-          expiryDate: entry.inventoryBatch?.expiryDate ? entry.inventoryBatch.expiryDate.toISOString() : null,
-        }))
+      ? line.serialEntries.map((entry: any) => {
+          const entryBatchNo = entry.inventoryBatch?.batchNo ?? line.batchNo ?? null;
+          const entryBatchKey = batchKey(entry.inventoryProductId ?? line.inventoryProductId, entryBatchNo);
+          const entryExpiryDate =
+            toIsoDate(entry.inventoryBatch?.expiryDate) ||
+            (entryBatchKey ? batchExpiryMap.get(entryBatchKey) || null : null);
+
+          return {
+            id: entry.id,
+            serialNo: entry.serialNo,
+            batchNo: entryBatchNo,
+            expiryDate: entryExpiryDate,
+          };
+        })
       : [],
   };
 }
@@ -94,6 +119,37 @@ export async function GET(req: Request) {
       take: 10,
     });
 
+    const batchConditions = new Map<string, { inventoryProductId: string; batchNo: string }>();
+
+    for (const transaction of transactions) {
+      for (const line of transaction.lines) {
+        const lineBatchKey = batchKey(line.inventoryProductId, line.batchNo);
+        if (lineBatchKey && !batchConditions.has(lineBatchKey)) {
+          batchConditions.set(lineBatchKey, { inventoryProductId: line.inventoryProductId, batchNo: String(line.batchNo) });
+        }
+
+        for (const entry of line.serialEntries || []) {
+          const entryBatchNo = entry.inventoryBatch?.batchNo ?? line.batchNo ?? null;
+          const entryBatchKey = batchKey(entry.inventoryProductId ?? line.inventoryProductId, entryBatchNo);
+          if (entryBatchKey && !batchConditions.has(entryBatchKey)) {
+            batchConditions.set(entryBatchKey, { inventoryProductId: entry.inventoryProductId ?? line.inventoryProductId, batchNo: String(entryBatchNo) });
+          }
+        }
+      }
+    }
+
+    const batchRows = batchConditions.size
+      ? await db.inventoryBatch.findMany({
+          where: { OR: Array.from(batchConditions.values()) },
+          select: { inventoryProductId: true, batchNo: true, expiryDate: true },
+        })
+      : [];
+
+    const batchExpiryMap = new Map<string, string | null>();
+    for (const batch of batchRows) {
+      batchExpiryMap.set(batchKey(batch.inventoryProductId, batch.batchNo), toIsoDate(batch.expiryDate));
+    }
+
     const traces = transactions
       .map((transaction) => {
         const finishedGoodLines = transaction.lines
@@ -104,11 +160,11 @@ export async function GET(req: Request) {
               line.adjustmentDirection === "IN" &&
               (!locationId || line.locationId === locationId)
           )
-          .map(mapLine);
+          .map((line) => mapLine(line, batchExpiryMap));
 
         const componentLines = transaction.lines
           .filter((line) => line.adjustmentDirection === "OUT")
-          .map(mapLine);
+          .map((line) => mapLine(line, batchExpiryMap));
 
         return {
           id: transaction.id,
