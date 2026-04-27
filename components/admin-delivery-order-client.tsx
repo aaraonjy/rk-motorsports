@@ -23,6 +23,17 @@ type CustomerOption = {
   deliveryCity?: string | null;
   deliveryPostCode?: string | null;
   deliveryCountryCode?: string | null;
+  deliveryAddresses?: Array<{
+    id: string;
+    label?: string | null;
+    addressLine1: string;
+    addressLine2?: string | null;
+    addressLine3?: string | null;
+    addressLine4?: string | null;
+    city?: string | null;
+    postCode?: string | null;
+    countryCode?: string | null;
+  }>;
   attention?: string | null;
   currency?: string | null;
   agentId?: string | null;
@@ -377,6 +388,14 @@ export function AdminDeliveryOrderClient({
   const [contactNo, setContactNo] = useState("");
   const [email, setEmail] = useState("");
   const [currency, setCurrency] = useState("MYR");
+  const [deliveryAddressSource, setDeliveryAddressSource] = useState("DEFAULT");
+  const [deliveryAddressLine1, setDeliveryAddressLine1] = useState("");
+  const [deliveryAddressLine2, setDeliveryAddressLine2] = useState("");
+  const [deliveryAddressLine3, setDeliveryAddressLine3] = useState("");
+  const [deliveryAddressLine4, setDeliveryAddressLine4] = useState("");
+  const [deliveryCity, setDeliveryCity] = useState("");
+  const [deliveryPostCode, setDeliveryPostCode] = useState("");
+  const [deliveryCountryCode, setDeliveryCountryCode] = useState("MY");
   const [reference, setReference] = useState("");
   const [remarks, setRemarks] = useState("");
   const [agentId, setAgentId] = useState("");
@@ -482,6 +501,53 @@ export function AdminDeliveryOrderClient({
     return availableSourceOrders.filter((order) => selected.has(order.id));
   }, [availableSourceOrders, selectedSourceOrderIds]);
 
+  const selectedCustomer = useMemo(() => initialCustomers.find((item) => item.id === customerId) || null, [customerId, initialCustomers]);
+
+  const deliveryAddressOptions = useMemo<SearchableSelectOption[]>(() => {
+    if (!selectedCustomer) return [{ id: "DEFAULT", label: "Default Delivery Address", searchText: "default delivery address" }];
+
+    return [
+      { id: "DEFAULT", label: "Default Delivery Address", searchText: "default delivery address" },
+      ...(selectedCustomer.deliveryAddresses || []).map((address) => {
+        const label = address.label?.trim() || "Secondary Delivery Address";
+        const addressText = [address.addressLine1, address.addressLine2, address.addressLine3, address.addressLine4, address.postCode, address.city, address.countryCode]
+          .filter(Boolean)
+          .join(" ");
+        return {
+          id: address.id,
+          label,
+          searchText: `${label} ${addressText}`.toLowerCase(),
+        };
+      }),
+    ];
+  }, [selectedCustomer]);
+
+  function applyDeliveryAddressFromCustomer(customer: CustomerOption, sourceId = "DEFAULT") {
+    if (sourceId === "DEFAULT") {
+      setDeliveryAddressSource("DEFAULT");
+      setDeliveryAddressLine1(customer.deliveryAddressLine1 || "");
+      setDeliveryAddressLine2(customer.deliveryAddressLine2 || "");
+      setDeliveryAddressLine3(customer.deliveryAddressLine3 || "");
+      setDeliveryAddressLine4(customer.deliveryAddressLine4 || "");
+      setDeliveryCity(customer.deliveryCity || "");
+      setDeliveryPostCode(customer.deliveryPostCode || "");
+      setDeliveryCountryCode(customer.deliveryCountryCode || "MY");
+      return;
+    }
+
+    const selectedAddress = (customer.deliveryAddresses || []).find((address) => address.id === sourceId);
+    if (!selectedAddress) return;
+
+    setDeliveryAddressSource(sourceId);
+    setDeliveryAddressLine1(selectedAddress.addressLine1 || "");
+    setDeliveryAddressLine2(selectedAddress.addressLine2 || "");
+    setDeliveryAddressLine3(selectedAddress.addressLine3 || "");
+    setDeliveryAddressLine4(selectedAddress.addressLine4 || "");
+    setDeliveryCity(selectedAddress.city || "");
+    setDeliveryPostCode(selectedAddress.postCode || "");
+    setDeliveryCountryCode(selectedAddress.countryCode || "MY");
+  }
+
   const normalizedLines = useMemo(() => {
     return lines.map((line) => {
       const qty = Math.max(0, Number(line.qty || 0));
@@ -549,6 +615,14 @@ export function AdminDeliveryOrderClient({
     setContactNo("");
     setEmail("");
     setCurrency("MYR");
+    setDeliveryAddressSource("DEFAULT");
+    setDeliveryAddressLine1("");
+    setDeliveryAddressLine2("");
+    setDeliveryAddressLine3("");
+    setDeliveryAddressLine4("");
+    setDeliveryCity("");
+    setDeliveryPostCode("");
+    setDeliveryCountryCode("MY");
     setReference("");
     setRemarks("");
     setAgentId("");
@@ -590,6 +664,7 @@ export function AdminDeliveryOrderClient({
     setEmail(customer.email || "");
     setCurrency(customer.currency || "MYR");
     setAgentId(customer.agentId || "");
+    applyDeliveryAddressFromCustomer(customer, "DEFAULT");
   }
 
   function updateLine(index: number, patch: Partial<LineForm>) {
@@ -687,6 +762,14 @@ export function AdminDeliveryOrderClient({
     setDocDesc(`Generated from ${selectedSourceOrders.map((order) => order.docNo).join(", ")}`);
     setReference(selectedSourceOrders.map((order) => order.docNo).join(", "));
     setRemarks(first?.remarks || "");
+    setDeliveryAddressSource("DEFAULT");
+    setDeliveryAddressLine1(first?.deliveryAddressLine1 || "");
+    setDeliveryAddressLine2(first?.deliveryAddressLine2 || "");
+    setDeliveryAddressLine3(first?.deliveryAddressLine3 || "");
+    setDeliveryAddressLine4(first?.deliveryAddressLine4 || "");
+    setDeliveryCity(first?.deliveryCity || "");
+    setDeliveryPostCode(first?.deliveryPostCode || "");
+    setDeliveryCountryCode(first?.deliveryCountryCode || "MY");
     setProjectId(first?.projectId || "");
     setDepartmentId(first?.departmentId || "");
     setTermsAndConditions(first?.termsAndConditions || "");
@@ -726,6 +809,13 @@ export function AdminDeliveryOrderClient({
         docDesc,
         customerId,
         currency,
+        deliveryAddressLine1,
+        deliveryAddressLine2,
+        deliveryAddressLine3,
+        deliveryAddressLine4,
+        deliveryCity,
+        deliveryPostCode,
+        deliveryCountryCode,
         reference,
         remarks,
         agentId,
@@ -901,50 +991,76 @@ export function AdminDeliveryOrderClient({
                   {projectFeatureEnabled ? <SearchableSelect label="Project" placeholder="No Project" options={projectOptions} value={projectId} onChange={(option) => { setProjectId(option?.id || ""); setDepartmentId(""); }} /> : null}
                   {departmentFeatureEnabled ? <SearchableSelect label="Department" placeholder="No Department" options={departmentOptions} value={departmentId} onChange={(option) => setDepartmentId(option?.id || "")} /> : null}
                 </div>
+
+                <div className="rounded-[1.5rem] border border-white/10 p-5">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold uppercase tracking-[0.24em] text-white/40">Delivery Address</p>
+                      <p className="mt-2 text-sm text-white/55">Select default or secondary delivery address for this Delivery Order.</p>
+                    </div>
+                    <div className="w-full md:w-80">
+                      <SearchableSelect
+                        label="Address Source"
+                        placeholder="Select delivery address"
+                        options={deliveryAddressOptions}
+                        value={deliveryAddressSource}
+                        disabled={!customerId}
+                        onChange={(option) => {
+                          if (!selectedCustomer) return;
+                          applyDeliveryAddressFromCustomer(selectedCustomer, option?.id || "DEFAULT");
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-5 grid gap-5 md:grid-cols-2">
+                    <div><label className="label-rk">Delivery Address Line 1</label><input className="input-rk" value={deliveryAddressLine1} onChange={(e) => setDeliveryAddressLine1(e.target.value)} /></div>
+                    <div><label className="label-rk">Delivery Address Line 2</label><input className="input-rk" value={deliveryAddressLine2} onChange={(e) => setDeliveryAddressLine2(e.target.value)} /></div>
+                    <div><label className="label-rk">Delivery Address Line 3</label><input className="input-rk" value={deliveryAddressLine3} onChange={(e) => setDeliveryAddressLine3(e.target.value)} /></div>
+                    <div><label className="label-rk">Delivery Address Line 4</label><input className="input-rk" value={deliveryAddressLine4} onChange={(e) => setDeliveryAddressLine4(e.target.value)} /></div>
+                    <div><label className="label-rk">City</label><input className="input-rk" value={deliveryCity} onChange={(e) => setDeliveryCity(e.target.value)} /></div>
+                    <div><label className="label-rk">Post Code</label><input className="input-rk" value={deliveryPostCode} onChange={(e) => setDeliveryPostCode(e.target.value)} /></div>
+                    <div><label className="label-rk">Country Code</label><input className="input-rk" value={deliveryCountryCode} onChange={(e) => setDeliveryCountryCode(e.target.value.toUpperCase())} /></div>
+                  </div>
+                </div>
               </div>
             ) : null}
 
             {activeTab === "BODY" ? (
-              <div className="mt-6 rounded-[1.5rem] border border-white/10 p-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-bold">Products</h3>
-                  <button type="button" onClick={() => setLines((prev) => [...prev, emptyLine(defaultLocationId)])} className="rounded-xl border border-white/15 px-4 py-2 text-sm text-white/75 transition hover:bg-white/10">
-                    Add Line
-                  </button>
-                </div>
-                <div className="mt-4 overflow-x-auto">
-                  <table className="min-w-[1200px] divide-y divide-white/10 text-sm">
-                    <thead className="text-left text-white/45">
-                      <tr>
-                        <th className="px-3 py-3">Product</th>
-                        <th className="px-3 py-3">UOM</th>
-                        <th className="px-3 py-3 text-right">Qty</th>
-                        <th className="px-3 py-3 text-right">Selling Price</th>
-                        <th className="px-3 py-3">Location</th>
-                        <th className="px-3 py-3">Remarks</th>
-                        <th className="px-3 py-3 text-right">Total</th>
-                        <th className="px-3 py-3"></th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-white/10 text-white/80">
-                      {lines.map((line, index) => (
-                        <tr key={index}>
-                          <td className="px-3 py-4 min-w-[280px]">
-                            <SearchableSelect label="" placeholder="Select product" options={productOptions} value={line.inventoryProductId} onChange={(option) => handleProductChange(index, option?.id || "")} disabled={Boolean(line.sourceLineId)} />
-                            {line.productDescription ? <div className="mt-2 text-xs text-white/45">{line.productDescription}</div> : null}
-                          </td>
-                          <td className="px-3 py-4"><input className="input-rk min-w-[90px]" value={line.uom} onChange={(e) => updateLine(index, { uom: e.target.value.toUpperCase() })} readOnly={Boolean(line.sourceLineId)} /></td>
-                          <td className="px-3 py-4"><input className="input-rk min-w-[90px] text-right" type="number" min="0" step="0.001" value={line.qty} onChange={(e) => updateLine(index, { qty: e.target.value })} /></td>
-                          <td className="px-3 py-4"><input className="input-rk min-w-[110px] text-right" type="number" min="0" step="0.01" value={line.unitPrice} onChange={(e) => updateLine(index, { unitPrice: e.target.value })} /></td>
-                          <td className="px-3 py-4 min-w-[240px]"><SearchableSelect label="" placeholder="Select location" options={locationOptions} value={line.locationId} onChange={(option) => updateLine(index, { locationId: option?.id || "" })} /></td>
-                          <td className="px-3 py-4"><input className="input-rk min-w-[180px]" value={line.remarks} onChange={(e) => updateLine(index, { remarks: e.target.value })} /></td>
-                          <td className="px-3 py-4 text-right">{money(normalizedLines[index]?.lineTotal || 0)}</td>
-                          <td className="px-3 py-4 text-right"><button type="button" onClick={() => setLines((prev) => prev.filter((_, lineIndex) => lineIndex !== index))} className="rounded-lg border border-red-500/30 px-3 py-2 text-xs text-red-200">Remove</button></td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+              <div className="mt-6 space-y-6">
+                {lines.map((line, index) => {
+                  const normalizedLine = normalizedLines[index];
+                  return (
+                    <div key={index} className="rounded-[1.5rem] border border-white/10 p-5">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <h3 className="text-lg font-bold">Product {index + 1}</h3>
+                        {lines.length > 1 ? (
+                          <button type="button" onClick={() => setLines((prev) => prev.filter((_, lineIndex) => lineIndex !== index))} className="rounded-xl border border-red-500/30 px-4 py-2 text-sm text-red-200 transition hover:bg-red-500/10">
+                            Remove
+                          </button>
+                        ) : null}
+                      </div>
+
+                      <div className="mt-5 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+                        <div className="xl:col-span-2">
+                          <SearchableSelect label="Product" placeholder="Search or select product" options={productOptions} value={line.inventoryProductId} onChange={(option) => handleProductChange(index, option?.id || "")} disabled={Boolean(line.sourceLineId)} />
+                          {line.productDescription ? <div className="mt-2 text-xs text-white/45">{line.productDescription}</div> : null}
+                        </div>
+                        <div><label className="label-rk">UOM</label><input className="input-rk" value={line.uom} onChange={(e) => updateLine(index, { uom: e.target.value.toUpperCase() })} readOnly={Boolean(line.sourceLineId)} /></div>
+                        <div><label className="label-rk">Qty</label><input className="input-rk text-right" type="number" min="0" step="0.001" value={line.qty} onChange={(e) => updateLine(index, { qty: e.target.value })} /></div>
+                        <div><label className="label-rk">Selling Price</label><input className="input-rk text-right" type="number" min="0" step="0.01" value={line.unitPrice} onChange={(e) => updateLine(index, { unitPrice: e.target.value })} /></div>
+                        <div><label className="label-rk">Discount</label><div className="grid grid-cols-[1fr_120px] gap-3"><input className="input-rk" type="number" min="0" step="0.01" value={line.discountRate} onChange={(e) => updateLine(index, { discountRate: e.target.value })} /><CompactSelect options={[{ id: "PERCENT", label: "%", searchText: "percent %" }, { id: "AMOUNT", label: "RM", searchText: "amount rm" }]} value={line.discountType} onChange={(value) => updateLine(index, { discountType: value === "AMOUNT" ? "AMOUNT" : "PERCENT" })} /></div></div>
+                        <div className="xl:col-span-2"><SearchableSelect label="Location" placeholder="Select location" options={locationOptions} value={line.locationId} onChange={(option) => updateLine(index, { locationId: option?.id || "" })} /></div>
+                        <div><label className="label-rk">Gross Amount</label><input className="input-rk text-right" value={money(normalizedLine?.lineTotal || 0)} readOnly /></div>
+                        <div className="xl:col-span-4"><label className="label-rk">Product Remarks</label><textarea className="input-rk min-h-[80px]" value={line.remarks} onChange={(e) => updateLine(index, { remarks: e.target.value })} /></div>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                <button type="button" onClick={() => setLines((prev) => [...prev, emptyLine(defaultLocationId)])} className="rounded-xl border border-white/15 px-5 py-3 text-sm text-white/75 transition hover:bg-white/10">
+                  + Add Product
+                </button>
               </div>
             ) : null}
 

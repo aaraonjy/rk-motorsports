@@ -192,9 +192,9 @@ export default async function AdminDeliveryOrderDetailPage({ params }: Params) {
                     <th className="px-4 py-3">Generated From</th>
                     <th className="px-4 py-3">UOM</th>
                     <th className="px-4 py-3 text-right">Qty</th>
-                    <th className="px-4 py-3 text-right">Unit Price</th>
+                    <th className="px-4 py-3 text-right">Selling Price</th>
                     <th className="px-4 py-3">Location</th>
-                    <th className="px-4 py-3 text-right">Product Total</th>
+                    <th className="px-4 py-3 text-right">Gross Amount</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/10 text-white/80">
