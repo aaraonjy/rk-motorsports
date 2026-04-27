@@ -569,6 +569,7 @@ export function AdminSalesQuotationClient({
 
   const [transactions, setTransactions] = useState<QuotationRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [products, setProducts] = useState<ProductOption[]>(initialProducts);
   const [searchKeyword, setSearchKeyword] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -682,12 +683,12 @@ export function AdminSalesQuotationClient({
 
   const productOptions = useMemo<SearchableSelectOption[]>(
     () =>
-      initialProducts.map((product) => ({
+      products.map((product) => ({
         id: product.id,
         label: `${product.code} — ${product.description}`,
         searchText: `${product.code} ${product.description} ${product.baseUom}`.toLowerCase(),
       })),
-    [initialProducts]
+    [products]
   );
 
   const locationOptions = useMemo<SearchableSelectOption[]>(
@@ -986,7 +987,35 @@ export function AdminSalesQuotationClient({
     setIsCreateOpen(true);
   }
 
+
+  async function loadLatestProducts() {
+    try {
+      const response = await fetch("/api/admin/products?activeOnly=1", { cache: "no-store" });
+      const data = await response.json();
+      if (!response.ok || !data.ok || !Array.isArray(data.products)) return;
+      setProducts(
+        data.products.map((product: any) => ({
+          id: product.id,
+          code: product.code,
+          description: product.description,
+          baseUom: product.baseUom,
+          sellingPrice: Number(product.sellingPrice ?? 0),
+          batchTracking: Boolean(product.batchTracking),
+          serialNumberTracking: Boolean(product.serialNumberTracking),
+          uomConversions: Array.isArray(product.uomConversions)
+            ? product.uomConversions.map((item: any) => ({
+                id: item.id,
+                uomCode: item.uomCode,
+                conversionRate: Number(item.conversionRate ?? 0),
+              }))
+            : [],
+        }))
+      );
+    } catch {}
+  }
+
   async function openCreate() {
+    await loadLatestProducts();
     setFormMode("create");
     setEditTarget(null);
     resetForm();
@@ -1054,7 +1083,7 @@ export function AdminSalesQuotationClient({
   }
 
   function handleProductChange(index: number, productId: string) {
-    const product = initialProducts.find((item) => item.id === productId);
+    const product = products.find((item) => item.id === productId);
     if (!product) {
       updateLine(index, { inventoryProductId: "", productCode: "", productDescription: "", uom: "", unitPrice: formatDecimalInput(0, priceDecimalPlaces) });
       return;
@@ -1376,7 +1405,7 @@ export function AdminSalesQuotationClient({
                   const normalizedLine = normalizedLines[index];
                   const total = normalizedLine?.lineTotal || 0;
                   const taxAmount = normalizedLine?.taxAmount || 0;
-                  const selectedProduct = initialProducts.find((item) => item.id === line.inventoryProductId) || null;
+                  const selectedProduct = products.find((item) => item.id === line.inventoryProductId) || null;
                   const uomOptions = getProductUomOptions(selectedProduct);
                   const trackingInfo = getProductTrackingInfo(selectedProduct);
                   return (

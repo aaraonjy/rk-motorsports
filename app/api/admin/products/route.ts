@@ -64,6 +64,35 @@ function mapProduct(product: any) {
   };
 }
 
+export async function GET(req: Request) {
+  try {
+    await requireAdmin();
+    const { searchParams } = new URL(req.url);
+    const activeOnly = searchParams.get("activeOnly") === "1" || searchParams.get("activeOnly") === "true";
+    const trackInventoryOnly = searchParams.get("trackInventory") === "1" || searchParams.get("trackInventory") === "true";
+
+    const products = await db.inventoryProduct.findMany({
+      where: {
+        ...(activeOnly ? { isActive: true } : {}),
+        ...(trackInventoryOnly ? { trackInventory: true } : {}),
+      },
+      orderBy: [{ code: "asc" }],
+      include: {
+        uomConversions: {
+          orderBy: [{ uomCode: "asc" }],
+        },
+      },
+    });
+
+    return NextResponse.json({ ok: true, products: products.map((product) => mapProduct(product)) });
+  } catch (error) {
+    return NextResponse.json(
+      { ok: false, error: error instanceof Error ? error.message : "Unable to load products." },
+      { status: error instanceof Error && error.message === "FORBIDDEN" ? 403 : 500 }
+    );
+  }
+}
+
 export async function POST(req: Request) {
   try {
     const admin = await requireAdmin();

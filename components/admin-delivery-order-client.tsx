@@ -670,6 +670,7 @@ export function AdminDeliveryOrderClient({
 
   const [transactions, setTransactions] = useState<DeliveryOrderRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [products, setProducts] = useState<ProductOption[]>(initialProducts);
   const [searchKeyword, setSearchKeyword] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -749,12 +750,12 @@ export function AdminDeliveryOrderClient({
 
   const productOptions = useMemo<SearchableSelectOption[]>(
     () =>
-      initialProducts.map((product) => ({
+      products.map((product) => ({
         id: product.id,
         label: `${product.code} — ${product.description}`,
         searchText: `${product.code} ${product.description} ${product.baseUom}`.toLowerCase(),
       })),
-    [initialProducts]
+    [products]
   );
 
   const locationOptions = useMemo<SearchableSelectOption[]>(
@@ -927,7 +928,7 @@ export function AdminDeliveryOrderClient({
 
   useEffect(() => {
     lines.forEach((line, index) => {
-      const product = initialProducts.find((item) => item.id === line.inventoryProductId);
+      const product = products.find((item) => item.id === line.inventoryProductId);
       if (!line.inventoryProductId || !line.locationId || !product?.batchTracking) return;
       if (availableBatches[index] !== undefined || loadingBatches[index]) return;
 
@@ -945,11 +946,11 @@ export function AdminDeliveryOrderClient({
         .catch(() => setAvailableBatches((prev) => ({ ...prev, [index]: [] })))
         .finally(() => setLoadingBatches((prev) => ({ ...prev, [index]: false })));
     });
-  }, [availableBatches, initialProducts, lines, loadingBatches]);
+  }, [availableBatches, products, lines, loadingBatches]);
 
   useEffect(() => {
     lines.forEach((line, index) => {
-      const product = initialProducts.find((item) => item.id === line.inventoryProductId);
+      const product = products.find((item) => item.id === line.inventoryProductId);
       if (!line.inventoryProductId || !line.locationId || !product?.serialNumberTracking) return;
       if (availableSerials[index] !== undefined || loadingSerials[index]) return;
 
@@ -967,12 +968,12 @@ export function AdminDeliveryOrderClient({
         .catch(() => setAvailableSerials((prev) => ({ ...prev, [index]: [] })))
         .finally(() => setLoadingSerials((prev) => ({ ...prev, [index]: false })));
     });
-  }, [availableSerials, initialProducts, lines, loadingSerials]);
+  }, [availableSerials, products, lines, loadingSerials]);
 
   useEffect(() => {
     lines.forEach((line) => {
       if (!line.inventoryProductId || !line.locationId) return;
-      const product = initialProducts.find((item) => item.id === line.inventoryProductId);
+      const product = products.find((item) => item.id === line.inventoryProductId);
       const batchNo = product?.batchTracking ? line.batchNo : "";
       if (product?.batchTracking && !batchNo) return;
       const key = balanceKey(line.inventoryProductId, line.locationId, batchNo);
@@ -993,7 +994,7 @@ export function AdminDeliveryOrderClient({
           setLoadingBalances((prev) => ({ ...prev, [key]: false }));
         });
     });
-  }, [balances, initialProducts, lines, loadingBalances]);
+  }, [balances, products, lines, loadingBalances]);
 
   function resetForm() {
     setFormMode("create");
@@ -1040,7 +1041,35 @@ export function AdminDeliveryOrderClient({
     setLoadingSerials({});
   }
 
+
+  async function loadLatestProducts() {
+    try {
+      const response = await fetch("/api/admin/products?activeOnly=1&trackInventory=1", { cache: "no-store" });
+      const data = await response.json();
+      if (!response.ok || !data.ok || !Array.isArray(data.products)) return;
+      setProducts(
+        data.products.map((product: any) => ({
+          id: product.id,
+          code: product.code,
+          description: product.description,
+          baseUom: product.baseUom,
+          sellingPrice: Number(product.sellingPrice ?? 0),
+          batchTracking: Boolean(product.batchTracking),
+          serialNumberTracking: Boolean(product.serialNumberTracking),
+          uomConversions: Array.isArray(product.uomConversions)
+            ? product.uomConversions.map((item: any) => ({
+                id: item.id,
+                uomCode: item.uomCode,
+                conversionRate: Number(item.conversionRate ?? 0),
+              }))
+            : [],
+        }))
+      );
+    } catch {}
+  }
+
   async function openCreate() {
+    await loadLatestProducts();
     resetForm();
     setIsCreateOpen(true);
     await loadNextDocNo(todayInput());
@@ -1153,7 +1182,7 @@ export function AdminDeliveryOrderClient({
   }
 
   function handleProductChange(index: number, productId: string) {
-    const product = initialProducts.find((item) => item.id === productId);
+    const product = products.find((item) => item.id === productId);
     if (!product) {
       updateLine(index, { inventoryProductId: "", productCode: "", productDescription: "", uom: "", unitPrice: formatDecimalInput(0, priceDecimalPlaces), batchNo: "", serialNos: [], serialSearch: "" });
       return;
@@ -1175,6 +1204,7 @@ export function AdminDeliveryOrderClient({
   }
 
   function openGenerateFromSalesOrder() {
+    void loadLatestProducts();
     setGenerateFromError("");
     setSubmitError("");
     if (!customerId) {
@@ -1297,7 +1327,7 @@ export function AdminDeliveryOrderClient({
       if (!line.inventoryProductId || !line.productCode) return `Product line ${index + 1} is missing product.`;
       if (Number(line.qty || 0) <= 0) return `Product line ${index + 1} quantity must be greater than zero.`;
       if (!line.locationId) return `Product line ${index + 1} requires stock location.`;
-      const product = initialProducts.find((item) => item.id === line.inventoryProductId);
+      const product = products.find((item) => item.id === line.inventoryProductId);
       if (product?.batchTracking && !line.batchNo) return `Product line ${index + 1} requires Batch No.`;
       if (product?.serialNumberTracking) {
         if (line.serialNos.length === 0) return `Product line ${index + 1} requires S/N No.`;
@@ -1586,7 +1616,7 @@ export function AdminDeliveryOrderClient({
                   const normalizedLine = normalizedLines[index];
                   const total = normalizedLine?.lineTotal || 0;
                   const taxAmount = 0;
-                  const selectedProduct = initialProducts.find((item) => item.id === line.inventoryProductId) || null;
+                  const selectedProduct = products.find((item) => item.id === line.inventoryProductId) || null;
                   const uomOptions = selectedProduct
                     ? [
                         {
