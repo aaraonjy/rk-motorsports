@@ -186,6 +186,9 @@ type LineForm = {
   discountRate: string;
   discountType: "PERCENT" | "AMOUNT";
   locationId: string;
+  batchNo: string;
+  serialNos: string[];
+  serialSearch: string;
   remarks: string;
 };
 
@@ -213,8 +216,43 @@ type SearchableSelectOption = { id: string; label: string; searchText: string };
 
 type BalanceResponse = { ok?: boolean; balance?: number; error?: string };
 
-function balanceKey(productId: string, locationId: string) {
-  return `${productId}__${locationId}`;
+type AvailableBatch = {
+  id: string;
+  batchNo: string;
+  expiryDate?: string | null;
+  balance?: number | null;
+};
+
+type AvailableSerial = {
+  id: string;
+  serialNo: string;
+  batchNo?: string | null;
+  expiryDate?: string | null;
+};
+
+function balanceKey(productId: string, locationId: string, batchNo?: string) {
+  return `${productId}__${locationId}__${(batchNo || "").trim().toUpperCase()}`;
+}
+
+function uniqueSerialNos(values: string[]) {
+  const seen = new Set<string>();
+  const next: string[] = [];
+  for (const value of values) {
+    const normalized = String(value || "").trim();
+    if (!normalized) continue;
+    const key = normalized.toUpperCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    next.push(normalized);
+  }
+  return next;
+}
+
+function batchOptionLabel(batch: AvailableBatch, qtyDecimalPlaces: number) {
+  const parts = [batch.batchNo];
+  if (typeof batch.balance === "number") parts.push(`Bal ${moneyWithPlaces(batch.balance, qtyDecimalPlaces)}`);
+  if (batch.expiryDate) parts.push(`Exp ${batch.expiryDate.slice(0, 10)}`);
+  return parts.join(" • ");
 }
 
 function getBalanceDisplay(value: number | undefined, isLoading: boolean, decimalPlaces: number) {
@@ -360,6 +398,9 @@ function emptyLine(defaultLocationId = "", qtyDecimalPlaces = 2, priceDecimalPla
     discountRate: "0",
     discountType: "PERCENT",
     locationId: defaultLocationId,
+    batchNo: "",
+    serialNos: [],
+    serialSearch: "",
     remarks: "",
   };
 }
@@ -495,6 +536,110 @@ function CompactSelect({ options, value, onChange }: { options: SearchableSelect
 }
 
 
+function OutboundSerialPicker({
+  label,
+  availableSerials,
+  selectedSerials,
+  searchValue,
+  onSearchValueChange,
+  onToggle,
+  disabled = false,
+}: {
+  label: string;
+  availableSerials: AvailableSerial[];
+  selectedSerials: string[];
+  searchValue: string;
+  onSearchValueChange: (value: string) => void;
+  onToggle: (serialNo: string) => void;
+  disabled?: boolean;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    function handleOutsideClick(event: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) setIsOpen(false);
+    }
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, []);
+
+  const filtered = useMemo(() => {
+    const keyword = searchValue.trim().toLowerCase();
+    if (!keyword) return availableSerials;
+    return availableSerials.filter((item) => `${item.serialNo} ${item.batchNo || ""} ${item.expiryDate || ""}`.toLowerCase().includes(keyword));
+  }, [availableSerials, searchValue]);
+
+  return (
+    <div className="space-y-3" ref={containerRef}>
+      <div className="relative">
+        <label className="label-rk">{label}</label>
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => {
+            if (disabled) return;
+            setIsOpen((prev) => !prev);
+          }}
+          className={`input-rk flex items-center justify-between gap-3 text-left ${disabled ? "cursor-not-allowed opacity-60" : ""}`}
+        >
+          <span className={selectedSerials.length > 0 ? "truncate text-white" : "truncate text-white/45"}>
+            {selectedSerials.length > 0 ? `${selectedSerials.length} serial(s) selected` : "Select existing serial no"}
+          </span>
+          <span className="shrink-0 text-white/60">▾</span>
+        </button>
+
+        {isOpen ? (
+          <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-[160] overflow-hidden rounded-2xl border border-white/10 bg-[#0b0b0f] shadow-2xl">
+            <div className="border-b border-white/10 p-3">
+              <input autoFocus className="input-rk" value={searchValue} onChange={(e) => onSearchValueChange(e.target.value)} placeholder="Search serial no" />
+            </div>
+            <div className="max-h-64 overflow-y-auto p-2">
+              {filtered.length === 0 ? (
+                <div className="rounded-xl px-3 py-3 text-sm text-white/45">No available serial numbers found for the selected product/location.</div>
+              ) : (
+                filtered.map((serial) => {
+                  const selected = selectedSerials.some((value) => value.toUpperCase() === serial.serialNo.toUpperCase());
+                  const meta = [serial.batchNo || null, serial.expiryDate ? `Exp ${serial.expiryDate.slice(0, 10)}` : null].filter(Boolean).join(" • ");
+                  return (
+                    <button
+                      key={serial.id}
+                      type="button"
+                      onClick={() => {
+                        onToggle(serial.serialNo);
+                        setIsOpen(false);
+                      }}
+                      className={`flex w-full items-start justify-between gap-3 rounded-xl px-3 py-3 text-left text-sm transition ${
+                        selected ? "bg-white/10 text-white" : "text-white/85 hover:bg-white/10 hover:text-white"
+                      }`}
+                    >
+                      <div>
+                        <div className="font-medium">{serial.serialNo}</div>
+                        {meta ? <div className="mt-1 text-xs text-white/45">{meta}</div> : null}
+                      </div>
+                      <div className="text-xs font-semibold">{selected ? "Selected" : "Select"}</div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        ) : null}
+      </div>
+
+      {selectedSerials.length > 0 ? (
+        <div className="flex flex-wrap gap-2">
+          {selectedSerials.map((serialNo) => (
+            <button key={serialNo} type="button" onClick={() => onToggle(serialNo)} className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs text-white/80 transition hover:bg-white/10">
+              {serialNo} ×
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function SummaryRow({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
   return (
     <div className={`mt-4 flex items-center justify-between gap-4 ${strong ? "text-xl font-bold text-white" : "text-white/75"}`}>
@@ -574,6 +719,10 @@ export function AdminDeliveryOrderClient({
   const [lines, setLines] = useState<LineForm[]>([emptyLine(defaultLocationId, qtyDecimalPlaces, priceDecimalPlaces)]);
   const [balances, setBalances] = useState<Record<string, number>>({});
   const [loadingBalances, setLoadingBalances] = useState<Record<string, boolean>>({});
+  const [availableBatches, setAvailableBatches] = useState<Record<number, AvailableBatch[]>>({});
+  const [loadingBatches, setLoadingBatches] = useState<Record<number, boolean>>({});
+  const [availableSerials, setAvailableSerials] = useState<Record<number, AvailableSerial[]>>({});
+  const [loadingSerials, setLoadingSerials] = useState<Record<number, boolean>>({});
 
   const statusOptions = useMemo<SearchableSelectOption[]>(
     () => [
@@ -777,13 +926,62 @@ export function AdminDeliveryOrderClient({
   }, [docDate, isCreateOpen, docNo]);
 
   useEffect(() => {
+    lines.forEach((line, index) => {
+      const product = initialProducts.find((item) => item.id === line.inventoryProductId);
+      if (!line.inventoryProductId || !line.locationId || !product?.batchTracking) return;
+      if (availableBatches[index] !== undefined || loadingBatches[index]) return;
+
+      setLoadingBatches((prev) => ({ ...prev, [index]: true }));
+      const params = new URLSearchParams({
+        inventoryProductId: line.inventoryProductId,
+        locationId: line.locationId,
+        direction: "outbound",
+      });
+      fetch(`/api/admin/stock/available-batches?${params.toString()}`, { cache: "no-store" })
+        .then((response) => response.json())
+        .then((data) => {
+          setAvailableBatches((prev) => ({ ...prev, [index]: data?.ok && Array.isArray(data.items) ? data.items : [] }));
+        })
+        .catch(() => setAvailableBatches((prev) => ({ ...prev, [index]: [] })))
+        .finally(() => setLoadingBatches((prev) => ({ ...prev, [index]: false })));
+    });
+  }, [availableBatches, initialProducts, lines, loadingBatches]);
+
+  useEffect(() => {
+    lines.forEach((line, index) => {
+      const product = initialProducts.find((item) => item.id === line.inventoryProductId);
+      if (!line.inventoryProductId || !line.locationId || !product?.serialNumberTracking) return;
+      if (availableSerials[index] !== undefined || loadingSerials[index]) return;
+
+      setLoadingSerials((prev) => ({ ...prev, [index]: true }));
+      const params = new URLSearchParams({
+        inventoryProductId: line.inventoryProductId,
+        locationId: line.locationId,
+      });
+      if (line.batchNo) params.set("batchNo", line.batchNo);
+      fetch(`/api/admin/stock/available-serials?${params.toString()}`, { cache: "no-store" })
+        .then((response) => response.json())
+        .then((data) => {
+          setAvailableSerials((prev) => ({ ...prev, [index]: data?.ok && Array.isArray(data.serials) ? data.serials : [] }));
+        })
+        .catch(() => setAvailableSerials((prev) => ({ ...prev, [index]: [] })))
+        .finally(() => setLoadingSerials((prev) => ({ ...prev, [index]: false })));
+    });
+  }, [availableSerials, initialProducts, lines, loadingSerials]);
+
+  useEffect(() => {
     lines.forEach((line) => {
       if (!line.inventoryProductId || !line.locationId) return;
-      const key = balanceKey(line.inventoryProductId, line.locationId);
+      const product = initialProducts.find((item) => item.id === line.inventoryProductId);
+      const batchNo = product?.batchTracking ? line.batchNo : "";
+      if (product?.batchTracking && !batchNo) return;
+      const key = balanceKey(line.inventoryProductId, line.locationId, batchNo);
       if (balances[key] !== undefined || loadingBalances[key]) return;
 
       setLoadingBalances((prev) => ({ ...prev, [key]: true }));
-      fetch(`/api/admin/stock/balance?inventoryProductId=${encodeURIComponent(line.inventoryProductId)}&locationId=${encodeURIComponent(line.locationId)}`, { cache: "no-store" })
+      const params = new URLSearchParams({ inventoryProductId: line.inventoryProductId, locationId: line.locationId });
+      if (batchNo) params.set("batchNo", batchNo);
+      fetch(`/api/admin/stock/balance?${params.toString()}`, { cache: "no-store" })
         .then((response) => response.json())
         .then((data: BalanceResponse) => {
           if (data?.ok && typeof data.balance === "number") {
@@ -795,7 +993,7 @@ export function AdminDeliveryOrderClient({
           setLoadingBalances((prev) => ({ ...prev, [key]: false }));
         });
     });
-  }, [balances, lines, loadingBalances]);
+  }, [balances, initialProducts, lines, loadingBalances]);
 
   function resetForm() {
     setFormMode("create");
@@ -834,6 +1032,12 @@ export function AdminDeliveryOrderClient({
     setGenerateFromError("");
     setSelectedSourceOrderIds([]);
     setPickLines([]);
+    setBalances({});
+    setLoadingBalances({});
+    setAvailableBatches({});
+    setLoadingBatches({});
+    setAvailableSerials({});
+    setLoadingSerials({});
   }
 
   async function openCreate() {
@@ -889,6 +1093,9 @@ export function AdminDeliveryOrderClient({
             discountRate: formatDecimalInput(line.discountRate ?? 0, priceDecimalPlaces),
             discountType: line.discountType === "AMOUNT" ? "AMOUNT" : "PERCENT",
             locationId: line.locationId || defaultLocationId,
+            batchNo: (line as any).batchNo || "",
+            serialNos: uniqueSerialNos(((line as any).serialNos || []) as string[]),
+            serialSearch: "",
             remarks: line.remarks || "",
           }))
         : [emptyLine(defaultLocationId, qtyDecimalPlaces, priceDecimalPlaces)]
@@ -948,7 +1155,7 @@ export function AdminDeliveryOrderClient({
   function handleProductChange(index: number, productId: string) {
     const product = initialProducts.find((item) => item.id === productId);
     if (!product) {
-      updateLine(index, { inventoryProductId: "", productCode: "", productDescription: "", uom: "", unitPrice: formatDecimalInput(0, priceDecimalPlaces) });
+      updateLine(index, { inventoryProductId: "", productCode: "", productDescription: "", uom: "", unitPrice: formatDecimalInput(0, priceDecimalPlaces), batchNo: "", serialNos: [], serialSearch: "" });
       return;
     }
     updateLine(index, {
@@ -958,7 +1165,13 @@ export function AdminDeliveryOrderClient({
       uom: product.baseUom,
       unitPrice: formatDecimalInput(product.sellingPrice, priceDecimalPlaces),
       locationId: lines[index]?.locationId || defaultLocationId,
+      batchNo: "",
+      serialNos: [],
+      serialSearch: "",
     });
+    setAvailableBatches((prev) => { const next = { ...prev }; delete next[index]; return next; });
+    setAvailableSerials((prev) => { const next = { ...prev }; delete next[index]; return next; });
+    setBalances({});
   }
 
   function openGenerateFromSalesOrder() {
@@ -1063,6 +1276,9 @@ export function AdminDeliveryOrderClient({
         discountRate: String(line.discountRate),
         discountType: line.discountType,
         locationId: line.locationId || defaultLocationId,
+        batchNo: "",
+        serialNos: [],
+        serialSearch: "",
         remarks: line.remarks,
       }))
     );
@@ -1081,6 +1297,12 @@ export function AdminDeliveryOrderClient({
       if (!line.inventoryProductId || !line.productCode) return `Product line ${index + 1} is missing product.`;
       if (Number(line.qty || 0) <= 0) return `Product line ${index + 1} quantity must be greater than zero.`;
       if (!line.locationId) return `Product line ${index + 1} requires stock location.`;
+      const product = initialProducts.find((item) => item.id === line.inventoryProductId);
+      if (product?.batchTracking && !line.batchNo) return `Product line ${index + 1} requires Batch No.`;
+      if (product?.serialNumberTracking) {
+        if (line.serialNos.length === 0) return `Product line ${index + 1} requires S/N No.`;
+        if (Number(line.qty || 0) !== line.serialNos.length) return `Product line ${index + 1} quantity must match selected S/N count.`;
+      }
     }
 
     return "";
@@ -1140,6 +1362,10 @@ export function AdminDeliveryOrderClient({
       setSubmitSuccess(successMessage);
       setBalances({});
       setLoadingBalances({});
+      setAvailableBatches({});
+      setLoadingBatches({});
+      setAvailableSerials({});
+      setLoadingSerials({});
       await loadTransactions();
       router.refresh();
     } catch (error) {
@@ -1163,6 +1389,10 @@ export function AdminDeliveryOrderClient({
       setCancelReason("");
       setBalances({});
       setLoadingBalances({});
+      setAvailableBatches({});
+      setLoadingBatches({});
+      setAvailableSerials({});
+      setLoadingSerials({});
       await loadTransactions();
       router.refresh();
     } catch (error) {
@@ -1423,16 +1653,65 @@ export function AdminDeliveryOrderClient({
                             placeholder="Search or select location"
                             options={locationOptions}
                             value={line.locationId}
-                            onChange={(option) => updateLine(index, { locationId: option?.id || "" })}
+                            onChange={(option) => {
+                              updateLine(index, { locationId: option?.id || "", batchNo: "", serialNos: [], serialSearch: "" });
+                              setAvailableBatches((prev) => { const next = { ...prev }; delete next[index]; return next; });
+                              setAvailableSerials((prev) => { const next = { ...prev }; delete next[index]; return next; });
+                              setBalances({});
+                            }}
                           />
                           <p className="mt-2 text-xs text-white/45">
-                            {getBalanceDisplay(
-                              line.inventoryProductId && line.locationId ? balances[balanceKey(line.inventoryProductId, line.locationId)] : undefined,
-                              line.inventoryProductId && line.locationId ? Boolean(loadingBalances[balanceKey(line.inventoryProductId, line.locationId)]) : false,
-                              qtyDecimalPlaces
-                            )}
+                            {selectedProduct?.batchTracking && !line.batchNo
+                              ? "Select Batch No to view batch balance."
+                              : getBalanceDisplay(
+                                  line.inventoryProductId && line.locationId ? balances[balanceKey(line.inventoryProductId, line.locationId, selectedProduct?.batchTracking ? line.batchNo : "")] : undefined,
+                                  line.inventoryProductId && line.locationId ? Boolean(loadingBalances[balanceKey(line.inventoryProductId, line.locationId, selectedProduct?.batchTracking ? line.batchNo : "")]) : false,
+                                  qtyDecimalPlaces
+                                )}
                           </p>
                         </div>
+                        {selectedProduct?.batchTracking ? (
+                          <div className="md:col-span-2">
+                            <SearchableSelect
+                              label="Batch No"
+                              placeholder={loadingBatches[index] ? "Loading batches..." : "Select Batch No"}
+                              options={(availableBatches[index] || []).map((batch) => ({
+                                id: batch.batchNo,
+                                label: batchOptionLabel(batch, qtyDecimalPlaces),
+                                searchText: `${batch.batchNo} ${batch.expiryDate || ""}`.toLowerCase(),
+                              }))}
+                              value={line.batchNo}
+                              disabled={!line.inventoryProductId || !line.locationId || Boolean(loadingBatches[index])}
+                              onChange={(option) => {
+                                updateLine(index, { batchNo: option?.id || "", serialNos: [], serialSearch: "" });
+                                setAvailableSerials((prev) => { const next = { ...prev }; delete next[index]; return next; });
+                                setBalances({});
+                              }}
+                            />
+                            {line.inventoryProductId && line.locationId && !loadingBatches[index] && (availableBatches[index] || []).length === 0 ? (
+                              <p className="mt-2 text-xs text-amber-200">No available batch balance found for this product/location.</p>
+                            ) : null}
+                          </div>
+                        ) : null}
+                        {selectedProduct?.serialNumberTracking ? (
+                          <div className="md:col-span-2">
+                            <OutboundSerialPicker
+                              label="S/N No"
+                              availableSerials={availableSerials[index] || []}
+                              selectedSerials={line.serialNos}
+                              searchValue={line.serialSearch}
+                              onSearchValueChange={(value) => updateLine(index, { serialSearch: value })}
+                              onToggle={(serialNo) => {
+                                const exists = line.serialNos.some((item) => item.toUpperCase() === serialNo.toUpperCase());
+                                updateLine(index, { serialNos: exists ? line.serialNos.filter((item) => item.toUpperCase() !== serialNo.toUpperCase()) : uniqueSerialNos([...line.serialNos, serialNo]) });
+                              }}
+                              disabled={!line.inventoryProductId || !line.locationId || (selectedProduct.batchTracking && !line.batchNo) || Boolean(loadingSerials[index])}
+                            />
+                            {line.inventoryProductId && line.locationId && (!selectedProduct.batchTracking || line.batchNo) && !loadingSerials[index] && (availableSerials[index] || []).length === 0 ? (
+                              <p className="mt-2 text-xs text-amber-200">No available S/N found for this product/location{selectedProduct.batchTracking ? " and batch" : ""}.</p>
+                            ) : null}
+                          </div>
+                        ) : null}
                         <div>
                           <label className="label-rk">Tax Code</label>
                           <input className="input-rk" value="-" readOnly />

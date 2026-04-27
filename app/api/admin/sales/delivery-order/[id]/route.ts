@@ -109,6 +109,8 @@ type DirectDeliveryOrderLinePayload = {
   discountRate?: number | string | null;
   discountType?: string | null;
   locationId?: string | null;
+  batchNo?: string | null;
+  serialNos?: string[] | null;
   remarks?: string | null;
 };
 
@@ -139,6 +141,20 @@ async function loadStockNumberFormat(tx: Prisma.TransactionClient) {
 
 function normalizeText(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function normalizeSerialNumbers(value: unknown) {
+  const items = Array.isArray(value) ? value : [];
+  const normalized = items.map((item) => (typeof item === "string" ? item.trim() : "")).filter(Boolean);
+  const seen = new Set<string>();
+  const unique: string[] = [];
+  for (const serialNo of normalized) {
+    const key = serialNo.toUpperCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(serialNo);
+  }
+  return unique;
 }
 
 function decimalWithPlaces(value: number | string | null | undefined, decimalPlaces: number, fallback = 0) {
@@ -229,10 +245,16 @@ async function buildDirectDeliveryOrderData(body: any, tx: Prisma.TransactionCli
 
     if (!product) throw new Error(`Product line ${lineNo} is missing product information.`);
     if (!product.trackInventory) throw new Error(`${product.code} is not a tracked stock item and cannot be delivered through DO stock out.`);
-    if (product.serialNumberTracking || product.batchTracking) throw new Error(`${product.code} uses serial/batch tracking. Delivery Order serial/batch picking will be added in a later phase.`);
     if (!location) throw new Error(`Product line ${lineNo} requires a valid stock location.`);
 
     const qty = qtyDecimalWithPlaces(line.qty, numberFormat.qtyDecimalPlaces);
+    const batchNo = normalizeText((line as any).batchNo)?.toUpperCase() || null;
+    const serialNos = normalizeSerialNumbers((line as any).serialNos);
+    if (product.batchTracking && !batchNo) throw new Error(`${product.code} requires Batch No.`);
+    if (product.serialNumberTracking) {
+      if (serialNos.length === 0) throw new Error(`${product.code} requires S/N No.`);
+      if (toNumber(qty) !== serialNos.length) throw new Error(`${product.code} quantity must match selected S/N count.`);
+    }
     const unitPrice = decimalWithPlaces(line.unitPrice, numberFormat.priceDecimalPlaces, Number(product.sellingPrice ?? 0));
     const discountType = String(line.discountType || "PERCENT").toUpperCase() === "AMOUNT" ? "AMOUNT" : "PERCENT";
     const discountRate = discountType === "PERCENT" ? basicDecimal(line.discountRate, 0) : new Prisma.Decimal(0);
@@ -253,6 +275,10 @@ async function buildDirectDeliveryOrderData(body: any, tx: Prisma.TransactionCli
       discountType,
       discountAmount,
       locationId: location.id,
+      batchNo,
+      serialNos,
+      batchTracking: Boolean(product.batchTracking),
+      serialNumberTracking: Boolean(product.serialNumberTracking),
       locationCode: location.code,
       locationName: location.name,
       taxCodeId: null,
@@ -299,11 +325,24 @@ async function createStockIssueForDirectDeliveryOrder(tx: Prisma.TransactionClie
 
   await acquireAdvisoryLock(tx, buildTransactionNumberLockKey("SI", deliveryOrder.docDate));
   await acquireAdvisoryLock(tx, buildDocumentNumberLockKey("SI", deliveryOrder.docDate));
-  await acquireStockMutationLocks(tx, lines.map((line) => ({ inventoryProductId: line.inventoryProductId!, locationId: line.locationId })));
+  await acquireStockMutationLocks(tx, lines.map((line) => ({ inventoryProductId: line.inventoryProductId!, locationId: line.locationId, batchNo: line.batchNo, serialNos: line.serialNos || [] })));
 
   for (const line of lines) {
-    const balance = await getStockBalance(tx, line.inventoryProductId!, line.locationId);
     const requiredQty = toNumber(line.qty);
+    if (line.serialNumberTracking) {
+      const availableCount = await tx.inventorySerial.count({
+        where: {
+          inventoryProductId: line.inventoryProductId!,
+          currentLocationId: line.locationId,
+          status: "IN_STOCK",
+          serialNo: { in: line.serialNos || [] },
+          ...(line.batchNo ? { inventoryBatch: { is: { batchNo: line.batchNo } } } : {}),
+        },
+      });
+      if (availableCount !== (line.serialNos || []).length) throw new Error(`${line.productCode} has one or more unavailable S/N at the selected location${line.batchNo ? " / batch" : ""}.`);
+      continue;
+    }
+    const balance = await getStockBalance(tx, line.inventoryProductId!, line.locationId, { batchNo: line.batchNo });
     if (balance < requiredQty && !config.allowNegativeStock) throw new Error(`Insufficient stock for ${line.productCode}. Current balance: ${balance}. Required: ${requiredQty}.`);
   }
 
@@ -322,9 +361,25 @@ async function createStockIssueForDirectDeliveryOrder(tx: Prisma.TransactionClie
       projectId: deliveryOrder.projectId,
       departmentId: deliveryOrder.departmentId,
       createdByAdminId: adminId,
-      lines: { create: lines.map((line) => ({ inventoryProductId: line.inventoryProductId!, qty: line.qty, locationId: line.locationId, remarks: line.remarks || `Auto stock issue for ${deliveryOrder.docNo}` })) },
+      lines: {
+        create: lines.map((line) => ({
+          inventoryProductId: line.inventoryProductId!,
+          qty: line.qty,
+          locationId: line.locationId,
+          batchNo: line.batchNo,
+          remarks: line.remarks || `Auto stock issue for ${deliveryOrder.docNo}`,
+          serialEntries: (line.serialNos || []).length
+            ? {
+                create: (line.serialNos || []).map((serialNo: string) => ({
+                  inventoryProductId: line.inventoryProductId!,
+                  serialNo,
+                })),
+              }
+            : undefined,
+        })),
+      },
     },
-    include: { lines: true },
+    include: { lines: { include: { serialEntries: true } } },
   });
 
   for (const stockLine of stockTransaction.lines) {
@@ -347,6 +402,21 @@ async function createStockIssueForDirectDeliveryOrder(tx: Prisma.TransactionClie
         remarks: stockLine.remarks,
       },
     });
+
+    for (const serialEntry of stockLine.serialEntries || []) {
+      const serialRecord = await tx.inventorySerial.findUnique({
+        where: { inventoryProductId_serialNo: { inventoryProductId: stockLine.inventoryProductId, serialNo: serialEntry.serialNo } },
+        include: { inventoryBatch: true },
+      });
+      if (!serialRecord || serialRecord.status !== "IN_STOCK" || serialRecord.currentLocationId !== stockLine.locationId) {
+        throw new Error(`Serial No ${serialEntry.serialNo} is not available at the selected location.`);
+      }
+      if (stockLine.batchNo && serialRecord.inventoryBatch?.batchNo !== stockLine.batchNo) {
+        throw new Error(`Serial No ${serialEntry.serialNo} does not belong to Batch No ${stockLine.batchNo}.`);
+      }
+      await tx.inventorySerial.update({ where: { id: serialRecord.id }, data: { status: "OUT_OF_STOCK", currentLocationId: null } });
+      await tx.stockTransactionLineSerial.update({ where: { id: serialEntry.id }, data: { inventorySerialId: serialRecord.id, inventoryBatchId: serialRecord.inventoryBatchId } });
+    }
   }
 }
 
@@ -466,6 +536,20 @@ async function reverseStockIssueForDeliveryOrder(tx: Prisma.TransactionClient, d
         remarks: cancelReason || `Cancellation reversal for ${deliveryOrder.docNo}`,
       },
     });
+
+    for (const serialEntry of line.serialEntries || []) {
+      const serial = serialEntry.inventorySerialId
+        ? await tx.inventorySerial.findUnique({ where: { id: serialEntry.inventorySerialId } })
+        : await tx.inventorySerial.findUnique({
+            where: { inventoryProductId_serialNo: { inventoryProductId: line.inventoryProductId, serialNo: serialEntry.serialNo } },
+          });
+      if (!serial) throw new Error(`Serial No ${serialEntry.serialNo} cannot be found for DO cancellation.`);
+      if (serial.status !== "OUT_OF_STOCK") throw new Error(`Serial No ${serialEntry.serialNo} cannot be restored because it is not in outbound state.`);
+      await tx.inventorySerial.update({
+        where: { id: serial.id },
+        data: { status: "IN_STOCK", currentLocationId: line.locationId!, inventoryBatchId: serialEntry.inventoryBatchId ?? serial.inventoryBatchId },
+      });
+    }
   }
 
   await tx.stockTransaction.update({
@@ -528,7 +612,21 @@ export async function GET(_req: Request, context: Params) {
       return NextResponse.json({ ok: false, error: "Delivery Order not found." }, { status: 404 });
     }
 
-    return NextResponse.json({ ok: true, transaction });
+    const stockIssue = await db.stockTransaction.findFirst({
+      where: { transactionType: "SI", reference: transaction.docNo, status: { not: "CANCELLED" } },
+      include: { lines: { orderBy: { createdAt: "asc" }, include: { serialEntries: { orderBy: { serialNo: "asc" } } } } },
+    });
+
+    const transactionWithStockPicking = {
+      ...transaction,
+      lines: transaction.lines.map((line, index) => ({
+        ...line,
+        batchNo: stockIssue?.lines[index]?.batchNo || null,
+        serialNos: stockIssue?.lines[index]?.serialEntries.map((entry) => entry.serialNo) || [],
+      })),
+    };
+
+    return NextResponse.json({ ok: true, transaction: transactionWithStockPicking });
   } catch (error) {
     return NextResponse.json(
       { ok: false, error: error instanceof Error ? error.message : "Unable to load delivery order." },
@@ -611,7 +709,7 @@ export async function PATCH(req: Request, context: Params) {
             cancelReason: null,
             lines: { create: buildLineCreateData(data.lines) },
           },
-          include: { lines: true },
+          include: { lines: { include: { serialEntries: true } } },
         });
 
         await createStockIssueForDirectDeliveryOrder(tx, admin.id, updated, data.lines, body);
@@ -628,7 +726,7 @@ export async function PATCH(req: Request, context: Params) {
           ...buildSalesUpdateData(data, body, admin.id),
           lines: { create: buildLineCreateData(data.lines) },
         },
-        include: { lines: true },
+        include: { lines: { include: { serialEntries: true } } },
       });
 
       await tx.salesTransaction.update({

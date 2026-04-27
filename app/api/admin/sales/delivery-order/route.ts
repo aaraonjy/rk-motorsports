@@ -28,6 +28,8 @@ type DeliveryOrderLinePayload = {
   discountRate?: number | string | null;
   discountType?: string | null;
   locationId?: string | null;
+  batchNo?: string | null;
+  serialNos?: string[] | null;
   taxCodeId?: string | null;
   remarks?: string | null;
 };
@@ -77,6 +79,20 @@ function qtyDecimalWithPlaces(value: number | string | null | undefined, decimal
 
 function normalizeText(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function normalizeSerialNumbers(value: unknown) {
+  const items = Array.isArray(value) ? value : [];
+  const normalized = items.map((item) => (typeof item === "string" ? item.trim() : "")).filter(Boolean);
+  const seen = new Set<string>();
+  const unique: string[] = [];
+  for (const serialNo of normalized) {
+    const key = serialNo.toUpperCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(serialNo);
+  }
+  return unique;
 }
 
 function decimal(value: number | string | null | undefined, fallback = 0) {
@@ -260,6 +276,8 @@ function buildDeliveryLine(
   const qty = qtyDecimalWithPlaces(line.qty, numberFormat.qtyDecimalPlaces);
   const unitPrice = decimalWithPlaces(line.unitPrice, numberFormat.priceDecimalPlaces, sourceLine ? toNumber(sourceLine.unitPrice) : product ? Number(product.sellingPrice ?? 0) : 0);
   const discountType = String(line.discountType || sourceLine?.discountType || "PERCENT").toUpperCase() === "AMOUNT" ? "AMOUNT" : "PERCENT";
+  const batchNo = normalizeText((line as any).batchNo)?.toUpperCase() || null;
+  const serialNos = normalizeSerialNumbers((line as any).serialNos);
   const discountRate = discountType === "PERCENT" ? decimal(line.discountRate, sourceLine ? toNumber(sourceLine.discountRate) : 0) : new Prisma.Decimal(0);
   const rawDiscountValue = decimal(line.discountRate, sourceLine ? toNumber(sourceLine.discountRate) : 0);
   const lineSubtotal = qty.mul(unitPrice).toDecimalPlaces(2);
@@ -280,6 +298,14 @@ function buildDeliveryLine(
     }
   }
 
+  if (product?.batchTracking && !batchNo) {
+    throw new Error(`${productCode} requires Batch No.`);
+  }
+  if (product?.serialNumberTracking) {
+    if (serialNos.length === 0) throw new Error(`${productCode} requires S/N No.`);
+    if (toNumber(qty) !== serialNos.length) throw new Error(`${productCode} quantity must match selected S/N count.`);
+  }
+
   return {
     lineNo,
     sourceLineId,
@@ -294,6 +320,10 @@ function buildDeliveryLine(
     discountType,
     discountAmount,
     locationId: location.id,
+    batchNo,
+    serialNos,
+    batchTracking: Boolean(product?.batchTracking),
+    serialNumberTracking: Boolean(product?.serialNumberTracking),
     locationCode: location.code,
     locationName: location.name,
     taxCodeId: null,
@@ -364,9 +394,6 @@ async function buildDeliveryOrderData(body: any, tx: Prisma.TransactionClient) {
     if (!product || !product.trackInventory) {
       throw new Error(`${line.productCode} is not a tracked stock item and cannot be delivered through DO stock out.`);
     }
-    if (product.serialNumberTracking || product.batchTracking) {
-      throw new Error(`${line.productCode} uses serial/batch tracking. Delivery Order serial/batch picking will be added in a later phase.`);
-    }
   }
 
   const subtotal = lines.reduce((sum, line) => sum.plus(line.lineSubtotal), new Prisma.Decimal(0)).toDecimalPlaces(2);
@@ -417,12 +444,30 @@ async function createStockIssueForDeliveryOrder(
     lines.map((line) => ({
       inventoryProductId: line.inventoryProductId!,
       locationId: line.locationId,
+      batchNo: line.batchNo,
+      serialNos: line.serialNos || [],
     }))
   );
 
   for (const line of lines) {
-    const balance = await getStockBalance(tx, line.inventoryProductId!, line.locationId);
     const requiredQty = toNumber(line.qty);
+    if (line.serialNumberTracking) {
+      const availableCount = await tx.inventorySerial.count({
+        where: {
+          inventoryProductId: line.inventoryProductId!,
+          currentLocationId: line.locationId,
+          status: "IN_STOCK",
+          serialNo: { in: line.serialNos || [] },
+          ...(line.batchNo ? { inventoryBatch: { is: { batchNo: line.batchNo } } } : {}),
+        },
+      });
+      if (availableCount !== (line.serialNos || []).length) {
+        throw new Error(`${line.productCode} has one or more unavailable S/N at the selected location${line.batchNo ? " / batch" : ""}.`);
+      }
+      continue;
+    }
+
+    const balance = await getStockBalance(tx, line.inventoryProductId!, line.locationId, { batchNo: line.batchNo });
     if (balance < requiredQty && !config.allowNegativeStock) {
       throw new Error(`Insufficient stock for ${line.productCode}. Current balance: ${balance}. Required: ${requiredQty}.`);
     }
@@ -449,11 +494,20 @@ async function createStockIssueForDeliveryOrder(
           inventoryProductId: line.inventoryProductId!,
           qty: line.qty,
           locationId: line.locationId,
+          batchNo: line.batchNo,
           remarks: line.remarks || `Auto stock issue for ${deliveryOrder.docNo}`,
+          serialEntries: (line.serialNos || []).length
+            ? {
+                create: (line.serialNos || []).map((serialNo: string) => ({
+                  inventoryProductId: line.inventoryProductId!,
+                  serialNo,
+                })),
+              }
+            : undefined,
         })),
       },
     },
-    include: { lines: true },
+    include: { lines: { include: { serialEntries: true } } },
   });
 
   for (const stockLine of stockTransaction.lines) {
@@ -476,6 +530,34 @@ async function createStockIssueForDeliveryOrder(
         remarks: stockLine.remarks,
       },
     });
+
+    for (const serialEntry of stockLine.serialEntries || []) {
+      const serialRecord = await tx.inventorySerial.findUnique({
+        where: {
+          inventoryProductId_serialNo: {
+            inventoryProductId: stockLine.inventoryProductId,
+            serialNo: serialEntry.serialNo,
+          },
+        },
+        include: { inventoryBatch: true },
+      });
+
+      if (!serialRecord || serialRecord.status !== "IN_STOCK" || serialRecord.currentLocationId !== stockLine.locationId) {
+        throw new Error(`Serial No ${serialEntry.serialNo} is not available at the selected location.`);
+      }
+      if (stockLine.batchNo && serialRecord.inventoryBatch?.batchNo !== stockLine.batchNo) {
+        throw new Error(`Serial No ${serialEntry.serialNo} does not belong to Batch No ${stockLine.batchNo}.`);
+      }
+
+      await tx.inventorySerial.update({
+        where: { id: serialRecord.id },
+        data: { status: "OUT_OF_STOCK", currentLocationId: null },
+      });
+      await tx.stockTransactionLineSerial.update({
+        where: { id: serialEntry.id },
+        data: { inventorySerialId: serialRecord.id, inventoryBatchId: serialRecord.inventoryBatchId },
+      });
+    }
   }
 
   return stockTransaction;
@@ -536,12 +618,28 @@ export async function GET(req: Request) {
       },
     });
 
-    const transactions = rows.map((row) => ({
-      ...row,
-      sourceLinks: row.targetLinks.map((link) => ({
-        sourceTransaction: link.sourceTransaction,
-      })),
-    }));
+    const stockIssues = rows.length
+      ? await db.stockTransaction.findMany({
+          where: { transactionType: "SI", reference: { in: rows.map((row) => row.docNo) }, status: { not: "CANCELLED" } },
+          include: { lines: { orderBy: { createdAt: "asc" }, include: { serialEntries: { orderBy: { serialNo: "asc" } } } } },
+        })
+      : [];
+    const stockIssueByReference = new Map(stockIssues.map((item) => [item.reference || "", item]));
+
+    const transactions = rows.map((row) => {
+      const stockIssue = stockIssueByReference.get(row.docNo);
+      return {
+        ...row,
+        lines: row.lines.map((line, index) => ({
+          ...line,
+          batchNo: stockIssue?.lines[index]?.batchNo || null,
+          serialNos: stockIssue?.lines[index]?.serialEntries.map((entry) => entry.serialNo) || [],
+        })),
+        sourceLinks: row.targetLinks.map((link) => ({
+          sourceTransaction: link.sourceTransaction,
+        })),
+      };
+    });
 
     return NextResponse.json({ ok: true, transactions });
   } catch (error) {
@@ -639,7 +737,7 @@ export async function POST(req: Request) {
             })),
           },
         },
-        include: { lines: true },
+        include: { lines: { include: { serialEntries: true } } },
       });
 
       const createdLineByNo = new Map(deliveryOrder.lines.map((line) => [line.lineNo, line]));
