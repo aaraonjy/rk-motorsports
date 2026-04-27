@@ -1351,7 +1351,7 @@ export function AdminSalesQuotationClient({
                           onChange={(option) => updateLine(index, { uom: option?.id || selectedProduct?.baseUom || "" })}
                         />
                         <Input label="Qty" value={line.qty} onChange={(value) => updateLine(index, { qty: value })} />
-                        <Input label="Unit Price" value={line.unitPrice} onChange={(value) => updateLine(index, { unitPrice: value })} />
+                        <Input label="Selling Price" value={line.unitPrice} onChange={(value) => updateLine(index, { unitPrice: value })} />
                         <div>
                           <label className="label-rk">Discount</label>
                           <div className="grid grid-cols-[minmax(0,1fr)_120px] gap-3">
@@ -1388,7 +1388,7 @@ export function AdminSalesQuotationClient({
                           />
                         ) : null}
                         {isLineItemTaxMode ? <ReadonlyLike label="Tax Amount" value={money(taxAmount || 0)} /> : null}
-                        <ReadonlyLike label="Product Total" value={money(total || 0)} />
+                        <ReadonlyLike label="Gross Amount" value={money(total || 0)} />
                         <div className="md:col-span-2 xl:col-span-4">
                           <label className="label-rk">Product Remarks</label>
                           <textarea className="input-rk min-h-[80px]" value={line.remarks} onChange={(e) => updateLine(index, { remarks: e.target.value })} />

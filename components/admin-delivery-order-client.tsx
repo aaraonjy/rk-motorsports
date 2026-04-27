@@ -919,7 +919,7 @@ export function AdminDeliveryOrderClient({
                         <th className="px-3 py-3">Product</th>
                         <th className="px-3 py-3">UOM</th>
                         <th className="px-3 py-3 text-right">Qty</th>
-                        <th className="px-3 py-3 text-right">Unit Price</th>
+                        <th className="px-3 py-3 text-right">Selling Price</th>
                         <th className="px-3 py-3">Location</th>
                         <th className="px-3 py-3">Remarks</th>
                         <th className="px-3 py-3 text-right">Total</th>
