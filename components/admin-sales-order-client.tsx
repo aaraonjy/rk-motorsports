@@ -1687,6 +1687,8 @@ export function AdminSalesOrderClient({
                             {getBalanceDisplay(
                               line.inventoryProductId && line.locationId ? balances[balanceKey(line.inventoryProductId, line.locationId)] : undefined,
                               line.inventoryProductId && line.locationId ? Boolean(loadingBalances[balanceKey(line.inventoryProductId, line.locationId)]) : false
+                            ,
+                              qtyDecimalPlaces
                             )}
                           </p>
                         </div>
