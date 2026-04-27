@@ -286,6 +286,22 @@ function formatDate(value: string | Date | null | undefined) {
   return date.toLocaleDateString("en-MY", { timeZone: "Asia/Kuala_Lumpur", day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
+
+function formatDateInput(value: string | Date | null | undefined) {
+  if (!value) return todayInput();
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return todayInput();
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kuala_Lumpur",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  const day = parts.find((part) => part.type === "day")?.value;
+  return year && month && day ? `${year}-${month}-${day}` : todayInput();
+}
 function normalizeDocNoInput(value: string) {
   return value.toUpperCase().replace(/\s+/g, "").slice(0, 30);
 }
