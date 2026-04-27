@@ -241,13 +241,18 @@ export function AdminAssemblyTemplateClient({
   initialProducts,
 }: Props) {
   const [remarks, setRemarks] = useState(initialRemarks);
-  const [lines, setProducts] = useState<EditableProduct[]>(
+  const [stockSettings, setStockSettings] = useState<StockSettingsConfig>({
+    qtyDecimalPlaces: DEFAULT_STOCK_NUMBER_FORMAT_CONFIG.qtyDecimalPlaces,
+    unitCostDecimalPlaces: DEFAULT_STOCK_NUMBER_FORMAT_CONFIG.unitCostDecimalPlaces,
+    priceDecimalPlaces: DEFAULT_STOCK_NUMBER_FORMAT_CONFIG.priceDecimalPlaces,
+  });
+  const [lines, setProducts] = useState<EditableProduct[]>(() =>
     initialProducts.length > 0
       ? initialProducts.map((line, index) => ({
           id: line.id,
           lineNo: index + 1,
           componentProductId: line.componentProductId,
-          qty: formatNumberByDecimalPlaces(line.qty, stockSettings.qtyDecimalPlaces),
+          qty: formatNumberByDecimalPlaces(line.qty, DEFAULT_STOCK_NUMBER_FORMAT_CONFIG.qtyDecimalPlaces),
           uom: line.uom,
           isRequired: line.isRequired,
           allowOverride: line.allowOverride,
@@ -255,11 +260,6 @@ export function AdminAssemblyTemplateClient({
         }))
       : [emptyProduct(1)]
   );
-  const [stockSettings, setStockSettings] = useState<StockSettingsConfig>({
-    qtyDecimalPlaces: DEFAULT_STOCK_NUMBER_FORMAT_CONFIG.qtyDecimalPlaces,
-    unitCostDecimalPlaces: DEFAULT_STOCK_NUMBER_FORMAT_CONFIG.unitCostDecimalPlaces,
-    priceDecimalPlaces: DEFAULT_STOCK_NUMBER_FORMAT_CONFIG.priceDecimalPlaces,
-  });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [submitSuccess, setSubmitSuccess] = useState("");
