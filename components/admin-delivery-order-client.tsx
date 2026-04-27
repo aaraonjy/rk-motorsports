@@ -290,11 +290,36 @@ function formatTraceDate(value: string | null | undefined) {
   return date.toLocaleDateString("en-MY", { timeZone: "Asia/Kuala_Lumpur", day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
+function formatTraceExpiryDate(value: string | null | undefined) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("en-MY", { timeZone: "Asia/Kuala_Lumpur", day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
 function formatTraceLineMeta(line: AssemblyTraceLine, qtyDecimalPlaces: number) {
-  const parts = [`Qty ${moneyWithPlaces(Number(line.qty || 0), qtyDecimalPlaces)}${line.uom ? ` ${line.uom}` : ""}`];
-  if (line.batchNo) parts.push(`Batch ${line.batchNo}`);
-  if (Array.isArray(line.serialNos) && line.serialNos.length > 0) parts.push(`S/N ${line.serialNos.join(", ")}`);
-  if (line.locationLabel) parts.push(line.locationLabel);
+  const parts = [`Qty: ${moneyWithPlaces(Number(line.qty || 0), qtyDecimalPlaces)}${line.uom ? ` ${line.uom}` : ""}`];
+
+  if (line.batchNo) {
+    const expiryDate = formatTraceExpiryDate(line.expiryDate);
+    parts.push(`Batch No: ${line.batchNo}${expiryDate ? ` (Expiry Date: ${expiryDate})` : ""}`);
+  }
+
+  const serialEntries = Array.isArray(line.serialEntries) ? line.serialEntries : [];
+  if (serialEntries.length > 0) {
+    const serialText = serialEntries
+      .map((entry) => {
+        const expiryDate = formatTraceExpiryDate(entry.expiryDate);
+        const batchText = entry.batchNo ? ` / Batch No: ${entry.batchNo}${expiryDate ? ` (Expiry Date: ${expiryDate})` : ""}` : "";
+        return `${entry.serialNo}${batchText}`;
+      })
+      .join(", ");
+    parts.push(`Serial No: ${serialText}`);
+  } else if (Array.isArray(line.serialNos) && line.serialNos.length > 0) {
+    parts.push(`Serial No: ${line.serialNos.join(", ")}`);
+  }
+
+  if (line.locationLabel) parts.push(`Location: ${line.locationLabel}`);
   return parts.join(" • ");
 }
 
