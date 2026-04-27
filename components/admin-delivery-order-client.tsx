@@ -1159,7 +1159,7 @@ export function AdminDeliveryOrderClient({
                 {lines.map((line, index) => {
                   const normalizedLine = normalizedLines[index];
                   const total = normalizedLine?.lineTotal || 0;
-                  const taxAmount = normalizedLine?.taxAmount || 0;
+                  const taxAmount = 0;
                   const selectedProduct = initialProducts.find((item) => item.id === line.inventoryProductId) || null;
                   const uomOptions = selectedProduct
                     ? [
@@ -1354,7 +1354,7 @@ export function AdminDeliveryOrderClient({
                         <td className="px-4 py-4 text-right">{moneyWithPlaces(line.orderedQty, qtyDecimalPlaces)}</td>
                         <td className="px-4 py-4 text-right">{moneyWithPlaces(line.deliveredQty, qtyDecimalPlaces)}</td>
                         <td className="px-4 py-4 text-right">{moneyWithPlaces(line.remainingDeliveryQty, qtyDecimalPlaces)}</td>
-                        <td className="px-4 py-4 text-right"><input className="input-rk w-32 text-right" type="number" min="0" max={line.remainingDeliveryQty} step={qtyInputStep} value={line.deliverQty} onChange={(e) => updatePickLine(line.key, e.target.value)} /></td>
+                        <td className="px-4 py-4 text-right"><input className="input-rk w-32 text-right" type="number" min="0" max={line.remainingDeliveryQty} step={qtyInputStep} value={line.deliverQty} onChange={(e) => updatePickLine(line.key, limitDecimalInputValue(e.target.value, qtyDecimalPlaces))} /></td>
                       </tr>
                     ))}
                   </tbody>
