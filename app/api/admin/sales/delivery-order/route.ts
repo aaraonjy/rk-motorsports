@@ -507,7 +507,7 @@ async function createStockIssueForDeliveryOrder(
         })),
       },
     },
-    include: { lines: { include: { serialEntries: true } } },
+    include: { lines: true },
   });
 
   for (const stockLine of stockTransaction.lines) {
@@ -737,7 +737,7 @@ export async function POST(req: Request) {
             })),
           },
         },
-        include: { lines: { include: { serialEntries: true } } },
+        include: { lines: true },
       });
 
       const createdLineByNo = new Map(deliveryOrder.lines.map((line) => [line.lineNo, line]));
