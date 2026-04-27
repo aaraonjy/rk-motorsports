@@ -379,7 +379,7 @@ async function createStockIssueForDirectDeliveryOrder(tx: Prisma.TransactionClie
         })),
       },
     },
-    include: { lines: { include: { serialEntries: true } } },
+    include: { lines: true },
   });
 
   for (const stockLine of stockTransaction.lines) {
@@ -497,7 +497,7 @@ async function reverseStockIssueForDeliveryOrder(tx: Prisma.TransactionClient, d
       reference: deliveryOrder.docNo,
       status: { not: "CANCELLED" },
     },
-    include: { lines: { include: { serialEntries: true } } },
+    include: { lines: true },
   });
 
   if (!stockTransaction) return;
@@ -709,7 +709,7 @@ export async function PATCH(req: Request, context: Params) {
             cancelReason: null,
             lines: { create: buildLineCreateData(data.lines) },
           },
-          include: { lines: { include: { serialEntries: true } } },
+          include: { lines: true },
         });
 
         await createStockIssueForDirectDeliveryOrder(tx, admin.id, updated, data.lines, body);
@@ -726,7 +726,7 @@ export async function PATCH(req: Request, context: Params) {
           ...buildSalesUpdateData(data, body, admin.id),
           lines: { create: buildLineCreateData(data.lines) },
         },
-        include: { lines: { include: { serialEntries: true } } },
+        include: { lines: true },
       });
 
       await tx.salesTransaction.update({
