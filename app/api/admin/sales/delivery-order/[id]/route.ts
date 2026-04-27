@@ -379,7 +379,7 @@ async function createStockIssueForDirectDeliveryOrder(tx: Prisma.TransactionClie
         })),
       },
     },
-    include: { lines: true },
+    include: { lines: { include: { serialEntries: true } } },
   });
 
   for (const stockLine of stockTransaction.lines) {
@@ -497,7 +497,7 @@ async function reverseStockIssueForDeliveryOrder(tx: Prisma.TransactionClient, d
       reference: deliveryOrder.docNo,
       status: { not: "CANCELLED" },
     },
-    include: { lines: true },
+    include: { lines: { include: { serialEntries: true } } },
   });
 
   if (!stockTransaction) return;
