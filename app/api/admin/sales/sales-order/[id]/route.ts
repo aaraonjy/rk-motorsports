@@ -56,6 +56,25 @@ function qtyDecimal(value: number | string | null | undefined) {
   return new Prisma.Decimal(numeric.toFixed(3));
 }
 
+
+function getDecimalPlaces(value: unknown, fallback = 2) {
+  const numeric = Number(value ?? fallback);
+  if (!Number.isFinite(numeric)) return fallback;
+  return Math.max(0, Math.min(6, Math.trunc(numeric)));
+}
+
+function decimalWithPlaces(value: number | string | null | undefined, decimalPlaces: number, fallback = 0) {
+  const numeric = Number(value ?? fallback);
+  if (!Number.isFinite(numeric)) return new Prisma.Decimal(fallback);
+  return new Prisma.Decimal(numeric.toFixed(decimalPlaces));
+}
+
+function qtyDecimalWithPlaces(value: number | string | null | undefined, decimalPlaces: number) {
+  const numeric = Number(value ?? 0);
+  if (!Number.isFinite(numeric) || numeric <= 0) throw new Error("Quantity must be greater than zero.");
+  return new Prisma.Decimal(numeric.toFixed(decimalPlaces));
+}
+
 function normalizeText(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
@@ -211,8 +230,8 @@ function calculateLine(
 
   if (!productCode || !productDescription) throw new Error(`Product line ${lineNo} is missing product information.`);
 
-  const qty = qtyDecimal(line.qty);
-  const unitPrice = decimal(line.unitPrice, product ? Number(product.sellingPrice ?? 0) : 0);
+  const qty = qtyDecimalWithPlaces(line.qty, numberFormat.qtyDecimalPlaces);
+  const unitPrice = decimalWithPlaces(line.unitPrice, numberFormat.priceDecimalPlaces, product ? Number(product.sellingPrice ?? 0) : 0);
   const rawDiscountValue = decimal(line.discountRate, 0);
   const discountType = String(line.discountType || "PERCENT").toUpperCase() === "AMOUNT" ? "AMOUNT" : "PERCENT";
   const discountRate = discountType === "PERCENT" ? rawDiscountValue : new Prisma.Decimal(0);
@@ -301,6 +320,11 @@ async function buildSalesOrderData(body: any) {
   const taxModuleEnabled = Boolean(taxConfig?.taxModuleEnabled);
   const taxCalculationMode = normalizeTaxCalculationMode(taxConfig?.taxCalculationMode);
   const taxCodeMap = new Map<string, TaxCodeSnapshot>(activeTaxCodes.map((item) => [item.id, item as TaxCodeSnapshot]));
+  const numberFormat = {
+    qtyDecimalPlaces: getDecimalPlaces(config?.qtyDecimalPlaces, 2),
+    unitCostDecimalPlaces: getDecimalPlaces(config?.unitCostDecimalPlaces, 2),
+    priceDecimalPlaces: getDecimalPlaces(config?.priceDecimalPlaces, 2),
+  };
 
   const productIds = Array.from(new Set(rawLines.map((line) => normalizeText(line.inventoryProductId)).filter(Boolean))) as string[];
   const locationIds = Array.from(new Set(rawLines.map((line) => normalizeText(line.locationId)).filter(Boolean))) as string[];

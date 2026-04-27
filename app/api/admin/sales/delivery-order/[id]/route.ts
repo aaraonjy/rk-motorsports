@@ -57,7 +57,7 @@ function calculateSalesOrderStatus(lines: Array<{ orderedQty: number; deliveredQ
   const isFullyDelivered = lines.every((line) => line.deliveredQty >= line.orderedQty);
   const isFullyInvoiced = lines.every((line) => line.invoicedQty >= line.orderedQty);
 
-  if (isFullyDelivered && isFullyInvoiced) return "COMPLETED" as SalesTransactionStatus;
+  if (isFullyDelivered || isFullyInvoiced) return "COMPLETED" as SalesTransactionStatus;
   if (hasAnyProgress) return "PARTIAL" as SalesTransactionStatus;
   return "OPEN" as SalesTransactionStatus;
 }

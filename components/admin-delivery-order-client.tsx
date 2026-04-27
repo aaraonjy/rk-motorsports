@@ -122,6 +122,12 @@ type DeliveryOrderRecord = {
   targetLinks?: Array<{ sourceTransaction?: { id: string; docNo?: string | null } | null }>;
 };
 
+type StockNumberFormatConfig = {
+  qtyDecimalPlaces: number;
+  unitCostDecimalPlaces: number;
+  priceDecimalPlaces: number;
+};
+
 type Props = {
   initialSalesOrders: SourceSalesOrderRecord[];
   initialCustomers: CustomerOption[];
@@ -133,6 +139,7 @@ type Props = {
   defaultLocationId: string;
   projectFeatureEnabled: boolean;
   departmentFeatureEnabled: boolean;
+  stockNumberFormat: StockNumberFormatConfig;
 };
 
 type LineForm = {
@@ -172,6 +179,19 @@ type PickLine = {
 
 type SearchableSelectOption = { id: string; label: string; searchText: string };
 
+type BalanceResponse = { ok?: boolean; balance?: number; error?: string };
+
+function balanceKey(productId: string, locationId: string) {
+  return `${productId}__${locationId}`;
+}
+
+function getBalanceDisplay(value: number | undefined, isLoading: boolean, decimalPlaces: number) {
+  if (isLoading) return "Loading balance...";
+  if (typeof value !== "number") return "Select product and location to view balance.";
+  return `Current Balance: ${moneyWithPlaces(value, decimalPlaces)}`;
+}
+
+
 function todayInput() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -179,6 +199,33 @@ function todayInput() {
 function money(value: number) {
   return value.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
+
+function getDecimalPlaces(value: unknown, fallback = 2) {
+  const numeric = Number(value ?? fallback);
+  if (!Number.isFinite(numeric)) return fallback;
+  return Math.max(0, Math.min(6, Math.trunc(numeric)));
+}
+
+function decimalStep(decimalPlaces: number) {
+  return decimalPlaces <= 0 ? "1" : `0.${"0".repeat(Math.max(0, decimalPlaces - 1))}1`;
+}
+
+function formatDecimalInput(value: unknown, decimalPlaces: number) {
+  const numeric = Number(value ?? 0);
+  if (!Number.isFinite(numeric)) return (0).toFixed(decimalPlaces);
+  return numeric.toFixed(decimalPlaces);
+}
+
+function normalizeDecimalInputValue(value: string, decimalPlaces: number) {
+  const numeric = Number(value || 0);
+  if (!Number.isFinite(numeric)) return "";
+  return numeric.toFixed(decimalPlaces);
+}
+
+function moneyWithPlaces(value: number, decimalPlaces: number) {
+  return value.toLocaleString("en-MY", { minimumFractionDigits: decimalPlaces, maximumFractionDigits: decimalPlaces });
+}
+
 
 function formatDate(value: string | Date | null | undefined) {
   if (!value) return "-";
@@ -356,8 +403,14 @@ export function AdminDeliveryOrderClient({
   defaultLocationId,
   projectFeatureEnabled,
   departmentFeatureEnabled,
+  stockNumberFormat,
 }: Props) {
   const router = useRouter();
+  const qtyDecimalPlaces = getDecimalPlaces(stockNumberFormat.qtyDecimalPlaces, 2);
+  const priceDecimalPlaces = getDecimalPlaces(stockNumberFormat.priceDecimalPlaces, 2);
+  const qtyInputStep = decimalStep(qtyDecimalPlaces);
+  const priceInputStep = decimalStep(priceDecimalPlaces);
+
   const [transactions, setTransactions] = useState<DeliveryOrderRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchKeyword, setSearchKeyword] = useState("");
@@ -405,6 +458,8 @@ export function AdminDeliveryOrderClient({
   const [bankAccount, setBankAccount] = useState("");
   const [footerRemarks, setFooterRemarks] = useState("");
   const [lines, setLines] = useState<LineForm[]>([emptyLine(defaultLocationId)]);
+  const [balances, setBalances] = useState<Record<string, number>>({});
+  const [loadingBalances, setLoadingBalances] = useState<Record<string, boolean>>({});
 
   const statusOptions = useMemo<SearchableSelectOption[]>(
     () => [
@@ -602,6 +657,27 @@ export function AdminDeliveryOrderClient({
     if (isCreateOpen && !docNo) void loadNextDocNo(docDate);
   }, [docDate, isCreateOpen, docNo]);
 
+  useEffect(() => {
+    lines.forEach((line) => {
+      if (!line.inventoryProductId || !line.locationId) return;
+      const key = balanceKey(line.inventoryProductId, line.locationId);
+      if (balances[key] !== undefined || loadingBalances[key]) return;
+
+      setLoadingBalances((prev) => ({ ...prev, [key]: true }));
+      fetch(`/api/admin/stock/balance?inventoryProductId=${encodeURIComponent(line.inventoryProductId)}&locationId=${encodeURIComponent(line.locationId)}`, { cache: "no-store" })
+        .then((response) => response.json())
+        .then((data: BalanceResponse) => {
+          if (data?.ok && typeof data.balance === "number") {
+            setBalances((prev) => ({ ...prev, [key]: Number(data.balance) }));
+          }
+        })
+        .catch(() => null)
+        .finally(() => {
+          setLoadingBalances((prev) => ({ ...prev, [key]: false }));
+        });
+    });
+  }, [balances, lines, loadingBalances]);
+
   function resetForm() {
     setActiveTab("HEADER");
     setDocDate(todayInput());
@@ -682,7 +758,7 @@ export function AdminDeliveryOrderClient({
       productCode: product.code,
       productDescription: product.description,
       uom: product.baseUom,
-      unitPrice: String(product.sellingPrice.toFixed(2)),
+      unitPrice: formatDecimalInput(product.sellingPrice, priceDecimalPlaces),
       locationId: lines[index]?.locationId || defaultLocationId,
     });
   }
@@ -798,9 +874,31 @@ export function AdminDeliveryOrderClient({
     setSubmitSuccess(`Imported ${validLines.length} Sales Order line(s). Please review and save the Delivery Order.`);
   }
 
+  function validateDeliveryOrderForm() {
+    if (!customerId) return "Customer is required.";
+    if (!lines.length) return "Please add at least one product line.";
+
+    for (let index = 0; index < lines.length; index += 1) {
+      const line = lines[index];
+      if (!line.inventoryProductId || !line.productCode) return `Product line ${index + 1} is missing product.`;
+      if (Number(line.qty || 0) <= 0) return `Product line ${index + 1} quantity must be greater than zero.`;
+      if (!line.locationId) return `Product line ${index + 1} requires stock location.`;
+    }
+
+    return "";
+  }
+
+  const formValidationMessage = validateDeliveryOrderForm();
+  const canSubmitDeliveryOrder = !isSubmitting && !formValidationMessage;
+
   async function submitDeliveryOrder() {
     setSubmitError("");
     setSubmitSuccess("");
+    const validationMessage = validateDeliveryOrderForm();
+    if (validationMessage) {
+      setSubmitError(validationMessage);
+      return;
+    }
     setIsSubmitting(true);
     try {
       const payload = {
@@ -920,7 +1018,7 @@ export function AdminDeliveryOrderClient({
                     </td>
                     <td className="px-4 py-4 text-white/65">{(item.targetLinks || []).map((link) => link.sourceTransaction?.docNo).filter(Boolean).join(", ") || "-"}</td>
                     <td className="px-4 py-4"><span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getStatusClass(item.status)}`}>{item.status}</span></td>
-                    <td className="px-4 py-4 text-right">{`${item.currency || "MYR"} ${money(Number(item.grandTotal || 0))}`}</td>
+                    <td className="px-4 py-4 text-right">{`${item.currency || "MYR"} ${moneyWithPlaces(Number(item.grandTotal || 0), priceDecimalPlaces)}`}</td>
                     <td className="px-4 py-4 text-right">
                       {item.status !== "CANCELLED" ? (
                         <button type="button" onClick={(event) => { event.stopPropagation(); setCancelTarget(item); }} className="rounded-xl border border-red-500/30 px-3 py-2 text-xs text-red-200 transition hover:bg-red-500/10">
@@ -1047,11 +1145,16 @@ export function AdminDeliveryOrderClient({
                           {line.productDescription ? <div className="mt-2 text-xs text-white/45">{line.productDescription}</div> : null}
                         </div>
                         <div><label className="label-rk">UOM</label><input className="input-rk" value={line.uom} onChange={(e) => updateLine(index, { uom: e.target.value.toUpperCase() })} readOnly={Boolean(line.sourceLineId)} /></div>
-                        <div><label className="label-rk">Qty</label><input className="input-rk text-right" type="number" min="0" step="0.001" value={line.qty} onChange={(e) => updateLine(index, { qty: e.target.value })} /></div>
-                        <div><label className="label-rk">Selling Price</label><input className="input-rk text-right" type="number" min="0" step="0.01" value={line.unitPrice} onChange={(e) => updateLine(index, { unitPrice: e.target.value })} /></div>
-                        <div><label className="label-rk">Discount</label><div className="grid grid-cols-[1fr_120px] gap-3"><input className="input-rk" type="number" min="0" step="0.01" value={line.discountRate} onChange={(e) => updateLine(index, { discountRate: e.target.value })} /><CompactSelect options={[{ id: "PERCENT", label: "%", searchText: "percent %" }, { id: "AMOUNT", label: "RM", searchText: "amount rm" }]} value={line.discountType} onChange={(value) => updateLine(index, { discountType: value === "AMOUNT" ? "AMOUNT" : "PERCENT" })} /></div></div>
-                        <div className="xl:col-span-2"><SearchableSelect label="Location" placeholder="Select location" options={locationOptions} value={line.locationId} onChange={(option) => updateLine(index, { locationId: option?.id || "" })} /></div>
-                        <div><label className="label-rk">Gross Amount</label><input className="input-rk text-right" value={money(normalizedLine?.lineTotal || 0)} readOnly /></div>
+                        <div><label className="label-rk">Qty</label><input className="input-rk text-right" type="number" min="0" step={qtyInputStep} value={line.qty} onChange={(e) => updateLine(index, { qty: e.target.value })} onBlur={(e) => updateLine(index, { qty: normalizeDecimalInputValue(e.target.value, qtyDecimalPlaces) })} /></div>
+                        <div><label className="label-rk">Selling Price</label><input className="input-rk text-right" type="number" min="0" step={priceInputStep} value={line.unitPrice} onChange={(e) => updateLine(index, { unitPrice: e.target.value })} onBlur={(e) => updateLine(index, { unitPrice: normalizeDecimalInputValue(e.target.value, priceDecimalPlaces) })} /></div>
+                        <div><label className="label-rk">Discount</label><div className="grid grid-cols-[1fr_120px] gap-3"><input className="input-rk" type="number" min="0" step={priceInputStep} value={line.discountRate} onChange={(e) => updateLine(index, { discountRate: e.target.value })} /><CompactSelect options={[{ id: "PERCENT", label: "%", searchText: "percent %" }, { id: "AMOUNT", label: "RM", searchText: "amount rm" }]} value={line.discountType} onChange={(value) => updateLine(index, { discountType: value === "AMOUNT" ? "AMOUNT" : "PERCENT" })} /></div></div>
+                        <div className="xl:col-span-2">
+                          <SearchableSelect label="Location" placeholder="Select location" options={locationOptions} value={line.locationId} onChange={(option) => updateLine(index, { locationId: option?.id || "" })} />
+                          <div className="mt-2 text-xs text-white/45">
+                            {getBalanceDisplay(balances[balanceKey(line.inventoryProductId, line.locationId)], Boolean(loadingBalances[balanceKey(line.inventoryProductId, line.locationId)]), qtyDecimalPlaces)}
+                          </div>
+                        </div>
+                        <div><label className="label-rk">Gross Amount</label><input className="input-rk text-right" value={moneyWithPlaces(normalizedLine?.lineTotal || 0, priceDecimalPlaces)} readOnly /></div>
                         <div className="xl:col-span-4"><label className="label-rk">Product Remarks</label><textarea className="input-rk min-h-[80px]" value={line.remarks} onChange={(e) => updateLine(index, { remarks: e.target.value })} /></div>
                       </div>
                     </div>
@@ -1075,10 +1178,10 @@ export function AdminDeliveryOrderClient({
                 <div className="rounded-[1.5rem] border border-white/10 p-5">
                   <h3 className="text-xl font-bold">Delivery Order Summary</h3>
                   <div className="mt-5 space-y-4 text-sm">
-                    <div className="flex justify-between gap-4"><span className="text-white/65">Subtotal</span><span>{money(totals.subtotal)}</span></div>
-                    <div className="flex justify-between gap-4"><span className="text-white/65">Discount</span><span>{money(totals.discountTotal)}</span></div>
-                    <div className="flex justify-between gap-4"><span className="text-white/65">Tax</span><span>{money(totals.taxTotal)}</span></div>
-                    <div className="border-t border-white/10 pt-4"><div className="flex justify-between gap-4 text-xl font-bold"><span>Grand Total ({currency})</span><span>{money(totals.grandTotal)}</span></div></div>
+                    <div className="flex justify-between gap-4"><span className="text-white/65">Subtotal</span><span>{moneyWithPlaces(totals.subtotal, priceDecimalPlaces)}</span></div>
+                    <div className="flex justify-between gap-4"><span className="text-white/65">Discount</span><span>{moneyWithPlaces(totals.discountTotal, priceDecimalPlaces)}</span></div>
+                    <div className="flex justify-between gap-4"><span className="text-white/65">Tax</span><span>{moneyWithPlaces(totals.taxTotal, priceDecimalPlaces)}</span></div>
+                    <div className="border-t border-white/10 pt-4"><div className="flex justify-between gap-4 text-xl font-bold"><span>Grand Total ({currency})</span><span>{moneyWithPlaces(totals.grandTotal, priceDecimalPlaces)}</span></div></div>
                   </div>
                 </div>
               </div>
@@ -1086,8 +1189,8 @@ export function AdminDeliveryOrderClient({
 
             <div className="mt-8 flex flex-wrap justify-end gap-3 border-t border-white/10 pt-5">
               <button type="button" onClick={closeForm} className="rounded-xl border border-white/15 px-5 py-3 text-sm text-white/75 transition hover:bg-white/10">Close</button>
-              <button type="button" disabled={isSubmitting} onClick={submitDeliveryOrder} className="rounded-xl bg-red-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-red-500 disabled:opacity-60">
-                {isSubmitting ? "Saving..." : "Create Delivery Order"}
+              <button type="button" disabled={!canSubmitDeliveryOrder} onClick={submitDeliveryOrder} className="rounded-xl bg-red-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-red-500 disabled:opacity-60">
+                {isSubmitting ? "Saving..." : formValidationMessage || "Create Delivery Order"}
               </button>
             </div>
           </div>
@@ -1143,10 +1246,10 @@ export function AdminDeliveryOrderClient({
                       <tr key={line.key}>
                         <td className="px-4 py-4">{line.sourceDocNo}</td>
                         <td className="px-4 py-4"><div className="font-semibold text-white">{line.productCode}</div><div className="text-xs text-white/45">{line.productDescription}</div></td>
-                        <td className="px-4 py-4 text-right">{money(line.orderedQty)}</td>
-                        <td className="px-4 py-4 text-right">{money(line.deliveredQty)}</td>
-                        <td className="px-4 py-4 text-right">{money(line.remainingDeliveryQty)}</td>
-                        <td className="px-4 py-4 text-right"><input className="input-rk w-32 text-right" type="number" min="0" max={line.remainingDeliveryQty} step="0.001" value={line.deliverQty} onChange={(e) => updatePickLine(line.key, e.target.value)} /></td>
+                        <td className="px-4 py-4 text-right">{moneyWithPlaces(line.orderedQty, qtyDecimalPlaces)}</td>
+                        <td className="px-4 py-4 text-right">{moneyWithPlaces(line.deliveredQty, qtyDecimalPlaces)}</td>
+                        <td className="px-4 py-4 text-right">{moneyWithPlaces(line.remainingDeliveryQty, qtyDecimalPlaces)}</td>
+                        <td className="px-4 py-4 text-right"><input className="input-rk w-32 text-right" type="number" min="0" max={line.remainingDeliveryQty} step={qtyInputStep} value={line.deliverQty} onChange={(e) => updatePickLine(line.key, e.target.value)} /></td>
                       </tr>
                     ))}
                   </tbody>

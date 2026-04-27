@@ -39,6 +39,42 @@ function normalizeDate(value: unknown) {
   return date;
 }
 
+
+function getDecimalPlaces(value: unknown, fallback = 2) {
+  const numeric = Number(value ?? fallback);
+  if (!Number.isFinite(numeric)) return fallback;
+  return Math.max(0, Math.min(6, Math.trunc(numeric)));
+}
+
+async function loadStockNumberFormat(tx: Prisma.TransactionClient) {
+  const config = await tx.stockConfiguration.findUnique({
+    where: { id: "default" },
+    select: {
+      qtyDecimalPlaces: true,
+      unitCostDecimalPlaces: true,
+      priceDecimalPlaces: true,
+    },
+  });
+
+  return {
+    qtyDecimalPlaces: getDecimalPlaces(config?.qtyDecimalPlaces, 2),
+    unitCostDecimalPlaces: getDecimalPlaces(config?.unitCostDecimalPlaces, 2),
+    priceDecimalPlaces: getDecimalPlaces(config?.priceDecimalPlaces, 2),
+  };
+}
+
+function decimalWithPlaces(value: number | string | null | undefined, decimalPlaces: number, fallback = 0) {
+  const numeric = Number(value ?? fallback);
+  if (!Number.isFinite(numeric)) return new Prisma.Decimal(fallback);
+  return new Prisma.Decimal(numeric.toFixed(decimalPlaces));
+}
+
+function qtyDecimalWithPlaces(value: number | string | null | undefined, decimalPlaces: number) {
+  const numeric = Number(value ?? 0);
+  if (!Number.isFinite(numeric) || numeric <= 0) throw new Error("Quantity must be greater than zero.");
+  return new Prisma.Decimal(numeric.toFixed(decimalPlaces));
+}
+
 function normalizeText(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
@@ -208,7 +244,8 @@ function buildDeliveryLine(
   lineNo: number,
   productMap: Map<string, any>,
   locationMap: Map<string, any>,
-  sourceLineMap: Map<string, any>
+  sourceLineMap: Map<string, any>,
+  numberFormat: { qtyDecimalPlaces: number; priceDecimalPlaces: number }
 ) {
   const sourceLineId = normalizeText(line.sourceLineId);
   const sourceLine = sourceLineId ? sourceLineMap.get(sourceLineId) : null;
@@ -220,8 +257,8 @@ function buildDeliveryLine(
   const productCode = normalizeText(line.productCode) || sourceLine?.productCode || product?.code || "";
   const productDescription = normalizeText(line.productDescription) || sourceLine?.productDescription || product?.description || "";
   const uom = (normalizeText(line.uom) || sourceLine?.uom || product?.baseUom || "UNIT").toUpperCase();
-  const qty = qtyDecimal(line.qty);
-  const unitPrice = decimal(line.unitPrice, sourceLine ? toNumber(sourceLine.unitPrice) : product ? Number(product.sellingPrice ?? 0) : 0);
+  const qty = qtyDecimalWithPlaces(line.qty, numberFormat.qtyDecimalPlaces);
+  const unitPrice = decimalWithPlaces(line.unitPrice, numberFormat.priceDecimalPlaces, sourceLine ? toNumber(sourceLine.unitPrice) : product ? Number(product.sellingPrice ?? 0) : 0);
   const discountType = String(line.discountType || sourceLine?.discountType || "PERCENT").toUpperCase() === "AMOUNT" ? "AMOUNT" : "PERCENT";
   const discountRate = discountType === "PERCENT" ? decimal(line.discountRate, sourceLine ? toNumber(sourceLine.discountRate) : 0) : new Prisma.Decimal(0);
   const rawDiscountValue = decimal(line.discountRate, sourceLine ? toNumber(sourceLine.discountRate) : 0);
@@ -286,6 +323,8 @@ async function buildDeliveryOrderData(body: any, tx: Prisma.TransactionClient) {
   });
   if (!customer) throw new Error("Selected customer is invalid.");
 
+  const numberFormat = await loadStockNumberFormat(tx);
+
   const productIds = Array.from(new Set(rawLines.map((line) => normalizeText(line.inventoryProductId)).filter(Boolean))) as string[];
   const locationIds = Array.from(new Set(rawLines.map((line) => normalizeText(line.locationId)).filter(Boolean))) as string[];
   const sourceLineIds = Array.from(new Set(rawLines.map((line) => normalizeText(line.sourceLineId)).filter(Boolean))) as string[];
@@ -318,7 +357,7 @@ async function buildDeliveryOrderData(body: any, tx: Prisma.TransactionClient) {
   const productMap = new Map<string, any>(products.map((item: any) => [item.id, item]));
   const locationMap = new Map<string, any>(locations.map((item: any) => [item.id, item]));
 
-  const lines = rawLines.map((line, index) => buildDeliveryLine(line, index + 1, productMap, locationMap, sourceLineMap));
+  const lines = rawLines.map((line, index) => buildDeliveryLine(line, index + 1, productMap, locationMap, sourceLineMap, numberFormat));
 
   for (const line of lines) {
     const product = line.inventoryProductId ? productMap.get(line.inventoryProductId) : null;

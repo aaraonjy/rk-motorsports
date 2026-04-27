@@ -99,6 +99,11 @@ export default async function AdminSalesQuotationPage() {
           initialDepartments={departments}
           projectFeatureEnabled={Boolean(stockConfig?.enableProject)}
           departmentFeatureEnabled={Boolean(stockConfig?.enableProject && stockConfig?.enableDepartment)}
+          stockNumberFormat={{
+            qtyDecimalPlaces: Number(stockConfig?.qtyDecimalPlaces ?? 2),
+            unitCostDecimalPlaces: Number(stockConfig?.unitCostDecimalPlaces ?? 2),
+            priceDecimalPlaces: Number(stockConfig?.priceDecimalPlaces ?? 2),
+          }}
           taxConfig={{
             taxModuleEnabled: Boolean(taxConfig?.taxModuleEnabled),
             taxCalculationMode: taxConfig?.taxCalculationMode ?? "TRANSACTION",

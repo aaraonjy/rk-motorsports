@@ -122,6 +122,12 @@ type QuotationRecord = {
   }>;
 };
 
+type StockNumberFormatConfig = {
+  qtyDecimalPlaces: number;
+  unitCostDecimalPlaces: number;
+  priceDecimalPlaces: number;
+};
+
 type Props = {
   initialCustomers: CustomerOption[];
   initialProducts: ProductOption[];
@@ -132,6 +138,7 @@ type Props = {
   defaultLocationId: string;
   projectFeatureEnabled: boolean;
   departmentFeatureEnabled: boolean;
+  stockNumberFormat: StockNumberFormatConfig;
   taxConfig: {
     taxModuleEnabled: boolean;
     taxCalculationMode: TaxCalculationModeValue;
@@ -179,6 +186,33 @@ function todayInput() {
 function money(value: number) {
   return value.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
+
+function getDecimalPlaces(value: unknown, fallback = 2) {
+  const numeric = Number(value ?? fallback);
+  if (!Number.isFinite(numeric)) return fallback;
+  return Math.max(0, Math.min(6, Math.trunc(numeric)));
+}
+
+function decimalStep(decimalPlaces: number) {
+  return decimalPlaces <= 0 ? "1" : `0.${"0".repeat(Math.max(0, decimalPlaces - 1))}1`;
+}
+
+function formatDecimalInput(value: unknown, decimalPlaces: number) {
+  const numeric = Number(value ?? 0);
+  if (!Number.isFinite(numeric)) return (0).toFixed(decimalPlaces);
+  return numeric.toFixed(decimalPlaces);
+}
+
+function normalizeDecimalInputValue(value: string, decimalPlaces: number) {
+  const numeric = Number(value || 0);
+  if (!Number.isFinite(numeric)) return "";
+  return numeric.toFixed(decimalPlaces);
+}
+
+function moneyWithPlaces(value: number, decimalPlaces: number) {
+  return value.toLocaleString("en-MY", { minimumFractionDigits: decimalPlaces, maximumFractionDigits: decimalPlaces });
+}
+
 
 function formatDate(value: string | Date | null | undefined) {
   if (!value) return "-";
@@ -487,10 +521,10 @@ function balanceKey(productId: string, locationId: string) {
   return `${productId}__${locationId}`;
 }
 
-function getBalanceDisplay(value: number | undefined, isLoading: boolean) {
+function getBalanceDisplay(value: number | undefined, isLoading: boolean, decimalPlaces: number) {
   if (isLoading) return "Loading balance...";
   if (typeof value !== "number") return "Select product and location to view balance.";
-  return `Current Balance: ${money(value)}`;
+  return `Current Balance: ${moneyWithPlaces(value, decimalPlaces)}`;
 }
 
 export function AdminSalesQuotationClient({
@@ -503,10 +537,16 @@ export function AdminSalesQuotationClient({
   defaultLocationId,
   projectFeatureEnabled,
   departmentFeatureEnabled,
+  stockNumberFormat,
   taxConfig,
 }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const qtyDecimalPlaces = getDecimalPlaces(stockNumberFormat.qtyDecimalPlaces, 2);
+  const priceDecimalPlaces = getDecimalPlaces(stockNumberFormat.priceDecimalPlaces, 2);
+  const qtyInputStep = decimalStep(qtyDecimalPlaces);
+  const priceInputStep = decimalStep(priceDecimalPlaces);
+
   const [transactions, setTransactions] = useState<QuotationRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchKeyword, setSearchKeyword] = useState("");
@@ -1010,7 +1050,7 @@ export function AdminSalesQuotationClient({
       productCode: product.code,
       productDescription: product.description,
       uom: product.baseUom,
-      unitPrice: String(product.sellingPrice.toFixed(2)),
+      unitPrice: formatDecimalInput(product.sellingPrice, priceDecimalPlaces),
       locationId: lines[index]?.locationId || defaultLocationId,
     });
   }
@@ -1184,7 +1224,7 @@ export function AdminSalesQuotationClient({
                       <div className="text-xs text-white/45">{item.customerAccountNo || "-"}</div>
                     </td>
                     <td className="px-4 py-4"><span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getStatusClass(item.status)}`}>{item.status}</span></td>
-                    <td className="px-4 py-4 text-right">{`${item.currency || "MYR"} ${money(Number(item.grandTotal || 0))}`}</td>
+                    <td className="px-4 py-4 text-right">{`${item.currency || "MYR"} ${moneyWithPlaces(Number(item.grandTotal || 0), priceDecimalPlaces)}`}</td>
                     <td className="px-4 py-4 text-right">
                       {item.status !== "CANCELLED" ? (
                         <div className="flex flex-wrap justify-end gap-2">
@@ -1350,12 +1390,12 @@ export function AdminSalesQuotationClient({
                           disabled={!selectedProduct}
                           onChange={(option) => updateLine(index, { uom: option?.id || selectedProduct?.baseUom || "" })}
                         />
-                        <Input label="Qty" value={line.qty} onChange={(value) => updateLine(index, { qty: value })} />
-                        <Input label="Selling Price" value={line.unitPrice} onChange={(value) => updateLine(index, { unitPrice: value })} />
+                        <Input label="Qty" type="number" min="0" step={qtyInputStep} value={line.qty} onChange={(value) => updateLine(index, { qty: value })} onBlur={(value) => updateLine(index, { qty: normalizeDecimalInputValue(value, qtyDecimalPlaces) })} />
+                        <Input label="Selling Price" type="number" min="0" step={priceInputStep} value={line.unitPrice} onChange={(value) => updateLine(index, { unitPrice: value })} onBlur={(value) => updateLine(index, { unitPrice: normalizeDecimalInputValue(value, priceDecimalPlaces) })} />
                         <div>
                           <label className="label-rk">Discount</label>
                           <div className="grid grid-cols-[minmax(0,1fr)_120px] gap-3">
-                            <input className="input-rk" value={line.discountRate} onChange={(e) => updateLine(index, { discountRate: e.target.value })} />
+                            <input className="input-rk" type="number" min="0" step={priceInputStep} value={line.discountRate} onChange={(e) => updateLine(index, { discountRate: e.target.value })} />
                             <CompactSelect
                               options={discountTypeOptions}
                               value={line.discountType}
@@ -1419,8 +1459,8 @@ export function AdminSalesQuotationClient({
                 </div>
                 <div className="h-fit rounded-[1.75rem] border border-white/10 bg-black/30 p-5 text-sm">
                   <h3 className="text-xl font-semibold text-white">Quotation Summary</h3>
-                  <SummaryRow label="Subtotal" value={money(totals.subtotal)} />
-                  <SummaryRow label="Discount" value={money(totals.discountTotal)} />
+                  <SummaryRow label="Subtotal" value={moneyWithPlaces(totals.subtotal, priceDecimalPlaces)} />
+                  <SummaryRow label="Discount" value={moneyWithPlaces(totals.discountTotal, priceDecimalPlaces)} />
                   {isTaxEnabled && !isLineItemTaxMode ? (
                     <div className="mt-4">
                       <SearchableSelect
@@ -1437,9 +1477,9 @@ export function AdminSalesQuotationClient({
                       Tax Code is controlled inside each product row. Quotation Summary shows the combined tax amount from all rows.
                     </div>
                   ) : null}
-                  {isTaxEnabled ? <SummaryRow label="Tax" value={money(totals.taxTotal)} /> : null}
+                  {isTaxEnabled ? <SummaryRow label="Tax" value={moneyWithPlaces(totals.taxTotal, priceDecimalPlaces)} /> : null}
                   <div className="mt-4 border-t border-white/10 pt-4">
-                    <SummaryRow label={`Grand Total (${currency || "MYR"})`} value={money(totals.grandTotal)} strong />
+                    <SummaryRow label={`Grand Total (${currency || "MYR"})`} value={moneyWithPlaces(totals.grandTotal, priceDecimalPlaces)} strong />
                   </div>
                 </div>
               </div>
@@ -1504,11 +1544,27 @@ export function AdminSalesQuotationClient({
   );
 }
 
-function Input({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+function Input({
+  label,
+  value,
+  onChange,
+  type = "text",
+  step,
+  min,
+  onBlur,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  type?: string;
+  step?: string;
+  min?: string;
+  onBlur?: (value: string) => void;
+}) {
   return (
     <div>
       <label className="label-rk">{label}</label>
-      <input className="input-rk" value={value} onChange={(e) => onChange(e.target.value)} />
+      <input className="input-rk" type={type} step={step} min={min} value={value} onChange={(e) => onChange(e.target.value)} onBlur={(e) => onBlur?.(e.target.value)} />
     </div>
   );
 }

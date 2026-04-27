@@ -190,6 +190,11 @@ export default async function AdminDeliveryOrderPage() {
           initialDepartments={departments}
           projectFeatureEnabled={Boolean(stockConfig?.enableProject)}
           departmentFeatureEnabled={Boolean(stockConfig?.enableProject && stockConfig?.enableDepartment)}
+          stockNumberFormat={{
+            qtyDecimalPlaces: Number(stockConfig?.qtyDecimalPlaces ?? 2),
+            unitCostDecimalPlaces: Number(stockConfig?.unitCostDecimalPlaces ?? 2),
+            priceDecimalPlaces: Number(stockConfig?.priceDecimalPlaces ?? 2),
+          }}
         />
       </div>
     </section>
