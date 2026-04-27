@@ -116,10 +116,42 @@ type DeliveryOrderRecord = {
   customerId?: string | null;
   customerName: string;
   customerAccountNo?: string | null;
+  deliveryAddressLine1?: string | null;
+  deliveryAddressLine2?: string | null;
+  deliveryAddressLine3?: string | null;
+  deliveryAddressLine4?: string | null;
+  deliveryCity?: string | null;
+  deliveryPostCode?: string | null;
+  deliveryCountryCode?: string | null;
+  attention?: string | null;
+  contactNo?: string | null;
+  email?: string | null;
+  currency?: string | null;
+  reference?: string | null;
+  remarks?: string | null;
+  agentId?: string | null;
+  projectId?: string | null;
+  departmentId?: string | null;
+  termsAndConditions?: string | null;
+  bankAccount?: string | null;
+  footerRemarks?: string | null;
   status: "OPEN" | "PARTIAL" | "COMPLETED" | "CANCELLED";
   grandTotal: string | number;
-  currency?: string | null;
-  targetLinks?: Array<{ sourceTransaction?: { id: string; docNo?: string | null } | null }>;
+  revisedFrom?: { id: string; docNo?: string | null } | null;
+  revisions?: Array<{ id: string; docNo?: string | null; status?: string | null }>;
+  targetLinks?: Array<{ sourceTransaction?: { id: string; docType?: string | null; docNo?: string | null; status?: string | null } | null }>;
+  lines?: Array<{
+    inventoryProductId?: string | null;
+    productCode?: string | null;
+    productDescription?: string | null;
+    uom?: string | null;
+    qty?: string | number | null;
+    unitPrice?: string | number | null;
+    discountRate?: string | number | null;
+    discountType?: string | null;
+    locationId?: string | null;
+    remarks?: string | null;
+  }>;
 };
 
 type StockNumberFormatConfig = {
@@ -256,6 +288,40 @@ function formatDate(value: string | Date | null | undefined) {
 
 function normalizeDocNoInput(value: string) {
   return value.toUpperCase().replace(/\s+/g, "").slice(0, 30);
+}
+
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function getBaseDeliveryOrderDocNo(docNo: string | null | undefined) {
+  const value = String(docNo || "").trim().toUpperCase();
+  const match = value.match(/^(DO-\d{8}-\d{4})(?:-(\d+))?$/);
+  return match ? match[1] : value;
+}
+
+function buildDeliveryOrderRevisionDocNoPreview(transaction: DeliveryOrderRecord) {
+  const baseDocNo = getBaseDeliveryOrderDocNo(transaction.revisedFrom?.docNo || transaction.docNo);
+  let maxRevision = 0;
+
+  for (const revision of transaction.revisions || []) {
+    const value = String(revision.docNo || "").trim().toUpperCase();
+    const match = value.match(new RegExp(`^${escapeRegExp(baseDocNo)}-(\\d+)$`));
+    if (!match) continue;
+
+    const revisionNo = Number(match[1]);
+    if (Number.isFinite(revisionNo) && revisionNo > maxRevision) maxRevision = revisionNo;
+  }
+
+  const currentValue = String(transaction.docNo || "").trim().toUpperCase();
+  const currentMatch = currentValue.match(new RegExp(`^${escapeRegExp(baseDocNo)}-(\\d+)$`));
+  if (currentMatch) {
+    const currentRevisionNo = Number(currentMatch[1]);
+    if (Number.isFinite(currentRevisionNo) && currentRevisionNo > maxRevision) maxRevision = currentRevisionNo;
+  }
+
+  return `${baseDocNo}-${maxRevision + 1}`;
 }
 
 function getStatusClass(status: string) {
@@ -446,6 +512,8 @@ export function AdminDeliveryOrderClient({
   const [searchKeyword, setSearchKeyword] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [formMode, setFormMode] = useState<"create" | "edit" | "revise">("create");
+  const [editTarget, setEditTarget] = useState<DeliveryOrderRecord | null>(null);
   const [activeTab, setActiveTab] = useState<"HEADER" | "BODY" | "FOOTER">("HEADER");
   const [submitError, setSubmitError] = useState("");
   const [submitSuccess, setSubmitSuccess] = useState("");
@@ -588,6 +656,11 @@ export function AdminDeliveryOrderClient({
 
   const selectedCustomer = useMemo(() => initialCustomers.find((item) => item.id === customerId) || null, [customerId, initialCustomers]);
 
+  function isGeneratedFromSalesOrder(transaction: DeliveryOrderRecord) {
+    return (transaction.targetLinks || []).some((link) => link.sourceTransaction?.docType === "SO" || String(link.sourceTransaction?.docNo || "").startsWith("SO-"));
+  }
+
+
   const deliveryAddressOptions = useMemo<SearchableSelectOption[]>(() => {
     if (!selectedCustomer) return [{ id: "DEFAULT", label: "Default Delivery Address", searchText: "default delivery address" }];
 
@@ -709,6 +782,8 @@ export function AdminDeliveryOrderClient({
   }, [balances, lines, loadingBalances]);
 
   function resetForm() {
+    setFormMode("create");
+    setEditTarget(null);
     setActiveTab("HEADER");
     setDocDate(todayInput());
     setDocNo("");
@@ -749,6 +824,83 @@ export function AdminDeliveryOrderClient({
     resetForm();
     setIsCreateOpen(true);
     await loadNextDocNo(todayInput());
+  }
+
+  function fillFormFromTransaction(transaction: DeliveryOrderRecord, mode: "edit" | "revise") {
+    setFormMode(mode);
+    setEditTarget(transaction);
+    setActiveTab("HEADER");
+    setDocDate(formatDateInput(transaction.docDate));
+    setDocNo(mode === "edit" ? transaction.docNo : "");
+    setDocNoDraft(mode === "edit" ? transaction.docNo : "");
+    setAutoGeneratedDocNoPreview(mode === "revise" ? buildDeliveryOrderRevisionDocNoPreview(transaction) : transaction.docNo);
+    setIsDocNoModalOpen(false);
+    setDocDesc(transaction.docDesc || "");
+    setCustomerId(transaction.customerId || "");
+    setCustomerAccountNo(transaction.customerAccountNo || "");
+    setCustomerName(transaction.customerName || "");
+    setAttention(transaction.attention || "");
+    setContactNo(transaction.contactNo || "");
+    setEmail(transaction.email || "");
+    setCurrency(transaction.currency || "MYR");
+    setDeliveryAddressSource("DEFAULT");
+    setDeliveryAddressLine1(transaction.deliveryAddressLine1 || "");
+    setDeliveryAddressLine2(transaction.deliveryAddressLine2 || "");
+    setDeliveryAddressLine3(transaction.deliveryAddressLine3 || "");
+    setDeliveryAddressLine4(transaction.deliveryAddressLine4 || "");
+    setDeliveryCity(transaction.deliveryCity || "");
+    setDeliveryPostCode(transaction.deliveryPostCode || "");
+    setDeliveryCountryCode(transaction.deliveryCountryCode || "MY");
+    setReference(transaction.reference || "");
+    setRemarks(transaction.remarks || "");
+    setAgentId(transaction.agentId || "");
+    setProjectId(transaction.projectId || "");
+    setDepartmentId(transaction.departmentId || "");
+    setTermsAndConditions(transaction.termsAndConditions || "");
+    setBankAccount(transaction.bankAccount || "");
+    setFooterRemarks(transaction.footerRemarks || "");
+    setLines(
+      Array.isArray(transaction.lines) && transaction.lines.length > 0
+        ? transaction.lines.map((line) => ({
+            sourceLineId: "",
+            sourceTransactionId: "",
+            inventoryProductId: line.inventoryProductId || "",
+            productCode: line.productCode || "",
+            productDescription: line.productDescription || "",
+            uom: line.uom || "",
+            qty: formatDecimalInput(line.qty ?? 1, qtyDecimalPlaces),
+            unitPrice: formatDecimalInput(line.unitPrice ?? 0, priceDecimalPlaces),
+            discountRate: formatDecimalInput(line.discountRate ?? 0, priceDecimalPlaces),
+            discountType: line.discountType === "AMOUNT" ? "AMOUNT" : "PERCENT",
+            locationId: line.locationId || defaultLocationId,
+            remarks: line.remarks || "",
+          }))
+        : [emptyLine(defaultLocationId, qtyDecimalPlaces, priceDecimalPlaces)]
+    );
+    setSubmitError("");
+    setSubmitSuccess("");
+    setGenerateFromError("");
+    setSelectedSourceOrderIds([]);
+    setPickLines([]);
+    setIsCreateOpen(true);
+  }
+
+  function openEdit(transaction: DeliveryOrderRecord) {
+    if (isGeneratedFromSalesOrder(transaction)) {
+      setSubmitSuccess("");
+      alert("Delivery Order generated from Sales Order cannot be edited. Please cancel this DO and generate a new DO from the original SO.");
+      return;
+    }
+    fillFormFromTransaction(transaction, "edit");
+  }
+
+  function openRevise(transaction: DeliveryOrderRecord) {
+    if (isGeneratedFromSalesOrder(transaction)) {
+      setSubmitSuccess("");
+      alert("Delivery Order generated from Sales Order cannot be revised. Please cancel this DO and generate a new DO from the original SO.");
+      return;
+    }
+    fillFormFromTransaction(transaction, "revise");
   }
 
   function closeForm() {
@@ -955,16 +1107,21 @@ export function AdminDeliveryOrderClient({
         lines,
       };
 
-      const response = await fetch("/api/admin/sales/delivery-order", {
-        method: "POST",
+      const isUpdateMode = formMode !== "create" && Boolean(editTarget?.id);
+      const endpoint = isUpdateMode && editTarget ? `/api/admin/sales/delivery-order/${editTarget.id}` : "/api/admin/sales/delivery-order";
+      const requestBody = isUpdateMode ? { ...payload, action: formMode === "revise" ? "revise" : "edit" } : payload;
+      const response = await fetch(endpoint, {
+        method: isUpdateMode ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(requestBody),
       });
       const data = await response.json();
       if (!response.ok || !data.ok) throw new Error(data.error || "Unable to save delivery order.");
 
+      const successMessage = formMode === "revise" ? "Delivery Order revised successfully." : formMode === "edit" ? "Delivery Order updated successfully." : "Delivery Order created successfully.";
       setIsCreateOpen(false);
       resetForm();
+      setSubmitSuccess(successMessage);
       await loadTransactions();
       router.refresh();
     } catch (error) {
@@ -1001,6 +1158,12 @@ export function AdminDeliveryOrderClient({
           <p className="mt-4 max-w-3xl text-white/70">Create and manage delivery order documents. Delivery Order performs stock out immediately.</p>
         </div>
       </div>
+
+      {submitSuccess && !isCreateOpen ? (
+        <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+          {submitSuccess}
+        </div>
+      ) : null}
 
       <div className="rounded-[2rem] border border-white/10 bg-black/45 p-5 backdrop-blur-md md:p-8">
         <div className="flex flex-wrap items-start justify-between gap-4">
@@ -1051,13 +1214,26 @@ export function AdminDeliveryOrderClient({
                     <td className="px-4 py-4 text-right">{`${item.currency || "MYR"} ${moneyWithPlaces(Number(item.grandTotal || 0), priceDecimalPlaces)}`}</td>
                     <td className="px-4 py-4 text-right">
                       {item.status !== "CANCELLED" ? (
-                        <button type="button" onClick={(event) => { event.stopPropagation(); setCancelTarget(item); }} className="rounded-xl border border-red-500/30 px-3 py-2 text-xs text-red-200 transition hover:bg-red-500/10">
-                          Cancel
-                        </button>
+                        <div className="flex flex-wrap justify-end gap-2">
+                          {!isGeneratedFromSalesOrder(item) ? (
+                            <>
+                              <button type="button" onClick={(event) => { event.stopPropagation(); openEdit(item); }} className="rounded-xl border border-white/15 px-3 py-2 text-xs text-white/75 transition hover:bg-white/10 hover:text-white">
+                                Edit
+                              </button>
+                              <button type="button" onClick={(event) => { event.stopPropagation(); openRevise(item); }} className="rounded-xl border border-sky-500/30 px-3 py-2 text-xs text-sky-200 transition hover:bg-sky-500/10">
+                                Edit Revise
+                              </button>
+                            </>
+                          ) : null}
+                          <button type="button" onClick={(event) => { event.stopPropagation(); setCancelTarget(item); }} className="rounded-xl border border-red-500/30 px-3 py-2 text-xs text-red-200 transition hover:bg-red-500/10">
+                            Cancel
+                          </button>
+                        </div>
                       ) : (
                         <span className="text-xs text-white/35">Cancelled</span>
                       )}
                     </td>
+
                   </tr>
                 ))
               )}
@@ -1072,7 +1248,7 @@ export function AdminDeliveryOrderClient({
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
                 <p className="text-sm font-semibold uppercase tracking-[0.24em] text-red-400/80">Delivery Order</p>
-                <h2 className="mt-3 text-3xl font-bold">Create Delivery Order</h2>
+                <h2 className="mt-3 text-3xl font-bold">{formMode === "revise" ? "Revise Delivery Order" : formMode === "edit" ? "Edit Delivery Order" : "Create Delivery Order"}</h2>
                 {lines.some((line) => line.sourceTransactionId) ? (
                   <p className="mt-3 text-sm text-sky-200">Generated from: {reference || "-"}</p>
                 ) : null}
@@ -1295,7 +1471,7 @@ export function AdminDeliveryOrderClient({
             <div className="mt-8 flex flex-wrap justify-end gap-3 border-t border-white/10 pt-5">
               <button type="button" onClick={closeForm} className="rounded-xl border border-white/15 px-5 py-3 text-sm text-white/75 transition hover:bg-white/10">Close</button>
               <button type="button" disabled={!canSubmitDeliveryOrder} onClick={submitDeliveryOrder} className="rounded-xl bg-red-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-red-500 disabled:opacity-60">
-                {isSubmitting ? "Saving..." : "Create Delivery Order"}
+                {isSubmitting ? "Saving..." : formMode === "revise" ? "Save Revised Delivery Order" : formMode === "edit" ? "Update Delivery Order" : "Create Delivery Order"}
               </button>
             </div>
           </div>

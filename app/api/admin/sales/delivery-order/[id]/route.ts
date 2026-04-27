@@ -6,9 +6,13 @@ import { createAuditLogFromRequest } from "@/lib/audit";
 import {
   acquireAdvisoryLock,
   acquireStockMutationLocks,
+  buildDocumentNumberLockKey,
   buildLedgerValues,
   buildTransactionEntityLockKey,
+  buildTransactionNumberLockKey,
   createStoredQtyDecimal,
+  generateStockDocumentNumber,
+  generateStockTransactionNumber,
   getStockBalance,
 } from "@/lib/stock";
 import { roundToDecimalPlaces, STOCK_STORAGE_DECIMAL_PLACES } from "@/lib/stock-format";
@@ -92,6 +96,328 @@ async function refreshSalesOrderStatuses(tx: Prisma.TransactionClient, sourceTra
       await tx.salesTransaction.update({ where: { id: source.id }, data: { status: nextStatus } });
     }
   }
+}
+
+
+type DirectDeliveryOrderLinePayload = {
+  inventoryProductId?: string | null;
+  productCode?: string | null;
+  productDescription?: string | null;
+  uom?: string | null;
+  qty?: number | string | null;
+  unitPrice?: number | string | null;
+  discountRate?: number | string | null;
+  discountType?: string | null;
+  locationId?: string | null;
+  remarks?: string | null;
+};
+
+function normalizeDate(value: unknown) {
+  const raw = typeof value === "string" && value.trim() ? value.trim() : new Date().toISOString().slice(0, 10);
+  const date = new Date(`${raw}T00:00:00.000+08:00`);
+  if (Number.isNaN(date.getTime())) throw new Error("Document Date is invalid.");
+  return date;
+}
+
+function getDecimalPlaces(value: unknown, fallback = 2) {
+  const numeric = Number(value ?? fallback);
+  if (!Number.isFinite(numeric)) return fallback;
+  return Math.max(0, Math.min(6, Math.trunc(numeric)));
+}
+
+async function loadStockNumberFormat(tx: Prisma.TransactionClient) {
+  const config = await tx.stockConfiguration.findUnique({
+    where: { id: "default" },
+    select: { qtyDecimalPlaces: true, unitCostDecimalPlaces: true, priceDecimalPlaces: true },
+  });
+
+  return {
+    qtyDecimalPlaces: getDecimalPlaces(config?.qtyDecimalPlaces, 2),
+    priceDecimalPlaces: getDecimalPlaces(config?.priceDecimalPlaces, 2),
+  };
+}
+
+function normalizeText(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function decimalWithPlaces(value: number | string | null | undefined, decimalPlaces: number, fallback = 0) {
+  const numeric = Number(value ?? fallback);
+  if (!Number.isFinite(numeric)) return new Prisma.Decimal(fallback);
+  return new Prisma.Decimal(numeric.toFixed(decimalPlaces));
+}
+
+function qtyDecimalWithPlaces(value: number | string | null | undefined, decimalPlaces: number) {
+  const numeric = Number(value ?? 0);
+  if (!Number.isFinite(numeric) || numeric <= 0) throw new Error("Quantity must be greater than zero.");
+  return new Prisma.Decimal(numeric.toFixed(decimalPlaces));
+}
+
+function basicDecimal(value: number | string | null | undefined, fallback = 0) {
+  const numeric = Number(value ?? fallback);
+  if (!Number.isFinite(numeric)) return new Prisma.Decimal(fallback);
+  return new Prisma.Decimal(numeric.toFixed(2));
+}
+
+function hasSalesOrderSource(transaction: { targetLinks?: Array<{ sourceTransaction?: { docType?: string | null; status?: string | null } | null }> }) {
+  return (transaction.targetLinks || []).some((link) => link.sourceTransaction?.docType === "SO" && link.sourceTransaction?.status !== "CANCELLED");
+}
+
+function getBaseDeliveryOrderDocNo(docNo: string | null | undefined) {
+  const value = String(docNo || "").trim().toUpperCase();
+  const match = value.match(/^(DO-\d{8}-\d{4})(?:-(\d+))?$/);
+  return match ? match[1] : value;
+}
+
+async function generateDeliveryOrderRevisionNo(tx: Prisma.TransactionClient, current: { id: string; docNo: string; revisedFromId?: string | null; revisedFrom?: { docNo?: string | null } | null }) {
+  const baseDocNo = getBaseDeliveryOrderDocNo(current.revisedFrom?.docNo || current.docNo);
+  const rows = await tx.salesTransaction.findMany({
+    where: {
+      docType: "DO",
+      OR: [{ docNo: baseDocNo }, { docNo: { startsWith: `${baseDocNo}-` } }, { revisedFromId: current.revisedFromId || current.id }],
+    },
+    select: { docNo: true },
+  });
+
+  let maxRevision = 0;
+  const pattern = new RegExp(`^${baseDocNo.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}-(\\d+)$`);
+  for (const row of rows) {
+    const match = String(row.docNo || "").match(pattern);
+    if (!match) continue;
+    const revisionNo = Number(match[1]);
+    if (Number.isFinite(revisionNo) && revisionNo > maxRevision) maxRevision = revisionNo;
+  }
+
+  return `${baseDocNo}-${maxRevision + 1}`;
+}
+
+async function buildDirectDeliveryOrderData(body: any, tx: Prisma.TransactionClient) {
+  const docDate = normalizeDate(body.docDate);
+  const customerId = normalizeText(body.customerId);
+  if (!customerId) throw new Error("Customer is required.");
+
+  const rawLines = Array.isArray(body.lines) ? (body.lines as DirectDeliveryOrderLinePayload[]) : [];
+  if (rawLines.length === 0) throw new Error("Please add at least one product line.");
+  if (rawLines.some((line) => normalizeText((line as any).sourceLineId) || normalizeText((line as any).sourceTransactionId))) {
+    throw new Error("Generated Delivery Order lines cannot be edited directly. Please cancel and generate a new DO from the Sales Order.");
+  }
+
+  const customer = await tx.user.findFirst({ where: { id: customerId, role: "CUSTOMER" } });
+  if (!customer) throw new Error("Selected customer is invalid.");
+
+  const numberFormat = await loadStockNumberFormat(tx);
+  const productIds = Array.from(new Set(rawLines.map((line) => normalizeText(line.inventoryProductId)).filter(Boolean))) as string[];
+  const locationIds = Array.from(new Set(rawLines.map((line) => normalizeText(line.locationId)).filter(Boolean))) as string[];
+
+  const [products, locations] = await Promise.all([
+    tx.inventoryProduct.findMany({
+      where: { id: { in: productIds }, isActive: true },
+      select: { id: true, code: true, description: true, baseUom: true, sellingPrice: true, trackInventory: true, batchTracking: true, serialNumberTracking: true },
+    }),
+    tx.stockLocation.findMany({ where: { id: { in: locationIds }, isActive: true }, select: { id: true, code: true, name: true } }),
+  ]);
+
+  const productMap = new Map(products.map((item) => [item.id, item]));
+  const locationMap = new Map(locations.map((item) => [item.id, item]));
+
+  const lines = rawLines.map((line, index) => {
+    const lineNo = index + 1;
+    const inventoryProductId = normalizeText(line.inventoryProductId);
+    const product = inventoryProductId ? productMap.get(inventoryProductId) : null;
+    const locationId = normalizeText(line.locationId);
+    const location = locationId ? locationMap.get(locationId) : null;
+
+    if (!product) throw new Error(`Product line ${lineNo} is missing product information.`);
+    if (!product.trackInventory) throw new Error(`${product.code} is not a tracked stock item and cannot be delivered through DO stock out.`);
+    if (product.serialNumberTracking || product.batchTracking) throw new Error(`${product.code} uses serial/batch tracking. Delivery Order serial/batch picking will be added in a later phase.`);
+    if (!location) throw new Error(`Product line ${lineNo} requires a valid stock location.`);
+
+    const qty = qtyDecimalWithPlaces(line.qty, numberFormat.qtyDecimalPlaces);
+    const unitPrice = decimalWithPlaces(line.unitPrice, numberFormat.priceDecimalPlaces, Number(product.sellingPrice ?? 0));
+    const discountType = String(line.discountType || "PERCENT").toUpperCase() === "AMOUNT" ? "AMOUNT" : "PERCENT";
+    const discountRate = discountType === "PERCENT" ? basicDecimal(line.discountRate, 0) : new Prisma.Decimal(0);
+    const rawDiscountValue = basicDecimal(line.discountRate, 0);
+    const lineSubtotal = qty.mul(unitPrice).toDecimalPlaces(2);
+    const discountAmount = discountType === "AMOUNT" ? Prisma.Decimal.min(rawDiscountValue, lineSubtotal).toDecimalPlaces(2) : lineSubtotal.mul(discountRate).div(100).toDecimalPlaces(2);
+    const lineTotal = lineSubtotal.minus(discountAmount).toDecimalPlaces(2);
+
+    return {
+      lineNo,
+      inventoryProductId: product.id,
+      productCode: product.code,
+      productDescription: normalizeText(line.productDescription) || product.description,
+      uom: (normalizeText(line.uom) || product.baseUom || "UNIT").toUpperCase(),
+      qty,
+      unitPrice,
+      discountRate,
+      discountType,
+      discountAmount,
+      locationId: location.id,
+      locationCode: location.code,
+      locationName: location.name,
+      taxCodeId: null,
+      taxCode: null,
+      taxDescription: null,
+      taxDisplayLabel: null,
+      taxRate: new Prisma.Decimal(0),
+      taxCalculationMethod: null,
+      taxAmount: new Prisma.Decimal(0),
+      lineSubtotal,
+      lineTotal,
+      remarks: normalizeText(line.remarks),
+    };
+  });
+
+  const subtotal = lines.reduce((sum, line) => sum.plus(line.lineSubtotal), new Prisma.Decimal(0)).toDecimalPlaces(2);
+  const discountTotal = lines.reduce((sum, line) => sum.plus(line.discountAmount), new Prisma.Decimal(0)).toDecimalPlaces(2);
+  const taxTotal = new Prisma.Decimal(0);
+  const grandTotal = lines.reduce((sum, line) => sum.plus(line.lineTotal), new Prisma.Decimal(0)).toDecimalPlaces(2);
+
+  return {
+    docDate,
+    customer,
+    currency: normalizeText(body.currency) || customer.currency || "MYR",
+    reference: normalizeText(body.reference),
+    remarks: normalizeText(body.remarks),
+    projectId: normalizeText(body.projectId),
+    departmentId: normalizeText(body.departmentId),
+    termsAndConditions: normalizeText(body.termsAndConditions),
+    bankAccount: normalizeText(body.bankAccount),
+    footerRemarks: normalizeText(body.footerRemarks),
+    subtotal,
+    discountTotal,
+    taxableSubtotal: subtotal.minus(discountTotal).toDecimalPlaces(2),
+    taxTotal,
+    grandTotal,
+    lines,
+  };
+}
+
+async function createStockIssueForDirectDeliveryOrder(tx: Prisma.TransactionClient, adminId: string, deliveryOrder: any, lines: Array<any>, body: any) {
+  const config = await tx.stockConfiguration.findUnique({ where: { id: "default" } });
+  if (!config?.stockModuleEnabled) throw new Error("Stock module is disabled.");
+
+  await acquireAdvisoryLock(tx, buildTransactionNumberLockKey("SI", deliveryOrder.docDate));
+  await acquireAdvisoryLock(tx, buildDocumentNumberLockKey("SI", deliveryOrder.docDate));
+  await acquireStockMutationLocks(tx, lines.map((line) => ({ inventoryProductId: line.inventoryProductId!, locationId: line.locationId })));
+
+  for (const line of lines) {
+    const balance = await getStockBalance(tx, line.inventoryProductId!, line.locationId);
+    const requiredQty = toNumber(line.qty);
+    if (balance < requiredQty && !config.allowNegativeStock) throw new Error(`Insufficient stock for ${line.productCode}. Current balance: ${balance}. Required: ${requiredQty}.`);
+  }
+
+  const transactionNo = await generateStockTransactionNumber(tx, "SI", deliveryOrder.docDate);
+  const stockDocNo = await generateStockDocumentNumber(tx, "SI", deliveryOrder.docDate);
+  const stockTransaction = await tx.stockTransaction.create({
+    data: {
+      transactionNo,
+      docNo: stockDocNo,
+      docDate: deliveryOrder.docDate,
+      docDesc: `Auto stock issue for ${deliveryOrder.docNo}`,
+      transactionType: "SI",
+      transactionDate: deliveryOrder.docDate,
+      reference: deliveryOrder.docNo,
+      remarks: normalizeText(body.stockRemarks) || deliveryOrder.remarks || `Auto generated from Delivery Order ${deliveryOrder.docNo}`,
+      projectId: deliveryOrder.projectId,
+      departmentId: deliveryOrder.departmentId,
+      createdByAdminId: adminId,
+      lines: { create: lines.map((line) => ({ inventoryProductId: line.inventoryProductId!, qty: line.qty, locationId: line.locationId, remarks: line.remarks || `Auto stock issue for ${deliveryOrder.docNo}` })) },
+    },
+    include: { lines: true },
+  });
+
+  for (const stockLine of stockTransaction.lines) {
+    const ledgerValues = buildLedgerValues(createStoredQtyDecimal(stockLine.qty), "OUT");
+    await tx.stockLedger.create({
+      data: {
+        movementDate: deliveryOrder.docDate,
+        movementType: "SI",
+        movementDirection: "OUT",
+        ...ledgerValues,
+        batchNo: stockLine.batchNo,
+        inventoryProductId: stockLine.inventoryProductId,
+        locationId: stockLine.locationId!,
+        transactionId: stockTransaction.id,
+        transactionLineId: stockLine.id,
+        referenceNo: stockTransaction.transactionNo,
+        referenceText: `Delivery Order ${deliveryOrder.docNo}`,
+        sourceType: "SALES_DELIVERY_ORDER",
+        sourceId: deliveryOrder.id,
+        remarks: stockLine.remarks,
+      },
+    });
+  }
+}
+
+function buildSalesUpdateData(data: Awaited<ReturnType<typeof buildDirectDeliveryOrderData>>, body: any, adminId: string) {
+  return {
+    docDate: data.docDate,
+    docDesc: normalizeText(body.docDesc),
+    customerId: data.customer.id,
+    customerAccountNo: data.customer.customerAccountNo,
+    customerName: data.customer.name,
+    billingAddressLine1: data.customer.billingAddressLine1,
+    billingAddressLine2: data.customer.billingAddressLine2,
+    billingAddressLine3: data.customer.billingAddressLine3,
+    billingAddressLine4: data.customer.billingAddressLine4,
+    billingCity: data.customer.billingCity,
+    billingPostCode: data.customer.billingPostCode,
+    billingCountryCode: data.customer.billingCountryCode,
+    deliveryAddressLine1: normalizeText(body.deliveryAddressLine1) ?? data.customer.deliveryAddressLine1,
+    deliveryAddressLine2: normalizeText(body.deliveryAddressLine2) ?? data.customer.deliveryAddressLine2,
+    deliveryAddressLine3: normalizeText(body.deliveryAddressLine3) ?? data.customer.deliveryAddressLine3,
+    deliveryAddressLine4: normalizeText(body.deliveryAddressLine4) ?? data.customer.deliveryAddressLine4,
+    deliveryCity: normalizeText(body.deliveryCity) ?? data.customer.deliveryCity,
+    deliveryPostCode: normalizeText(body.deliveryPostCode) ?? data.customer.deliveryPostCode,
+    deliveryCountryCode: normalizeText(body.deliveryCountryCode) ?? data.customer.deliveryCountryCode,
+    attention: data.customer.attention,
+    contactNo: data.customer.phone,
+    email: data.customer.email,
+    currency: data.currency,
+    reference: data.reference,
+    remarks: data.remarks,
+    agentId: data.customer.agentId,
+    projectId: data.projectId,
+    departmentId: data.departmentId,
+    subtotal: data.subtotal,
+    discountTotal: data.discountTotal,
+    taxableSubtotal: data.taxableSubtotal,
+    taxTotal: data.taxTotal,
+    grandTotal: data.grandTotal,
+    termsAndConditions: data.termsAndConditions,
+    bankAccount: data.bankAccount,
+    footerRemarks: data.footerRemarks,
+    createdByAdminId: adminId,
+  };
+}
+
+function buildLineCreateData(lines: Array<any>) {
+  return lines.map((line) => ({
+    lineNo: line.lineNo,
+    inventoryProductId: line.inventoryProductId,
+    productCode: line.productCode,
+    productDescription: line.productDescription,
+    uom: line.uom,
+    qty: line.qty,
+    unitPrice: line.unitPrice,
+    discountRate: line.discountRate,
+    discountType: line.discountType,
+    discountAmount: line.discountAmount,
+    locationId: line.locationId,
+    locationCode: line.locationCode,
+    locationName: line.locationName,
+    taxCodeId: line.taxCodeId,
+    taxCode: line.taxCode,
+    taxDescription: line.taxDescription,
+    taxDisplayLabel: line.taxDisplayLabel,
+    taxRate: line.taxRate,
+    taxCalculationMethod: line.taxCalculationMethod,
+    taxAmount: line.taxAmount,
+    lineSubtotal: line.lineSubtotal,
+    lineTotal: line.lineTotal,
+    remarks: line.remarks,
+  }));
 }
 
 async function reverseStockIssueForDeliveryOrder(tx: Prisma.TransactionClient, deliveryOrder: any, adminId: string, cancelReason: string | null) {
@@ -219,21 +545,26 @@ export async function PATCH(req: Request, context: Params) {
     const action = typeof body.action === "string" ? body.action : "";
     const cancelReason = typeof body.cancelReason === "string" ? body.cancelReason.trim() || null : null;
 
-    if (action !== "cancel") {
-      return NextResponse.json({ ok: false, error: "Delivery Order can only be cancelled after creation." }, { status: 400 });
+    if (!["cancel", "edit", "revise"].includes(action)) {
+      return NextResponse.json({ ok: false, error: "Invalid Delivery Order action." }, { status: 400 });
     }
 
-    const cancelled = await db.$transaction(async (tx) => {
+    const result = await db.$transaction(async (tx) => {
       await acquireAdvisoryLock(tx, `sales-transaction:${id}`);
 
       const current = await tx.salesTransaction.findUnique({
         where: { id },
         include: {
+          revisedFrom: { select: { id: true, docNo: true } },
           lines: true,
-          sourceLinks: { select: { sourceTransactionId: true } },
-          targetLinks: {
+          sourceLinks: {
             include: {
               targetTransaction: { select: { id: true, docType: true, status: true } },
+            },
+          },
+          targetLinks: {
+            include: {
+              sourceTransaction: { select: { id: true, docType: true, docNo: true, status: true } },
             },
           },
         },
@@ -242,45 +573,84 @@ export async function PATCH(req: Request, context: Params) {
       if (!current || current.docType !== "DO") throw new Error("Delivery Order not found.");
       if (current.status === "CANCELLED") throw new Error("This Delivery Order is already cancelled.");
 
-      const hasActiveInvoice = current.targetLinks.some(
+      const hasActiveInvoice = current.sourceLinks.some(
         (link) => ["INV", "CS"].includes(String(link.targetTransaction?.docType || "")) && link.targetTransaction?.status !== "CANCELLED"
       );
-      if (hasActiveInvoice) {
-        throw new Error("This Delivery Order has been generated to an active invoice. Cancel the invoice first.");
+      if (hasActiveInvoice) throw new Error("This Delivery Order has been generated to an active invoice. Cancel the invoice first.");
+
+      if (action === "cancel") {
+        await reverseStockIssueForDeliveryOrder(tx, current, admin.id, cancelReason);
+
+        const updated = await tx.salesTransaction.update({
+          where: { id },
+          data: { status: "CANCELLED", cancelledAt: new Date(), cancelledByAdminId: admin.id, cancelReason },
+          include: { cancelledByAdmin: { select: { id: true, name: true, email: true } }, lines: true },
+        });
+
+        await refreshSalesOrderStatuses(tx, current.targetLinks.map((link) => link.sourceTransaction?.id).filter(Boolean) as string[]);
+        return { transaction: updated, auditAction: "CANCEL" as const, description: `Cancelled Delivery Order ${updated.docNo}.` };
       }
 
-      await reverseStockIssueForDeliveryOrder(tx, current, admin.id, cancelReason);
+      if (hasSalesOrderSource(current)) {
+        throw new Error("Delivery Order generated from Sales Order cannot be edited. Please cancel this DO and generate a new DO from the original SO.");
+      }
 
-      const updated = await tx.salesTransaction.update({
-        where: { id },
+      const data = await buildDirectDeliveryOrderData(body, tx);
+      await reverseStockIssueForDeliveryOrder(tx, current, admin.id, action === "revise" ? "Revised Delivery Order" : "Edited Delivery Order");
+
+      if (action === "edit") {
+        await tx.salesTransactionLine.deleteMany({ where: { transactionId: current.id } });
+        const updated = await tx.salesTransaction.update({
+          where: { id: current.id },
+          data: {
+            ...buildSalesUpdateData(data, body, admin.id),
+            docNo: current.docNo,
+            status: "OPEN",
+            cancelledAt: null,
+            cancelledByAdminId: null,
+            cancelReason: null,
+            lines: { create: buildLineCreateData(data.lines) },
+          },
+          include: { lines: true },
+        });
+
+        await createStockIssueForDirectDeliveryOrder(tx, admin.id, updated, data.lines, body);
+        return { transaction: updated, auditAction: "UPDATE" as const, description: `Updated Delivery Order ${updated.docNo}.` };
+      }
+
+      const nextDocNo = await generateDeliveryOrderRevisionNo(tx, current);
+      const revised = await tx.salesTransaction.create({
         data: {
-          status: "CANCELLED",
-          cancelledAt: new Date(),
-          cancelledByAdminId: admin.id,
-          cancelReason,
+          docType: "DO",
+          docNo: nextDocNo,
+          status: "OPEN",
+          revisedFromId: current.revisedFromId || current.id,
+          ...buildSalesUpdateData(data, body, admin.id),
+          lines: { create: buildLineCreateData(data.lines) },
         },
-        include: {
-          cancelledByAdmin: { select: { id: true, name: true, email: true } },
-          lines: true,
-        },
+        include: { lines: true },
       });
 
-      await refreshSalesOrderStatuses(tx, current.sourceLinks.map((link) => link.sourceTransactionId));
+      await tx.salesTransaction.update({
+        where: { id: current.id },
+        data: { status: "CANCELLED", cancelledAt: new Date(), cancelledByAdminId: admin.id, cancelReason: "Revised Delivery Order" },
+      });
 
-      return updated;
+      await createStockIssueForDirectDeliveryOrder(tx, admin.id, revised, data.lines, body);
+      return { transaction: revised, auditAction: "REVISE" as const, description: `Revised Delivery Order ${current.docNo} to ${revised.docNo}.` };
     });
 
     await createAuditLogFromRequest({
       req,
       user: admin,
       module: "SALES",
-      action: "CANCEL",
+      action: result.auditAction,
       entityType: "SALES_DELIVERY_ORDER",
-      entityId: cancelled.id,
-      description: `Cancelled Delivery Order ${cancelled.docNo}.`,
+      entityId: result.transaction.id,
+      description: result.description,
     });
 
-    return NextResponse.json({ ok: true, transaction: cancelled });
+    return NextResponse.json({ ok: true, transaction: result.transaction });
   } catch (error) {
     return NextResponse.json(
       { ok: false, error: error instanceof Error ? error.message : "Unable to update delivery order." },

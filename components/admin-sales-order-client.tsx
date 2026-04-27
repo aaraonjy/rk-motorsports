@@ -1419,6 +1419,12 @@ export function AdminSalesOrderClient({
         </div>
       </div>
 
+      {submitSuccess && !isCreateOpen ? (
+        <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+          {submitSuccess}
+        </div>
+      ) : null}
+
       <div className="rounded-[2rem] border border-white/10 bg-black/45 p-5 backdrop-blur-md md:p-8">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
