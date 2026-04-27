@@ -1138,6 +1138,8 @@ export function AdminDeliveryOrderClient({
       setIsCreateOpen(false);
       resetForm();
       setSubmitSuccess(successMessage);
+      setBalances({});
+      setLoadingBalances({});
       await loadTransactions();
       router.refresh();
     } catch (error) {
@@ -1159,6 +1161,8 @@ export function AdminDeliveryOrderClient({
       if (!response.ok || !data.ok) throw new Error(data.error || "Unable to cancel delivery order.");
       setCancelTarget(null);
       setCancelReason("");
+      setBalances({});
+      setLoadingBalances({});
       await loadTransactions();
       router.refresh();
     } catch (error) {
