@@ -210,6 +210,7 @@ function calculateLine(
   options: {
     taxModuleEnabled: boolean;
     taxCalculationMode: TaxCalculationModeValue;
+    numberFormat: { qtyDecimalPlaces: number; priceDecimalPlaces: number };
   }
 ) {
   const inventoryProductId = typeof line.inventoryProductId === "string" && line.inventoryProductId.trim() ? line.inventoryProductId.trim() : null;
@@ -223,8 +224,8 @@ function calculateLine(
 
   if (!productCode || !productDescription) throw new Error(`Product line ${lineNo} is missing product information.`);
 
-  const qty = qtyDecimalWithPlaces(line.qty, numberFormat.qtyDecimalPlaces);
-  const unitPrice = decimalWithPlaces(line.unitPrice, numberFormat.priceDecimalPlaces, product ? Number(product.sellingPrice ?? 0) : 0);
+  const qty = qtyDecimalWithPlaces(line.qty, options.numberFormat.qtyDecimalPlaces);
+  const unitPrice = decimalWithPlaces(line.unitPrice, options.numberFormat.priceDecimalPlaces, product ? Number(product.sellingPrice ?? 0) : 0);
   const rawDiscountValue = decimal(line.discountRate, 0);
   const discountType = String(line.discountType || "PERCENT").toUpperCase() === "AMOUNT" ? "AMOUNT" : "PERCENT";
   const discountRate = discountType === "PERCENT" ? rawDiscountValue : new Prisma.Decimal(0);
@@ -415,6 +416,7 @@ export async function POST(req: Request) {
       calculateLine(line, index + 1, productMap, locationMap, taxCodeMap, {
         taxModuleEnabled,
         taxCalculationMode,
+        numberFormat,
       })
     );
 
