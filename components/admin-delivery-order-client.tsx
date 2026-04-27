@@ -937,7 +937,7 @@ export function AdminDeliveryOrderClient({
         locationId: line.locationId,
         direction: "outbound",
       });
-      fetch(`/api/admin/stock/available-batches?${params.toString()}`, { cache: "no-store" })
+      fetch(`/api/admin/stock/batches?${params.toString()}`, { cache: "no-store" })
         .then((response) => response.json())
         .then((data) => {
           setAvailableBatches((prev) => ({ ...prev, [index]: data?.ok && Array.isArray(data.items) ? data.items : [] }));
@@ -959,7 +959,7 @@ export function AdminDeliveryOrderClient({
         locationId: line.locationId,
       });
       if (line.batchNo) params.set("batchNo", line.batchNo);
-      fetch(`/api/admin/stock/available-serials?${params.toString()}`, { cache: "no-store" })
+      fetch(`/api/admin/stock/serials?${params.toString()}`, { cache: "no-store" })
         .then((response) => response.json())
         .then((data) => {
           setAvailableSerials((prev) => ({ ...prev, [index]: data?.ok && Array.isArray(data.serials) ? data.serials : [] }));
