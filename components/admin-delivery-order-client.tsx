@@ -412,6 +412,16 @@ function CompactSelect({ options, value, onChange }: { options: SearchableSelect
   );
 }
 
+
+function SummaryRow({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
+  return (
+    <div className={`mt-4 flex items-center justify-between gap-4 ${strong ? "text-xl font-bold text-white" : "text-white/75"}`}>
+      <span>{label}</span>
+      <span className={strong ? "text-white" : "text-white"}>{value}</span>
+    </div>
+  );
+}
+
 export function AdminDeliveryOrderClient({
   initialSalesOrders,
   initialCustomers,
@@ -1148,60 +1158,135 @@ export function AdminDeliveryOrderClient({
               <div className="mt-6 space-y-5">
                 {lines.map((line, index) => {
                   const normalizedLine = normalizedLines[index];
+                  const total = normalizedLine?.lineTotal || 0;
+                  const taxAmount = normalizedLine?.taxAmount || 0;
+                  const selectedProduct = initialProducts.find((item) => item.id === line.inventoryProductId) || null;
+                  const uomOptions = selectedProduct
+                    ? [
+                        {
+                          id: selectedProduct.baseUom,
+                          label: `${selectedProduct.baseUom} (Base UOM)`,
+                          searchText: selectedProduct.baseUom.toLowerCase(),
+                        },
+                        ...(selectedProduct.uomConversions || [])
+                          .filter((item) => item.uomCode && Number(item.conversionRate) > 0)
+                          .map((item) => ({
+                            id: item.uomCode.toUpperCase(),
+                            label: `${item.uomCode.toUpperCase()} (1 = ${item.conversionRate} ${selectedProduct.baseUom})`,
+                            searchText: `${item.uomCode} ${selectedProduct.baseUom} ${item.conversionRate}`.toLowerCase(),
+                          })),
+                      ]
+                    : [];
+                  const trackingInfo = selectedProduct
+                    ? [selectedProduct.batchTracking ? "Batch Tracked" : "", selectedProduct.serialNumberTracking ? "Serial Tracked" : ""].filter(Boolean).join(" • ")
+                    : "";
                   return (
                     <div key={index} className="rounded-[1.75rem] border border-white/10 p-5">
                       <div className="mb-5 flex items-center justify-between gap-3">
                         <h3 className="text-lg font-semibold text-white">Product {index + 1}</h3>
-                        {lines.length > 1 ? (
-                          <button type="button" onClick={() => setLines((prev) => prev.filter((_, lineIndex) => lineIndex !== index))} className="rounded-xl border border-red-500/30 px-4 py-2 text-sm text-red-200 transition hover:bg-red-500/10">
-                            Remove
-                          </button>
-                        ) : null}
+                        {lines.length > 1 ? <button type="button" onClick={() => setLines((prev) => prev.filter((_, i) => i !== index))} className="rounded-xl border border-red-500/30 px-3 py-2 text-sm text-red-200 hover:bg-red-500/10">Remove</button> : null}
                       </div>
-
                       <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
                         <div className="md:col-span-2">
-                          <SearchableSelect label="Product" placeholder="Search or select product" options={productOptions} value={line.inventoryProductId} onChange={(option) => handleProductChange(index, option?.id || "")} disabled={Boolean(line.sourceLineId)} />
-                          {line.productDescription ? <div className="mt-2 text-xs text-white/45">{line.productDescription}</div> : null}
+                          <SearchableSelect
+                            label="Product"
+                            placeholder="Search or select product"
+                            options={productOptions}
+                            value={line.inventoryProductId}
+                            disabled={Boolean(line.sourceLineId)}
+                            onChange={(option) => handleProductChange(index, option?.id || "")}
+                          />
+                          {trackingInfo || line.productDescription ? <p className="mt-2 text-xs text-white/45">{trackingInfo || line.productDescription}</p> : null}
                         </div>
-                        <div><label className="label-rk">UOM</label><input className="input-rk" value={line.uom} onChange={(e) => updateLine(index, { uom: e.target.value.toUpperCase() })} readOnly={Boolean(line.sourceLineId)} /></div>
-                        <div><label className="label-rk">Qty</label><input className="input-rk text-right" type="number" min="0" step={qtyInputStep} value={line.qty} onChange={(e) => updateLine(index, { qty: limitDecimalInputValue(e.target.value, qtyDecimalPlaces) })} onBlur={(e) => updateLine(index, { qty: normalizeDecimalInputValue(e.target.value, qtyDecimalPlaces) })} /></div>
-                        <div><label className="label-rk">Selling Price</label><input className="input-rk text-right" type="number" min="0" step={priceInputStep} value={line.unitPrice} onChange={(e) => updateLine(index, { unitPrice: limitDecimalInputValue(e.target.value, priceDecimalPlaces) })} onBlur={(e) => updateLine(index, { unitPrice: normalizeDecimalInputValue(e.target.value, priceDecimalPlaces) })} /></div>
-                        <div><label className="label-rk">Discount</label><div className="grid grid-cols-[1fr_120px] gap-3"><input className="input-rk" type="number" min="0" step={priceInputStep} value={line.discountRate} onChange={(e) => updateLine(index, { discountRate: limitDecimalInputValue(e.target.value, priceDecimalPlaces) })} /><CompactSelect options={[{ id: "PERCENT", label: "%", searchText: "percent %" }, { id: "AMOUNT", label: "RM", searchText: "amount rm" }]} value={line.discountType} onChange={(value) => updateLine(index, { discountType: value === "AMOUNT" ? "AMOUNT" : "PERCENT" })} /></div></div>
-                        <div className="md:col-span-2">
-                          <SearchableSelect label="Location" placeholder="Select location" options={locationOptions} value={line.locationId} onChange={(option) => updateLine(index, { locationId: option?.id || "" })} />
-                          <div className="mt-2 text-xs text-white/45">
-                            {getBalanceDisplay(balances[balanceKey(line.inventoryProductId, line.locationId)], Boolean(loadingBalances[balanceKey(line.inventoryProductId, line.locationId)]), qtyDecimalPlaces)}
+                        <SearchableSelect
+                          label="UOM"
+                          placeholder="Select UOM"
+                          options={uomOptions}
+                          value={line.uom}
+                          disabled={Boolean(line.sourceLineId) || !selectedProduct}
+                          onChange={(option) => updateLine(index, { uom: option?.id || selectedProduct?.baseUom || "" })}
+                        />
+                        <div>
+                          <label className="label-rk">Qty</label>
+                          <input className="input-rk" type="number" min="0" step={qtyInputStep} value={line.qty} onChange={(e) => updateLine(index, { qty: limitDecimalInputValue(e.target.value, qtyDecimalPlaces) })} onBlur={(e) => updateLine(index, { qty: normalizeDecimalInputValue(e.target.value, qtyDecimalPlaces) })} />
+                        </div>
+                        <div>
+                          <label className="label-rk">Selling Price</label>
+                          <input className="input-rk" type="number" min="0" step={priceInputStep} value={line.unitPrice} onChange={(e) => updateLine(index, { unitPrice: limitDecimalInputValue(e.target.value, priceDecimalPlaces) })} onBlur={(e) => updateLine(index, { unitPrice: normalizeDecimalInputValue(e.target.value, priceDecimalPlaces) })} />
+                        </div>
+                        <div>
+                          <label className="label-rk">Discount</label>
+                          <div className="grid grid-cols-[minmax(0,1fr)_120px] gap-3">
+                            <input className="input-rk" type="number" min="0" step={priceInputStep} value={line.discountRate} onChange={(e) => updateLine(index, { discountRate: limitDecimalInputValue(e.target.value, priceDecimalPlaces) })} />
+                            <CompactSelect options={[{ id: "PERCENT", label: "%", searchText: "percent %" }, { id: "AMOUNT", label: "RM", searchText: "amount rm" }]} value={line.discountType} onChange={(value) => updateLine(index, { discountType: value === "AMOUNT" ? "AMOUNT" : "PERCENT" })} />
                           </div>
                         </div>
-                        <div><label className="label-rk">Gross Amount</label><input className="input-rk text-right" value={moneyWithPlaces(normalizedLine?.lineTotal || 0, priceDecimalPlaces)} readOnly /></div>
-                        <div className="md:col-span-4"><label className="label-rk">Product Remarks</label><textarea className="input-rk min-h-[80px]" value={line.remarks} onChange={(e) => updateLine(index, { remarks: e.target.value })} /></div>
+                        <div className="md:col-span-2">
+                          <SearchableSelect
+                            label="Location"
+                            placeholder="Search or select location"
+                            options={locationOptions}
+                            value={line.locationId}
+                            onChange={(option) => updateLine(index, { locationId: option?.id || "" })}
+                          />
+                          <p className="mt-2 text-xs text-white/45">
+                            {getBalanceDisplay(
+                              line.inventoryProductId && line.locationId ? balances[balanceKey(line.inventoryProductId, line.locationId)] : undefined,
+                              line.inventoryProductId && line.locationId ? Boolean(loadingBalances[balanceKey(line.inventoryProductId, line.locationId)]) : false,
+                              qtyDecimalPlaces
+                            )}
+                          </p>
+                        </div>
+                        <div>
+                          <label className="label-rk">Tax Code</label>
+                          <input className="input-rk" value="-" readOnly />
+                        </div>
+                        <div>
+                          <label className="label-rk">Tax Amount</label>
+                          <input className="input-rk" value={moneyWithPlaces(taxAmount, priceDecimalPlaces)} readOnly />
+                        </div>
+                        <div>
+                          <label className="label-rk">Gross Amount</label>
+                          <input className="input-rk" value={moneyWithPlaces(total, priceDecimalPlaces)} readOnly />
+                        </div>
+                        <div className="md:col-span-4">
+                          <label className="label-rk">Product Remarks</label>
+                          <textarea className="input-rk min-h-[90px]" value={line.remarks} onChange={(e) => updateLine(index, { remarks: e.target.value })} />
+                        </div>
                       </div>
                     </div>
                   );
                 })}
-
-                <button type="button" onClick={() => setLines((prev) => [...prev, emptyLine(defaultLocationId, qtyDecimalPlaces, priceDecimalPlaces)])} className="rounded-xl border border-white/15 px-5 py-3 text-sm text-white/75 transition hover:bg-white/10">
-                  + Add Product
-                </button>
+                <button type="button" onClick={() => setLines((prev) => [...prev, emptyLine(defaultLocationId, qtyDecimalPlaces, priceDecimalPlaces)])} className="rounded-xl border border-white/15 px-4 py-3 text-sm text-white/75 transition hover:bg-white/10 hover:text-white">+ Add Product</button>
               </div>
             ) : null}
 
             {activeTab === "FOOTER" ? (
               <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_360px]">
                 <div className="space-y-5">
-                  <div><label className="label-rk">Remarks</label><textarea className="input-rk min-h-[96px]" value={remarks} onChange={(e) => setRemarks(e.target.value)} /></div>
-                  <div><label className="label-rk">Terms & Conditions</label><textarea className="input-rk min-h-[96px]" value={termsAndConditions} onChange={(e) => setTermsAndConditions(e.target.value)} /></div>
-                  <div><label className="label-rk">Bank Account</label><textarea className="input-rk min-h-[96px]" value={bankAccount} onChange={(e) => setBankAccount(e.target.value)} /></div>
-                  <div><label className="label-rk">Footer Remarks</label><textarea className="input-rk min-h-[96px]" value={footerRemarks} onChange={(e) => setFooterRemarks(e.target.value)} /></div>
+                  <div>
+                    <label className="label-rk">Terms & Conditions</label>
+                    <textarea className="input-rk min-h-[140px]" value={termsAndConditions} onChange={(e) => setTermsAndConditions(e.target.value)} placeholder="Enter terms manually. Template picker can be added in later phase." />
+                  </div>
+                  <div>
+                    <label className="label-rk">Bank Account</label>
+                    <textarea className="input-rk min-h-[100px]" value={bankAccount} onChange={(e) => setBankAccount(e.target.value)} placeholder="Enter bank details manually." />
+                  </div>
+                  <div>
+                    <label className="label-rk">Footer Remarks</label>
+                    <textarea className="input-rk min-h-[100px]" value={footerRemarks} onChange={(e) => setFooterRemarks(e.target.value)} />
+                  </div>
                 </div>
-                <div className="rounded-[1.75rem] border border-white/10 p-5">
-                  <h3 className="text-xl font-bold">Delivery Order Summary</h3>
-                  <div className="mt-5 space-y-4 text-sm">
-                    <div className="flex justify-between gap-4"><span className="text-white/65">Subtotal</span><span>{moneyWithPlaces(totals.subtotal, priceDecimalPlaces)}</span></div>
-                    <div className="flex justify-between gap-4"><span className="text-white/65">Discount</span><span>{moneyWithPlaces(totals.discountTotal, priceDecimalPlaces)}</span></div>
-                    <div className="flex justify-between gap-4"><span className="text-white/65">Tax</span><span>{moneyWithPlaces(totals.taxTotal, priceDecimalPlaces)}</span></div>
-                    <div className="border-t border-white/10 pt-4"><div className="flex justify-between gap-4 text-xl font-bold"><span>Grand Total ({currency})</span><span>{moneyWithPlaces(totals.grandTotal, priceDecimalPlaces)}</span></div></div>
+                <div className="h-fit rounded-[1.75rem] border border-white/10 bg-black/30 p-5 text-sm">
+                  <h3 className="text-xl font-semibold text-white">Delivery Order Summary</h3>
+                  <SummaryRow label="Subtotal" value={moneyWithPlaces(totals.subtotal, priceDecimalPlaces)} />
+                  <SummaryRow label="Discount" value={moneyWithPlaces(totals.discountTotal, priceDecimalPlaces)} />
+                  <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-xs leading-6 text-white/60">
+                    Delivery Order does not calculate tax separately at this stage. Summary keeps the same layout as Sales Order for consistency.
+                  </div>
+                  <SummaryRow label="Tax" value={moneyWithPlaces(totals.taxTotal, priceDecimalPlaces)} />
+                  <div className="mt-4 border-t border-white/10 pt-4">
+                    <SummaryRow label={`Grand Total (${currency || "MYR"})`} value={moneyWithPlaces(totals.grandTotal, priceDecimalPlaces)} strong />
                   </div>
                 </div>
               </div>
