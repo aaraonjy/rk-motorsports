@@ -105,6 +105,27 @@ export default async function AdminDeliveryOrderDetailPage({ params }: Params) {
     );
   }
 
+  const stockIssue = await db.stockTransaction.findFirst({
+    where: {
+      transactionType: "SI",
+      reference: transaction.docNo,
+      status: { not: "CANCELLED" },
+    },
+    include: {
+      lines: {
+        orderBy: { createdAt: "asc" },
+        include: {
+          serialEntries: {
+            orderBy: { serialNo: "asc" },
+            include: {
+              inventoryBatch: { select: { batchNo: true, expiryDate: true } },
+            },
+          },
+        },
+      },
+    },
+  });
+
   const currency = transaction.currency || "MYR";
   const generatedFrom = transaction.targetLinks.map((link) => link.sourceTransaction).filter(Boolean);
   const generatedTo = transaction.sourceLinks.map((link) => link.targetTransaction).filter((item) => item && item.status !== "CANCELLED");
@@ -201,21 +222,30 @@ export default async function AdminDeliveryOrderDetailPage({ params }: Params) {
                   {transaction.lines.length === 0 ? (
                     <tr><td colSpan={7} className="px-4 py-8 text-center text-white/50">No product line found.</td></tr>
                   ) : (
-                    transaction.lines.map((line) => (
-                      <tr key={line.id}>
-                        <td className="px-4 py-4">
-                          <div className="font-semibold text-white">{line.productCode}</div>
-                          <div className="mt-1 text-xs text-white/50">{line.productDescription}</div>
-                          {line.remarks ? <div className="mt-2 text-xs text-white/40">Remarks: {line.remarks}</div> : null}
-                        </td>
-                        <td className="px-4 py-4">{line.sourceLineLinks.map((link) => link.sourceTransaction?.docNo).filter(Boolean).join(", ") || "-"}</td>
-                        <td className="px-4 py-4">{line.uom}</td>
-                        <td className="px-4 py-4 text-right">{money(line.qty)}</td>
-                        <td className="px-4 py-4 text-right">{money(line.unitPrice)}</td>
-                        <td className="px-4 py-4">{line.locationCode ? `${line.locationCode} — ${line.locationName || ""}` : "-"}</td>
-                        <td className="px-4 py-4 text-right">{money(line.lineTotal)}</td>
-                      </tr>
-                    ))
+                    transaction.lines.map((line, index) => {
+                      const stockLine = stockIssue?.lines[index];
+                      const serialNos = stockLine?.serialEntries.map((entry) => entry.serialNo).filter(Boolean) || [];
+                      const serialBatchNo = stockLine?.serialEntries.find((entry) => entry.inventoryBatch?.batchNo)?.inventoryBatch?.batchNo || null;
+                      const batchNo = stockLine?.batchNo || serialBatchNo || null;
+
+                      return (
+                        <tr key={line.id}>
+                          <td className="px-4 py-4">
+                            <div className="font-semibold text-white">{line.productCode}</div>
+                            <div className="mt-1 text-xs text-white/50">{line.productDescription}</div>
+                            {batchNo ? <div className="mt-2 text-xs text-amber-100/80">Batch No: {batchNo}</div> : null}
+                            {serialNos.length > 0 ? <div className="mt-1 text-xs text-sky-100/80">S/N No: {serialNos.join(", ")}</div> : null}
+                            {line.remarks ? <div className="mt-2 text-xs text-white/40">Remarks: {line.remarks}</div> : null}
+                          </td>
+                          <td className="px-4 py-4">{line.sourceLineLinks.map((link) => link.sourceTransaction?.docNo).filter(Boolean).join(", ") || "-"}</td>
+                          <td className="px-4 py-4">{line.uom}</td>
+                          <td className="px-4 py-4 text-right">{money(line.qty)}</td>
+                          <td className="px-4 py-4 text-right">{money(line.unitPrice)}</td>
+                          <td className="px-4 py-4">{line.locationCode ? `${line.locationCode} — ${line.locationName || ""}` : "-"}</td>
+                          <td className="px-4 py-4 text-right">{money(line.lineTotal)}</td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
