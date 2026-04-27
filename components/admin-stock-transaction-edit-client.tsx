@@ -926,12 +926,12 @@ export function AdminStockTransactionEditClient({
       serialEntryText: "",
       serialSearch: "",
       locationId: defaultCreateLocationId || lines[index]?.locationId || "",
-      qty: product?.serialNumberTracking ? "0.00" : "1.00",
+      qty: product?.serialNumberTracking ? formatNumberByDecimalPlaces(0, stockSettings.qtyDecimalPlaces) : formatNumberByDecimalPlaces(1, stockSettings.qtyDecimalPlaces),
     });
   }
 
   function addLine() {
-    setLines((prev) => [...prev, { inventoryProductId: "", qty: "1.00", uomCode: "", unitCost: "0.00", batchNo: "", batchMode: "existing", expiryDate: "", serialNos: [], serialEntryText: "", serialSearch: "", remarks: "", locationId: defaultCreateLocationId || "", fromLocationId: "", toLocationId: "", adjustmentDirection: "" }]);
+    setLines((prev) => [...prev, { inventoryProductId: "", qty: formatNumberByDecimalPlaces(1, stockSettings.qtyDecimalPlaces), uomCode: "", unitCost: formatNumberByDecimalPlaces(0, stockSettings.unitCostDecimalPlaces), batchNo: "", batchMode: "existing", expiryDate: "", serialNos: [], serialEntryText: "", serialSearch: "", remarks: "", locationId: defaultCreateLocationId || "", fromLocationId: "", toLocationId: "", adjustmentDirection: "" }]);
   }
 
   function removeLine(index: number) {

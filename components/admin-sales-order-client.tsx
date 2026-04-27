@@ -220,14 +220,14 @@ type LineForm = {
   remarks: string;
 };
 
-function emptyLine(defaultTaxCodeId = "", defaultLocationId = ""): LineForm {
+function emptyLine(defaultTaxCodeId = "", defaultLocationId = "", qtyDecimalPlaces = 2, priceDecimalPlaces = 2): LineForm {
   return {
     inventoryProductId: "",
     productCode: "",
     productDescription: "",
     uom: "",
-    qty: "1",
-    unitPrice: "0.00",
+    qty: formatDecimalInput(1, qtyDecimalPlaces),
+    unitPrice: formatDecimalInput(0, priceDecimalPlaces),
     discountRate: "0",
     discountType: "PERCENT",
     locationId: defaultLocationId,
@@ -683,10 +683,7 @@ export function AdminSalesOrderClient({
   const [footerRemarks, setFooterRemarks] = useState("");
   const [selectedTaxCodeId, setSelectedTaxCodeId] = useState(taxConfig.taxModuleEnabled ? taxConfig.defaultAdminTaxCodeId || "" : "");
   const [lines, setLines] = useState<LineForm[]>([
-    emptyLine(
-      taxConfig.taxModuleEnabled && normalizeTaxCalculationMode(taxConfig.taxCalculationMode) === "LINE_ITEM" ? taxConfig.defaultAdminTaxCodeId || "" : "",
-      defaultLocationId
-    ),
+    emptyLine(taxConfig.taxModuleEnabled && normalizeTaxCalculationMode(taxConfig.taxCalculationMode) === "LINE_ITEM" ? taxConfig.defaultAdminTaxCodeId || "" : "", defaultLocationId, qtyDecimalPlaces, priceDecimalPlaces),
   ]);
   const [balances, setBalances] = useState<Record<string, number>>({});
   const [loadingBalances, setLoadingBalances] = useState<Record<string, boolean>>({});
@@ -1025,10 +1022,7 @@ export function AdminSalesOrderClient({
     setFooterRemarks("");
     setSelectedTaxCodeId(taxConfig.taxModuleEnabled ? taxConfig.defaultAdminTaxCodeId || "" : "");
     setLines([
-      emptyLine(
-        taxConfig.taxModuleEnabled && normalizeTaxCalculationMode(taxConfig.taxCalculationMode) === "LINE_ITEM" ? taxConfig.defaultAdminTaxCodeId || "" : "",
-        defaultLocationId
-      ),
+      emptyLine(taxConfig.taxModuleEnabled && normalizeTaxCalculationMode(taxConfig.taxCalculationMode) === "LINE_ITEM" ? taxConfig.defaultAdminTaxCodeId || "" : "", defaultLocationId, qtyDecimalPlaces, priceDecimalPlaces),
     ]);
     setSubmitError("");
     setSubmitSuccess("");
@@ -1082,16 +1076,16 @@ export function AdminSalesOrderClient({
             productCode: line.productCode || "",
             productDescription: line.productDescription || "",
             uom: line.uom || "",
-            qty: String(line.qty ?? "1"),
-            unitPrice: String(line.unitPrice ?? "0.00"),
-            discountRate: String(line.discountRate ?? "0"),
+            qty: formatDecimalInput(line.qty ?? 1, qtyDecimalPlaces),
+            unitPrice: formatDecimalInput(line.unitPrice ?? 0, priceDecimalPlaces),
+            discountRate: formatDecimalInput(line.discountRate ?? 0, priceDecimalPlaces),
             discountType: line.discountType === "AMOUNT" ? "AMOUNT" : "PERCENT",
             locationId: line.locationId || defaultLocationId,
             taxRate: "0",
             taxCodeId: line.taxCodeId || "",
             remarks: line.remarks || "",
           }))
-        : [emptyLine(taxConfig.taxModuleEnabled && normalizeTaxCalculationMode(taxConfig.taxCalculationMode) === "LINE_ITEM" ? taxConfig.defaultAdminTaxCodeId || "" : "", defaultLocationId)]
+        : [emptyLine(taxConfig.taxModuleEnabled && normalizeTaxCalculationMode(taxConfig.taxCalculationMode) === "LINE_ITEM" ? taxConfig.defaultAdminTaxCodeId || "" : "", defaultLocationId, qtyDecimalPlaces, priceDecimalPlaces)]
     );
     setSubmitError("");
     setSubmitSuccess("");
@@ -1184,9 +1178,9 @@ export function AdminSalesOrderClient({
         productCode: line.productCode || "",
         productDescription: line.productDescription || "",
         uom: line.uom || "",
-        qty: String(line.qty ?? "1"),
-        unitPrice: String(line.unitPrice ?? "0.00"),
-        discountRate: String(line.discountRate ?? "0"),
+        qty: formatDecimalInput(line.qty ?? 1, qtyDecimalPlaces),
+        unitPrice: formatDecimalInput(line.unitPrice ?? 0, priceDecimalPlaces),
+        discountRate: formatDecimalInput(line.discountRate ?? 0, priceDecimalPlaces),
         discountType: line.discountType === "AMOUNT" ? "AMOUNT" : "PERCENT",
         locationId: line.locationId || defaultLocationId,
         taxRate: "0",
@@ -1195,7 +1189,7 @@ export function AdminSalesOrderClient({
       }))
     );
 
-    setLines(importedLines.length > 0 ? importedLines : [emptyLine(isLineItemTaxMode ? taxConfig.defaultAdminTaxCodeId || "" : "", defaultLocationId)]);
+    setLines(importedLines.length > 0 ? importedLines : [emptyLine(isLineItemTaxMode ? taxConfig.defaultAdminTaxCodeId || "" : "", defaultLocationId, qtyDecimalPlaces, priceDecimalPlaces)]);
     setSourceQuotationId(selectedSourceQuotations.length === 1 ? first.id : "");
     setIsGenerateFromOpen(false);
     setGenerateFromError("");
@@ -1306,7 +1300,7 @@ export function AdminSalesOrderClient({
   function handleProductChange(index: number, productId: string) {
     const product = initialProducts.find((item) => item.id === productId);
     if (!product) {
-      updateLine(index, { inventoryProductId: "", productCode: "", productDescription: "", uom: "", unitPrice: "0.00" });
+      updateLine(index, { inventoryProductId: "", productCode: "", productDescription: "", uom: "", unitPrice: formatDecimalInput(0, priceDecimalPlaces) });
       return;
     }
     updateLine(index, {
@@ -1730,7 +1724,7 @@ export function AdminSalesOrderClient({
                     </div>
                   );
                 })}
-                <button type="button" onClick={() => setLines((prev) => [...prev, emptyLine(isLineItemTaxMode ? taxConfig.defaultAdminTaxCodeId || "" : "", defaultLocationId)])} className="rounded-xl border border-white/15 px-4 py-3 text-sm text-white/75 transition hover:bg-white/10 hover:text-white">+ Add Product</button>
+                <button type="button" onClick={() => setLines((prev) => [...prev, emptyLine(isLineItemTaxMode ? taxConfig.defaultAdminTaxCodeId || "" : "", defaultLocationId, qtyDecimalPlaces, priceDecimalPlaces)])} className="rounded-xl border border-white/15 px-4 py-3 text-sm text-white/75 transition hover:bg-white/10 hover:text-white">+ Add Product</button>
               </div>
             ) : null}
 

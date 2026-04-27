@@ -265,7 +265,7 @@ function getStatusClass(status: string) {
   return "border-amber-500/25 bg-amber-500/10 text-amber-200";
 }
 
-function emptyLine(defaultLocationId = ""): LineForm {
+function emptyLine(defaultLocationId = "", qtyDecimalPlaces = 2, priceDecimalPlaces = 2): LineForm {
   return {
     sourceLineId: "",
     sourceTransactionId: "",
@@ -273,8 +273,8 @@ function emptyLine(defaultLocationId = ""): LineForm {
     productCode: "",
     productDescription: "",
     uom: "",
-    qty: "1",
-    unitPrice: "0.00",
+    qty: formatDecimalInput(1, qtyDecimalPlaces),
+    unitPrice: formatDecimalInput(0, priceDecimalPlaces),
     discountRate: "0",
     discountType: "PERCENT",
     locationId: defaultLocationId,
@@ -477,7 +477,7 @@ export function AdminDeliveryOrderClient({
   const [termsAndConditions, setTermsAndConditions] = useState("");
   const [bankAccount, setBankAccount] = useState("");
   const [footerRemarks, setFooterRemarks] = useState("");
-  const [lines, setLines] = useState<LineForm[]>([emptyLine(defaultLocationId)]);
+  const [lines, setLines] = useState<LineForm[]>([emptyLine(defaultLocationId, qtyDecimalPlaces, priceDecimalPlaces)]);
   const [balances, setBalances] = useState<Record<string, number>>({});
   const [loadingBalances, setLoadingBalances] = useState<Record<string, boolean>>({});
 
@@ -727,7 +727,7 @@ export function AdminDeliveryOrderClient({
     setTermsAndConditions("");
     setBankAccount("");
     setFooterRemarks("");
-    setLines([emptyLine(defaultLocationId)]);
+    setLines([emptyLine(defaultLocationId, qtyDecimalPlaces, priceDecimalPlaces)]);
     setSubmitError("");
     setSubmitSuccess("");
     setGenerateFromError("");
@@ -770,7 +770,7 @@ export function AdminDeliveryOrderClient({
   function handleProductChange(index: number, productId: string) {
     const product = initialProducts.find((item) => item.id === productId);
     if (!product) {
-      updateLine(index, { inventoryProductId: "", productCode: "", productDescription: "", uom: "", unitPrice: "0.00" });
+      updateLine(index, { inventoryProductId: "", productCode: "", productDescription: "", uom: "", unitPrice: formatDecimalInput(0, priceDecimalPlaces) });
       return;
     }
     updateLine(index, {
@@ -1181,7 +1181,7 @@ export function AdminDeliveryOrderClient({
                   );
                 })}
 
-                <button type="button" onClick={() => setLines((prev) => [...prev, emptyLine(defaultLocationId)])} className="rounded-xl border border-white/15 px-5 py-3 text-sm text-white/75 transition hover:bg-white/10">
+                <button type="button" onClick={() => setLines((prev) => [...prev, emptyLine(defaultLocationId, qtyDecimalPlaces, priceDecimalPlaces)])} className="rounded-xl border border-white/15 px-5 py-3 text-sm text-white/75 transition hover:bg-white/10">
                   + Add Product
                 </button>
               </div>

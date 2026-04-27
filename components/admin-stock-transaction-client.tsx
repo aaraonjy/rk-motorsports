@@ -180,12 +180,12 @@ type AvailableBatch = {
   balance?: number | null;
 };
 
-function emptyLine(): FormLine {
+function emptyLine(qtyDecimalPlaces = 2, unitCostDecimalPlaces = 2): FormLine {
   return {
     inventoryProductId: "",
-    qty: "1",
+    qty: formatNumberByDecimalPlaces(1, qtyDecimalPlaces),
     uomCode: "",
-    unitCost: "0.00",
+    unitCost: formatNumberByDecimalPlaces(0, unitCostDecimalPlaces),
     batchNo: "",
     batchMode: "existing",
     expiryDate: "",
@@ -1130,10 +1130,10 @@ export function AdminStockTransactionClient({
     setLines([
       defaultCreateLocationId
         ? {
-            ...emptyLine(),
+            ...emptyLine(stockSettings.qtyDecimalPlaces, stockSettings.unitCostDecimalPlaces),
             locationId: defaultCreateLocationId,
           }
-        : emptyLine(),
+        : emptyLine(stockSettings.qtyDecimalPlaces, stockSettings.unitCostDecimalPlaces),
     ]);
     setSubmitError("");
     setSubmitSuccess("");
@@ -1188,7 +1188,7 @@ export function AdminStockTransactionClient({
       serialEntryText: "",
       serialSearch: "",
       locationId: defaultCreateLocationId || lines[index]?.locationId || "",
-      qty: product?.serialNumberTracking ? "0" : "1",
+      qty: product?.serialNumberTracking ? formatNumberByDecimalPlaces(0, stockSettings.qtyDecimalPlaces) : formatNumberByDecimalPlaces(1, stockSettings.qtyDecimalPlaces),
     });
   }
 
@@ -1197,10 +1197,10 @@ export function AdminStockTransactionClient({
       ...prev,
       defaultCreateLocationId
         ? {
-            ...emptyLine(),
+            ...emptyLine(stockSettings.qtyDecimalPlaces, stockSettings.unitCostDecimalPlaces),
             locationId: defaultCreateLocationId,
           }
-        : emptyLine(),
+        : emptyLine(stockSettings.qtyDecimalPlaces, stockSettings.unitCostDecimalPlaces),
     ]);
   }
 
