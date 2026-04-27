@@ -230,6 +230,34 @@ type AvailableSerial = {
   expiryDate?: string | null;
 };
 
+type AssemblyTraceLine = {
+  id: string;
+  productId: string;
+  productCode: string;
+  productDescription: string;
+  qty: number;
+  uom?: string | null;
+  batchNo?: string | null;
+  expiryDate?: string | null;
+  adjustmentDirection?: "IN" | "OUT" | null;
+  locationLabel?: string | null;
+  remarks?: string | null;
+  serialNos?: string[];
+  serialEntries?: Array<{ id: string; serialNo: string; batchNo?: string | null; expiryDate?: string | null }>;
+};
+
+type AssemblyTrace = {
+  id: string;
+  transactionNo: string;
+  docNo?: string | null;
+  transactionDate?: string | null;
+  docDate?: string | null;
+  reference?: string | null;
+  remarks?: string | null;
+  finishedGoods: AssemblyTraceLine[];
+  components: AssemblyTraceLine[];
+};
+
 function balanceKey(productId: string, locationId: string, batchNo?: string) {
   return `${productId}__${locationId}__${(batchNo || "").trim().toUpperCase()}`;
 }
@@ -252,6 +280,21 @@ function batchOptionLabel(batch: AvailableBatch, qtyDecimalPlaces: number) {
   const parts = [batch.batchNo];
   if (typeof batch.balance === "number") parts.push(`Bal ${moneyWithPlaces(batch.balance, qtyDecimalPlaces)}`);
   if (batch.expiryDate) parts.push(`Exp ${batch.expiryDate.slice(0, 10)}`);
+  return parts.join(" • ");
+}
+
+function formatTraceDate(value: string | null | undefined) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("en-MY", { timeZone: "Asia/Kuala_Lumpur", day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
+function formatTraceLineMeta(line: AssemblyTraceLine, qtyDecimalPlaces: number) {
+  const parts = [`Qty ${moneyWithPlaces(Number(line.qty || 0), qtyDecimalPlaces)}${line.uom ? ` ${line.uom}` : ""}`];
+  if (line.batchNo) parts.push(`Batch ${line.batchNo}`);
+  if (Array.isArray(line.serialNos) && line.serialNos.length > 0) parts.push(`S/N ${line.serialNos.join(", ")}`);
+  if (line.locationLabel) parts.push(line.locationLabel);
   return parts.join(" • ");
 }
 
@@ -724,6 +767,8 @@ export function AdminDeliveryOrderClient({
   const [loadingBatches, setLoadingBatches] = useState<Record<number, boolean>>({});
   const [availableSerials, setAvailableSerials] = useState<Record<number, AvailableSerial[]>>({});
   const [loadingSerials, setLoadingSerials] = useState<Record<number, boolean>>({});
+  const [assemblyTraces, setAssemblyTraces] = useState<Record<number, AssemblyTrace[]>>({});
+  const [loadingAssemblyTraces, setLoadingAssemblyTraces] = useState<Record<number, boolean>>({});
 
   const statusOptions = useMemo<SearchableSelectOption[]>(
     () => [
@@ -971,6 +1016,27 @@ export function AdminDeliveryOrderClient({
   }, [availableSerials, products, lines, loadingSerials]);
 
   useEffect(() => {
+    lines.forEach((line, index) => {
+      if (!line.inventoryProductId || !line.locationId || !line.batchNo) return;
+      if (assemblyTraces[index] !== undefined || loadingAssemblyTraces[index]) return;
+
+      setLoadingAssemblyTraces((prev) => ({ ...prev, [index]: true }));
+      const params = new URLSearchParams({
+        inventoryProductId: line.inventoryProductId,
+        locationId: line.locationId,
+        batchNo: line.batchNo,
+      });
+      fetch(`/api/admin/stock/assembly-trace?${params.toString()}`, { cache: "no-store" })
+        .then((response) => response.json())
+        .then((data) => {
+          setAssemblyTraces((prev) => ({ ...prev, [index]: data?.ok && Array.isArray(data.traces) ? data.traces : [] }));
+        })
+        .catch(() => setAssemblyTraces((prev) => ({ ...prev, [index]: [] })))
+        .finally(() => setLoadingAssemblyTraces((prev) => ({ ...prev, [index]: false })));
+    });
+  }, [assemblyTraces, lines, loadingAssemblyTraces]);
+
+  useEffect(() => {
     lines.forEach((line) => {
       if (!line.inventoryProductId || !line.locationId) return;
       const product = products.find((item) => item.id === line.inventoryProductId);
@@ -1039,6 +1105,8 @@ export function AdminDeliveryOrderClient({
     setLoadingBatches({});
     setAvailableSerials({});
     setLoadingSerials({});
+    setAssemblyTraces({});
+    setLoadingAssemblyTraces({});
   }
 
 
@@ -1185,6 +1253,7 @@ export function AdminDeliveryOrderClient({
     const product = products.find((item) => item.id === productId);
     if (!product) {
       updateLine(index, { inventoryProductId: "", productCode: "", productDescription: "", uom: "", unitPrice: formatDecimalInput(0, priceDecimalPlaces), batchNo: "", serialNos: [], serialSearch: "" });
+      setAssemblyTraces((prev) => { const next = { ...prev }; delete next[index]; return next; });
       return;
     }
     updateLine(index, {
@@ -1200,6 +1269,7 @@ export function AdminDeliveryOrderClient({
     });
     setAvailableBatches((prev) => { const next = { ...prev }; delete next[index]; return next; });
     setAvailableSerials((prev) => { const next = { ...prev }; delete next[index]; return next; });
+    setAssemblyTraces((prev) => { const next = { ...prev }; delete next[index]; return next; });
     setBalances({});
   }
 
@@ -1396,6 +1466,8 @@ export function AdminDeliveryOrderClient({
       setLoadingBatches({});
       setAvailableSerials({});
       setLoadingSerials({});
+      setAssemblyTraces({});
+      setLoadingAssemblyTraces({});
       await loadTransactions();
       router.refresh();
     } catch (error) {
@@ -1423,6 +1495,8 @@ export function AdminDeliveryOrderClient({
       setLoadingBatches({});
       setAvailableSerials({});
       setLoadingSerials({});
+      setAssemblyTraces({});
+      setLoadingAssemblyTraces({});
       await loadTransactions();
       router.refresh();
     } catch (error) {
@@ -1687,6 +1761,7 @@ export function AdminDeliveryOrderClient({
                               updateLine(index, { locationId: option?.id || "", batchNo: "", serialNos: [], serialSearch: "" });
                               setAvailableBatches((prev) => { const next = { ...prev }; delete next[index]; return next; });
                               setAvailableSerials((prev) => { const next = { ...prev }; delete next[index]; return next; });
+                              setAssemblyTraces((prev) => { const next = { ...prev }; delete next[index]; return next; });
                               setBalances({});
                             }}
                           />
@@ -1715,11 +1790,42 @@ export function AdminDeliveryOrderClient({
                               onChange={(option) => {
                                 updateLine(index, { batchNo: option?.id || "", serialNos: [], serialSearch: "" });
                                 setAvailableSerials((prev) => { const next = { ...prev }; delete next[index]; return next; });
+                                setAssemblyTraces((prev) => { const next = { ...prev }; delete next[index]; return next; });
                                 setBalances({});
                               }}
                             />
                             {line.inventoryProductId && line.locationId && !loadingBatches[index] && (availableBatches[index] || []).length === 0 ? (
                               <p className="mt-2 text-xs text-amber-200">No available batch balance found for this product/location.</p>
+                            ) : null}
+                            {line.batchNo ? (
+                              <div className="mt-3 rounded-2xl border border-sky-500/20 bg-sky-500/10 p-4 text-sm text-sky-100">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <div className="font-semibold">Assembly Trace</div>
+                                  {loadingAssemblyTraces[index] ? <div className="text-xs text-sky-100/70">Loading...</div> : null}
+                                </div>
+                                {!loadingAssemblyTraces[index] && (assemblyTraces[index] || []).length === 0 ? (
+                                  <p className="mt-2 text-xs text-sky-100/70">No assembly trace found for this batch.</p>
+                                ) : null}
+                                {(assemblyTraces[index] || []).map((trace) => (
+                                  <div key={trace.id} className="mt-3 rounded-xl border border-white/10 bg-black/20 p-3">
+                                    <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-100/70">
+                                      {trace.docNo || trace.transactionNo}{trace.docDate || trace.transactionDate ? ` • ${formatTraceDate(trace.docDate || trace.transactionDate)}` : ""}
+                                    </div>
+                                    <div className="mt-3 space-y-2">
+                                      {trace.components.length === 0 ? (
+                                        <div className="text-xs text-white/45">No raw material component lines found.</div>
+                                      ) : (
+                                        trace.components.map((component) => (
+                                          <div key={component.id} className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2">
+                                            <div className="font-medium text-white">{component.productCode} — {component.productDescription}</div>
+                                            <div className="mt-1 text-xs text-white/60">{formatTraceLineMeta(component, qtyDecimalPlaces)}</div>
+                                          </div>
+                                        ))
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
                             ) : null}
                           </div>
                         ) : null}
