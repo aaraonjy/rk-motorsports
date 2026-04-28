@@ -380,9 +380,7 @@ function CancelledTransactionNotice({
   );
 }
 
-function CancelledInlineDetails({
-  transaction,
-}: {
+: {
   transaction: {
     cancelReason?: string | null;
     cancelledAt?: string | Date | null;
@@ -1571,7 +1569,7 @@ export function AdminSalesOrderClient({
       setCancelTarget(null);
       setCancelReason("");
       setSubmitMessageType("cancel");
-      setSubmitSuccess("Sales Order cancelled successfully.");
+      setSubmitSuccess("");
       setRecentCancelledTransaction((data.transaction || { ...cancelTarget, status: "CANCELLED", cancelReason, cancelledAt: new Date().toISOString() }) as SalesOrderRecord);
       await loadTransactions();
       router.refresh();
@@ -1694,7 +1692,7 @@ export function AdminSalesOrderClient({
                           </div>
                         )
                       ) : (
-                        <CancelledInlineDetails transaction={item} />
+                        <span className="text-xs text-white/35">Cancelled</span>
                       )}
                     </td>
                   </tr>

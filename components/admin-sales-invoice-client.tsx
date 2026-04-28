@@ -526,9 +526,7 @@ function CancelledTransactionNotice({
   );
 }
 
-function CancelledInlineDetails({
-  transaction,
-}: {
+: {
   transaction: {
     cancelReason?: string | null;
     cancelledAt?: string | Date | null;
@@ -1651,7 +1649,7 @@ export function AdminSalesInvoiceClient({
       setCancelTarget(null);
       setCancelReason("");
       setSubmitMessageType("cancel");
-      setSubmitSuccess("Sales Invoice cancelled successfully.");
+      setSubmitSuccess("");
       setRecentCancelledTransaction((data.transaction || { ...cancelTarget, status: "CANCELLED", cancelReason, cancelledAt: new Date().toISOString() }) as SalesInvoiceRecord);
       setBalances({});
       setLoadingBalances({});
@@ -1758,7 +1756,7 @@ export function AdminSalesInvoiceClient({
                           </button>
                         </div>
                       ) : (
-                        <CancelledInlineDetails transaction={item} />
+                        <span className="text-xs text-white/35">Cancelled</span>
                       )}
                     </td>
 

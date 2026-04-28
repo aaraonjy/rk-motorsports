@@ -319,9 +319,7 @@ function CancelledTransactionNotice({
   );
 }
 
-function CancelledInlineDetails({
-  transaction,
-}: {
+: {
   transaction: {
     cancelReason?: string | null;
     cancelledAt?: string | Date | null;
@@ -1296,7 +1294,7 @@ export function AdminSalesQuotationClient({
       setCancelTarget(null);
       setCancelReason("");
       setSubmitMessageType("cancel");
-      setSubmitSuccess("Quotation cancelled successfully.");
+      setSubmitSuccess("");
       setRecentCancelledTransaction((data.transaction || { ...cancelTarget, status: "CANCELLED", cancelReason, cancelledAt: new Date().toISOString() }) as QuotationRecord);
       await loadTransactions();
       router.refresh();
@@ -1419,7 +1417,7 @@ export function AdminSalesQuotationClient({
                           </div>
                         )
                       ) : (
-                        <CancelledInlineDetails transaction={item} />
+                        <span className="text-xs text-white/35">Cancelled</span>
                       )}
                     </td>
                   </tr>

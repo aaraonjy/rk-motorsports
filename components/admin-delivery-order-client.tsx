@@ -520,9 +520,7 @@ function CancelledTransactionNotice({
   );
 }
 
-function CancelledInlineDetails({
-  transaction,
-}: {
+: {
   transaction: {
     cancelReason?: string | null;
     cancelledAt?: string | Date | null;
@@ -1689,7 +1687,7 @@ export function AdminDeliveryOrderClient({
       setCancelTarget(null);
       setCancelReason("");
       setSubmitMessageType("cancel");
-      setSubmitSuccess("Delivery Order cancelled successfully.");
+      setSubmitSuccess("");
       setRecentCancelledTransaction((data.transaction || { ...cancelTarget, status: "CANCELLED", cancelReason, cancelledAt: new Date().toISOString() }) as DeliveryOrderRecord);
       setBalances({});
       setLoadingBalances({});
@@ -1802,7 +1800,7 @@ export function AdminDeliveryOrderClient({
                           )}
                         </div>
                       ) : (
-                        <CancelledInlineDetails transaction={item} />
+                        <span className="text-xs text-white/35">Cancelled</span>
                       )}
                     </td>
 
