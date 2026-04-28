@@ -168,6 +168,72 @@ async function generateCashSalesNo(tx: Prisma.TransactionClient, docDate: Date) 
   return `${prefix}-${String(maxSeq + 1).padStart(4, "0")}`;
 }
 
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function getBaseCashSalesDocNo(docNo: string | null | undefined) {
+  const value = String(docNo || "").trim().toUpperCase();
+  const match = value.match(/^(CS-\d{8}-\d{4})(?:-(\d+))?$/);
+  return match ? match[1] : value;
+}
+
+async function generateCashSalesRevisionNo(
+  tx: Prisma.TransactionClient,
+  current: { id: string; docNo: string; revisedFromId?: string | null; revisedFrom?: { docNo?: string | null } | null }
+) {
+  const baseDocNo = getBaseCashSalesDocNo(current.revisedFrom?.docNo || current.docNo);
+  const rows = await tx.salesTransaction.findMany({
+    where: {
+      docType: "CS",
+      OR: [
+        { id: current.id },
+        { docNo: baseDocNo },
+        { docNo: { startsWith: `${baseDocNo}-` } },
+        { revisedFromId: current.revisedFromId || current.id },
+      ],
+    },
+    select: { docNo: true },
+  });
+
+  let maxRevision = 0;
+  const pattern = new RegExp(`^${escapeRegExp(baseDocNo)}-(\\d+)$`);
+  for (const row of rows) {
+    const match = String(row.docNo || "").match(pattern);
+    if (!match) continue;
+    const revisionNo = Number(match[1]);
+    if (Number.isFinite(revisionNo) && revisionNo > maxRevision) maxRevision = revisionNo;
+  }
+
+  return `${baseDocNo}-${maxRevision + 1}`;
+}
+
+async function generateCashSalesRevisionNoFromRequest(tx: Prisma.TransactionClient, searchParams: URLSearchParams) {
+  const sourceId = normalizeText(searchParams.get("sourceTransactionId")) || normalizeText(searchParams.get("reviseFromId")) || normalizeText(searchParams.get("id"));
+  const sourceDocNo = normalizeText(searchParams.get("sourceDocNo")) || normalizeText(searchParams.get("docNo"));
+
+  const current = await tx.salesTransaction.findFirst({
+    where: {
+      docType: "CS",
+      ...(sourceId
+        ? { id: sourceId }
+        : sourceDocNo
+          ? { docNo: sourceDocNo.toUpperCase() }
+          : { id: "__missing_cash_sales_revision_source__" }),
+    },
+    select: {
+      id: true,
+      docNo: true,
+      revisedFromId: true,
+      revisedFrom: { select: { docNo: true } },
+    },
+  });
+
+  if (!current) throw new Error("Cash Sales source document is required to generate revision document number.");
+  return generateCashSalesRevisionNo(tx, current);
+}
+
 function assertValidManualDocNo(value: unknown) {
   const docNo = normalizeText(value)?.toUpperCase() || null;
   if (!docNo) return null;
@@ -628,6 +694,13 @@ export async function GET(req: Request) {
   try {
     await requireAdmin();
     const { searchParams } = new URL(req.url);
+
+    if (searchParams.get("nextRevisionDocNo") === "1" || (searchParams.get("nextDocNo") === "1" && searchParams.get("mode") === "revise")) {
+      const docNo = await db.$transaction(async (tx) => {
+        return generateCashSalesRevisionNoFromRequest(tx, searchParams);
+      });
+      return NextResponse.json({ ok: true, docNo });
+    }
 
     if (searchParams.get("nextDocNo") === "1") {
       const docDate = normalizeDate(searchParams.get("docDate"));

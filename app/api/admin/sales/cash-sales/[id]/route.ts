@@ -796,7 +796,7 @@ export async function PATCH(req: Request, context: Params) {
       description: result.description,
     });
 
-    return NextResponse.json({ ok: true, transaction: result.transaction });
+    return NextResponse.json({ ok: true, transaction: withCancellationDetails(result.transaction) });
   } catch (error) {
     return NextResponse.json(
       { ok: false, error: error instanceof Error ? error.message : "Unable to update cash sales." },
