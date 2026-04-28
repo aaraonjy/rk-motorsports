@@ -319,26 +319,6 @@ function CancelledTransactionNotice({
   );
 }
 
-: {
-  transaction: {
-    cancelReason?: string | null;
-    cancelledAt?: string | Date | null;
-    cancelledBy?: string | null;
-    cancelledByName?: string | null;
-    cancelledByAdminName?: string | null;
-    cancelledByAdmin?: { name?: string | null } | null;
-  };
-}) {
-  return (
-    <div className="space-y-1 text-xs text-white/45">
-      <div className="text-red-200/80">Cancelled</div>
-      <div>{formatCancelDateTime(transaction.cancelledAt)}</div>
-      <div>By: {getCancelledByName(transaction)}</div>
-      <div className="max-w-[220px] truncate" title={getCancelReason(transaction)}>Reason: {getCancelReason(transaction)}</div>
-    </div>
-  );
-}
-
 function getSalesDocumentLabel(_transaction: QuotationRecord) {
   return "quotation";
 }
