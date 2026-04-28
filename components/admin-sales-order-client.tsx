@@ -1548,23 +1548,25 @@ export function AdminSalesOrderClient({
                     <td className="px-4 py-4 text-right">{`${item.currency || "MYR"} ${moneyWithPlaces(Number(item.grandTotal || 0), priceDecimalPlaces)}`}</td>
                     <td className="px-4 py-4 text-right">
                       {item.status !== "CANCELLED" ? (
-                        <div className="flex flex-wrap justify-end gap-2">
-                          <button type="button" onClick={(event) => { event.stopPropagation(); openEdit(item); }} className="rounded-xl border border-white/15 px-3 py-2 text-xs text-white/75 transition hover:bg-white/10">
-                            Edit
-                          </button>
-                          <button type="button" onClick={(event) => { event.stopPropagation(); openRevise(item); }} className="rounded-xl border border-sky-500/30 px-3 py-2 text-xs text-sky-200 transition hover:bg-sky-500/10">
-                            Edit Revise
-                          </button>
-                          {!hasActiveDownstreamTransaction(item) ? (
-                            <button type="button" onClick={(event) => { event.stopPropagation(); setCancelTarget(item); }} className="rounded-xl border border-red-500/30 px-3 py-2 text-xs text-red-200 transition hover:bg-red-500/10">
-                              Cancel
-                            </button>
-                          ) : (
+                        hasActiveDownstreamTransaction(item) ? (
+                          <div className="flex flex-wrap justify-end gap-2">
                             <span className="rounded-xl border border-white/10 px-3 py-2 text-xs text-white/35" title="Cancel the active downstream document first.">
                               Locked
                             </span>
-                          )}
-                        </div>
+                          </div>
+                        ) : (
+                          <div className="flex flex-wrap justify-end gap-2">
+                            <button type="button" onClick={(event) => { event.stopPropagation(); openEdit(item); }} className="rounded-xl border border-white/15 px-3 py-2 text-xs text-white/75 transition hover:bg-white/10">
+                              Edit
+                            </button>
+                            <button type="button" onClick={(event) => { event.stopPropagation(); openRevise(item); }} className="rounded-xl border border-sky-500/30 px-3 py-2 text-xs text-sky-200 transition hover:bg-sky-500/10">
+                              Edit Revise
+                            </button>
+                            <button type="button" onClick={(event) => { event.stopPropagation(); setCancelTarget(item); }} className="rounded-xl border border-red-500/30 px-3 py-2 text-xs text-red-200 transition hover:bg-red-500/10">
+                              Cancel
+                            </button>
+                          </div>
+                        )
                       ) : (
                         <span className="text-xs text-white/35">Cancelled</span>
                       )}
