@@ -669,7 +669,17 @@ export async function GET(req: Request) {
             sourceTransaction: { select: { id: true, docType: true, docNo: true, status: true } },
           },
         },
-        lines: { orderBy: { lineNo: "asc" } },
+        lines: {
+          orderBy: { lineNo: "asc" },
+          include: {
+            inventoryProduct: { select: { itemType: true } },
+            sourceLineLinks: {
+              include: {
+                targetTransaction: { select: { id: true, status: true } },
+              },
+            },
+          },
+        },
       },
     });
 
@@ -683,9 +693,13 @@ export async function GET(req: Request) {
 
     const transactions = rows.map((row) => {
       const stockIssue = stockIssueByReference.get(row.docNo);
+      const progressLines = row.lines.map((line) => withSalesLineProgress(line));
+      const progressStatus = row.status === "CANCELLED" ? row.status : calculateSalesOrderStatus(progressLines);
       return {
         ...row,
-        lines: row.lines.map((line, index) => ({
+        status: progressStatus,
+        progressStatus,
+        lines: progressLines.map((line, index) => ({
           ...line,
           batchNo: stockIssue?.lines[index]?.batchNo || null,
           serialNos: stockIssue?.lines[index]?.serialEntries.map((entry) => entry.serialNo) || [],

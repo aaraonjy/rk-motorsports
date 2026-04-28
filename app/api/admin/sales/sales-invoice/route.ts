@@ -263,6 +263,42 @@ async function refreshSalesOrderStatuses(tx: Prisma.TransactionClient, sourceTra
   }
 }
 
+async function refreshDeliveryOrderStatuses(tx: Prisma.TransactionClient, sourceTransactionIds: string[]) {
+  const uniqueIds = Array.from(new Set(sourceTransactionIds.filter(Boolean)));
+  for (const sourceTransactionId of uniqueIds) {
+    const source = await tx.salesTransaction.findUnique({
+      where: { id: sourceTransactionId },
+      select: {
+        id: true,
+        docType: true,
+        status: true,
+        lines: {
+          orderBy: { lineNo: "asc" },
+          include: {
+            inventoryProduct: { select: { itemType: true } },
+            sourceLineLinks: {
+              include: {
+                targetTransaction: { select: { id: true, status: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!source || source.docType !== "DO" || source.status === "CANCELLED") continue;
+
+    const lines = source.lines.map((line) => withSalesLineProgress(line));
+    const nextStatus = calculateSalesOrderStatus(lines);
+    if (source.status !== nextStatus) {
+      await tx.salesTransaction.update({
+        where: { id: source.id },
+        data: { status: nextStatus },
+      });
+    }
+  }
+}
+
 async function getTrackedSourceLines(tx: Prisma.TransactionClient, sourceLineIds: string[]) {
   if (sourceLineIds.length === 0) return new Map<string, any>();
 
@@ -821,6 +857,7 @@ export async function POST(req: Request) {
         await createStockIssueForSalesInvoice(tx, admin.id, salesInvoice, data.lines, body);
       }
       await refreshSalesOrderStatuses(tx, data.sourceTransactionIds);
+      await refreshDeliveryOrderStatuses(tx, data.sourceTransactionIds);
 
       return salesInvoice;
     });

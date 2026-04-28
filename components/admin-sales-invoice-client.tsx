@@ -913,7 +913,11 @@ export function AdminSalesInvoiceClient({
   }, [availableSourceOrders, selectedSourceOrderIds]);
 
   function isGeneratedFromSalesOrder(transaction: SalesInvoiceRecord) {
-    return (transaction.targetLinks || []).some((link) => link.sourceTransaction?.docType === "SO" || String(link.sourceTransaction?.docNo || "").startsWith("SO-"));
+    return (transaction.targetLinks || []).some((link) =>
+      ["SO", "DO"].includes(String(link.sourceTransaction?.docType || "")) ||
+      String(link.sourceTransaction?.docNo || "").startsWith("SO-") ||
+      String(link.sourceTransaction?.docNo || "").startsWith("DO-")
+    );
   }
 
   function isGeneratedLineFromSalesOrder(line: LineForm) {
@@ -1228,7 +1232,7 @@ export function AdminSalesInvoiceClient({
   function openEdit(transaction: SalesInvoiceRecord) {
     if (isGeneratedFromSalesOrder(transaction)) {
       setSubmitSuccess("");
-      alert("Sales Invoice generated from Sales Order cannot be edited. Please cancel this Sales Invoice and generate a new Sales Invoice from the original source document.");
+      alert("Sales Invoice generated from source document cannot be edited. Please cancel this Sales Invoice and generate a new Sales Invoice from the original source document.");
       return;
     }
     fillFormFromTransaction(transaction, "edit");
@@ -1237,7 +1241,7 @@ export function AdminSalesInvoiceClient({
   function openRevise(transaction: SalesInvoiceRecord) {
     if (isGeneratedFromSalesOrder(transaction)) {
       setSubmitSuccess("");
-      alert("Sales Invoice generated from Sales Order cannot be revised. Please cancel this Sales Invoice and generate a new Sales Invoice from the original source document.");
+      alert("Sales Invoice generated from source document cannot be revised. Please cancel this Sales Invoice and generate a new Sales Invoice from the original source document.");
       return;
     }
     fillFormFromTransaction(transaction, "revise");

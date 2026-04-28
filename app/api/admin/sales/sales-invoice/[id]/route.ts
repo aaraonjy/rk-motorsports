@@ -124,6 +124,39 @@ async function refreshSalesOrderStatuses(tx: Prisma.TransactionClient, sourceTra
   }
 }
 
+async function refreshDeliveryOrderStatuses(tx: Prisma.TransactionClient, sourceTransactionIds: string[]) {
+  const uniqueIds = Array.from(new Set(sourceTransactionIds.filter(Boolean)));
+  for (const sourceTransactionId of uniqueIds) {
+    const source = await tx.salesTransaction.findUnique({
+      where: { id: sourceTransactionId },
+      select: {
+        id: true,
+        docType: true,
+        status: true,
+        lines: {
+          orderBy: { lineNo: "asc" },
+          include: {
+            inventoryProduct: { select: { itemType: true } },
+            sourceLineLinks: {
+              include: {
+                targetTransaction: { select: { id: true, status: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!source || source.docType !== "DO" || source.status === "CANCELLED") continue;
+
+    const lines = source.lines.map((line) => withSalesLineProgress(line));
+    const nextStatus = calculateSalesOrderStatus(lines);
+    if (source.status !== nextStatus) {
+      await tx.salesTransaction.update({ where: { id: source.id }, data: { status: nextStatus } });
+    }
+  }
+}
+
 
 type DirectSalesInvoiceLinePayload = {
   inventoryProductId?: string | null;
@@ -203,7 +236,7 @@ function basicDecimal(value: number | string | null | undefined, fallback = 0) {
 }
 
 function hasSalesOrderSource(transaction: { targetLinks?: Array<{ sourceTransaction?: { docType?: string | null; status?: string | null } | null }> }) {
-  return (transaction.targetLinks || []).some((link) => link.sourceTransaction?.docType === "SO" && link.sourceTransaction?.status !== "CANCELLED");
+  return (transaction.targetLinks || []).some((link) => ["SO", "DO"].includes(String(link.sourceTransaction?.docType || "")) && link.sourceTransaction?.status !== "CANCELLED");
 }
 
 function getBaseSalesInvoiceDocNo(docNo: string | null | undefined) {
@@ -720,12 +753,14 @@ export async function PATCH(req: Request, context: Params) {
           include: { cancelledByAdmin: { select: { id: true, name: true, email: true } }, lines: true },
         });
 
-        await refreshSalesOrderStatuses(tx, current.targetLinks.map((link) => link.sourceTransaction?.id).filter(Boolean) as string[]);
+        const sourceTransactionIds = current.targetLinks.map((link) => link.sourceTransaction?.id).filter(Boolean) as string[];
+        await refreshSalesOrderStatuses(tx, sourceTransactionIds);
+        await refreshDeliveryOrderStatuses(tx, sourceTransactionIds);
         return { transaction: updated, auditAction: "CANCEL" as const, description: `Cancelled Sales Invoice ${updated.docNo}.` };
       }
 
       if (hasSalesOrderSource(current)) {
-        throw new Error("Sales Invoice generated from Sales Order cannot be edited. Please cancel this DO and generate a new DO from the original SO.");
+        throw new Error("Sales Invoice generated from source document cannot be edited. Please cancel this Sales Invoice and generate a new Sales Invoice from the original source document.");
       }
 
       const data = await buildDirectSalesInvoiceData(body, tx);
