@@ -39,6 +39,29 @@ function getStatusClass(status: string) {
   return "border-amber-500/25 bg-amber-500/10 text-amber-200";
 }
 
+type PaymentHistoryItem = {
+  id: string;
+  paymentDate: Date | string | null;
+  paymentMode: string;
+  amount: unknown;
+  createdByAdmin?: { id?: string | null; name?: string | null; email?: string | null } | null;
+};
+
+function getPaymentModeLabel(value: string | null | undefined) {
+  switch (value) {
+    case "CASH":
+      return "Cash";
+    case "CARD":
+      return "Card Payment";
+    case "BANK_TRANSFER":
+      return "Bank Transfer";
+    case "QR":
+      return "QR Payment";
+    default:
+      return value || "-";
+  }
+}
+
 
 type AssemblyTraceComponent = {
   id: string;
@@ -142,6 +165,12 @@ export default async function AdminSalesInvoiceDetailPage({ params }: Params) {
       targetLinks: {
         include: {
           sourceTransaction: { select: { id: true, docType: true, docNo: true, status: true } },
+        },
+      },
+      payments: {
+        orderBy: [{ paymentDate: "asc" }, { createdAt: "asc" }],
+        include: {
+          createdByAdmin: { select: { id: true, name: true, email: true } },
         },
       },
       lines: {
@@ -316,6 +345,7 @@ export default async function AdminSalesInvoiceDetailPage({ params }: Params) {
   const currency = transaction.currency || "MYR";
   const generatedFrom = transaction.targetLinks.map((link) => link.sourceTransaction).filter(Boolean);
   const generatedTo = transaction.sourceLinks.map((link) => link.targetTransaction).filter((item) => item && item.status !== "CANCELLED");
+  const paymentHistory = (transaction.payments || []) as PaymentHistoryItem[];
 
   return (
     <section className="section-pad">
@@ -487,11 +517,30 @@ export default async function AdminSalesInvoiceDetailPage({ params }: Params) {
                   </div>
                 </div>
               </div>
+
+              <div className="mt-6 border-t border-white/10 pt-5">
+                <h4 className="text-xs font-semibold uppercase tracking-[0.2em] text-white/45">Payment History</h4>
+                {paymentHistory.length > 0 ? (
+                  <div className="mt-4 space-y-2">
+                    {paymentHistory.map((payment) => (
+                      <div key={payment.id} className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-3 text-sm text-white/80">
+                        <div className="flex items-center justify-between gap-4">
+                          <span>{formatDate(payment.paymentDate)} • {getPaymentModeLabel(payment.paymentMode)}</span>
+                          <span className="font-semibold text-white">{currency} {money(payment.amount)}</span>
+                        </div>
+                        {payment.createdByAdmin?.name ? <div className="mt-1 text-xs text-white/45">Recorded By: {payment.createdByAdmin.name}</div> : null}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-3 text-sm text-white/45">No payment history found.</div>
+                )}
+              </div>
             </div>
           </div>
 
           <div className="mt-8 rounded-[1.5rem] border border-white/10 bg-white/[0.02] p-4 text-sm text-white/55">
-            Stock Issue is auto-created with reference <span className="font-semibold text-white/75">{transaction.docNo}</span>. Cancelling this DO will reverse the stock issue automatically.
+            Stock Issue is auto-created with reference <span className="font-semibold text-white/75">{transaction.docNo}</span>. Cancelling this Cash Sales will reverse the stock issue automatically.
           </div>
         </div>
       </div>
