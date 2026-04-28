@@ -38,7 +38,7 @@ export default async function AdminDeliveryOrderPage() {
   if (!user) redirect("/login");
   if (user.role !== "ADMIN") redirect("/dashboard");
 
-  const [customers, products, locations, agents, projects, departments, stockConfig, salesOrders] = await Promise.all([
+  const [customers, products, locations, agents, projects, departments, stockConfig, taxConfig, taxCodes, salesOrders] = await Promise.all([
     db.user.findMany({
       where: { role: "CUSTOMER" },
       orderBy: [{ customerAccountNo: "asc" }, { name: "asc" }],
@@ -105,6 +105,15 @@ export default async function AdminDeliveryOrderPage() {
     db.project.findMany({ where: { isActive: true }, orderBy: [{ code: "asc" }], select: { id: true, code: true, name: true, isActive: true } }),
     db.department.findMany({ where: { isActive: true }, orderBy: [{ code: "asc" }], select: { id: true, code: true, name: true, projectId: true, isActive: true } }),
     db.stockConfiguration.findUnique({ where: { id: "default" } }),
+    db.taxConfiguration.findUnique({
+      where: { id: "default" },
+      include: { defaultAdminTaxCode: true },
+    }),
+    db.taxCode.findMany({
+      where: { isActive: true },
+      orderBy: [{ sortOrder: "asc" }, { code: "asc" }],
+      select: { id: true, code: true, description: true, rate: true, calculationMethod: true },
+    }),
     db.salesTransaction.findMany({
       where: { docType: "SO", status: { not: "CANCELLED" } },
       orderBy: [{ docDate: "desc" }, { docNo: "desc" }],
@@ -188,6 +197,7 @@ export default async function AdminDeliveryOrderPage() {
                 discountRate: Number(line.discountRate ?? 0),
                 discountType: line.discountType,
                 locationId: line.locationId,
+                taxCodeId: line.taxCodeId,
                 remarks: line.remarks,
               };
             }),
@@ -220,6 +230,18 @@ export default async function AdminDeliveryOrderPage() {
             qtyDecimalPlaces: Number(stockConfig?.qtyDecimalPlaces ?? 2),
             unitCostDecimalPlaces: Number(stockConfig?.unitCostDecimalPlaces ?? 2),
             priceDecimalPlaces: Number(stockConfig?.priceDecimalPlaces ?? 2),
+          }}
+          taxConfig={{
+            taxModuleEnabled: Boolean(taxConfig?.taxModuleEnabled),
+            taxCalculationMode: (taxConfig?.taxCalculationMode || "TRANSACTION") as any,
+            defaultAdminTaxCodeId: taxConfig?.defaultAdminTaxCodeId || "",
+            taxCodes: taxCodes.map((taxCode) => ({
+              id: taxCode.id,
+              code: taxCode.code,
+              description: taxCode.description,
+              rate: Number(taxCode.rate ?? 0),
+              calculationMethod: taxCode.calculationMethod as any,
+            })),
           }}
         />
       </div>
