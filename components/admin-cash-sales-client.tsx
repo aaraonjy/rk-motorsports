@@ -1733,6 +1733,7 @@ export function AdminCashSalesClient({
           discountRate: isServiceItem ? "0" : String(line.discountRate),
           discountType: isServiceItem ? "AMOUNT" : line.discountType,
           locationId: isServiceItem ? "" : (line.locationId || defaultLocationId),
+          taxCodeId: isLineItemTaxMode ? taxConfig.defaultAdminTaxCodeId || "" : "",
           batchNo: "",
           serialNos: [],
           serialSearch: "",
