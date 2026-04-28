@@ -770,6 +770,7 @@ export function AdminSalesInvoiceClient({
   const [activeTab, setActiveTab] = useState<"HEADER" | "BODY" | "FOOTER">("HEADER");
   const [submitError, setSubmitError] = useState("");
   const [submitSuccess, setSubmitSuccess] = useState("");
+  const [submitMessageType, setSubmitMessageType] = useState<"success" | "cancel">("success");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [cancelTarget, setCancelTarget] = useState<SalesInvoiceRecord | null>(null);
   const [cancelReason, setCancelReason] = useState("");
@@ -1116,6 +1117,7 @@ export function AdminSalesInvoiceClient({
     setFooterRemarks("");
     setLines([emptyLine(defaultLocationId, qtyDecimalPlaces, priceDecimalPlaces)]);
     setSubmitError("");
+    setSubmitMessageType("success");
     setSubmitSuccess("");
     setGenerateFromError("");
     setSelectedSourceOrderIds([]);
@@ -1222,6 +1224,7 @@ export function AdminSalesInvoiceClient({
         : [emptyLine(defaultLocationId, qtyDecimalPlaces, priceDecimalPlaces)]
     );
     setSubmitError("");
+    setSubmitMessageType("success");
     setSubmitSuccess("");
     setGenerateFromError("");
     setSelectedSourceOrderIds([]);
@@ -1231,6 +1234,7 @@ export function AdminSalesInvoiceClient({
 
   function openEdit(transaction: SalesInvoiceRecord) {
     if (isGeneratedFromSalesOrder(transaction)) {
+      setSubmitMessageType("success");
       setSubmitSuccess("");
       alert("Sales Invoice generated from source document cannot be edited. Please cancel this Sales Invoice and generate a new Sales Invoice from the original source document.");
       return;
@@ -1240,6 +1244,7 @@ export function AdminSalesInvoiceClient({
 
   function openRevise(transaction: SalesInvoiceRecord) {
     if (isGeneratedFromSalesOrder(transaction)) {
+      setSubmitMessageType("success");
       setSubmitSuccess("");
       alert("Sales Invoice generated from source document cannot be revised. Please cancel this Sales Invoice and generate a new Sales Invoice from the original source document.");
       return;
@@ -1440,6 +1445,7 @@ export function AdminSalesInvoiceClient({
 
     setIsGenerateFromOpen(false);
     setActiveTab("BODY");
+    setSubmitMessageType("success");
     setSubmitSuccess(`Imported ${validLines.length} Sales Order line(s). Please review and save the Sales Invoice.`);
   }
 
@@ -1473,6 +1479,7 @@ export function AdminSalesInvoiceClient({
 
   async function submitDeliveryOrder() {
     setSubmitError("");
+    setSubmitMessageType("success");
     setSubmitSuccess("");
     const validationMessage = validateDeliveryOrderForm();
     if (validationMessage) {
@@ -1519,6 +1526,7 @@ export function AdminSalesInvoiceClient({
       const successMessage = formMode === "revise" ? "Sales Invoice revised successfully." : formMode === "edit" ? "Sales Invoice updated successfully." : "Sales Invoice created successfully.";
       setIsCreateOpen(false);
       resetForm();
+      setSubmitMessageType("success");
       setSubmitSuccess(successMessage);
       setBalances({});
       setLoadingBalances({});
@@ -1549,6 +1557,8 @@ export function AdminSalesInvoiceClient({
       if (!response.ok || !data.ok) throw new Error(data.error || "Unable to cancel sales invoice.");
       setCancelTarget(null);
       setCancelReason("");
+      setSubmitMessageType("cancel");
+      setSubmitSuccess("Sales Invoice cancelled successfully.");
       setBalances({});
       setLoadingBalances({});
       setAvailableBatches({});
@@ -1574,7 +1584,13 @@ export function AdminSalesInvoiceClient({
       </div>
 
       {submitSuccess && !isCreateOpen ? (
-        <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+        <div
+          className={`rounded-2xl border px-4 py-3 text-sm ${
+            submitMessageType === "cancel"
+              ? "border-red-500/30 bg-red-500/10 text-red-200"
+              : "border-emerald-500/30 bg-emerald-500/10 text-emerald-200"
+          }`}
+        >
           {submitSuccess}
         </div>
       ) : null}

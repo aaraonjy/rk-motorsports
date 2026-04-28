@@ -771,6 +771,7 @@ export function AdminDeliveryOrderClient({
   const [activeTab, setActiveTab] = useState<"HEADER" | "BODY" | "FOOTER">("HEADER");
   const [submitError, setSubmitError] = useState("");
   const [submitSuccess, setSubmitSuccess] = useState("");
+  const [submitMessageType, setSubmitMessageType] = useState<"success" | "cancel">("success");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [cancelTarget, setCancelTarget] = useState<DeliveryOrderRecord | null>(null);
   const [cancelReason, setCancelReason] = useState("");
@@ -1152,6 +1153,7 @@ export function AdminDeliveryOrderClient({
     setFooterRemarks("");
     setLines([emptyLine(defaultLocationId, qtyDecimalPlaces, priceDecimalPlaces)]);
     setSubmitError("");
+    setSubmitMessageType("success");
     setSubmitSuccess("");
     setGenerateFromError("");
     setSelectedSourceOrderIds([]);
@@ -1259,6 +1261,7 @@ export function AdminDeliveryOrderClient({
         : [emptyLine(defaultLocationId, qtyDecimalPlaces, priceDecimalPlaces)]
     );
     setSubmitError("");
+    setSubmitMessageType("success");
     setSubmitSuccess("");
     setGenerateFromError("");
     setSelectedSourceOrderIds([]);
@@ -1268,6 +1271,7 @@ export function AdminDeliveryOrderClient({
 
   function openEdit(transaction: DeliveryOrderRecord) {
     if (isGeneratedFromSalesOrder(transaction)) {
+      setSubmitMessageType("success");
       setSubmitSuccess("");
       alert("Delivery Order generated from Sales Order cannot be edited. Please cancel this DO and generate a new DO from the original SO.");
       return;
@@ -1277,6 +1281,7 @@ export function AdminDeliveryOrderClient({
 
   function openRevise(transaction: DeliveryOrderRecord) {
     if (isGeneratedFromSalesOrder(transaction)) {
+      setSubmitMessageType("success");
       setSubmitSuccess("");
       alert("Delivery Order generated from Sales Order cannot be revised. Please cancel this DO and generate a new DO from the original SO.");
       return;
@@ -1478,6 +1483,7 @@ export function AdminDeliveryOrderClient({
 
     setIsGenerateFromOpen(false);
     setActiveTab("BODY");
+    setSubmitMessageType("success");
     setSubmitSuccess(`Imported ${validLines.length} Sales Order line(s). Please review and save the Delivery Order.`);
   }
 
@@ -1511,6 +1517,7 @@ export function AdminDeliveryOrderClient({
 
   async function submitDeliveryOrder() {
     setSubmitError("");
+    setSubmitMessageType("success");
     setSubmitSuccess("");
     const validationMessage = validateDeliveryOrderForm();
     if (validationMessage) {
@@ -1557,6 +1564,7 @@ export function AdminDeliveryOrderClient({
       const successMessage = formMode === "revise" ? "Delivery Order revised successfully." : formMode === "edit" ? "Delivery Order updated successfully." : "Delivery Order created successfully.";
       setIsCreateOpen(false);
       resetForm();
+      setSubmitMessageType("success");
       setSubmitSuccess(successMessage);
       setBalances({});
       setLoadingBalances({});
@@ -1587,6 +1595,8 @@ export function AdminDeliveryOrderClient({
       if (!response.ok || !data.ok) throw new Error(data.error || "Unable to cancel delivery order.");
       setCancelTarget(null);
       setCancelReason("");
+      setSubmitMessageType("cancel");
+      setSubmitSuccess("Delivery Order cancelled successfully.");
       setBalances({});
       setLoadingBalances({});
       setAvailableBatches({});
@@ -1612,7 +1622,13 @@ export function AdminDeliveryOrderClient({
       </div>
 
       {submitSuccess && !isCreateOpen ? (
-        <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+        <div
+          className={`rounded-2xl border px-4 py-3 text-sm ${
+            submitMessageType === "cancel"
+              ? "border-red-500/30 bg-red-500/10 text-red-200"
+              : "border-emerald-500/30 bg-emerald-500/10 text-emerald-200"
+          }`}
+        >
           {submitSuccess}
         </div>
       ) : null}

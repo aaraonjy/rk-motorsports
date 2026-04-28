@@ -592,6 +592,7 @@ export function AdminSalesQuotationClient({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [submitSuccess, setSubmitSuccess] = useState("");
+  const [submitMessageType, setSubmitMessageType] = useState<"success" | "cancel">("success");
   const [cancelTarget, setCancelTarget] = useState<QuotationRecord | null>(null);
   const [cancelReason, setCancelReason] = useState("");
   const [formMode, setFormMode] = useState<"create" | "edit" | "revise">("create");
@@ -936,6 +937,7 @@ export function AdminSalesQuotationClient({
       emptyLine(taxConfig.taxModuleEnabled && normalizeTaxCalculationMode(taxConfig.taxCalculationMode) === "LINE_ITEM" ? taxConfig.defaultAdminTaxCodeId || "" : "", defaultLocationId, qtyDecimalPlaces, priceDecimalPlaces),
     ]);
     setSubmitError("");
+    setSubmitMessageType("success");
     setSubmitSuccess("");
   }
 
@@ -998,6 +1000,7 @@ export function AdminSalesQuotationClient({
         : [emptyLine(taxConfig.taxModuleEnabled && normalizeTaxCalculationMode(taxConfig.taxCalculationMode) === "LINE_ITEM" ? taxConfig.defaultAdminTaxCodeId || "" : "", defaultLocationId, qtyDecimalPlaces, priceDecimalPlaces)]
     );
     setSubmitError("");
+    setSubmitMessageType("success");
     setSubmitSuccess("");
     setIsCreateOpen(true);
   }
@@ -1117,6 +1120,7 @@ export function AdminSalesQuotationClient({
 
   async function submitQuotation() {
     setSubmitError("");
+    setSubmitMessageType("success");
     setSubmitSuccess("");
     setIsSubmitting(true);
     try {
@@ -1168,6 +1172,7 @@ export function AdminSalesQuotationClient({
       });
       const data = await response.json();
       if (!response.ok || !data.ok) throw new Error(data.error || "Unable to save quotation.");
+      setSubmitMessageType("success");
       setSubmitSuccess(formMode === "revise" ? "Quotation revised successfully." : formMode === "edit" ? "Quotation updated successfully." : "Quotation created successfully.");
       setIsCreateOpen(false);
       setEditTarget(null);
@@ -1200,6 +1205,8 @@ export function AdminSalesQuotationClient({
       if (!response.ok || !data.ok) throw new Error(data.error || "Unable to cancel quotation.");
       setCancelTarget(null);
       setCancelReason("");
+      setSubmitMessageType("cancel");
+      setSubmitSuccess("Quotation cancelled successfully.");
       await loadTransactions();
       router.refresh();
     } catch (error) {
@@ -1216,7 +1223,17 @@ export function AdminSalesQuotationClient({
         </div>
       </div>
 
-      {submitSuccess ? <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">{submitSuccess}</div> : null}
+      {submitSuccess && !isCreateOpen ? (
+        <div
+          className={`rounded-2xl border px-4 py-3 text-sm ${
+            submitMessageType === "cancel"
+              ? "border-red-500/30 bg-red-500/10 text-red-200"
+              : "border-emerald-500/30 bg-emerald-500/10 text-emerald-200"
+          }`}
+        >
+          {submitSuccess}
+        </div>
+      ) : null}
 
       <div className="rounded-[2rem] border border-white/10 bg-black/45 p-5 backdrop-blur-md md:p-8">
         <div className="flex flex-wrap items-start justify-between gap-4">
