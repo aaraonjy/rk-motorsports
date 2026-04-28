@@ -556,7 +556,7 @@ function CancelledTransactionNotice({
 }
 
 function getSalesDocumentLabel(_transaction: SalesInvoiceRecord) {
-  return salesDocumentLabel;
+  return "sales invoice";
 }
 
 function getStatusClass(status: string) {
@@ -1703,7 +1703,7 @@ export function AdminSalesInvoiceClient({
       ) : null}
 
       {submitMessageType === "cancel" && recentCancelledTransaction && !isCreateOpen ? (
-        <CancelledTransactionNotice transaction={recentCancelledTransaction} label={getSalesDocumentLabel(recentCancelledTransaction)} />
+        <CancelledTransactionNotice transaction={recentCancelledTransaction} label={salesDocumentLabel} />
       ) : null}
 
       <div className="rounded-[2rem] border border-white/10 bg-black/45 p-5 backdrop-blur-md md:p-8">
