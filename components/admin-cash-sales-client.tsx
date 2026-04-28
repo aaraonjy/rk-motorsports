@@ -149,6 +149,10 @@ type CashSalesRecord = {
   footerRemarks?: string | null;
   status: "OPEN" | "PARTIAL" | "COMPLETED" | "CANCELLED";
   grandTotal: string | number;
+  payments?: PaymentHistoryItem[];
+  totalPaid?: string | number | null;
+  outstandingBalance?: string | number | null;
+  paymentStatus?: "UNPAID" | "PARTIALLY_PAID" | "PAID" | string | null;
   cancelReason?: string | null;
   cancelledAt?: string | Date | null;
   cancelledBy?: string | null;
@@ -171,6 +175,14 @@ type CashSalesRecord = {
     locationId?: string | null;
     remarks?: string | null;
   }>;
+};
+
+type PaymentHistoryItem = {
+  id: string;
+  paymentDate: string;
+  paymentMode: string;
+  amount: string | number;
+  createdByAdmin?: { id?: string | null; name?: string | null; email?: string | null } | null;
 };
 
 type StockNumberFormatConfig = {
@@ -408,6 +420,50 @@ function normalizeDecimalInputValue(value: string, decimalPlaces: number) {
 
 function moneyWithPlaces(value: number, decimalPlaces: number) {
   return value.toLocaleString("en-MY", { minimumFractionDigits: decimalPlaces, maximumFractionDigits: decimalPlaces });
+}
+
+
+
+function getPaymentModeLabel(value: string) {
+  switch (value) {
+    case "CASH":
+      return "Cash";
+    case "CARD":
+      return "Card Payment";
+    case "BANK_TRANSFER":
+      return "Bank Transfer";
+    case "QR":
+      return "QR Payment";
+    default:
+      return value || "-";
+  }
+}
+
+function getPaymentStatusLabel(value: string | null | undefined) {
+  switch (value) {
+    case "PAID":
+      return "Fully Paid";
+    case "PARTIALLY_PAID":
+      return "Partial Paid";
+    case "UNPAID":
+      return "Unpaid";
+    default:
+      return value || "Unpaid";
+  }
+}
+
+function getPaymentStatusClass(value: string | null | undefined) {
+  if (value === "PAID") return "border-emerald-500/25 bg-emerald-500/10 text-emerald-200";
+  if (value === "PARTIALLY_PAID") return "border-amber-500/25 bg-amber-500/10 text-amber-200";
+  return "border-white/15 bg-white/5 text-white/55";
+}
+
+function getPaymentSummary(record: { grandTotal?: string | number | null; totalPaid?: string | number | null; outstandingBalance?: string | number | null; paymentStatus?: string | null; payments?: PaymentHistoryItem[] }) {
+  const grandTotal = Number(record.grandTotal || 0);
+  const totalPaid = Number(record.totalPaid ?? (record.payments || []).reduce((sum, payment) => sum + Number(payment.amount || 0), 0));
+  const outstandingBalance = Number(record.outstandingBalance ?? Math.max(0, grandTotal - totalPaid));
+  const paymentStatus = record.paymentStatus || (grandTotal <= 0 || totalPaid >= grandTotal ? "PAID" : totalPaid > 0 ? "PARTIALLY_PAID" : "UNPAID");
+  return { grandTotal, totalPaid, outstandingBalance, paymentStatus };
 }
 
 
@@ -833,6 +889,9 @@ export function AdminCashSalesClient({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [cancelTarget, setCancelTarget] = useState<CashSalesRecord | null>(null);
   const [cancelReason, setCancelReason] = useState("");
+  const [paymentDate, setPaymentDate] = useState(todayInput());
+  const [paymentMode, setPaymentMode] = useState("CASH");
+  const [paymentAmount, setPaymentAmount] = useState("0");
   const [isGenerateFromOpen, setIsGenerateFromOpen] = useState(false);
   const [generateFromError, setGenerateFromError] = useState("");
   const [sourceSearch, setSourceSearch] = useState("");
@@ -885,6 +944,16 @@ export function AdminCashSalesClient({
       { id: "PARTIAL", label: "Partial", searchText: "partial" },
       { id: "COMPLETED", label: "Completed", searchText: "completed" },
       { id: "CANCELLED", label: "Cancelled", searchText: "cancelled" },
+    ],
+    []
+  );
+
+  const paymentModeOptions = useMemo<SearchableSelectOption[]>(
+    () => [
+      { id: "CASH", label: "Cash", searchText: "cash" },
+      { id: "CARD", label: "Card Payment", searchText: "card payment" },
+      { id: "BANK_TRANSFER", label: "Bank Transfer", searchText: "bank transfer" },
+      { id: "QR", label: "QR Payment", searchText: "qr payment" },
     ],
     []
   );
@@ -1058,6 +1127,22 @@ export function AdminCashSalesClient({
     return { subtotal, discountTotal, taxTotal: 0, grandTotal };
   }, [normalizedLines]);
 
+  const existingTotalPaid = useMemo(() => {
+    if (formMode === "edit" && editTarget) return getPaymentSummary(editTarget).totalPaid;
+    return 0;
+  }, [editTarget, formMode]);
+
+  const normalizedPaymentAmount = useMemo(() => {
+    const numeric = Number(paymentAmount || 0);
+    if (!Number.isFinite(numeric) || numeric < 0) return 0;
+    return Math.round((numeric + Number.EPSILON) * 100) / 100;
+  }, [paymentAmount]);
+
+  const projectedTotalPaid = Math.round((existingTotalPaid + normalizedPaymentAmount + Number.EPSILON) * 100) / 100;
+  const projectedOutstandingBalance = Math.max(0, Math.round((totals.grandTotal - projectedTotalPaid + Number.EPSILON) * 100) / 100);
+  const projectedPaymentStatus = totals.grandTotal <= 0 || projectedTotalPaid >= totals.grandTotal ? "PAID" : projectedTotalPaid > 0 ? "PARTIALLY_PAID" : "UNPAID";
+  const maxPaymentAmount = Math.max(0, Math.round((totals.grandTotal - existingTotalPaid + Number.EPSILON) * 100) / 100);
+
   async function loadTransactions() {
     setIsLoading(true);
     try {
@@ -1226,6 +1311,9 @@ export function AdminCashSalesClient({
     setSubmitMessageType("success");
     setRecentCancelledTransaction(null);
     setSubmitSuccess("");
+    setPaymentDate(todayInput());
+    setPaymentMode("CASH");
+    setPaymentAmount("0");
     setGenerateFromError("");
     setSelectedSourceOrderIds([]);
     setPickLines([]);
@@ -1334,6 +1422,9 @@ export function AdminCashSalesClient({
     );
     setSubmitError("");
     setSubmitSuccess("");
+    setPaymentDate(todayInput());
+    setPaymentMode("CASH");
+    setPaymentAmount("0");
     setGenerateFromError("");
     setSelectedSourceOrderIds([]);
     setPickLines([]);
@@ -1579,6 +1670,8 @@ export function AdminCashSalesClient({
       }
     }
 
+    if (normalizedPaymentAmount > maxPaymentAmount) return "Payment amount cannot exceed outstanding balance.";
+
     return "";
   }
 
@@ -1618,6 +1711,9 @@ export function AdminCashSalesClient({
         termsAndConditions,
         bankAccount,
         footerRemarks,
+        paymentDate,
+        paymentMode,
+        paymentAmount: normalizedPaymentAmount,
         lines,
       };
 
@@ -1737,15 +1833,18 @@ export function AdminCashSalesClient({
                 <th className="px-4 py-3">Customer</th>
                 <th className="px-4 py-3">Generated From</th>
                 <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Payment</th>
                 <th className="px-4 py-3 text-right">Grand Total</th>
+                <th className="px-4 py-3 text-right">Paid</th>
+                <th className="px-4 py-3 text-right">Outstanding</th>
                 <th className="px-4 py-3 text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/10">
               {isLoading ? (
-                <tr><td colSpan={6} className="px-4 py-8 text-center text-white/50">Loading cash sales...</td></tr>
+                <tr><td colSpan={9} className="px-4 py-8 text-center text-white/50">Loading cash sales...</td></tr>
               ) : transactions.length === 0 ? (
-                <tr><td colSpan={6} className="px-4 py-8 text-center text-white/50">No cash sales found.</td></tr>
+                <tr><td colSpan={9} className="px-4 py-8 text-center text-white/50">No cash sales found.</td></tr>
               ) : (
                 transactions.map((item) => (
                   <tr key={item.id} onClick={() => router.push(`/admin/sales/cash-sales/${item.id}`)} className="cursor-pointer text-white/80 transition hover:bg-white/[0.04]">
@@ -1756,7 +1855,14 @@ export function AdminCashSalesClient({
                     </td>
                     <td className="px-4 py-4 text-white/65">{(item.targetLinks || []).map((link) => link.sourceTransaction?.docNo).filter(Boolean).join(", ") || "-"}</td>
                     <td className="px-4 py-4"><span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getStatusClass(item.status)}`}>{item.status}</span></td>
+                    <td className="px-4 py-4">
+                      <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getPaymentStatusClass(getPaymentSummary(item).paymentStatus)}`}>
+                        {getPaymentStatusLabel(getPaymentSummary(item).paymentStatus)}
+                      </span>
+                    </td>
                     <td className="px-4 py-4 text-right">{`${item.currency || "MYR"} ${moneyWithPlaces(Number(item.grandTotal || 0), priceDecimalPlaces)}`}</td>
+                    <td className="px-4 py-4 text-right">{`${item.currency || "MYR"} ${moneyWithPlaces(getPaymentSummary(item).totalPaid, priceDecimalPlaces)}`}</td>
+                    <td className="px-4 py-4 text-right">{`${item.currency || "MYR"} ${moneyWithPlaces(getPaymentSummary(item).outstandingBalance, priceDecimalPlaces)}`}</td>
                     <td className="px-4 py-4 text-right">
                       {item.status !== "CANCELLED" ? (
                         <div className="flex flex-wrap justify-end gap-2">
@@ -2107,6 +2213,57 @@ export function AdminCashSalesClient({
                   <SummaryRow label="Tax" value={moneyWithPlaces(totals.taxTotal, priceDecimalPlaces)} />
                   <div className="mt-4 border-t border-white/10 pt-4">
                     <SummaryRow label={`Grand Total (${currency || "MYR"})`} value={moneyWithPlaces(totals.grandTotal, priceDecimalPlaces)} strong />
+                  </div>
+
+                  <div className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-4">
+                    <h4 className="text-sm font-semibold uppercase tracking-[0.2em] text-white/55">Payment</h4>
+                    <div className="mt-4 grid gap-4">
+                      <div>
+                        <label className="label-rk">Payment Date</label>
+                        <input type="date" className="input-rk" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} />
+                      </div>
+                      <CompactSelect options={paymentModeOptions} value={paymentMode} onChange={setPaymentMode} />
+                      <div>
+                        <label className="label-rk">Payment Amount</label>
+                        <input
+                          className="input-rk"
+                          type="number"
+                          min="0"
+                          step={decimalStep(priceDecimalPlaces)}
+                          value={paymentAmount}
+                          onChange={(e) => setPaymentAmount(limitDecimalInputValue(e.target.value, priceDecimalPlaces))}
+                          onBlur={(e) => setPaymentAmount(normalizeDecimalInputValue(e.target.value, priceDecimalPlaces))}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="mt-5 border-t border-white/10 pt-4">
+                      <SummaryRow label="Existing Paid" value={moneyWithPlaces(existingTotalPaid, priceDecimalPlaces)} />
+                      <SummaryRow label="New Payment" value={moneyWithPlaces(normalizedPaymentAmount, priceDecimalPlaces)} />
+                      <SummaryRow label="Total Paid" value={moneyWithPlaces(projectedTotalPaid, priceDecimalPlaces)} />
+                      <SummaryRow label="Outstanding" value={moneyWithPlaces(projectedOutstandingBalance, priceDecimalPlaces)} strong />
+                      <div className="mt-4">
+                        <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getPaymentStatusClass(projectedPaymentStatus)}`}>
+                          {getPaymentStatusLabel(projectedPaymentStatus)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {editTarget?.payments?.length ? (
+                      <div className="mt-5 border-t border-white/10 pt-4">
+                        <div className="text-xs font-semibold uppercase tracking-[0.2em] text-white/45">Payment History</div>
+                        <div className="mt-3 space-y-2">
+                          {editTarget.payments.map((payment) => (
+                            <div key={payment.id} className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-white/70">
+                              <div className="flex items-center justify-between gap-3">
+                                <span>{formatDate(payment.paymentDate)} • {getPaymentModeLabel(payment.paymentMode)}</span>
+                                <span className="font-semibold text-white">{currency || "MYR"} {moneyWithPlaces(Number(payment.amount || 0), priceDecimalPlaces)}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               </div>

@@ -37,6 +37,95 @@ function withCancellationDetails<T extends Record<string, any>>(transaction: T) 
 
 
 
+
+function sanitizeMoneyAmount(value: unknown) {
+  const numeric = Number(value ?? 0);
+  if (!Number.isFinite(numeric) || numeric < 0) return 0;
+  return Math.round((numeric + Number.EPSILON) * 100) / 100;
+}
+
+function isAllowedPaymentMode(value: string) {
+  return ["CASH", "CARD", "BANK_TRANSFER", "QR"].includes(value);
+}
+
+function normalizePaymentDate(value: unknown) {
+  const raw = typeof value === "string" && value.trim() ? value.trim() : new Date().toISOString().slice(0, 10);
+  const paymentDate = new Date(`${raw}T00:00:00.000+08:00`);
+  if (Number.isNaN(paymentDate.getTime())) throw new Error("Payment Date is invalid.");
+  return paymentDate;
+}
+
+function getPaymentMode(value: unknown) {
+  const paymentMode = String(value || "CASH").trim().toUpperCase();
+  if (!isAllowedPaymentMode(paymentMode)) throw new Error("Invalid payment mode.");
+  return paymentMode;
+}
+
+function getPaymentInput(body: any) {
+  const amount = sanitizeMoneyAmount(body?.paymentAmount);
+  const paymentMode = getPaymentMode(body?.paymentMode);
+  const paymentDate = normalizePaymentDate(body?.paymentDate);
+  return { amount, paymentMode, paymentDate };
+}
+
+function calculateSalesPaymentSummary(payments: Array<{ amount?: Prisma.Decimal | number | string | null }>, grandTotal: Prisma.Decimal | number | string | null | undefined) {
+  const total = toNumber(grandTotal);
+  const totalPaid = payments.reduce((sum, payment) => sum + toNumber(payment.amount), 0);
+  const roundedTotalPaid = Math.round((totalPaid + Number.EPSILON) * 100) / 100;
+  const outstandingBalance = Math.max(0, Math.round((total - roundedTotalPaid + Number.EPSILON) * 100) / 100);
+  return {
+    totalPaid: roundedTotalPaid,
+    outstandingBalance,
+    paymentStatus: total <= 0 || roundedTotalPaid >= total ? "PAID" : roundedTotalPaid > 0 ? "PARTIALLY_PAID" : "UNPAID",
+  };
+}
+
+function getCashSalesStatusForPayment(grandTotal: Prisma.Decimal | number | string, totalPaid: number) {
+  const total = toNumber(grandTotal);
+  if (total <= 0 || totalPaid >= total) return "COMPLETED" as SalesTransactionStatus;
+  if (totalPaid > 0) return "PARTIAL" as SalesTransactionStatus;
+  return "OPEN" as SalesTransactionStatus;
+}
+
+function withPaymentSummary<T extends Record<string, any>>(transaction: T) {
+  const payments = Array.isArray(transaction.payments) ? transaction.payments : [];
+  const summary = calculateSalesPaymentSummary(payments, transaction.grandTotal);
+  return {
+    ...transaction,
+    payments,
+    totalPaid: summary.totalPaid,
+    outstandingBalance: summary.outstandingBalance,
+    paymentStatus: summary.paymentStatus,
+  };
+}
+
+function validatePaymentAmount(paymentAmount: number, grandTotal: Prisma.Decimal | number | string, existingPaid = 0) {
+  const outstanding = Math.max(0, Math.round((toNumber(grandTotal) - existingPaid + Number.EPSILON) * 100) / 100);
+  if (paymentAmount > outstanding) {
+    throw new Error("Payment amount cannot exceed the outstanding balance.");
+  }
+}
+
+async function createSalesTransactionPaymentIfNeeded(
+  tx: Prisma.TransactionClient,
+  transactionId: string,
+  adminId: string,
+  paymentInput: { amount: number; paymentMode: string; paymentDate: Date }
+) {
+  if (paymentInput.amount <= 0) return null;
+
+  return tx.salesTransactionPayment.create({
+    data: {
+      salesTransactionId: transactionId,
+      paymentDate: paymentInput.paymentDate,
+      paymentMode: paymentInput.paymentMode,
+      amount: new Prisma.Decimal(paymentInput.amount.toFixed(2)),
+      createdByAdminId: adminId,
+    },
+  });
+}
+
+
 function roundQty(value: unknown) {
   return roundToDecimalPlaces(Number(value ?? 0), STOCK_STORAGE_DECIMAL_PLACES.qty);
 }
@@ -113,6 +202,10 @@ async function refreshSalesOrderStatuses(tx: Prisma.TransactionClient, sourceTra
         id: true,
         docType: true,
         status: true,
+        payments: {
+          orderBy: { paymentDate: "asc" },
+          include: { createdByAdmin: { select: { id: true, name: true, email: true } } },
+        },
         lines: {
           orderBy: { lineNo: "asc" },
           include: {
@@ -666,7 +759,7 @@ export async function GET(_req: Request, context: Params) {
     });
 
     const transactionWithStockPicking = {
-      ...withCancellationDetails(transaction),
+      ...withPaymentSummary(withCancellationDetails(transaction)),
       lines: transaction.lines.map((line, index) => ({
         ...line,
         batchNo: stockIssue?.lines[index]?.batchNo || null,
@@ -703,6 +796,10 @@ export async function PATCH(req: Request, context: Params) {
         include: {
           revisedFrom: { select: { id: true, docNo: true } },
           lines: true,
+          payments: {
+            orderBy: { paymentDate: "asc" },
+            include: { createdByAdmin: { select: { id: true, name: true, email: true } } },
+          },
           sourceLinks: {
             include: {
               targetTransaction: { select: { id: true, docType: true, status: true } },
@@ -730,7 +827,14 @@ export async function PATCH(req: Request, context: Params) {
         const updated = await tx.salesTransaction.update({
           where: { id },
           data: { status: "CANCELLED", cancelledAt: new Date(), cancelledByAdminId: admin.id, cancelReason },
-          include: { cancelledByAdmin: { select: { id: true, name: true, email: true } }, lines: true },
+          include: {
+            cancelledByAdmin: { select: { id: true, name: true, email: true } },
+            lines: true,
+            payments: {
+              orderBy: { paymentDate: "asc" },
+              include: { createdByAdmin: { select: { id: true, name: true, email: true } } },
+            },
+          },
         });
 
         await refreshSalesOrderStatuses(tx, current.targetLinks.map((link) => link.sourceTransaction?.id).filter(Boolean) as string[]);
@@ -742,6 +846,13 @@ export async function PATCH(req: Request, context: Params) {
       }
 
       const data = await buildDirectCashSalesData(body, tx);
+      const paymentInput = getPaymentInput(body);
+      const existingTotalPaid = (current.payments || []).reduce((sum, payment) => sum + toNumber(payment.amount), 0);
+      validatePaymentAmount(paymentInput.amount, data.grandTotal, existingTotalPaid);
+      const nextTotalPaid = Math.round((existingTotalPaid + paymentInput.amount + Number.EPSILON) * 100) / 100;
+      const nextStatus = getCashSalesStatusForPayment(data.grandTotal, nextTotalPaid);
+      const revisedStatus = getCashSalesStatusForPayment(data.grandTotal, paymentInput.amount);
+
       await reverseStockIssueForCashSales(tx, current, admin.id, action === "revise" ? "Revised Cash Sales" : "Edited Cash Sales");
 
       if (action === "edit") {
@@ -751,17 +862,34 @@ export async function PATCH(req: Request, context: Params) {
           data: {
             ...buildSalesUpdateData(data, body, admin.id),
             docNo: current.docNo,
-            status: "OPEN",
+            status: nextStatus,
             cancelledAt: null,
             cancelledByAdminId: null,
             cancelReason: null,
             lines: { create: buildLineCreateData(data.lines) },
           },
-          include: { lines: true },
+          include: {
+            lines: true,
+            payments: {
+              orderBy: { paymentDate: "asc" },
+              include: { createdByAdmin: { select: { id: true, name: true, email: true } } },
+            },
+          },
         });
 
+        await createSalesTransactionPaymentIfNeeded(tx, updated.id, admin.id, paymentInput);
         await createStockIssueForDirectCashSales(tx, admin.id, updated, data.lines, body);
-        return { transaction: updated, auditAction: "UPDATE" as const, description: `Updated Cash Sales ${updated.docNo}.` };
+        const updatedWithPayments = await tx.salesTransaction.findUnique({
+          where: { id: updated.id },
+          include: {
+            lines: true,
+            payments: {
+              orderBy: { paymentDate: "asc" },
+              include: { createdByAdmin: { select: { id: true, name: true, email: true } } },
+            },
+          },
+        });
+        return { transaction: updatedWithPayments || updated, auditAction: "UPDATE" as const, description: `Updated Cash Sales ${updated.docNo}.` };
       }
 
       const nextDocNo = await generateCashSalesRevisionNo(tx, current);
@@ -769,13 +897,21 @@ export async function PATCH(req: Request, context: Params) {
         data: {
           docType: "CS",
           docNo: nextDocNo,
-          status: "OPEN",
+          status: revisedStatus,
           revisedFromId: current.revisedFromId || current.id,
           ...buildSalesUpdateData(data, body, admin.id),
           lines: { create: buildLineCreateData(data.lines) },
         },
-        include: { lines: true },
+        include: {
+          lines: true,
+          payments: {
+            orderBy: { paymentDate: "asc" },
+            include: { createdByAdmin: { select: { id: true, name: true, email: true } } },
+          },
+        },
       });
+
+      await createSalesTransactionPaymentIfNeeded(tx, revised.id, admin.id, paymentInput);
 
       await tx.salesTransaction.update({
         where: { id: current.id },
@@ -783,7 +919,17 @@ export async function PATCH(req: Request, context: Params) {
       });
 
       await createStockIssueForDirectCashSales(tx, admin.id, revised, data.lines, body);
-      return { transaction: revised, auditAction: "REVISE" as const, description: `Revised Cash Sales ${current.docNo} to ${revised.docNo}.` };
+      const revisedWithPayments = await tx.salesTransaction.findUnique({
+        where: { id: revised.id },
+        include: {
+          lines: true,
+          payments: {
+            orderBy: { paymentDate: "asc" },
+            include: { createdByAdmin: { select: { id: true, name: true, email: true } } },
+          },
+        },
+      });
+      return { transaction: revisedWithPayments || revised, auditAction: "REVISE" as const, description: `Revised Cash Sales ${current.docNo} to ${revised.docNo}.` };
     });
 
     await createAuditLogFromRequest({
@@ -796,7 +942,7 @@ export async function PATCH(req: Request, context: Params) {
       description: result.description,
     });
 
-    return NextResponse.json({ ok: true, transaction: withCancellationDetails(result.transaction) });
+    return NextResponse.json({ ok: true, transaction: withPaymentSummary(withCancellationDetails(result.transaction)) });
   } catch (error) {
     return NextResponse.json(
       { ok: false, error: error instanceof Error ? error.message : "Unable to update cash sales." },

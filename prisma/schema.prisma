@@ -218,6 +218,7 @@ model User {
   cancelledStockTransactions StockTransaction[] @relation("CancelledStockTransactions")
   createdSalesTransactions SalesTransaction[] @relation("CreatedSalesTransactions")
   cancelledSalesTransactions SalesTransaction[] @relation("CancelledSalesTransactions")
+  createdSalesTransactionPayments SalesTransactionPayment[] @relation("CreatedSalesTransactionPayments")
   agent                  Agent?              @relation(fields: [agentId], references: [id], onDelete: SetNull)
   deliveryAddresses      CustomerDeliveryAddress[]
 
@@ -639,6 +640,7 @@ model SalesTransaction {
   lines                SalesTransactionLine[]
   sourceLinks          SalesTransactionLink[] @relation("SalesTransactionSourceLinks")
   targetLinks          SalesTransactionLink[] @relation("SalesTransactionTargetLinks")
+  payments             SalesTransactionPayment[]
 
   @@index([docType, docDate])
   @@index([status, docDate])
@@ -654,6 +656,24 @@ model SalesTransaction {
   targetLineLinks SalesTransactionLineLink[] @relation("SalesLineTargetTransaction")
 }
 
+
+
+model SalesTransactionPayment {
+  id                 String           @id @default(cuid())
+  salesTransactionId String
+  paymentDate        DateTime
+  paymentMode        String
+  amount             Decimal          @db.Decimal(14, 2)
+  createdByAdminId   String
+  createdAt          DateTime         @default(now())
+
+  salesTransaction   SalesTransaction @relation(fields: [salesTransactionId], references: [id], onDelete: Cascade)
+  createdByAdmin     User             @relation("CreatedSalesTransactionPayments", fields: [createdByAdminId], references: [id], onDelete: Restrict)
+
+  @@index([salesTransactionId])
+  @@index([paymentDate])
+  @@index([createdByAdminId])
+}
 
 model SalesTransactionLine {
   id                  String            @id @default(cuid())
