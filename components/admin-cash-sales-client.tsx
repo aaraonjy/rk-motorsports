@@ -93,6 +93,12 @@ type SourceSalesOrderRecord = {
   footerRemarks?: string | null;
   status: string;
   grandTotal: string | number;
+  cancelReason?: string | null;
+  cancelledAt?: string | Date | null;
+  cancelledBy?: string | null;
+  cancelledByName?: string | null;
+  cancelledByAdminName?: string | null;
+  cancelledByAdmin?: { id?: string | null; name?: string | null; email?: string | null } | null;
   lines?: Array<{
     id: string;
     inventoryProductId?: string | null;
@@ -460,6 +466,58 @@ function buildCashSalesRevisionDocNoPreview(transaction: CashSalesRecord) {
   return `${baseDocNo}-${maxRevision + 1}`;
 }
 
+
+function formatCancelDateTime(value: string | Date | null | undefined) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleString("en-MY", {
+    timeZone: "Asia/Kuala_Lumpur",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function getCancelledByName(transaction: {
+  cancelledBy?: string | null;
+  cancelledByName?: string | null;
+  cancelledByAdminName?: string | null;
+  cancelledByAdmin?: { name?: string | null } | null;
+}) {
+  return transaction.cancelledBy || transaction.cancelledByName || transaction.cancelledByAdminName || transaction.cancelledByAdmin?.name || "-";
+}
+
+function getCancelReason(transaction: { cancelReason?: string | null }) {
+  return transaction.cancelReason && transaction.cancelReason.trim() ? transaction.cancelReason : "-";
+}
+
+function CancelledTransactionNotice({
+  transaction,
+}: {
+  transaction: {
+    cancelReason?: string | null;
+    cancelledAt?: string | Date | null;
+    cancelledBy?: string | null;
+    cancelledByName?: string | null;
+    cancelledByAdminName?: string | null;
+    cancelledByAdmin?: { name?: string | null } | null;
+  };
+}) {
+  return (
+    <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-4 text-sm text-red-100">
+      <div className="font-semibold">This cash sales has been cancelled.</div>
+      <div className="mt-3 space-y-2 text-white/85">
+        <div>Cancelled At: {formatCancelDateTime(transaction.cancelledAt)}</div>
+        <div>Cancelled By: {getCancelledByName(transaction)}</div>
+        <div>Reason: {getCancelReason(transaction)}</div>
+      </div>
+    </div>
+  );
+}
+
 function getStatusClass(status: string) {
   if (status === "CANCELLED") return "border-red-500/25 bg-red-500/10 text-red-200";
   if (status === "COMPLETED") return "border-sky-500/25 bg-sky-500/10 text-sky-200";
@@ -764,6 +822,8 @@ export function AdminCashSalesClient({
   const [activeTab, setActiveTab] = useState<"HEADER" | "BODY" | "FOOTER">("HEADER");
   const [submitError, setSubmitError] = useState("");
   const [submitSuccess, setSubmitSuccess] = useState("");
+  const [submitMessageType, setSubmitMessageType] = useState<"success" | "cancel">("success");
+  const [recentCancelledTransaction, setRecentCancelledTransaction] = useState<CashSalesRecord | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [cancelTarget, setCancelTarget] = useState<CashSalesRecord | null>(null);
   const [cancelReason, setCancelReason] = useState("");
@@ -1157,6 +1217,8 @@ export function AdminCashSalesClient({
     setFooterRemarks("");
     setLines([emptyLine(defaultLocationId, qtyDecimalPlaces, priceDecimalPlaces)]);
     setSubmitError("");
+    setSubmitMessageType("success");
+    setRecentCancelledTransaction(null);
     setSubmitSuccess("");
     setGenerateFromError("");
     setSelectedSourceOrderIds([]);
@@ -1484,6 +1546,8 @@ export function AdminCashSalesClient({
 
     setIsGenerateFromOpen(false);
     setActiveTab("BODY");
+    setSubmitMessageType("success");
+    setRecentCancelledTransaction(null);
     setSubmitSuccess(`Imported ${validLines.length} Sales Order line(s). Please review and save the Cash Sales.`);
   }
 
@@ -1517,6 +1581,8 @@ export function AdminCashSalesClient({
 
   async function submitCashSales() {
     setSubmitError("");
+    setSubmitMessageType("success");
+    setRecentCancelledTransaction(null);
     setSubmitSuccess("");
     const validationMessage = validateCashSalesForm();
     if (validationMessage) {
@@ -1563,6 +1629,8 @@ export function AdminCashSalesClient({
       const successMessage = formMode === "revise" ? "Cash Sales revised successfully." : formMode === "edit" ? "Cash Sales updated successfully." : "Cash Sales created successfully.";
       setIsCreateOpen(false);
       resetForm();
+      setSubmitMessageType("success");
+      setRecentCancelledTransaction(null);
       setSubmitSuccess(successMessage);
       setBalances({});
       setLoadingBalances({});
@@ -1593,6 +1661,9 @@ export function AdminCashSalesClient({
       if (!response.ok || !data.ok) throw new Error(data.error || "Unable to cancel cash sales.");
       setCancelTarget(null);
       setCancelReason("");
+      setSubmitMessageType("cancel");
+      setSubmitSuccess("");
+      setRecentCancelledTransaction((data.transaction || { ...cancelTarget, status: "CANCELLED", cancelReason, cancelledAt: new Date().toISOString() }) as CashSalesRecord);
       setBalances({});
       setLoadingBalances({});
       setAvailableBatches({});
@@ -1618,9 +1689,19 @@ export function AdminCashSalesClient({
       </div>
 
       {submitSuccess && !isCreateOpen ? (
-        <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+        <div
+          className={`rounded-2xl border px-4 py-3 text-sm ${
+            submitMessageType === "cancel"
+              ? "border-red-500/30 bg-red-500/10 text-red-200"
+              : "border-emerald-500/30 bg-emerald-500/10 text-emerald-200"
+          }`}
+        >
           {submitSuccess}
         </div>
+      ) : null}
+
+      {submitMessageType === "cancel" && recentCancelledTransaction && !isCreateOpen ? (
+        <CancelledTransactionNotice transaction={recentCancelledTransaction} />
       ) : null}
 
       <div className="rounded-[2rem] border border-white/10 bg-black/45 p-5 backdrop-blur-md md:p-8">
