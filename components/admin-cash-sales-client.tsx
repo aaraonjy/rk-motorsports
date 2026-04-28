@@ -2095,7 +2095,7 @@ export function AdminCashSalesClient({
                   const isGeneratedLine = isGeneratedLineFromSalesOrder(line);
                   const normalizedLine = normalizedLines[index];
                   const total = normalizedLine?.lineTotal || 0;
-                  const taxAmount = 0;
+                  const taxAmount = normalizedLine?.taxAmount || 0;
                   const selectedProduct = products.find((item) => item.id === line.inventoryProductId) || null;
                   const uomOptions = selectedProduct
                     ? [
