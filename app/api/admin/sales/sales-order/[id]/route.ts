@@ -310,6 +310,18 @@ function calculateLine(
   };
 }
 
+async function hasActiveUpstreamQuotation(tx: Prisma.TransactionClient, transactionId: string) {
+  const activeLink = await tx.salesTransactionLink.findFirst({
+    where: {
+      targetTransactionId: transactionId,
+      sourceTransaction: { docType: "QO", status: { not: "CANCELLED" } },
+    },
+    select: { id: true },
+  });
+
+  return Boolean(activeLink);
+}
+
 async function hasActiveDownstreamTransaction(tx: Prisma.TransactionClient, transactionId: string) {
   const activeLink = await tx.salesTransactionLink.findFirst({
     where: {
@@ -498,6 +510,7 @@ export async function GET(_req: Request, { params }: Params) {
         },
         targetLinks: {
           include: {
+            sourceTransaction: { select: { id: true, docType: true, docNo: true, status: true } },
             targetTransaction: { select: { id: true, docType: true, docNo: true, status: true } },
           },
         },
@@ -622,6 +635,9 @@ export async function PATCH(req: Request, { params }: Params) {
 
       if (!existing || existing.docType !== "SO") throw new Error("Sales Order not found.");
       if (existing.status === "CANCELLED") throw new Error("Cancelled sales order cannot be edited or revised.");
+      if (await hasActiveUpstreamQuotation(tx, existing.id)) {
+        throw new Error("Sales Order generated from Quotation cannot be edited or revised. Please cancel this SO and generate a new SO from the original Quotation.");
+      }
       if (await hasActiveDownstreamTransaction(tx, existing.id)) {
         throw new Error("This sales order has active downstream sales transactions and cannot be edited or revised.");
       }

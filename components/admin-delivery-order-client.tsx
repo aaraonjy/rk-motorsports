@@ -577,7 +577,7 @@ function SearchableSelect({
   );
 }
 
-function CompactSelect({ options, value, onChange }: { options: SearchableSelectOption[]; value: string; onChange: (value: string) => void }) {
+function CompactSelect({ options, value, onChange, disabled = false }: { options: SearchableSelectOption[]; value: string; onChange: (value: string) => void; disabled?: boolean }) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const selectedOption = useMemo(() => options.find((item) => item.id === value) || null, [options, value]);
@@ -592,7 +592,7 @@ function CompactSelect({ options, value, onChange }: { options: SearchableSelect
 
   return (
     <div ref={containerRef} className="relative">
-      <button type="button" onClick={() => setIsOpen((prev) => !prev)} className="input-rk flex items-center justify-between gap-3 pr-20 text-left">
+      <button type="button" disabled={disabled} onClick={() => { if (!disabled) setIsOpen((prev) => !prev); }} className={`input-rk flex items-center justify-between gap-3 pr-20 text-left ${disabled ? "cursor-not-allowed opacity-60" : ""}`}>
         <span className={selectedOption ? "truncate text-white" : "truncate text-white/45"}>{selectedOption?.label || ""}</span>
         <span className="shrink-0 pr-5 text-white/60">▾</span>
       </button>
@@ -911,6 +911,12 @@ export function AdminDeliveryOrderClient({
   function isGeneratedFromSalesOrder(transaction: DeliveryOrderRecord) {
     return (transaction.targetLinks || []).some((link) => link.sourceTransaction?.docType === "SO" || String(link.sourceTransaction?.docNo || "").startsWith("SO-"));
   }
+
+  function isGeneratedLineFromSalesOrder(line: LineForm) {
+    return Boolean(line.sourceLineId || line.sourceTransactionId);
+  }
+
+  const hasGeneratedSalesOrderLines = lines.some((line) => isGeneratedLineFromSalesOrder(line));
 
 
   const deliveryAddressOptions = useMemo<SearchableSelectOption[]>(() => {
@@ -1704,6 +1710,11 @@ export function AdminDeliveryOrderClient({
               ))}
             </div>
 
+            {hasGeneratedSalesOrderLines ? (
+              <div className="mt-5 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+                This Delivery Order is generated from Sales Order. Product, qty, selling price, discount, and footer pricing are locked. Batch/S/N and location selection remain available for stock-out execution. To change claim or delivery values, cancel this DO and generate again from the Sales Order.
+              </div>
+            ) : null}
             {generateFromError ? <div className="mt-5 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">{generateFromError}</div> : null}
             {submitError ? <div className="mt-5 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{submitError}</div> : null}
             {submitSuccess ? <div className="mt-5 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">{submitSuccess}</div> : null}
@@ -1771,6 +1782,7 @@ export function AdminDeliveryOrderClient({
             {activeTab === "BODY" ? (
               <div className="mt-6 space-y-5">
                 {lines.map((line, index) => {
+                  const isGeneratedLine = isGeneratedLineFromSalesOrder(line);
                   const normalizedLine = normalizedLines[index];
                   const total = normalizedLine?.lineTotal || 0;
                   const taxAmount = 0;
@@ -1798,7 +1810,7 @@ export function AdminDeliveryOrderClient({
                     <div key={index} className="rounded-[1.75rem] border border-white/10 p-5">
                       <div className="mb-5 flex items-center justify-between gap-3">
                         <h3 className="text-lg font-semibold text-white">Product {index + 1}</h3>
-                        {lines.length > 1 ? <button type="button" onClick={() => setLines((prev) => prev.filter((_, i) => i !== index))} className="rounded-xl border border-red-500/30 px-3 py-2 text-sm text-red-200 hover:bg-red-500/10">Remove</button> : null}
+                        {lines.length > 1 && !isGeneratedLine ? <button type="button" onClick={() => setLines((prev) => prev.filter((_, i) => i !== index))} className="rounded-xl border border-red-500/30 px-3 py-2 text-sm text-red-200 hover:bg-red-500/10">Remove</button> : null}
                       </div>
                       <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
                         <div className="md:col-span-2">
@@ -1822,17 +1834,17 @@ export function AdminDeliveryOrderClient({
                         />
                         <div>
                           <label className="label-rk">Qty</label>
-                          <input className="input-rk" type="number" min="0" step={qtyInputStep} value={line.qty} onChange={(e) => updateLine(index, { qty: limitDecimalInputValue(e.target.value, qtyDecimalPlaces) })} onBlur={(e) => updateLine(index, { qty: normalizeDecimalInputValue(e.target.value, qtyDecimalPlaces) })} />
+                          <input className="input-rk" type="number" min="0" step={qtyInputStep} value={line.qty} disabled={isGeneratedLine} onChange={(e) => updateLine(index, { qty: limitDecimalInputValue(e.target.value, qtyDecimalPlaces) })} onBlur={(e) => updateLine(index, { qty: normalizeDecimalInputValue(e.target.value, qtyDecimalPlaces) })} />
                         </div>
                         <div>
                           <label className="label-rk">Selling Price</label>
-                          <input className="input-rk" type="number" min="0" step={priceInputStep} value={line.unitPrice} onChange={(e) => updateLine(index, { unitPrice: limitDecimalInputValue(e.target.value, priceDecimalPlaces) })} onBlur={(e) => updateLine(index, { unitPrice: normalizeDecimalInputValue(e.target.value, priceDecimalPlaces) })} />
+                          <input className="input-rk" type="number" min="0" step={priceInputStep} value={line.unitPrice} disabled={isGeneratedLine} onChange={(e) => updateLine(index, { unitPrice: limitDecimalInputValue(e.target.value, priceDecimalPlaces) })} onBlur={(e) => updateLine(index, { unitPrice: normalizeDecimalInputValue(e.target.value, priceDecimalPlaces) })} />
                         </div>
                         <div>
                           <label className="label-rk">Discount</label>
                           <div className="grid grid-cols-[minmax(0,1fr)_120px] gap-3">
-                            <input className="input-rk" type="number" min="0" step={priceInputStep} value={line.discountRate} onChange={(e) => updateLine(index, { discountRate: limitDecimalInputValue(e.target.value, priceDecimalPlaces) })} />
-                            <CompactSelect options={[{ id: "PERCENT", label: "%", searchText: "percent %" }, { id: "AMOUNT", label: "RM", searchText: "amount rm" }]} value={line.discountType} onChange={(value) => updateLine(index, { discountType: value === "AMOUNT" ? "AMOUNT" : "PERCENT" })} />
+                            <input className="input-rk" type="number" min="0" step={priceInputStep} value={line.discountRate} disabled={isGeneratedLine} onChange={(e) => updateLine(index, { discountRate: limitDecimalInputValue(e.target.value, priceDecimalPlaces) })} />
+                            <CompactSelect options={[{ id: "PERCENT", label: "%", searchText: "percent %" }, { id: "AMOUNT", label: "RM", searchText: "amount rm" }]} value={line.discountType} disabled={isGeneratedLine} onChange={(value) => updateLine(index, { discountType: value === "AMOUNT" ? "AMOUNT" : "PERCENT" })} />
                           </div>
                         </div>
                         <div className="md:col-span-2">
@@ -1954,7 +1966,9 @@ export function AdminDeliveryOrderClient({
                     </div>
                   );
                 })}
-                <button type="button" onClick={() => setLines((prev) => [...prev, emptyLine(defaultLocationId, qtyDecimalPlaces, priceDecimalPlaces)])} className="rounded-xl border border-white/15 px-4 py-3 text-sm text-white/75 transition hover:bg-white/10 hover:text-white">+ Add Product</button>
+                {!hasGeneratedSalesOrderLines ? (
+                  <button type="button" onClick={() => setLines((prev) => [...prev, emptyLine(defaultLocationId, qtyDecimalPlaces, priceDecimalPlaces)])} className="rounded-xl border border-white/15 px-4 py-3 text-sm text-white/75 transition hover:bg-white/10 hover:text-white">+ Add Product</button>
+                ) : null}
               </div>
             ) : null}
 
@@ -2008,6 +2022,11 @@ export function AdminDeliveryOrderClient({
               <p className="mt-3 text-sm text-white/60">Only Sales Orders with remaining delivery qty are shown.</p>
             </div>
 
+            {hasGeneratedSalesOrderLines ? (
+              <div className="mt-5 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+                This Delivery Order is generated from Sales Order. Product, qty, selling price, discount, and footer pricing are locked. Batch/S/N and location selection remain available for stock-out execution. To change claim or delivery values, cancel this DO and generate again from the Sales Order.
+              </div>
+            ) : null}
             {generateFromError ? <div className="mt-5 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">{generateFromError}</div> : null}
 
             <div className="mt-6">

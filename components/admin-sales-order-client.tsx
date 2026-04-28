@@ -166,6 +166,7 @@ type SalesOrderRecord = {
   grandTotal: string | number;
   revisedFrom?: { id: string; docNo?: string | null } | null;
   revisions?: Array<{ id: string; docNo?: string | null; status?: string | null }>;
+  targetLinks?: Array<{ sourceTransaction?: { id: string; docType?: string | null; docNo?: string | null; status?: string | null } | null }>;
   lines?: Array<{
     inventoryProductId?: string | null;
     productCode?: string | null;
@@ -843,6 +844,18 @@ export function AdminSalesOrderClient({
     return availableSourceQuotations.filter((quotation) => selected.has(quotation.id));
   }, [availableSourceQuotations, sourceQuotationIds]);
 
+  function isGeneratedFromQuotation(transaction: SalesOrderRecord | null) {
+    return Boolean(
+      transaction?.targetLinks?.some(
+        (link) => link.sourceTransaction?.docType === "QO" && link.sourceTransaction?.status !== "CANCELLED"
+      )
+    );
+  }
+
+  const isGeneratedFromQuotationDocument =
+    (formMode === "create" && sourceQuotationIds.length > 0) ||
+    (formMode !== "create" && isGeneratedFromQuotation(editTarget));
+
 
   function openDocNoModal() {
     setDocNoDraft(docNo);
@@ -1197,9 +1210,9 @@ export function AdminSalesOrderClient({
     setSourceQuotationId(selectedSourceQuotations.length === 1 ? first.id : "");
     setIsGenerateFromOpen(false);
     setGenerateFromError("");
-    setActiveTab("BODY");
+    setActiveTab("HEADER");
     setSubmitError("");
-    setSubmitSuccess(`Imported ${selectedSourceQuotations.length} quotation(s). Please review and save the Sales Order.`);
+    setSubmitSuccess(`Imported ${selectedSourceQuotations.length} quotation(s). Body and footer pricing are locked because this Sales Order is generated from Quotation.`);
   }
 
 
@@ -1576,17 +1589,27 @@ export function AdminSalesOrderClient({
             </div>
 
             <div className="mt-6 flex flex-wrap gap-2 border-b border-white/10 pb-4">
-              {(["HEADER", "BODY", "FOOTER"] as const).map((tab) => (
-                <button
-                  key={tab}
-                  type="button"
-                  onClick={() => setActiveTab(tab)}
-                  className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${activeTab === tab ? "bg-red-600 text-white" : "border border-white/10 text-white/65 hover:bg-white/10 hover:text-white"}`}
-                >
-                  {tab === "HEADER" ? "Header" : tab === "BODY" ? "Body" : "Footer"}
-                </button>
-              ))}
+              {(["HEADER", "BODY", "FOOTER"] as const).map((tab) => {
+                const isLockedTab = isGeneratedFromQuotationDocument && tab !== "HEADER";
+                return (
+                  <button
+                    key={tab}
+                    type="button"
+                    disabled={isLockedTab}
+                    onClick={() => { if (!isLockedTab) setActiveTab(tab); }}
+                    className={`rounded-xl px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-45 ${activeTab === tab ? "bg-red-600 text-white" : "border border-white/10 text-white/65 hover:bg-white/10 hover:text-white"}`}
+                  >
+                    {tab === "HEADER" ? "Header" : tab === "BODY" ? "Body" : "Footer"}
+                  </button>
+                );
+              })}
             </div>
+
+            {isGeneratedFromQuotationDocument ? (
+              <div className="mt-5 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+                This Sales Order is generated from Quotation. Body and footer pricing are locked. To change product, qty, price, discount, tax, or footer pricing details, cancel this SO and generate a new SO from the Quotation.
+              </div>
+            ) : null}
 
             {generateFromError ? (
               <div className="mt-5 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">

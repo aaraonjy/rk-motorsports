@@ -347,6 +347,7 @@ export async function GET(req: Request) {
         revisions: { select: { id: true, docNo: true, status: true } },
         targetLinks: {
           include: {
+            sourceTransaction: { select: { id: true, docType: true, docNo: true, status: true } },
             targetTransaction: { select: { id: true, docType: true, docNo: true, status: true } },
           },
         },
@@ -394,7 +395,44 @@ export async function POST(req: Request) {
     const customerId = normalizeText(body.customerId);
     if (!customerId) return NextResponse.json({ ok: false, error: "Customer is required." }, { status: 400 });
 
-    const rawLines = Array.isArray(body.lines) ? (body.lines as SalesOrderLinePayload[]) : [];
+    const sourceQuotationIdsForLines: string[] = Array.isArray(body.sourceQuotationIds)
+      ? body.sourceQuotationIds
+          .filter((value: unknown): value is string => typeof value === "string" && value.trim().length > 0)
+          .map((value: string) => value.trim())
+      : normalizeText(body.sourceQuotationId)
+        ? [normalizeText(body.sourceQuotationId) as string]
+        : [];
+    const uniqueSourceQuotationIdsForLines = Array.from(new Set<string>(sourceQuotationIdsForLines));
+
+    let rawLines = Array.isArray(body.lines) ? (body.lines as SalesOrderLinePayload[]) : [];
+
+    if (uniqueSourceQuotationIdsForLines.length > 0) {
+      const sourceQuotations = await db.salesTransaction.findMany({
+        where: { id: { in: uniqueSourceQuotationIdsForLines } },
+        include: { lines: { orderBy: { lineNo: "asc" } } },
+      });
+
+      if (sourceQuotations.length !== uniqueSourceQuotationIdsForLines.length) {
+        return NextResponse.json({ ok: false, error: "One or more selected quotations are invalid." }, { status: 400 });
+      }
+
+      rawLines = sourceQuotations.flatMap((quotation) =>
+        quotation.lines.map((line): SalesOrderLinePayload => ({
+          inventoryProductId: line.inventoryProductId,
+          productCode: line.productCode,
+          productDescription: line.productDescription,
+          uom: line.uom,
+          qty: Number(line.qty ?? 0),
+          unitPrice: Number(line.unitPrice ?? 0),
+          discountRate: Number(line.discountRate ?? 0),
+          discountType: line.discountType,
+          locationId: line.locationId,
+          taxCodeId: line.taxCodeId,
+          remarks: line.remarks,
+        }))
+      );
+    }
+
     if (rawLines.length === 0) return NextResponse.json({ ok: false, error: "Please add at least one product line." }, { status: 400 });
 
     const [customer, config, taxConfig, activeTaxCodes] = await Promise.all([
