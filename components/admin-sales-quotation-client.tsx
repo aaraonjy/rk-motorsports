@@ -551,7 +551,15 @@ function getBalanceDisplay(value: number | undefined, isLoading: boolean, decima
 }
 
 function hasActiveDownstreamTransaction(transaction: QuotationRecord) {
-  return (transaction.targetLinks || []).some((link) => link.targetTransaction && link.targetTransaction.status !== "CANCELLED");
+  const targetLinks = Array.isArray(transaction.targetLinks) ? transaction.targetLinks : [];
+  const hasActiveTargetLink = targetLinks.some((link: any) => {
+    const downstream = link?.targetTransaction || link?.sourceTransaction || null;
+    return downstream && downstream.status !== "CANCELLED";
+  });
+
+  // Fallback for existing generated quotations where downstream links may not be returned by the list API.
+  // In this flow, QO becomes CONFIRMED when it has been generated to Sales Order.
+  return hasActiveTargetLink || transaction.status === "CONFIRMED";
 }
 
 export function AdminSalesQuotationClient({
