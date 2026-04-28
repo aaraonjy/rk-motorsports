@@ -1780,7 +1780,12 @@ export function AdminDeliveryOrderClient({
             ) : null}
 
             {activeTab === "BODY" ? (
-              <div className="mt-6 space-y-5">
+              <div className={`mt-6 space-y-5 ${hasGeneratedSalesOrderLines ? "rounded-[1.75rem] border border-white/10 bg-white/[0.04] p-4 opacity-70 grayscale" : ""}`}>
+                {hasGeneratedSalesOrderLines ? (
+                  <div className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white/55">
+                    Read-only generated body section. This Delivery Order was generated from Sales Order, so product, qty, selling price, discount, and line pricing details are locked.
+                  </div>
+                ) : null}
                 {lines.map((line, index) => {
                   const isGeneratedLine = isGeneratedLineFromSalesOrder(line);
                   const normalizedLine = normalizedLines[index];
@@ -1973,7 +1978,12 @@ export function AdminDeliveryOrderClient({
             ) : null}
 
             {activeTab === "FOOTER" ? (
-              <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_360px]">
+              <div className={`mt-6 grid gap-6 lg:grid-cols-[1fr_360px] ${hasGeneratedSalesOrderLines ? "rounded-[1.75rem] border border-white/10 bg-white/[0.04] p-4 opacity-70 grayscale" : ""}`}>
+                {hasGeneratedSalesOrderLines ? (
+                  <div className="lg:col-span-2 rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white/55">
+                    Read-only generated footer section. This Delivery Order was generated from Sales Order, so footer pricing details are locked.
+                  </div>
+                ) : null}
                 <div className="space-y-5">
                   <div>
                     <label className="label-rk">Terms & Conditions</label>
