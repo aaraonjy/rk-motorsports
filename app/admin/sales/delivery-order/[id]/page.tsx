@@ -178,6 +178,7 @@ export default async function AdminDeliveryOrderDetailPage({ params }: Params) {
       lines: {
         orderBy: { createdAt: "asc" },
         include: {
+          inventoryProduct: { select: { id: true, isAssemblyItem: true } },
           serialEntries: {
             orderBy: { serialNo: "asc" },
             include: {
@@ -191,6 +192,7 @@ export default async function AdminDeliveryOrderDetailPage({ params }: Params) {
 
   const stockLines = stockIssue?.lines || [];
   const traceLookupKeys = stockLines
+    .filter((line) => Boolean(line.inventoryProduct?.isAssemblyItem))
     .map((line) => ({
       inventoryProductId: line.inventoryProductId,
       batchNo: line.batchNo,

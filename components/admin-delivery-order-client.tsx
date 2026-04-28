@@ -47,6 +47,7 @@ type ProductOption = {
   sellingPrice: number;
   batchTracking: boolean;
   serialNumberTracking: boolean;
+  isAssemblyItem: boolean;
   uomConversions?: Array<{ id?: string; uomCode: string; conversionRate: number }>;
 };
 
@@ -1042,7 +1043,8 @@ export function AdminDeliveryOrderClient({
 
   useEffect(() => {
     lines.forEach((line, index) => {
-      if (!line.inventoryProductId || !line.locationId || !line.batchNo) return;
+      const product = products.find((item) => item.id === line.inventoryProductId);
+      if (!line.inventoryProductId || !line.locationId || !line.batchNo || !product?.isAssemblyItem) return;
       if (assemblyTraces[index] !== undefined || loadingAssemblyTraces[index]) return;
 
       setLoadingAssemblyTraces((prev) => ({ ...prev, [index]: true }));
@@ -1149,6 +1151,7 @@ export function AdminDeliveryOrderClient({
           sellingPrice: Number(product.sellingPrice ?? 0),
           batchTracking: Boolean(product.batchTracking),
           serialNumberTracking: Boolean(product.serialNumberTracking),
+          isAssemblyItem: Boolean(product.isAssemblyItem),
           uomConversions: Array.isArray(product.uomConversions)
             ? product.uomConversions.map((item: any) => ({
                 id: item.id,
@@ -1822,7 +1825,7 @@ export function AdminDeliveryOrderClient({
                             {line.inventoryProductId && line.locationId && !loadingBatches[index] && (availableBatches[index] || []).length === 0 ? (
                               <p className="mt-2 text-xs text-amber-200">No available batch balance found for this product/location.</p>
                             ) : null}
-                            {line.batchNo ? (
+                            {line.batchNo && selectedProduct?.isAssemblyItem ? (
                               <div className="mt-3 rounded-2xl border border-sky-500/20 bg-sky-500/10 p-4 text-sm text-sky-100">
                                 <div className="flex flex-wrap items-center justify-between gap-2">
                                   <div className="font-semibold">Assembly Trace</div>
