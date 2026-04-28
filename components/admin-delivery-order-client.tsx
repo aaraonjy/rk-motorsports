@@ -1712,7 +1712,7 @@ export function AdminDeliveryOrderClient({
 
             {hasGeneratedSalesOrderLines ? (
               <div className="mt-5 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-                This Delivery Order is generated from Sales Order. Product, qty, selling price, discount, and footer pricing are locked. Batch/S/N and location selection remain available for stock-out execution. To change claim or delivery values, cancel this DO and generate again from the Sales Order.
+                This Delivery Order is generated from Sales Order. Product, qty, selling price, discount, batch/S/N, location, and footer pricing are locked. To change claim or delivery values, cancel this DO and generate again from the Sales Order.
               </div>
             ) : null}
             {generateFromError ? <div className="mt-5 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">{generateFromError}</div> : null}
@@ -1858,7 +1858,7 @@ export function AdminDeliveryOrderClient({
                             placeholder="Search or select location"
                             options={locationOptions}
                             value={line.locationId}
-                            disabled={isGeneratedLine && formMode !== "create"}
+                            disabled={isGeneratedLine}
                             onChange={(option) => {
                               updateLine(index, { locationId: option?.id || "", batchNo: "", serialNos: [], serialSearch: "" });
                               setAvailableBatches((prev) => { const next = { ...prev }; delete next[index]; return next; });
@@ -1890,7 +1890,7 @@ export function AdminDeliveryOrderClient({
                                 searchText: `${batch.batchNo} ${batch.expiryDate || ""}`.toLowerCase(),
                               }))}
                               value={line.batchNo}
-                              disabled={!line.inventoryProductId || !line.locationId || Boolean(loadingBatches[index]) || (isGeneratedLine && formMode !== "create")}
+                              disabled={!line.inventoryProductId || !line.locationId || Boolean(loadingBatches[index]) || isGeneratedLine}
                               onChange={(option) => {
                                 updateLine(index, { batchNo: option?.id || "", serialNos: [], serialSearch: "" });
                                 setAvailableSerials((prev) => { const next = { ...prev }; delete next[index]; return next; });
@@ -1945,7 +1945,7 @@ export function AdminDeliveryOrderClient({
                                 const exists = line.serialNos.some((item) => item.toUpperCase() === serialNo.toUpperCase());
                                 updateLine(index, { serialNos: exists ? line.serialNos.filter((item) => item.toUpperCase() !== serialNo.toUpperCase()) : uniqueSerialNos([...line.serialNos, serialNo]) });
                               }}
-                              disabled={!line.inventoryProductId || !line.locationId || (selectedProduct.batchTracking && !line.batchNo) || Boolean(loadingSerials[index]) || (isGeneratedLine && formMode !== "create")}
+                              disabled={!line.inventoryProductId || !line.locationId || (selectedProduct.batchTracking && !line.batchNo) || Boolean(loadingSerials[index]) || isGeneratedLine}
                             />
                             {line.inventoryProductId && line.locationId && (!selectedProduct.batchTracking || line.batchNo) && !loadingSerials[index] && (availableSerials[index] || []).length === 0 ? (
                               <p className="mt-2 text-xs text-amber-200">No available S/N found for this product/location{selectedProduct.batchTracking ? " and batch" : ""}.</p>
@@ -2035,7 +2035,7 @@ export function AdminDeliveryOrderClient({
 
             {hasGeneratedSalesOrderLines ? (
               <div className="mt-5 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-                This Delivery Order is generated from Sales Order. Product, qty, selling price, discount, and footer pricing are locked. Batch/S/N and location selection remain available for stock-out execution. To change claim or delivery values, cancel this DO and generate again from the Sales Order.
+                This Delivery Order is generated from Sales Order. Product, qty, selling price, discount, batch/S/N, location, and footer pricing are locked. To change claim or delivery values, cancel this DO and generate again from the Sales Order.
               </div>
             ) : null}
             {generateFromError ? <div className="mt-5 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">{generateFromError}</div> : null}
