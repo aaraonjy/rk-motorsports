@@ -707,6 +707,9 @@ export async function GET(req: Request) {
         sourceLinks: row.targetLinks.map((link) => ({
           sourceTransaction: link.sourceTransaction,
         })),
+        downstreamLinks: row.sourceLinks.map((link) => ({
+          targetTransaction: link.targetTransaction,
+        })),
       };
     });
 

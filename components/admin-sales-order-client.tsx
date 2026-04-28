@@ -166,7 +166,10 @@ type SalesOrderRecord = {
   grandTotal: string | number;
   revisedFrom?: { id: string; docNo?: string | null } | null;
   revisions?: Array<{ id: string; docNo?: string | null; status?: string | null }>;
-  targetLinks?: Array<{ sourceTransaction?: { id: string; docType?: string | null; docNo?: string | null; status?: string | null } | null }>;
+  targetLinks?: Array<{
+    sourceTransaction?: { id: string; docType?: string | null; docNo?: string | null; status?: string | null } | null;
+    targetTransaction?: { id: string; docType?: string | null; docNo?: string | null; status?: string | null } | null;
+  }>;
   lines?: Array<{
     inventoryProductId?: string | null;
     productCode?: string | null;
@@ -609,6 +612,10 @@ function getBalanceDisplay(value: number | undefined, isLoading: boolean, decima
   return `Current Balance: ${moneyWithPlaces(value, decimalPlaces)}`;
 }
 
+
+function hasActiveDownstreamTransaction(transaction: SalesOrderRecord) {
+  return (transaction.targetLinks || []).some((link) => link.targetTransaction && link.targetTransaction.status !== "CANCELLED");
+}
 
 export function AdminSalesOrderClient({
   initialQuotations,
@@ -1548,9 +1555,15 @@ export function AdminSalesOrderClient({
                           <button type="button" onClick={(event) => { event.stopPropagation(); openRevise(item); }} className="rounded-xl border border-sky-500/30 px-3 py-2 text-xs text-sky-200 transition hover:bg-sky-500/10">
                             Edit Revise
                           </button>
-                          <button type="button" onClick={(event) => { event.stopPropagation(); setCancelTarget(item); }} className="rounded-xl border border-red-500/30 px-3 py-2 text-xs text-red-200 transition hover:bg-red-500/10">
-                            Cancel
-                          </button>
+                          {!hasActiveDownstreamTransaction(item) ? (
+                            <button type="button" onClick={(event) => { event.stopPropagation(); setCancelTarget(item); }} className="rounded-xl border border-red-500/30 px-3 py-2 text-xs text-red-200 transition hover:bg-red-500/10">
+                              Cancel
+                            </button>
+                          ) : (
+                            <span className="rounded-xl border border-white/10 px-3 py-2 text-xs text-white/35" title="Cancel the active downstream document first.">
+                              Locked
+                            </span>
+                          )}
                         </div>
                       ) : (
                         <span className="text-xs text-white/35">Cancelled</span>

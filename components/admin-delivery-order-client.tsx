@@ -146,6 +146,7 @@ type DeliveryOrderRecord = {
   revisedFrom?: { id: string; docNo?: string | null } | null;
   revisions?: Array<{ id: string; docNo?: string | null; status?: string | null }>;
   targetLinks?: Array<{ sourceTransaction?: { id: string; docType?: string | null; docNo?: string | null; status?: string | null } | null }>;
+  downstreamLinks?: Array<{ targetTransaction?: { id: string; docType?: string | null; docNo?: string | null; status?: string | null } | null }>;
   lines?: Array<{
     inventoryProductId?: string | null;
     productCode?: string | null;
@@ -731,6 +732,13 @@ function SummaryRow({ label, value, strong = false }: { label: string; value: st
       <span className={strong ? "text-white" : "text-white"}>{value}</span>
     </div>
   );
+}
+
+function hasActiveInvoiceTransaction(transaction: DeliveryOrderRecord) {
+  return (transaction.downstreamLinks || []).some((link) => {
+    const target = link.targetTransaction;
+    return target && ["INV", "CS"].includes(String(target.docType || "")) && target.status !== "CANCELLED";
+  });
 }
 
 export function AdminDeliveryOrderClient({
@@ -1669,9 +1677,15 @@ export function AdminDeliveryOrderClient({
                               </button>
                             </>
                           ) : null}
-                          <button type="button" onClick={(event) => { event.stopPropagation(); setCancelTarget(item); }} className="rounded-xl border border-red-500/30 px-3 py-2 text-xs text-red-200 transition hover:bg-red-500/10">
-                            Cancel
-                          </button>
+                          {!hasActiveInvoiceTransaction(item) ? (
+                            <button type="button" onClick={(event) => { event.stopPropagation(); setCancelTarget(item); }} className="rounded-xl border border-red-500/30 px-3 py-2 text-xs text-red-200 transition hover:bg-red-500/10">
+                              Cancel
+                            </button>
+                          ) : (
+                            <span className="rounded-xl border border-white/10 px-3 py-2 text-xs text-white/35" title="Cancel the active invoice first.">
+                              Locked
+                            </span>
+                          )}
                         </div>
                       ) : (
                         <span className="text-xs text-white/35">Cancelled</span>

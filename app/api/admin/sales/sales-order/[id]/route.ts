@@ -566,6 +566,24 @@ export async function PATCH(req: Request, { params }: Params) {
         return NextResponse.json({ ok: false, error: "Sales Order is already cancelled." }, { status: 400 });
       }
 
+      const activeDownstream = await db.salesTransactionLink.findFirst({
+        where: {
+          sourceTransactionId: id,
+          targetTransaction: { status: { not: "CANCELLED" } },
+        },
+        select: { targetTransaction: { select: { docNo: true, docType: true } } },
+      });
+
+      if (activeDownstream?.targetTransaction) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: `Cannot cancel this Sales Order because it has an active downstream ${activeDownstream.targetTransaction.docType} (${activeDownstream.targetTransaction.docNo}). Please cancel the downstream document first.`,
+          },
+          { status: 400 }
+        );
+      }
+
       const updated = await db.$transaction(async (tx) => {
         const cancelled = await tx.salesTransaction.update({
           where: { id },
