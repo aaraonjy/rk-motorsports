@@ -959,6 +959,30 @@ export function AdminSalesInvoiceClient({
   );
 
 
+  const availableSourceOrders = useMemo(() => {
+    return initialSalesOrders.filter((order) => {
+      if (!customerId) return false;
+      if (order.customerId !== customerId) return false;
+      if (order.status === "CANCELLED" || order.status === "COMPLETED") return false;
+      return (order.lines || []).some((line) => {
+        const itemType = line.itemType === "SERVICE_ITEM" || line.itemType === "NON_STOCK_ITEM" ? line.itemType : "STOCK_ITEM";
+        return itemType === "SERVICE_ITEM" ? Number(line.remainingInvoiceAmount || 0) > 0 : Number(line.remainingInvoiceQty || 0) > 0;
+      });
+    });
+  }, [customerId, initialSalesOrders]);
+
+  const filteredSourceOrders = useMemo(() => {
+    const keyword = sourceSearch.trim().toLowerCase();
+    if (!keyword) return availableSourceOrders;
+    return availableSourceOrders.filter((order) => `${order.docNo} ${order.customerName} ${order.customerAccountNo || ""}`.toLowerCase().includes(keyword));
+  }, [availableSourceOrders, sourceSearch]);
+
+  const selectedSourceOrders = useMemo(() => {
+    const selected = new Set(selectedSourceOrderIds);
+    return availableSourceOrders.filter((order) => selected.has(order.id));
+  }, [availableSourceOrders, selectedSourceOrderIds]);
+
+
   function isGeneratedFromSalesOrder(transaction: SalesInvoiceRecord) {
     return (transaction.targetLinks || []).some((link) =>
       ["SO", "DO"].includes(String(link.sourceTransaction?.docType || "")) ||
@@ -1283,7 +1307,7 @@ export function AdminSalesInvoiceClient({
   function openEdit(transaction: SalesInvoiceRecord) {
     if (isGeneratedFromSalesOrder(transaction)) {
       setSubmitMessageType("success");
-    setRecentCancelledTransaction(null);
+      setRecentCancelledTransaction(null);
       setSubmitSuccess("");
       alert("Sales Invoice generated from source document cannot be edited. Please cancel this Sales Invoice and generate a new Sales Invoice from the original source document.");
       return;
@@ -1294,7 +1318,7 @@ export function AdminSalesInvoiceClient({
   function openRevise(transaction: SalesInvoiceRecord) {
     if (isGeneratedFromSalesOrder(transaction)) {
       setSubmitMessageType("success");
-    setRecentCancelledTransaction(null);
+      setRecentCancelledTransaction(null);
       setSubmitSuccess("");
       alert("Sales Invoice generated from source document cannot be revised. Please cancel this Sales Invoice and generate a new Sales Invoice from the original source document.");
       return;
@@ -1579,7 +1603,7 @@ export function AdminSalesInvoiceClient({
       setIsCreateOpen(false);
       resetForm();
       setSubmitMessageType("success");
-    setRecentCancelledTransaction(null);
+      setRecentCancelledTransaction(null);
       setSubmitSuccess(successMessage);
       setBalances({});
       setLoadingBalances({});
