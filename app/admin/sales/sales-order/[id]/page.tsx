@@ -17,7 +17,7 @@ function toNumber(value: unknown) {
 
 function getLinkedQty(
   line: {
-    sourceLineLinks?: Array<{ linkType?: string | null; qty?: unknown; targetTransaction?: { status?: string | null } | null }>;
+    sourceLineLinks?: Array<{ linkType?: string | null; qty?: unknown; claimAmount?: unknown; targetTransaction?: { status?: string | null } | null }>;
   },
   linkType: "DELIVERED_TO" | "INVOICED_TO"
 ) {
@@ -27,6 +27,19 @@ function getLinkedQty(
     .reduce((sum, link) => sum + toNumber(link.qty), 0);
 }
 
+
+
+function getLinkedAmount(
+  line: {
+    sourceLineLinks?: Array<{ linkType?: string | null; claimAmount?: unknown; targetTransaction?: { status?: string | null } | null }>;
+  },
+  linkType: "DELIVERED_TO" | "INVOICED_TO"
+) {
+  return (line.sourceLineLinks || [])
+    .filter((link) => link.linkType === linkType)
+    .filter((link) => link.targetTransaction?.status !== "CANCELLED")
+    .reduce((sum, link) => sum + toNumber(link.claimAmount), 0);
+}
 
 function formatDate(value: Date | string | null | undefined) {
   if (!value) return "-";
@@ -344,7 +357,11 @@ export default async function AdminSalesOrderDetailPage({ params, searchParams }
                   {transaction.lines.length === 0 ? (
                     <tr><td colSpan={12} className="px-4 py-8 text-center text-white/50">No product line found.</td></tr>
                   ) : (
-                    transaction.lines.map((line) => (
+                    transaction.lines.map((line) => {
+                      const isServiceItem = line.inventoryProduct?.itemType === "SERVICE_ITEM";
+                      const deliveredAmount = getLinkedAmount(line, "DELIVERED_TO");
+                      const invoicedAmount = getLinkedAmount(line, "INVOICED_TO");
+                      return (
                       <tr key={line.id}>
                         <td className="px-4 py-4">
                           <div className="font-semibold text-white">{line.productCode}</div>
@@ -353,10 +370,10 @@ export default async function AdminSalesOrderDetailPage({ params, searchParams }
                         </td>
                         <td className="px-4 py-4">{line.uom}</td>
                         <td className="px-4 py-4 text-right">{money(line.qty)}</td>
-                        <td className="px-4 py-4 text-right">{money(getLinkedQty(line, "DELIVERED_TO"))}</td>
-                        <td className="px-4 py-4 text-right">{money(Math.max(0, toNumber(line.qty) - getLinkedQty(line, "DELIVERED_TO")))}</td>
-                        <td className="px-4 py-4 text-right">{money(getLinkedQty(line, "INVOICED_TO"))}</td>
-                        <td className="px-4 py-4 text-right">{money(Math.max(0, toNumber(line.qty) - getLinkedQty(line, "INVOICED_TO")))}</td>
+                        <td className="px-4 py-4 text-right">{isServiceItem ? money(deliveredAmount) : money(getLinkedQty(line, "DELIVERED_TO"))}</td>
+                        <td className="px-4 py-4 text-right">{isServiceItem ? money(Math.max(0, toNumber(line.lineTotal) - deliveredAmount)) : money(Math.max(0, toNumber(line.qty) - getLinkedQty(line, "DELIVERED_TO")))}</td>
+                        <td className="px-4 py-4 text-right">{isServiceItem ? money(invoicedAmount) : money(getLinkedQty(line, "INVOICED_TO"))}</td>
+                        <td className="px-4 py-4 text-right">{isServiceItem ? money(Math.max(0, toNumber(line.lineTotal) - invoicedAmount)) : money(Math.max(0, toNumber(line.qty) - getLinkedQty(line, "INVOICED_TO")))}</td>
                         <td className="px-4 py-4 text-right">{money(line.unitPrice)}</td>
                         <td className="px-4 py-4 text-right">
                           {line.discountType === "AMOUNT" ? `${currency} ${money(line.discountAmount)}` : `${money(line.discountRate)}%`}
@@ -365,7 +382,8 @@ export default async function AdminSalesOrderDetailPage({ params, searchParams }
                         <td className="px-4 py-4">{line.taxCode || "-"}</td>
                         <td className="px-4 py-4 text-right">{money(line.lineTotal)}</td>
                       </tr>
-                    ))
+                      );
+                    })
                   )}
                 </tbody>
               </table>

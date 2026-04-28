@@ -74,7 +74,7 @@ export async function GET(req: Request) {
     const products = await db.inventoryProduct.findMany({
       where: {
         ...(activeOnly ? { isActive: true } : {}),
-        ...(trackInventoryOnly ? { trackInventory: true } : {}),
+        ...(trackInventoryOnly ? { OR: [{ trackInventory: true }, { itemType: "SERVICE_ITEM" }] } : {}),
       },
       orderBy: [{ code: "asc" }],
       include: {

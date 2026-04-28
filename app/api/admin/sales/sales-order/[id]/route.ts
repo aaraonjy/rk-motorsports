@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
+import { Prisma, SalesTransactionStatus } from "@prisma/client";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { createAuditLogFromRequest } from "@/lib/audit";
@@ -148,7 +148,7 @@ function toNumber(value: Prisma.Decimal | number | string | null | undefined) {
 
 function sumLinkedQty(
   line: {
-    sourceLineLinks?: Array<{ linkType?: string | null; qty?: Prisma.Decimal | number | string | null; targetTransaction?: { status?: string | null } | null }>;
+    sourceLineLinks?: Array<{ linkType?: string | null; qty?: Prisma.Decimal | number | string | null; claimAmount?: Prisma.Decimal | number | string | null; targetTransaction?: { status?: string | null } | null }>;
   },
   linkType: "DELIVERED_TO" | "INVOICED_TO"
 ) {
@@ -159,121 +159,65 @@ function sumLinkedQty(
 }
 
 function withSalesOrderLineProgress(line: any) {
+  const itemType = line.inventoryProduct?.itemType || line.itemType || "STOCK_ITEM";
   const orderedQty = toNumber(line.qty);
   const deliveredQty = sumLinkedQty(line, "DELIVERED_TO");
   const invoicedQty = sumLinkedQty(line, "INVOICED_TO");
+  const orderedAmount = toNumber(line.lineTotal);
+  const deliveredAmount = sumLinkedAmount(line, "DELIVERED_TO");
+  const invoicedAmount = sumLinkedAmount(line, "INVOICED_TO");
 
   return {
     ...line,
+    itemType,
     orderedQty,
     deliveredQty,
     invoicedQty,
+    orderedAmount,
+    deliveredAmount,
+    invoicedAmount,
     remainingDeliveryQty: Math.max(0, orderedQty - deliveredQty),
     remainingInvoiceQty: Math.max(0, orderedQty - invoicedQty),
+    remainingDeliveryAmount: Math.max(0, orderedAmount - deliveredAmount),
+    remainingInvoiceAmount: Math.max(0, orderedAmount - invoicedAmount),
   };
 }
 
-function getSalesOrderProgressStatus(lines: Array<{ orderedQty: number; deliveredQty: number; invoicedQty: number }>) {
-  if (lines.length === 0) return "OPEN";
 
-  const hasAnyProgress = lines.some((line) => line.deliveredQty > 0 || line.invoicedQty > 0);
-  const isFullyDelivered = lines.every((line) => line.deliveredQty >= line.orderedQty);
-  const isFullyInvoiced = lines.every((line) => line.invoicedQty >= line.orderedQty);
-
-  if (isFullyDelivered || isFullyInvoiced) return "COMPLETED";
-  if (hasAnyProgress) return "PARTIAL";
-  return "OPEN";
-}
-
-
-function taxSnapshot(taxCode: TaxCodeSnapshot | null) {
-  if (!taxCode) {
-    return {
-      taxCodeId: null,
-      taxCode: null,
-      taxDescription: null,
-      taxDisplayLabel: null,
-      taxRate: new Prisma.Decimal(0),
-      taxCalculationMethod: null,
-    };
-  }
-
-  return {
-    taxCodeId: taxCode.id,
-    taxCode: taxCode.code,
-    taxDescription: taxCode.description,
-    taxDisplayLabel: taxCode.displayLabel || null,
-    taxRate: decimal(toNumber(taxCode.rate), 0),
-    taxCalculationMethod: taxCode.calculationMethod,
-  };
-}
-
-function calculateLine(
-  line: SalesOrderLinePayload,
-  lineNo: number,
-  productMap: Map<string, any>,
-  locationMap: Map<string, { id: string; code: string; name: string }>,
-  taxCodeMap: Map<string, TaxCodeSnapshot>,
-  options: {
-    taxModuleEnabled: boolean;
-    taxCalculationMode: TaxCalculationModeValue;
-    numberFormat: { qtyDecimalPlaces: number; priceDecimalPlaces: number };
-  }
+function sumLinkedAmount(
+  line: {
+    sourceLineLinks?: Array<{ linkType?: string | null; claimAmount?: Prisma.Decimal | number | string | null; targetTransaction?: { status?: string | null } | null }>;
+  },
+  linkType: "DELIVERED_TO" | "INVOICED_TO"
 ) {
-  const inventoryProductId = typeof line.inventoryProductId === "string" && line.inventoryProductId.trim() ? line.inventoryProductId.trim() : null;
-  const product = inventoryProductId ? productMap.get(inventoryProductId) : null;
-  const locationId = typeof line.locationId === "string" && line.locationId.trim() ? line.locationId.trim() : null;
-  const location = locationId ? locationMap.get(locationId) || null : null;
+  return (line.sourceLineLinks || [])
+    .filter((link) => link.linkType === linkType)
+    .filter((link) => link.targetTransaction?.status !== "CANCELLED")
+    .reduce((sum, link) => sum + toNumber(link.claimAmount), 0);
+}
 
-  const productCode = normalizeText(line.productCode) || product?.code || "";
-  const productDescription = normalizeText(line.productDescription) || product?.description || "";
-  const uom = (normalizeText(line.uom) || product?.baseUom || "UNIT").toUpperCase();
+function getSalesOrderProgressStatus(lines: Array<{ itemType?: string; orderedQty: number; deliveredQty: number; invoicedQty: number; orderedAmount?: number; deliveredAmount?: number; invoicedAmount?: number }>) {
+  if (lines.length === 0) return "OPEN" as SalesTransactionStatus;
 
-  if (!productCode || !productDescription) throw new Error(`Product line ${lineNo} is missing product information.`);
+  const hasAnyProgress = lines.some((line) =>
+    line.itemType === "SERVICE_ITEM"
+      ? Number(line.deliveredAmount || 0) > 0 || Number(line.invoicedAmount || 0) > 0
+      : line.deliveredQty > 0 || line.invoicedQty > 0
+  );
+  const isFullyDelivered = lines.every((line) =>
+    line.itemType === "SERVICE_ITEM"
+      ? Number(line.deliveredAmount || 0) >= Number(line.orderedAmount || 0)
+      : line.deliveredQty >= line.orderedQty
+  );
+  const isFullyInvoiced = lines.every((line) =>
+    line.itemType === "SERVICE_ITEM"
+      ? Number(line.invoicedAmount || 0) >= Number(line.orderedAmount || 0)
+      : line.invoicedQty >= line.orderedQty
+  );
 
-  const qty = qtyDecimalWithPlaces(line.qty, options.numberFormat.qtyDecimalPlaces);
-  const unitPrice = decimalWithPlaces(line.unitPrice, options.numberFormat.priceDecimalPlaces, product ? Number(product.sellingPrice ?? 0) : 0);
-  const rawDiscountValue = decimal(line.discountRate, 0);
-  const discountType = String(line.discountType || "PERCENT").toUpperCase() === "AMOUNT" ? "AMOUNT" : "PERCENT";
-  const discountRate = discountType === "PERCENT" ? rawDiscountValue : new Prisma.Decimal(0);
-  const lineSubtotal = qty.mul(unitPrice).toDecimalPlaces(2);
-  const discountAmount = discountType === "AMOUNT"
-    ? Prisma.Decimal.min(rawDiscountValue, lineSubtotal).toDecimalPlaces(2)
-    : lineSubtotal.mul(rawDiscountValue).div(100).toDecimalPlaces(2);
-  const taxableAmount = lineSubtotal.minus(discountAmount).toDecimalPlaces(2);
-
-  const lineTaxCode =
-    options.taxModuleEnabled && options.taxCalculationMode === "LINE_ITEM"
-      ? taxCodeMap.get(normalizeTaxCodeId(line.taxCodeId) || "") || null
-      : null;
-
-  const lineTaxBreakdown = calculateLineItemTaxBreakdown({
-    lineTotal: Number(taxableAmount),
-    taxRate: lineTaxCode ? toNumber(lineTaxCode.rate) : null,
-    calculationMethod: lineTaxCode?.calculationMethod ?? null,
-    taxEnabled: Boolean(lineTaxCode),
-  });
-
-  return {
-    lineNo,
-    inventoryProductId,
-    productCode,
-    productDescription,
-    uom,
-    qty,
-    unitPrice,
-    discountRate,
-    discountType,
-    discountAmount,
-    locationId: location?.id || null,
-    locationCode: location?.code || null,
-    locationName: location?.name || null,
-    ...taxSnapshot(lineTaxCode),
-    taxAmount: decimal(lineTaxBreakdown.taxAmount, 0),
-    lineSubtotal,
-    lineTotal: decimal(lineTaxBreakdown.lineGrandTotalAfterTax, Number(taxableAmount)),
-    remarks: normalizeText(line.remarks),
-  };
+  if (isFullyDelivered || isFullyInvoiced) return "COMPLETED" as SalesTransactionStatus;
+  if (hasAnyProgress) return "PARTIAL" as SalesTransactionStatus;
+  return "OPEN" as SalesTransactionStatus;
 }
 
 async function hasActiveDownstreamTransaction(tx: Prisma.TransactionClient, transactionId: string) {
@@ -470,6 +414,7 @@ export async function GET(_req: Request, { params }: Params) {
         lines: {
           orderBy: { lineNo: "asc" },
           include: {
+            inventoryProduct: { select: { itemType: true } },
             sourceLineLinks: {
               include: {
                 targetTransaction: { select: { id: true, docType: true, docNo: true, status: true } },

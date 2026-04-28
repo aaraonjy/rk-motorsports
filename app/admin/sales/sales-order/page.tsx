@@ -46,8 +46,10 @@ export default async function AdminSalesOrderPage() {
         description: true,
         baseUom: true,
         sellingPrice: true,
+        itemType: true,
         batchTracking: true,
         serialNumberTracking: true,
+        isAssemblyItem: true,
         uomConversions: {
           select: { id: true, uomCode: true, conversionRate: true },
           orderBy: [{ uomCode: "asc" }],
@@ -163,8 +165,10 @@ export default async function AdminSalesOrderPage() {
             description: product.description,
             baseUom: product.baseUom,
             sellingPrice: Number(product.sellingPrice ?? 0),
+            itemType: product.itemType,
             batchTracking: Boolean(product.batchTracking),
             serialNumberTracking: Boolean(product.serialNumberTracking),
+            isAssemblyItem: Boolean(product.isAssemblyItem),
             uomConversions: product.uomConversions.map((item) => ({
               id: item.id,
               uomCode: item.uomCode,

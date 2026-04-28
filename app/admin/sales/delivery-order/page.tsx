@@ -10,7 +10,7 @@ function toNumber(value: unknown) {
 
 function sumLinkedQty(
   line: {
-    sourceLineLinks?: Array<{ linkType?: string | null; qty?: unknown; targetTransaction?: { status?: string | null } | null }>;
+    sourceLineLinks?: Array<{ linkType?: string | null; qty?: unknown; claimAmount?: unknown; targetTransaction?: { status?: string | null } | null }>;
   },
   linkType: "DELIVERED_TO" | "INVOICED_TO"
 ) {
@@ -18,6 +18,19 @@ function sumLinkedQty(
     .filter((link) => link.linkType === linkType)
     .filter((link) => link.targetTransaction?.status !== "CANCELLED")
     .reduce((sum, link) => sum + toNumber(link.qty), 0);
+}
+
+
+function sumLinkedAmount(
+  line: {
+    sourceLineLinks?: Array<{ linkType?: string | null; claimAmount?: unknown; targetTransaction?: { status?: string | null } | null }>;
+  },
+  linkType: "DELIVERED_TO" | "INVOICED_TO"
+) {
+  return (line.sourceLineLinks || [])
+    .filter((link) => link.linkType === linkType)
+    .filter((link) => link.targetTransaction?.status !== "CANCELLED")
+    .reduce((sum, link) => sum + toNumber(link.claimAmount), 0);
 }
 
 export default async function AdminDeliveryOrderPage() {
@@ -69,7 +82,7 @@ export default async function AdminDeliveryOrderPage() {
       },
     }),
     db.inventoryProduct.findMany({
-      where: { isActive: true, trackInventory: true },
+      where: { isActive: true, OR: [{ trackInventory: true }, { itemType: "SERVICE_ITEM" }] },
       orderBy: [{ code: "asc" }],
       select: {
         id: true,
@@ -77,6 +90,7 @@ export default async function AdminDeliveryOrderPage() {
         description: true,
         baseUom: true,
         sellingPrice: true,
+        itemType: true,
         batchTracking: true,
         serialNumberTracking: true,
         isAssemblyItem: true,
@@ -98,6 +112,7 @@ export default async function AdminDeliveryOrderPage() {
         lines: {
           orderBy: { lineNo: "asc" },
           include: {
+            inventoryProduct: { select: { itemType: true } },
             sourceLineLinks: {
               include: {
                 targetTransaction: { select: { id: true, status: true } },
@@ -150,17 +165,25 @@ export default async function AdminDeliveryOrderPage() {
             status: order.status,
             grandTotal: Number(order.grandTotal ?? 0),
             lines: order.lines.map((line) => {
+              const itemType = line.inventoryProduct?.itemType || "STOCK_ITEM";
               const deliveredQty = sumLinkedQty(line, "DELIVERED_TO");
               const remainingDeliveryQty = Math.max(0, toNumber(line.qty) - deliveredQty);
+              const orderedAmount = toNumber(line.lineTotal);
+              const deliveredAmount = sumLinkedAmount(line, "DELIVERED_TO");
+              const remainingDeliveryAmount = Math.max(0, orderedAmount - deliveredAmount);
               return {
                 id: line.id,
                 inventoryProductId: line.inventoryProductId,
                 productCode: line.productCode,
                 productDescription: line.productDescription,
+                itemType,
                 uom: line.uom,
                 qty: Number(line.qty ?? 0),
                 deliveredQty,
                 remainingDeliveryQty,
+                orderedAmount,
+                deliveredAmount,
+                remainingDeliveryAmount,
                 unitPrice: Number(line.unitPrice ?? 0),
                 discountRate: Number(line.discountRate ?? 0),
                 discountType: line.discountType,
@@ -176,6 +199,7 @@ export default async function AdminDeliveryOrderPage() {
             description: product.description,
             baseUom: product.baseUom,
             sellingPrice: Number(product.sellingPrice ?? 0),
+            itemType: product.itemType,
             batchTracking: Boolean(product.batchTracking),
             serialNumberTracking: Boolean(product.serialNumberTracking),
             isAssemblyItem: Boolean(product.isAssemblyItem),

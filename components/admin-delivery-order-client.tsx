@@ -45,6 +45,7 @@ type ProductOption = {
   description: string;
   baseUom: string;
   sellingPrice: number;
+  itemType: "STOCK_ITEM" | "SERVICE_ITEM" | "NON_STOCK_ITEM";
   batchTracking: boolean;
   serialNumberTracking: boolean;
   isAssemblyItem: boolean;
@@ -97,10 +98,14 @@ type SourceSalesOrderRecord = {
     inventoryProductId?: string | null;
     productCode?: string | null;
     productDescription?: string | null;
+    itemType?: "STOCK_ITEM" | "SERVICE_ITEM" | "NON_STOCK_ITEM" | null;
     uom?: string | null;
     qty?: string | number | null;
     deliveredQty?: string | number | null;
     remainingDeliveryQty?: string | number | null;
+    orderedAmount?: string | number | null;
+    deliveredAmount?: string | number | null;
+    remainingDeliveryAmount?: string | number | null;
     unitPrice?: string | number | null;
     discountRate?: string | number | null;
     discountType?: string | null;
@@ -145,6 +150,7 @@ type DeliveryOrderRecord = {
     inventoryProductId?: string | null;
     productCode?: string | null;
     productDescription?: string | null;
+    itemType?: "STOCK_ITEM" | "SERVICE_ITEM" | "NON_STOCK_ITEM" | null;
     uom?: string | null;
     qty?: string | number | null;
     unitPrice?: string | number | null;
@@ -181,8 +187,10 @@ type LineForm = {
   inventoryProductId: string;
   productCode: string;
   productDescription: string;
+  itemType: "STOCK_ITEM" | "SERVICE_ITEM" | "NON_STOCK_ITEM";
   uom: string;
   qty: string;
+  claimAmount: string;
   unitPrice: string;
   discountRate: string;
   discountType: "PERCENT" | "AMOUNT";
@@ -201,16 +209,21 @@ type PickLine = {
   inventoryProductId: string;
   productCode: string;
   productDescription: string;
+  itemType: "STOCK_ITEM" | "SERVICE_ITEM" | "NON_STOCK_ITEM";
   uom: string;
   orderedQty: number;
   deliveredQty: number;
   remainingDeliveryQty: number;
+  orderedAmount: number;
+  deliveredAmount: number;
+  remainingDeliveryAmount: number;
   unitPrice: number;
   discountRate: number;
   discountType: "PERCENT" | "AMOUNT";
   locationId: string;
   remarks: string;
   deliverQty: string;
+  deliverAmount: string;
 };
 
 type SearchableSelectOption = { id: string; label: string; searchText: string };
@@ -461,8 +474,10 @@ function emptyLine(defaultLocationId = "", qtyDecimalPlaces = 2, priceDecimalPla
     inventoryProductId: "",
     productCode: "",
     productDescription: "",
+    itemType: "STOCK_ITEM",
     uom: "",
     qty: formatDecimalInput(1, qtyDecimalPlaces),
+    claimAmount: formatDecimalInput(0, priceDecimalPlaces),
     unitPrice: formatDecimalInput(0, priceDecimalPlaces),
     discountRate: "0",
     discountType: "PERCENT",
@@ -1067,6 +1082,7 @@ export function AdminDeliveryOrderClient({
     lines.forEach((line) => {
       if (!line.inventoryProductId || !line.locationId) return;
       const product = products.find((item) => item.id === line.inventoryProductId);
+      if (product?.itemType === "SERVICE_ITEM") return;
       const batchNo = product?.batchTracking ? line.batchNo : "";
       if (product?.batchTracking && !batchNo) return;
       const key = balanceKey(line.inventoryProductId, line.locationId, batchNo);
@@ -1148,6 +1164,7 @@ export function AdminDeliveryOrderClient({
           code: product.code,
           description: product.description,
           baseUom: product.baseUom,
+          itemType: product.itemType === "SERVICE_ITEM" || product.itemType === "NON_STOCK_ITEM" ? product.itemType : "STOCK_ITEM",
           sellingPrice: Number(product.sellingPrice ?? 0),
           batchTracking: Boolean(product.batchTracking),
           serialNumberTracking: Boolean(product.serialNumberTracking),
@@ -1212,8 +1229,10 @@ export function AdminDeliveryOrderClient({
             inventoryProductId: line.inventoryProductId || "",
             productCode: line.productCode || "",
             productDescription: line.productDescription || "",
+            itemType: line.itemType === "SERVICE_ITEM" || line.itemType === "NON_STOCK_ITEM" ? line.itemType : "STOCK_ITEM",
             uom: line.uom || "",
             qty: formatDecimalInput(line.qty ?? 1, qtyDecimalPlaces),
+            claimAmount: formatDecimalInput(Number(line.qty ?? 0) * Number(line.unitPrice ?? 0), priceDecimalPlaces),
             unitPrice: formatDecimalInput(line.unitPrice ?? 0, priceDecimalPlaces),
             discountRate: formatDecimalInput(line.discountRate ?? 0, priceDecimalPlaces),
             discountType: line.discountType === "AMOUNT" ? "AMOUNT" : "PERCENT",
@@ -1280,7 +1299,7 @@ export function AdminDeliveryOrderClient({
   function handleProductChange(index: number, productId: string) {
     const product = products.find((item) => item.id === productId);
     if (!product) {
-      updateLine(index, { inventoryProductId: "", productCode: "", productDescription: "", uom: "", unitPrice: formatDecimalInput(0, priceDecimalPlaces), batchNo: "", serialNos: [], serialSearch: "" });
+      updateLine(index, { inventoryProductId: "", productCode: "", productDescription: "", itemType: "STOCK_ITEM", uom: "", claimAmount: formatDecimalInput(0, priceDecimalPlaces), unitPrice: formatDecimalInput(0, priceDecimalPlaces), batchNo: "", serialNos: [], serialSearch: "" });
       setAssemblyTraces((prev) => { const next = { ...prev }; delete next[index]; return next; });
       return;
     }
@@ -1288,6 +1307,7 @@ export function AdminDeliveryOrderClient({
       inventoryProductId: product.id,
       productCode: product.code,
       productDescription: product.description,
+      itemType: product.itemType,
       uom: product.baseUom,
       unitPrice: formatDecimalInput(product.sellingPrice, priceDecimalPlaces),
       locationId: lines[index]?.locationId || defaultLocationId,
@@ -1328,26 +1348,39 @@ export function AdminDeliveryOrderClient({
 
     const nextLines: PickLine[] = selectedSourceOrders.flatMap((order) =>
       (order.lines || [])
-        .filter((line) => Number(line.remainingDeliveryQty || 0) > 0)
-        .map((line) => ({
-          key: `${order.id}-${line.id}`,
-          sourceTransactionId: order.id,
-          sourceDocNo: order.docNo,
-          sourceLineId: line.id,
-          inventoryProductId: line.inventoryProductId || "",
-          productCode: line.productCode || "",
-          productDescription: line.productDescription || "",
-          uom: line.uom || "",
-          orderedQty: Number(line.qty || 0),
-          deliveredQty: Number(line.deliveredQty || 0),
-          remainingDeliveryQty: Number(line.remainingDeliveryQty || 0),
-          unitPrice: Number(line.unitPrice || 0),
-          discountRate: Number(line.discountRate || 0),
-          discountType: line.discountType === "AMOUNT" ? "AMOUNT" : "PERCENT",
-          locationId: line.locationId || defaultLocationId,
-          remarks: line.remarks || "",
-          deliverQty: String(Number(line.remainingDeliveryQty || 0)),
-        }))
+        .filter((line) => {
+          const itemType = line.itemType === "SERVICE_ITEM" || line.itemType === "NON_STOCK_ITEM" ? line.itemType : "STOCK_ITEM";
+          return itemType === "SERVICE_ITEM" ? Number(line.remainingDeliveryAmount || 0) > 0 : Number(line.remainingDeliveryQty || 0) > 0;
+        })
+        .map((line) => {
+          const itemType = line.itemType === "SERVICE_ITEM" || line.itemType === "NON_STOCK_ITEM" ? line.itemType : "STOCK_ITEM";
+          const orderedAmount = Number(line.orderedAmount ?? (Number(line.qty || 0) * Number(line.unitPrice || 0)));
+          const remainingDeliveryAmount = Number(line.remainingDeliveryAmount ?? orderedAmount);
+          return {
+            key: `${order.id}-${line.id}`,
+            sourceTransactionId: order.id,
+            sourceDocNo: order.docNo,
+            sourceLineId: line.id,
+            inventoryProductId: line.inventoryProductId || "",
+            productCode: line.productCode || "",
+            productDescription: line.productDescription || "",
+            itemType,
+            uom: line.uom || "",
+            orderedQty: Number(line.qty || 0),
+            deliveredQty: Number(line.deliveredQty || 0),
+            remainingDeliveryQty: Number(line.remainingDeliveryQty || 0),
+            orderedAmount,
+            deliveredAmount: Number(line.deliveredAmount || 0),
+            remainingDeliveryAmount,
+            unitPrice: Number(line.unitPrice || 0),
+            discountRate: Number(line.discountRate || 0),
+            discountType: line.discountType === "AMOUNT" ? "AMOUNT" : "PERCENT",
+            locationId: line.locationId || defaultLocationId,
+            remarks: line.remarks || "",
+            deliverQty: String(Number(line.remainingDeliveryQty || 0)),
+            deliverAmount: formatDecimalInput(remainingDeliveryAmount, priceDecimalPlaces),
+          };
+        })
     );
 
     setPickLines(nextLines);
@@ -1358,15 +1391,27 @@ export function AdminDeliveryOrderClient({
     setPickLines((prev) => prev.map((line) => (line.key === key ? { ...line, deliverQty: value } : line)));
   }
 
+  function updatePickLineAmount(key: string, value: string) {
+    setPickLines((prev) => prev.map((line) => (line.key === key ? { ...line, deliverAmount: value } : line)));
+  }
+
   function importPickLines() {
-    const validLines = pickLines.filter((line) => Number(line.deliverQty || 0) > 0);
+    const validLines = pickLines.filter((line) => line.itemType === "SERVICE_ITEM" ? Number(line.deliverAmount || 0) > 0 : Number(line.deliverQty || 0) > 0);
     if (validLines.length === 0) {
-      setGenerateFromError("Please enter delivery qty for at least one line.");
+      setGenerateFromError("Please enter delivery qty / claim amount for at least one line.");
       return;
     }
-    const overLine = validLines.find((line) => Number(line.deliverQty || 0) > line.remainingDeliveryQty);
+    const overLine = validLines.find((line) =>
+      line.itemType === "SERVICE_ITEM"
+        ? Number(line.deliverAmount || 0) > line.remainingDeliveryAmount
+        : Number(line.deliverQty || 0) > line.remainingDeliveryQty
+    );
     if (overLine) {
-      setGenerateFromError(`${overLine.productCode} delivery qty cannot exceed remaining qty.`);
+      setGenerateFromError(
+        overLine.itemType === "SERVICE_ITEM"
+          ? `${overLine.productCode} claim amount cannot exceed remaining amount.`
+          : `${overLine.productCode} delivery qty cannot exceed remaining qty.`
+      );
       return;
     }
 
@@ -1392,23 +1437,29 @@ export function AdminDeliveryOrderClient({
     setFooterRemarks(first?.footerRemarks || "");
 
     setLines(
-      validLines.map((line) => ({
-        sourceLineId: line.sourceLineId,
-        sourceTransactionId: line.sourceTransactionId,
-        inventoryProductId: line.inventoryProductId,
-        productCode: line.productCode,
-        productDescription: line.productDescription,
-        uom: line.uom,
-        qty: String(line.deliverQty),
-        unitPrice: String(line.unitPrice.toFixed(2)),
-        discountRate: String(line.discountRate),
-        discountType: line.discountType,
-        locationId: line.locationId || defaultLocationId,
-        batchNo: "",
-        serialNos: [],
-        serialSearch: "",
-        remarks: line.remarks,
-      }))
+      validLines.map((line) => {
+        const isServiceItem = line.itemType === "SERVICE_ITEM";
+        const claimAmount = Number(line.deliverAmount || 0);
+        return {
+          sourceLineId: line.sourceLineId,
+          sourceTransactionId: line.sourceTransactionId,
+          inventoryProductId: line.inventoryProductId,
+          productCode: line.productCode,
+          productDescription: line.productDescription,
+          itemType: line.itemType,
+          uom: line.uom,
+          qty: isServiceItem ? formatDecimalInput(1, qtyDecimalPlaces) : String(line.deliverQty),
+          claimAmount: isServiceItem ? formatDecimalInput(claimAmount, priceDecimalPlaces) : formatDecimalInput(Number(line.deliverQty || 0) * line.unitPrice, priceDecimalPlaces),
+          unitPrice: isServiceItem ? formatDecimalInput(claimAmount, priceDecimalPlaces) : String(line.unitPrice.toFixed(2)),
+          discountRate: isServiceItem ? "0" : String(line.discountRate),
+          discountType: isServiceItem ? "AMOUNT" : line.discountType,
+          locationId: isServiceItem ? "" : (line.locationId || defaultLocationId),
+          batchNo: "",
+          serialNos: [],
+          serialSearch: "",
+          remarks: line.remarks,
+        };
+      })
     );
 
     setIsGenerateFromOpen(false);
@@ -1423,9 +1474,14 @@ export function AdminDeliveryOrderClient({
     for (let index = 0; index < lines.length; index += 1) {
       const line = lines[index];
       if (!line.inventoryProductId || !line.productCode) return `Product line ${index + 1} is missing product.`;
+      const product = products.find((item) => item.id === line.inventoryProductId);
+      const isServiceItem = product?.itemType === "SERVICE_ITEM" || line.itemType === "SERVICE_ITEM";
+      if (isServiceItem) {
+        if (Number(line.claimAmount || line.unitPrice || 0) <= 0) return `Product line ${index + 1} claim amount must be greater than zero.`;
+        continue;
+      }
       if (Number(line.qty || 0) <= 0) return `Product line ${index + 1} quantity must be greater than zero.`;
       if (!line.locationId) return `Product line ${index + 1} requires stock location.`;
-      const product = products.find((item) => item.id === line.inventoryProductId);
       if (product?.batchTracking && !line.batchNo) return `Product line ${index + 1} requires Batch No.`;
       if (product?.serialNumberTracking) {
         if (line.serialNos.length === 0) return `Product line ${index + 1} requires S/N No.`;
@@ -1794,7 +1850,9 @@ export function AdminDeliveryOrderClient({
                             }}
                           />
                           <p className="mt-2 text-xs text-white/45">
-                            {selectedProduct?.batchTracking && !line.batchNo
+                            {selectedProduct?.itemType === "SERVICE_ITEM"
+                              ? "Service item claim by amount."
+                              : selectedProduct?.batchTracking && !line.batchNo
                               ? "Select Batch No to view batch balance."
                               : getBalanceDisplay(
                                   line.inventoryProductId && line.locationId ? balances[balanceKey(line.inventoryProductId, line.locationId, selectedProduct?.batchTracking ? line.batchNo : "")] : undefined,
@@ -1982,7 +2040,7 @@ export function AdminDeliveryOrderClient({
                       <th className="px-4 py-3 text-right">Ordered</th>
                       <th className="px-4 py-3 text-right">Delivered</th>
                       <th className="px-4 py-3 text-right">Remaining</th>
-                      <th className="px-4 py-3 text-right">Deliver Qty</th>
+                      <th className="px-4 py-3 text-right">Deliver / Claim</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/10 text-white/80">
@@ -1990,10 +2048,22 @@ export function AdminDeliveryOrderClient({
                       <tr key={line.key}>
                         <td className="px-4 py-4">{line.sourceDocNo}</td>
                         <td className="px-4 py-4"><div className="font-semibold text-white">{line.productCode}</div><div className="text-xs text-white/45">{line.productDescription}</div></td>
-                        <td className="px-4 py-4 text-right">{moneyWithPlaces(line.orderedQty, qtyDecimalPlaces)}</td>
-                        <td className="px-4 py-4 text-right">{moneyWithPlaces(line.deliveredQty, qtyDecimalPlaces)}</td>
-                        <td className="px-4 py-4 text-right">{moneyWithPlaces(line.remainingDeliveryQty, qtyDecimalPlaces)}</td>
-                        <td className="px-4 py-4 text-right"><input className="input-rk w-32 text-right" type="number" min="0" max={line.remainingDeliveryQty} step={qtyInputStep} value={line.deliverQty} onChange={(e) => updatePickLine(line.key, limitDecimalInputValue(e.target.value, qtyDecimalPlaces))} /></td>
+                        <td className="px-4 py-4 text-right">
+                          {line.itemType === "SERVICE_ITEM" ? `${currency} ${moneyWithPlaces(line.orderedAmount, priceDecimalPlaces)}` : moneyWithPlaces(line.orderedQty, qtyDecimalPlaces)}
+                        </td>
+                        <td className="px-4 py-4 text-right">
+                          {line.itemType === "SERVICE_ITEM" ? `${currency} ${moneyWithPlaces(line.deliveredAmount, priceDecimalPlaces)}` : moneyWithPlaces(line.deliveredQty, qtyDecimalPlaces)}
+                        </td>
+                        <td className="px-4 py-4 text-right">
+                          {line.itemType === "SERVICE_ITEM" ? `${currency} ${moneyWithPlaces(line.remainingDeliveryAmount, priceDecimalPlaces)}` : moneyWithPlaces(line.remainingDeliveryQty, qtyDecimalPlaces)}
+                        </td>
+                        <td className="px-4 py-4 text-right">
+                          {line.itemType === "SERVICE_ITEM" ? (
+                            <input className="input-rk w-36 text-right" type="number" min="0" max={line.remainingDeliveryAmount} step={priceInputStep} value={line.deliverAmount} onChange={(e) => updatePickLineAmount(line.key, limitDecimalInputValue(e.target.value, priceDecimalPlaces))} />
+                          ) : (
+                            <input className="input-rk w-32 text-right" type="number" min="0" max={line.remainingDeliveryQty} step={qtyInputStep} value={line.deliverQty} onChange={(e) => updatePickLine(line.key, limitDecimalInputValue(e.target.value, qtyDecimalPlaces))} />
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>

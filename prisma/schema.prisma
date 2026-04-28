@@ -704,6 +704,7 @@ model SalesTransactionLineLink {
   targetTransactionId   String
   linkType              SalesLineLinkType
   qty                   Decimal                 @db.Decimal(12, 3)
+  claimAmount           Decimal?                @db.Decimal(14, 2)
   createdAt             DateTime                @default(now())
 
   sourceLine            SalesTransactionLine     @relation("SalesLineSource", fields: [sourceLineId], references: [id], onDelete: Cascade)

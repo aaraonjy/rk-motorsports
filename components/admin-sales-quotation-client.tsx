@@ -49,8 +49,10 @@ type ProductOption = {
   description: string;
   baseUom: string;
   sellingPrice: number;
+  itemType: "STOCK_ITEM" | "SERVICE_ITEM" | "NON_STOCK_ITEM";
   batchTracking: boolean;
   serialNumberTracking: boolean;
+  isAssemblyItem: boolean;
   uomConversions?: ProductUomConversionOption[];
 };
 
@@ -999,9 +1001,11 @@ export function AdminSalesQuotationClient({
           code: product.code,
           description: product.description,
           baseUom: product.baseUom,
+          itemType: product.itemType === "SERVICE_ITEM" || product.itemType === "NON_STOCK_ITEM" ? product.itemType : "STOCK_ITEM",
           sellingPrice: Number(product.sellingPrice ?? 0),
           batchTracking: Boolean(product.batchTracking),
           serialNumberTracking: Boolean(product.serialNumberTracking),
+          isAssemblyItem: Boolean(product.isAssemblyItem),
           uomConversions: Array.isArray(product.uomConversions)
             ? product.uomConversions.map((item: any) => ({
                 id: item.id,

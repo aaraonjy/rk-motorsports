@@ -30,7 +30,7 @@ function roundQty(value: unknown) {
 
 function sumLinkedQty(
   line: {
-    sourceLineLinks?: Array<{ linkType?: string | null; qty?: Prisma.Decimal | number | string | null; targetTransaction?: { status?: string | null } | null }>;
+    sourceLineLinks?: Array<{ linkType?: string | null; qty?: Prisma.Decimal | number | string | null; claimAmount?: Prisma.Decimal | number | string | null; targetTransaction?: { status?: string | null } | null }>;
   },
   linkType: "DELIVERED_TO" | "INVOICED_TO"
 ) {
@@ -40,26 +40,61 @@ function sumLinkedQty(
     .reduce((sum, link) => sum + toNumber(link.qty), 0);
 }
 
+
+function sumLinkedAmount(
+  line: {
+    sourceLineLinks?: Array<{ linkType?: string | null; claimAmount?: Prisma.Decimal | number | string | null; targetTransaction?: { status?: string | null } | null }>;
+  },
+  linkType: "DELIVERED_TO" | "INVOICED_TO"
+) {
+  return (line.sourceLineLinks || [])
+    .filter((link) => link.linkType === linkType)
+    .filter((link) => link.targetTransaction?.status !== "CANCELLED")
+    .reduce((sum, link) => sum + toNumber(link.claimAmount), 0);
+}
+
 function withSalesLineProgress(line: any) {
+  const itemType = line.inventoryProduct?.itemType || line.itemType || "STOCK_ITEM";
   const orderedQty = toNumber(line.qty);
   const deliveredQty = sumLinkedQty(line, "DELIVERED_TO");
   const invoicedQty = sumLinkedQty(line, "INVOICED_TO");
+  const orderedAmount = toNumber(line.lineTotal);
+  const deliveredAmount = sumLinkedAmount(line, "DELIVERED_TO");
+  const invoicedAmount = sumLinkedAmount(line, "INVOICED_TO");
   return {
     ...line,
+    itemType,
     orderedQty,
     deliveredQty,
     invoicedQty,
+    orderedAmount,
+    deliveredAmount,
+    invoicedAmount,
     remainingDeliveryQty: Math.max(0, orderedQty - deliveredQty),
     remainingInvoiceQty: Math.max(0, orderedQty - invoicedQty),
+    remainingDeliveryAmount: Math.max(0, orderedAmount - deliveredAmount),
+    remainingInvoiceAmount: Math.max(0, orderedAmount - invoicedAmount),
   };
 }
 
-function calculateSalesOrderStatus(lines: Array<{ orderedQty: number; deliveredQty: number; invoicedQty: number }>) {
+function calculateSalesOrderStatus(lines: Array<{ itemType?: string; orderedQty: number; deliveredQty: number; invoicedQty: number; orderedAmount?: number; deliveredAmount?: number; invoicedAmount?: number }>) {
   if (lines.length === 0) return "OPEN" as SalesTransactionStatus;
 
-  const hasAnyProgress = lines.some((line) => line.deliveredQty > 0 || line.invoicedQty > 0);
-  const isFullyDelivered = lines.every((line) => line.deliveredQty >= line.orderedQty);
-  const isFullyInvoiced = lines.every((line) => line.invoicedQty >= line.orderedQty);
+  const hasAnyProgress = lines.some((line) =>
+    line.itemType === "SERVICE_ITEM"
+      ? Number(line.deliveredAmount || 0) > 0 || Number(line.invoicedAmount || 0) > 0
+      : line.deliveredQty > 0 || line.invoicedQty > 0
+  );
+  const isFullyDelivered = lines.every((line) =>
+    line.itemType === "SERVICE_ITEM"
+      ? Number(line.deliveredAmount || 0) >= Number(line.orderedAmount || 0)
+      : line.deliveredQty >= line.orderedQty
+  );
+  const isFullyInvoiced = lines.every((line) =>
+    line.itemType === "SERVICE_ITEM"
+      ? Number(line.invoicedAmount || 0) >= Number(line.orderedAmount || 0)
+      : line.invoicedQty >= line.orderedQty
+  );
 
   if (isFullyDelivered || isFullyInvoiced) return "COMPLETED" as SalesTransactionStatus;
   if (hasAnyProgress) return "PARTIAL" as SalesTransactionStatus;
@@ -78,6 +113,7 @@ async function refreshSalesOrderStatuses(tx: Prisma.TransactionClient, sourceTra
         lines: {
           orderBy: { lineNo: "asc" },
           include: {
+            inventoryProduct: { select: { itemType: true } },
             sourceLineLinks: {
               include: {
                 targetTransaction: { select: { id: true, status: true } },
@@ -106,6 +142,7 @@ type DirectDeliveryOrderLinePayload = {
   uom?: string | null;
   qty?: number | string | null;
   unitPrice?: number | string | null;
+  claimAmount?: number | string | null;
   discountRate?: number | string | null;
   discountType?: string | null;
   locationId?: string | null;
@@ -228,7 +265,7 @@ async function buildDirectDeliveryOrderData(body: any, tx: Prisma.TransactionCli
   const [products, locations] = await Promise.all([
     tx.inventoryProduct.findMany({
       where: { id: { in: productIds }, isActive: true },
-      select: { id: true, code: true, description: true, baseUom: true, sellingPrice: true, trackInventory: true, batchTracking: true, serialNumberTracking: true },
+      select: { id: true, code: true, description: true, baseUom: true, sellingPrice: true, trackInventory: true, itemType: true, batchTracking: true, serialNumberTracking: true },
     }),
     tx.stockLocation.findMany({ where: { id: { in: locationIds }, isActive: true }, select: { id: true, code: true, name: true } }),
   ]);
@@ -244,18 +281,20 @@ async function buildDirectDeliveryOrderData(body: any, tx: Prisma.TransactionCli
     const location = locationId ? locationMap.get(locationId) : null;
 
     if (!product) throw new Error(`Product line ${lineNo} is missing product information.`);
-    if (!product.trackInventory) throw new Error(`${product.code} is not a tracked stock item and cannot be delivered through DO stock out.`);
-    if (!location) throw new Error(`Product line ${lineNo} requires a valid stock location.`);
+    const isServiceItem = product.itemType === "SERVICE_ITEM";
+    if (!isServiceItem && !product.trackInventory) throw new Error(`${product.code} is not a tracked stock item and cannot be delivered through DO stock out.`);
+    if (!isServiceItem && !location) throw new Error(`Product line ${lineNo} requires a valid stock location.`);
 
     const qty = qtyDecimalWithPlaces(line.qty, numberFormat.qtyDecimalPlaces);
-    const batchNo = normalizeText((line as any).batchNo)?.toUpperCase() || null;
-    const serialNos = normalizeSerialNumbers((line as any).serialNos);
-    if (product.batchTracking && !batchNo) throw new Error(`${product.code} requires Batch No.`);
-    if (product.serialNumberTracking) {
+    const batchNo = isServiceItem ? null : normalizeText((line as any).batchNo)?.toUpperCase() || null;
+    const serialNos = isServiceItem ? [] : normalizeSerialNumbers((line as any).serialNos);
+    if (!isServiceItem && product.batchTracking && !batchNo) throw new Error(`${product.code} requires Batch No.`);
+    if (!isServiceItem && product.serialNumberTracking) {
       if (serialNos.length === 0) throw new Error(`${product.code} requires S/N No.`);
       if (toNumber(qty) !== serialNos.length) throw new Error(`${product.code} quantity must match selected S/N count.`);
     }
-    const unitPrice = decimalWithPlaces(line.unitPrice, numberFormat.priceDecimalPlaces, Number(product.sellingPrice ?? 0));
+    const claimAmount = isServiceItem ? decimalWithPlaces(line.claimAmount ?? line.unitPrice, numberFormat.priceDecimalPlaces, Number(product.sellingPrice ?? 0)) : null;
+    const unitPrice = isServiceItem ? claimAmount! : decimalWithPlaces(line.unitPrice, numberFormat.priceDecimalPlaces, Number(product.sellingPrice ?? 0));
     const discountType = String(line.discountType || "PERCENT").toUpperCase() === "AMOUNT" ? "AMOUNT" : "PERCENT";
     const discountRate = discountType === "PERCENT" ? basicDecimal(line.discountRate, 0) : new Prisma.Decimal(0);
     const rawDiscountValue = basicDecimal(line.discountRate, 0);
@@ -268,19 +307,21 @@ async function buildDirectDeliveryOrderData(body: any, tx: Prisma.TransactionCli
       inventoryProductId: product.id,
       productCode: product.code,
       productDescription: normalizeText(line.productDescription) || product.description,
+      itemType: product.itemType,
+      claimAmount,
       uom: (normalizeText(line.uom) || product.baseUom || "UNIT").toUpperCase(),
       qty,
       unitPrice,
       discountRate,
       discountType,
       discountAmount,
-      locationId: location.id,
+      locationId: location?.id || null,
       batchNo,
       serialNos,
-      batchTracking: Boolean(product.batchTracking),
-      serialNumberTracking: Boolean(product.serialNumberTracking),
-      locationCode: location.code,
-      locationName: location.name,
+      batchTracking: !isServiceItem && Boolean(product.batchTracking),
+      serialNumberTracking: !isServiceItem && Boolean(product.serialNumberTracking),
+      locationCode: location?.code || null,
+      locationName: location?.name || null,
       taxCodeId: null,
       taxCode: null,
       taxDescription: null,
@@ -320,14 +361,17 @@ async function buildDirectDeliveryOrderData(body: any, tx: Prisma.TransactionCli
 }
 
 async function createStockIssueForDirectDeliveryOrder(tx: Prisma.TransactionClient, adminId: string, deliveryOrder: any, lines: Array<any>, body: any) {
+  const stockLines = lines.filter((line) => line.itemType !== "SERVICE_ITEM");
+  if (stockLines.length === 0) return null;
+
   const config = await tx.stockConfiguration.findUnique({ where: { id: "default" } });
   if (!config?.stockModuleEnabled) throw new Error("Stock module is disabled.");
 
   await acquireAdvisoryLock(tx, buildTransactionNumberLockKey("SI", deliveryOrder.docDate));
   await acquireAdvisoryLock(tx, buildDocumentNumberLockKey("SI", deliveryOrder.docDate));
-  await acquireStockMutationLocks(tx, lines.map((line) => ({ inventoryProductId: line.inventoryProductId!, locationId: line.locationId, batchNo: line.batchNo, serialNos: line.serialNos || [] })));
+  await acquireStockMutationLocks(tx, stockLines.map((line) => ({ inventoryProductId: line.inventoryProductId!, locationId: line.locationId, batchNo: line.batchNo, serialNos: line.serialNos || [] })));
 
-  for (const line of lines) {
+  for (const line of stockLines) {
     const requiredQty = toNumber(line.qty);
     if (line.serialNumberTracking) {
       const availableCount = await tx.inventorySerial.count({
@@ -362,7 +406,7 @@ async function createStockIssueForDirectDeliveryOrder(tx: Prisma.TransactionClie
       departmentId: deliveryOrder.departmentId,
       createdByAdminId: adminId,
       lines: {
-        create: lines.map((line) => ({
+        create: stockLines.map((line) => ({
           inventoryProductId: line.inventoryProductId!,
           qty: line.qty,
           locationId: line.locationId,
@@ -592,6 +636,7 @@ export async function GET(_req: Request, context: Params) {
         lines: {
           orderBy: { lineNo: "asc" },
           include: {
+            inventoryProduct: { select: { itemType: true } },
             sourceLineLinks: {
               include: {
                 sourceTransaction: { select: { id: true, docType: true, docNo: true, status: true } },

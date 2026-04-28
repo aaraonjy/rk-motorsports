@@ -25,6 +25,7 @@ type DeliveryOrderLinePayload = {
   uom?: string | null;
   qty?: number | string | null;
   unitPrice?: number | string | null;
+  claimAmount?: number | string | null;
   discountRate?: number | string | null;
   discountType?: string | null;
   locationId?: string | null;
@@ -165,7 +166,7 @@ function assertValidManualDocNo(value: unknown) {
 
 function sumLinkedQty(
   line: {
-    sourceLineLinks?: Array<{ linkType?: string | null; qty?: Prisma.Decimal | number | string | null; targetTransaction?: { status?: string | null } | null }>;
+    sourceLineLinks?: Array<{ linkType?: string | null; qty?: Prisma.Decimal | number | string | null; claimAmount?: Prisma.Decimal | number | string | null; targetTransaction?: { status?: string | null } | null }>;
   },
   linkType: "DELIVERED_TO" | "INVOICED_TO"
 ) {
@@ -175,27 +176,62 @@ function sumLinkedQty(
     .reduce((sum, link) => sum + toNumber(link.qty), 0);
 }
 
+
+function sumLinkedAmount(
+  line: {
+    sourceLineLinks?: Array<{ linkType?: string | null; claimAmount?: Prisma.Decimal | number | string | null; targetTransaction?: { status?: string | null } | null }>;
+  },
+  linkType: "DELIVERED_TO" | "INVOICED_TO"
+) {
+  return (line.sourceLineLinks || [])
+    .filter((link) => link.linkType === linkType)
+    .filter((link) => link.targetTransaction?.status !== "CANCELLED")
+    .reduce((sum, link) => sum + toNumber(link.claimAmount), 0);
+}
+
 function withSalesLineProgress(line: any) {
+  const itemType = line.inventoryProduct?.itemType || line.itemType || "STOCK_ITEM";
   const orderedQty = toNumber(line.qty);
   const deliveredQty = sumLinkedQty(line, "DELIVERED_TO");
   const invoicedQty = sumLinkedQty(line, "INVOICED_TO");
+  const orderedAmount = toNumber(line.lineTotal);
+  const deliveredAmount = sumLinkedAmount(line, "DELIVERED_TO");
+  const invoicedAmount = sumLinkedAmount(line, "INVOICED_TO");
 
   return {
     ...line,
+    itemType,
     orderedQty,
     deliveredQty,
     invoicedQty,
+    orderedAmount,
+    deliveredAmount,
+    invoicedAmount,
     remainingDeliveryQty: Math.max(0, orderedQty - deliveredQty),
     remainingInvoiceQty: Math.max(0, orderedQty - invoicedQty),
+    remainingDeliveryAmount: Math.max(0, orderedAmount - deliveredAmount),
+    remainingInvoiceAmount: Math.max(0, orderedAmount - invoicedAmount),
   };
 }
 
-function calculateSalesOrderStatus(lines: Array<{ orderedQty: number; deliveredQty: number; invoicedQty: number }>) {
+function calculateSalesOrderStatus(lines: Array<{ itemType?: string; orderedQty: number; deliveredQty: number; invoicedQty: number; orderedAmount?: number; deliveredAmount?: number; invoicedAmount?: number }>) {
   if (lines.length === 0) return "OPEN" as SalesTransactionStatus;
 
-  const hasAnyProgress = lines.some((line) => line.deliveredQty > 0 || line.invoicedQty > 0);
-  const isFullyDelivered = lines.every((line) => line.deliveredQty >= line.orderedQty);
-  const isFullyInvoiced = lines.every((line) => line.invoicedQty >= line.orderedQty);
+  const hasAnyProgress = lines.some((line) =>
+    line.itemType === "SERVICE_ITEM"
+      ? Number(line.deliveredAmount || 0) > 0 || Number(line.invoicedAmount || 0) > 0
+      : line.deliveredQty > 0 || line.invoicedQty > 0
+  );
+  const isFullyDelivered = lines.every((line) =>
+    line.itemType === "SERVICE_ITEM"
+      ? Number(line.deliveredAmount || 0) >= Number(line.orderedAmount || 0)
+      : line.deliveredQty >= line.orderedQty
+  );
+  const isFullyInvoiced = lines.every((line) =>
+    line.itemType === "SERVICE_ITEM"
+      ? Number(line.invoicedAmount || 0) >= Number(line.orderedAmount || 0)
+      : line.invoicedQty >= line.orderedQty
+  );
 
   if (isFullyDelivered || isFullyInvoiced) return "COMPLETED" as SalesTransactionStatus;
   if (hasAnyProgress) return "PARTIAL" as SalesTransactionStatus;
@@ -214,6 +250,7 @@ async function refreshSalesOrderStatuses(tx: Prisma.TransactionClient, sourceTra
         lines: {
           orderBy: { lineNo: "asc" },
           include: {
+            inventoryProduct: { select: { itemType: true } },
             sourceLineLinks: {
               include: {
                 targetTransaction: { select: { id: true, status: true } },
@@ -244,6 +281,7 @@ async function getTrackedSourceLines(tx: Prisma.TransactionClient, sourceLineIds
     where: { id: { in: sourceLineIds } },
     include: {
       transaction: { select: { id: true, docType: true, docNo: true, status: true, customerId: true } },
+      inventoryProduct: { select: { itemType: true } },
       sourceLineLinks: {
         include: {
           targetTransaction: { select: { id: true, status: true } },
@@ -272,9 +310,12 @@ function buildDeliveryLine(
 
   const productCode = normalizeText(line.productCode) || sourceLine?.productCode || product?.code || "";
   const productDescription = normalizeText(line.productDescription) || sourceLine?.productDescription || product?.description || "";
+  const itemType = product?.itemType || sourceLine?.itemType || "STOCK_ITEM";
+  const isServiceItem = itemType === "SERVICE_ITEM";
   const uom = (normalizeText(line.uom) || sourceLine?.uom || product?.baseUom || "UNIT").toUpperCase();
   const qty = qtyDecimalWithPlaces(line.qty, numberFormat.qtyDecimalPlaces);
-  const unitPrice = decimalWithPlaces(line.unitPrice, numberFormat.priceDecimalPlaces, sourceLine ? toNumber(sourceLine.unitPrice) : product ? Number(product.sellingPrice ?? 0) : 0);
+  const requestedClaimAmount = decimalWithPlaces(line.claimAmount ?? line.unitPrice, numberFormat.priceDecimalPlaces, sourceLine ? Math.max(0, toNumber(sourceLine.remainingDeliveryAmount)) : product ? Number(product.sellingPrice ?? 0) : 0);
+  const unitPrice = isServiceItem ? requestedClaimAmount : decimalWithPlaces(line.unitPrice, numberFormat.priceDecimalPlaces, sourceLine ? toNumber(sourceLine.unitPrice) : product ? Number(product.sellingPrice ?? 0) : 0);
   const discountType = String(line.discountType || sourceLine?.discountType || "PERCENT").toUpperCase() === "AMOUNT" ? "AMOUNT" : "PERCENT";
   const batchNo = normalizeText((line as any).batchNo)?.toUpperCase() || null;
   const serialNos = normalizeSerialNumbers((line as any).serialNos);
@@ -287,21 +328,28 @@ function buildDeliveryLine(
   const taxableAmount = lineSubtotal.minus(discountAmount).toDecimalPlaces(2);
 
   if (!productCode || !productDescription) throw new Error(`Product line ${lineNo} is missing product information.`);
-  if (!locationId || !location) throw new Error(`Product line ${lineNo} requires a valid stock location.`);
+  if (!isServiceItem && (!locationId || !location)) throw new Error(`Product line ${lineNo} requires a valid stock location.`);
 
   if (sourceLine) {
     if (sourceLine.transaction?.docType !== "SO") throw new Error("Delivery Order can only generate from Sales Order.");
     if (sourceLine.transaction?.status === "CANCELLED") throw new Error(`${sourceLine.transaction?.docNo || "Source Sales Order"} is cancelled.`);
-    const remaining = Number(sourceLine.remainingDeliveryQty || 0);
-    if (toNumber(qty) > remaining) {
-      throw new Error(`${productCode} delivery qty exceeds remaining Sales Order qty.`);
+    if (isServiceItem) {
+      const remainingAmount = Number(sourceLine.remainingDeliveryAmount || 0);
+      if (toNumber(requestedClaimAmount) > remainingAmount) {
+        throw new Error(`${productCode} claim amount exceeds remaining Sales Order amount.`);
+      }
+    } else {
+      const remaining = Number(sourceLine.remainingDeliveryQty || 0);
+      if (toNumber(qty) > remaining) {
+        throw new Error(`${productCode} delivery qty exceeds remaining Sales Order qty.`);
+      }
     }
   }
 
-  if (product?.batchTracking && !batchNo) {
+  if (!isServiceItem && product?.batchTracking && !batchNo) {
     throw new Error(`${productCode} requires Batch No.`);
   }
-  if (product?.serialNumberTracking) {
+  if (!isServiceItem && product?.serialNumberTracking) {
     if (serialNos.length === 0) throw new Error(`${productCode} requires S/N No.`);
     if (toNumber(qty) !== serialNos.length) throw new Error(`${productCode} quantity must match selected S/N count.`);
   }
@@ -319,13 +367,15 @@ function buildDeliveryLine(
     discountRate,
     discountType,
     discountAmount,
-    locationId: location.id,
-    batchNo,
+    itemType,
+    claimAmount: isServiceItem ? requestedClaimAmount : null,
+    locationId: location?.id || null,
+    batchNo: isServiceItem ? null : batchNo,
     serialNos,
-    batchTracking: Boolean(product?.batchTracking),
-    serialNumberTracking: Boolean(product?.serialNumberTracking),
-    locationCode: location.code,
-    locationName: location.name,
+    batchTracking: !isServiceItem && Boolean(product?.batchTracking),
+    serialNumberTracking: !isServiceItem && Boolean(product?.serialNumberTracking),
+    locationCode: location?.code || null,
+    locationName: location?.name || null,
     taxCodeId: null,
     taxCode: null,
     taxDescription: null,
@@ -370,6 +420,7 @@ async function buildDeliveryOrderData(body: any, tx: Prisma.TransactionClient) {
             baseUom: true,
             sellingPrice: true,
             trackInventory: true,
+            itemType: true,
             batchTracking: true,
             serialNumberTracking: true,
           },
@@ -391,7 +442,8 @@ async function buildDeliveryOrderData(body: any, tx: Prisma.TransactionClient) {
 
   for (const line of lines) {
     const product = line.inventoryProductId ? productMap.get(line.inventoryProductId) : null;
-    if (!product || !product.trackInventory) {
+    if (!product) throw new Error(`${line.productCode} product is invalid.`);
+    if (product.itemType !== "SERVICE_ITEM" && !product.trackInventory) {
       throw new Error(`${line.productCode} is not a tracked stock item and cannot be delivered through DO stock out.`);
     }
   }
@@ -434,6 +486,9 @@ async function createStockIssueForDeliveryOrder(
   lines: Array<any>,
   body: any
 ) {
+  const stockLines = lines.filter((line) => line.itemType !== "SERVICE_ITEM");
+  if (stockLines.length === 0) return null;
+
   const config = await tx.stockConfiguration.findUnique({ where: { id: "default" } });
   if (!config?.stockModuleEnabled) throw new Error("Stock module is disabled.");
 
@@ -441,7 +496,7 @@ async function createStockIssueForDeliveryOrder(
   await acquireAdvisoryLock(tx, buildDocumentNumberLockKey("SI", deliveryOrder.docDate));
   await acquireStockMutationLocks(
     tx,
-    lines.map((line) => ({
+    stockLines.map((line) => ({
       inventoryProductId: line.inventoryProductId!,
       locationId: line.locationId,
       batchNo: line.batchNo,
@@ -449,7 +504,7 @@ async function createStockIssueForDeliveryOrder(
     }))
   );
 
-  for (const line of lines) {
+  for (const line of stockLines) {
     const requiredQty = toNumber(line.qty);
     if (line.serialNumberTracking) {
       const availableCount = await tx.inventorySerial.count({
@@ -490,7 +545,7 @@ async function createStockIssueForDeliveryOrder(
       departmentId: deliveryOrder.departmentId,
       createdByAdminId: adminId,
       lines: {
-        create: lines.map((line) => ({
+        create: stockLines.map((line) => ({
           inventoryProductId: line.inventoryProductId!,
           qty: line.qty,
           locationId: line.locationId,
@@ -753,7 +808,8 @@ export async function POST(req: Request) {
             sourceTransactionId: line.sourceTransactionId,
             targetTransactionId: deliveryOrder.id,
             linkType: "DELIVERED_TO",
-            qty: line.qty,
+            qty: line.itemType === "SERVICE_ITEM" ? new Prisma.Decimal(0) : line.qty,
+            claimAmount: line.itemType === "SERVICE_ITEM" ? line.claimAmount : null,
           },
         });
       }
