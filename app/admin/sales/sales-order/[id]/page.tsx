@@ -184,6 +184,7 @@ export default async function AdminSalesOrderDetailPage({ params, searchParams }
       lines: {
         orderBy: { lineNo: "asc" },
         include: {
+          inventoryProduct: { select: { id: true, itemType: true } },
           sourceLineLinks: {
             include: {
               targetTransaction: { select: { id: true, docType: true, docNo: true, status: true } },
