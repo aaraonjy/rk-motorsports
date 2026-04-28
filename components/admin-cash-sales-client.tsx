@@ -1172,12 +1172,12 @@ export function AdminCashSalesClient({
       const lineSubtotal = roundMoney(qty * unitPrice);
       const discountAmount = line.discountType === "AMOUNT" ? Math.min(lineSubtotal, roundMoney(discountValue)) : roundMoney(lineSubtotal * (discountValue / 100));
       const taxableAmount = Math.max(0, roundMoney(lineSubtotal - discountAmount));
-      const lineTaxCode = isLineItemTaxMode ? availableTaxCodes.find((item) => item.id === line.taxCodeId) || null : null;
+      const lineTaxCode = availableTaxCodes.find((item) => item.id === line.taxCodeId) || null;
       const lineTaxBreakdown = calculateLineItemTaxBreakdown({
         lineTotal: taxableAmount,
         taxRate: lineTaxCode?.rate ?? null,
         calculationMethod: lineTaxCode?.calculationMethod ?? null,
-        taxEnabled: Boolean(isLineItemTaxMode && lineTaxCode),
+        taxEnabled: Boolean(isTaxEnabled && lineTaxCode),
       });
 
       return {
@@ -1191,7 +1191,7 @@ export function AdminCashSalesClient({
         lineTotal: lineTaxBreakdown.lineGrandTotalAfterTax,
       };
     });
-  }, [availableTaxCodes, isLineItemTaxMode, lines]);
+  }, [availableTaxCodes, isTaxEnabled, lines]);
 
   const totals = useMemo(() => {
     const subtotal = roundMoney(normalizedLines.reduce((sum, line) => sum + line.lineSubtotal, 0));
