@@ -172,7 +172,6 @@ function calculateSalesPaymentSummary(payments: Array<{ amount?: Prisma.Decimal 
 function getCashSalesStatusForPayment(grandTotal: Prisma.Decimal | number | string, totalPaid: number) {
   const total = toNumber(grandTotal);
   if (total <= 0 || totalPaid >= total) return "COMPLETED" as SalesTransactionStatus;
-  if (totalPaid > 0) return "PARTIAL" as SalesTransactionStatus;
   return "OPEN" as SalesTransactionStatus;
 }
 
@@ -214,402 +213,48 @@ async function createSalesTransactionPaymentIfNeeded(
   });
 }
 
-
-function getMalaysiaDateParts(date: Date) {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Kuala_Lumpur",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(date);
-
-  const year = parts.find((part) => part.type === "year")?.value;
-  const month = parts.find((part) => part.type === "month")?.value;
-  const day = parts.find((part) => part.type === "day")?.value;
-
-  if (!year || !month || !day) throw new Error("Unable to generate cash sales date prefix.");
-  return { year, month, day };
+async function loadTaxSettings(tx: Prisma.TransactionClient) {
+  const config = await tx.taxConfiguration.findUnique({ where: { id: "default" } });
+  const taxCodes = await tx.taxCode.findMany({ where: { isActive: true } });
+  return {
+    enabled: Boolean(config?.taxModuleEnabled),
+    mode: config?.taxCalculationMode === "LINE_ITEM" ? "LINE_ITEM" : "TRANSACTION",
+    taxCodes: new Map(taxCodes.map((taxCode) => [taxCode.id, taxCode])),
+  };
 }
 
-function buildSalesDocumentNumberLockKey(docType: string, documentDate: Date) {
-  const { year, month, day } = getMalaysiaDateParts(documentDate);
-  return `sales-docno:${docType}:${year}${month}${day}`;
-}
+function calculateTaxAmount(taxableAmount: Prisma.Decimal, taxRate: Prisma.Decimal | number | string | null | undefined, method: string | null | undefined) {
+  const rate = new Prisma.Decimal(Number(taxRate ?? 0));
+  if (rate.lte(0) || taxableAmount.lte(0)) return new Prisma.Decimal(0);
 
-async function generateCashSalesNo(tx: Prisma.TransactionClient, docDate: Date) {
-  const { year, month, day } = getMalaysiaDateParts(docDate);
-  const prefix = `CS-${year}${month}${day}`;
-  const pattern = new RegExp(`^${prefix}-(\\d{4})$`);
-
-  const existing = await tx.salesTransaction.findMany({
-    where: { docType: "CS", docNo: { startsWith: `${prefix}-` } },
-    select: { docNo: true },
-  });
-
-  let maxSeq = 0;
-  for (const item of existing) {
-    const match = item.docNo?.match(pattern);
-    if (!match) continue;
-    const seq = Number(match[1]);
-    if (Number.isFinite(seq) && seq > maxSeq) maxSeq = seq;
+  if (method === "INCLUSIVE") {
+    return taxableAmount.mul(rate).div(new Prisma.Decimal(100).plus(rate)).toDecimalPlaces(2);
   }
 
-  return `${prefix}-${String(maxSeq + 1).padStart(4, "0")}`;
+  return taxableAmount.mul(rate).div(100).toDecimalPlaces(2);
 }
 
-
-function escapeRegExp(value: string) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function getBaseCashSalesDocNo(docNo: string | null | undefined) {
-  const value = String(docNo || "").trim().toUpperCase();
-  const match = value.match(/^(CS-\d{8}-\d{4})(?:-(\d+))?$/);
-  return match ? match[1] : value;
-}
-
-async function generateCashSalesRevisionNo(
-  tx: Prisma.TransactionClient,
-  current: { id: string; docNo: string; revisedFromId?: string | null; revisedFrom?: { docNo?: string | null } | null }
-) {
-  const baseDocNo = getBaseCashSalesDocNo(current.revisedFrom?.docNo || current.docNo);
-  const rows = await tx.salesTransaction.findMany({
-    where: {
-      docType: "CS",
-      OR: [
-        { id: current.id },
-        { docNo: baseDocNo },
-        { docNo: { startsWith: `${baseDocNo}-` } },
-        { revisedFromId: current.revisedFromId || current.id },
-      ],
-    },
-    select: { docNo: true },
-  });
-
-  let maxRevision = 0;
-  const pattern = new RegExp(`^${escapeRegExp(baseDocNo)}-(\\d+)$`);
-  for (const row of rows) {
-    const match = String(row.docNo || "").match(pattern);
-    if (!match) continue;
-    const revisionNo = Number(match[1]);
-    if (Number.isFinite(revisionNo) && revisionNo > maxRevision) maxRevision = revisionNo;
-  }
-
-  return `${baseDocNo}-${maxRevision + 1}`;
-}
-
-async function generateCashSalesRevisionNoFromRequest(tx: Prisma.TransactionClient, searchParams: URLSearchParams) {
-  const sourceId = normalizeText(searchParams.get("sourceTransactionId")) || normalizeText(searchParams.get("reviseFromId")) || normalizeText(searchParams.get("id"));
-  const sourceDocNo = normalizeText(searchParams.get("sourceDocNo")) || normalizeText(searchParams.get("docNo"));
-
-  const current = await tx.salesTransaction.findFirst({
-    where: {
-      docType: "CS",
-      ...(sourceId
-        ? { id: sourceId }
-        : sourceDocNo
-          ? { docNo: sourceDocNo.toUpperCase() }
-          : { id: "__missing_cash_sales_revision_source__" }),
-    },
-    select: {
-      id: true,
-      docNo: true,
-      revisedFromId: true,
-      revisedFrom: { select: { docNo: true } },
-    },
-  });
-
-  if (!current) throw new Error("Cash Sales source document is required to generate revision document number.");
-  return generateCashSalesRevisionNo(tx, current);
-}
-
-function assertValidManualDocNo(value: unknown) {
-  const docNo = normalizeText(value)?.toUpperCase() || null;
-  if (!docNo) return null;
-  if (!/^CS-\d{8}-\d{4}$/.test(docNo)) {
-    throw new Error("Cash Sales No must use CS-YYYYMMDD-0001 format.");
-  }
-  return docNo;
-}
-
-function sumLinkedQty(
-  line: {
-    sourceLineLinks?: Array<{ linkType?: string | null; qty?: Prisma.Decimal | number | string | null; claimAmount?: Prisma.Decimal | number | string | null; targetTransaction?: { status?: string | null } | null }>;
-  },
-  linkType: "INVOICED_TO" | "INVOICED_TO"
-) {
-  return (line.sourceLineLinks || [])
-    .filter((link) => link.linkType === linkType)
-    .filter((link) => link.targetTransaction?.status !== "CANCELLED")
-    .reduce((sum, link) => sum + toNumber(link.qty), 0);
-}
-
-
-function sumLinkedAmount(
-  line: {
-    sourceLineLinks?: Array<{ linkType?: string | null; claimAmount?: Prisma.Decimal | number | string | null; targetTransaction?: { status?: string | null } | null }>;
-  },
-  linkType: "INVOICED_TO" | "INVOICED_TO"
-) {
-  return (line.sourceLineLinks || [])
-    .filter((link) => link.linkType === linkType)
-    .filter((link) => link.targetTransaction?.status !== "CANCELLED")
-    .reduce((sum, link) => sum + toNumber(link.claimAmount), 0);
-}
-
-function withSalesLineProgress(line: any) {
-  const itemType = line.inventoryProduct?.itemType || line.itemType || "STOCK_ITEM";
-  const orderedQty = toNumber(line.qty);
-  const invoicedQty = sumLinkedQty(line, "INVOICED_TO");
-  const orderedAmount = toNumber(line.lineTotal);
-  const invoicedAmount = sumLinkedAmount(line, "INVOICED_TO");
+function applyLineTax(line: any, taxSettings: Awaited<ReturnType<typeof loadTaxSettings>>, requestedTaxCodeId: string | null) {
+  const taxCode = taxSettings.enabled && taxSettings.mode === "LINE_ITEM" && requestedTaxCodeId ? taxSettings.taxCodes.get(requestedTaxCodeId) : null;
+  const taxAmount = taxCode ? calculateTaxAmount(line.lineTotal, taxCode.rate, taxCode.calculationMethod) : new Prisma.Decimal(0);
+  const lineTotal = taxCode?.calculationMethod === "INCLUSIVE" ? line.lineTotal : line.lineTotal.plus(taxAmount).toDecimalPlaces(2);
 
   return {
     ...line,
-    itemType,
-    orderedQty,
-    invoicedQty,
-    orderedAmount,
-    invoicedAmount,
-    remainingInvoiceQty: Math.max(0, orderedQty - invoicedQty),
-    remainingInvoiceAmount: Math.max(0, orderedAmount - invoicedAmount),
+    taxCodeId: taxCode?.id || null,
+    taxCode: taxCode?.code || null,
+    taxDescription: taxCode?.description || null,
+    taxDisplayLabel: taxCode?.displayLabel || taxCode?.code || null,
+    taxRate: taxCode?.rate || new Prisma.Decimal(0),
+    taxCalculationMethod: taxCode?.calculationMethod || null,
+    taxAmount,
+    lineTotal,
   };
 }
 
-function calculateSalesOrderStatus(lines: Array<{ itemType?: string; orderedQty: number; invoicedQty: number; orderedAmount?: number; invoicedAmount?: number }>) {
-  if (lines.length === 0) return "OPEN" as SalesTransactionStatus;
-
-  const hasAnyProgress = lines.some((line) =>
-    line.itemType === "SERVICE_ITEM"
-      ? Number(line.invoicedAmount || 0) > 0
-      : line.invoicedQty > 0
-  );
-  const isFullyInvoiced = lines.every((line) =>
-    line.itemType === "SERVICE_ITEM"
-      ? Number(line.invoicedAmount || 0) >= Number(line.orderedAmount || 0)
-      : line.invoicedQty >= line.orderedQty
-  );
-
-  if (isFullyInvoiced) return "COMPLETED" as SalesTransactionStatus;
-  if (hasAnyProgress) return "PARTIAL" as SalesTransactionStatus;
-  return "OPEN" as SalesTransactionStatus;
-}
-
-async function refreshSalesOrderStatuses(tx: Prisma.TransactionClient, sourceTransactionIds: string[]) {
-  const uniqueIds = Array.from(new Set(sourceTransactionIds.filter(Boolean)));
-  for (const sourceTransactionId of uniqueIds) {
-    const source = await tx.salesTransaction.findUnique({
-      where: { id: sourceTransactionId },
-      select: {
-        id: true,
-        docType: true,
-        status: true,
-        lines: {
-          orderBy: { lineNo: "asc" },
-          include: {
-            inventoryProduct: { select: { itemType: true } },
-            sourceLineLinks: {
-              include: {
-                targetTransaction: { select: { id: true, status: true } },
-              },
-            },
-          },
-        },
-      },
-    });
-
-    if (!source || source.docType !== "SO" || source.status === "CANCELLED") continue;
-
-    const lines = source.lines.map((line) => withSalesLineProgress(line));
-    const nextStatus = calculateSalesOrderStatus(lines);
-    if (source.status !== nextStatus) {
-      await tx.salesTransaction.update({
-        where: { id: source.id },
-        data: { status: nextStatus },
-      });
-    }
-  }
-}
-
-async function getTrackedSourceLines(tx: Prisma.TransactionClient, sourceLineIds: string[]) {
-  if (sourceLineIds.length === 0) return new Map<string, any>();
-
-  const sourceLines = await tx.salesTransactionLine.findMany({
-    where: { id: { in: sourceLineIds } },
-    include: {
-      transaction: { select: { id: true, docType: true, docNo: true, status: true, customerId: true } },
-      inventoryProduct: { select: { itemType: true } },
-      sourceLineLinks: {
-        include: {
-          targetTransaction: { select: { id: true, status: true } },
-        },
-      },
-    },
-  });
-
-  return new Map(sourceLines.map((line) => [line.id, withSalesLineProgress(line)]));
-}
-
-function buildInvoiceLine(
-  line: CashSalesLinePayload,
-  lineNo: number,
-  productMap: Map<string, any>,
-  locationMap: Map<string, any>,
-  sourceLineMap: Map<string, any>,
-  numberFormat: { qtyDecimalPlaces: number; priceDecimalPlaces: number }
-) {
-  const sourceLineId = normalizeText(line.sourceLineId);
-  const sourceLine = sourceLineId ? sourceLineMap.get(sourceLineId) : null;
-  const inventoryProductId = normalizeText(line.inventoryProductId) || sourceLine?.inventoryProductId || null;
-  const product = inventoryProductId ? productMap.get(inventoryProductId) : null;
-  const locationId = normalizeText(line.locationId) || sourceLine?.locationId || null;
-  const location = locationId ? locationMap.get(locationId) : null;
-
-  const productCode = normalizeText(line.productCode) || sourceLine?.productCode || product?.code || "";
-  const productDescription = normalizeText(line.productDescription) || sourceLine?.productDescription || product?.description || "";
-  const itemType = product?.itemType || sourceLine?.itemType || "STOCK_ITEM";
-  const isServiceItem = itemType === "SERVICE_ITEM";
-  const uom = (normalizeText(line.uom) || sourceLine?.uom || product?.baseUom || "UNIT").toUpperCase();
-  const qty = qtyDecimalWithPlaces(line.qty, numberFormat.qtyDecimalPlaces);
-  const requestedClaimAmount = decimalWithPlaces(line.claimAmount ?? line.unitPrice, numberFormat.priceDecimalPlaces, sourceLine ? Math.max(0, toNumber(sourceLine.remainingInvoiceAmount)) : product ? Number(product.sellingPrice ?? 0) : 0);
-  const unitPrice = isServiceItem ? requestedClaimAmount : decimalWithPlaces(line.unitPrice, numberFormat.priceDecimalPlaces, sourceLine ? toNumber(sourceLine.unitPrice) : product ? Number(product.sellingPrice ?? 0) : 0);
-  const discountType = String(line.discountType || sourceLine?.discountType || "PERCENT").toUpperCase() === "AMOUNT" ? "AMOUNT" : "PERCENT";
-  const batchNo = normalizeText((line as any).batchNo)?.toUpperCase() || null;
-  const serialNos = normalizeSerialNumbers((line as any).serialNos);
-  const discountRate = discountType === "PERCENT" ? decimal(line.discountRate, sourceLine ? toNumber(sourceLine.discountRate) : 0) : new Prisma.Decimal(0);
-  const rawDiscountValue = decimal(line.discountRate, sourceLine ? toNumber(sourceLine.discountRate) : 0);
-  const lineSubtotal = qty.mul(unitPrice).toDecimalPlaces(2);
-  const discountAmount = discountType === "AMOUNT"
-    ? Prisma.Decimal.min(rawDiscountValue, lineSubtotal).toDecimalPlaces(2)
-    : lineSubtotal.mul(discountRate).div(100).toDecimalPlaces(2);
-  const taxableAmount = lineSubtotal.minus(discountAmount).toDecimalPlaces(2);
-
-  if (!productCode || !productDescription) throw new Error(`Product line ${lineNo} is missing product information.`);
-  if (!isServiceItem && (!locationId || !location)) throw new Error(`Product line ${lineNo} requires a valid stock location.`);
-
-  if (sourceLine) {
-    if (!(["DO", "SO"].includes(sourceLine.transaction?.docType || ""))) throw new Error("Cash Sales can only generate from Delivery Order or Sales Order.");
-    if (sourceLine.transaction?.status === "CANCELLED") throw new Error(`${sourceLine.transaction?.docNo || "Source Document"} is cancelled.`);
-    if (isServiceItem) {
-      const remainingAmount = Number(sourceLine.remainingInvoiceAmount || 0);
-      if (toNumber(requestedClaimAmount) > remainingAmount) {
-        throw new Error(`${productCode} claim amount exceeds remaining source document amount.`);
-      }
-    } else {
-      const remaining = Number(sourceLine.remainingInvoiceQty || 0);
-      if (toNumber(qty) > remaining) {
-        throw new Error(`${productCode} invoice qty exceeds remaining source document qty.`);
-      }
-    }
-  }
-
-  if (!isServiceItem && product?.batchTracking && !batchNo) {
-    throw new Error(`${productCode} requires Batch No.`);
-  }
-  if (!isServiceItem && product?.serialNumberTracking) {
-    if (serialNos.length === 0) throw new Error(`${productCode} requires S/N No.`);
-    if (toNumber(qty) !== serialNos.length) throw new Error(`${productCode} quantity must match selected S/N count.`);
-  }
-
-  return {
-    lineNo,
-    sourceLineId,
-    sourceTransactionId: sourceLine?.transactionId || normalizeText(line.sourceTransactionId),
-    inventoryProductId,
-    productCode,
-    productDescription,
-    uom,
-    qty,
-    unitPrice,
-    discountRate,
-    discountType,
-    discountAmount,
-    itemType,
-    claimAmount: isServiceItem ? requestedClaimAmount : null,
-    locationId: location?.id || null,
-    batchNo: isServiceItem ? null : batchNo,
-    serialNos,
-    batchTracking: !isServiceItem && Boolean(product?.batchTracking),
-    serialNumberTracking: !isServiceItem && Boolean(product?.serialNumberTracking),
-    locationCode: location?.code || null,
-    locationName: location?.name || null,
-    taxCodeId: null,
-    taxCode: null,
-    taxDescription: null,
-    taxDisplayLabel: null,
-    taxRate: new Prisma.Decimal(0),
-    taxCalculationMethod: null,
-    taxAmount: new Prisma.Decimal(0),
-    lineSubtotal,
-    lineTotal: taxableAmount,
-    remarks: normalizeText(line.remarks),
-  };
-}
-
-async function buildCashSalesData(body: any, tx: Prisma.TransactionClient) {
-  const docDate = normalizeDate(body.docDate);
-  const customerId = normalizeText(body.customerId);
-  if (!customerId) throw new Error("Customer is required.");
-
-  const rawLines = Array.isArray(body.lines) ? (body.lines as CashSalesLinePayload[]) : [];
-  if (rawLines.length === 0) throw new Error("Please add at least one product line.");
-
-  const customer = await tx.user.findFirst({
-    where: { id: customerId, role: "CUSTOMER" },
-    include: { agent: true },
-  });
-  if (!customer) throw new Error("Selected customer is invalid.");
-
-  const numberFormat = await loadStockNumberFormat(tx);
-
-  const productIds = Array.from(new Set(rawLines.map((line) => normalizeText(line.inventoryProductId)).filter(Boolean))) as string[];
-  const locationIds = Array.from(new Set(rawLines.map((line) => normalizeText(line.locationId)).filter(Boolean))) as string[];
-  const sourceLineIds = Array.from(new Set(rawLines.map((line) => normalizeText(line.sourceLineId)).filter(Boolean))) as string[];
-
-  const [products, locations, sourceLineMap] = await Promise.all([
-    productIds.length
-      ? tx.inventoryProduct.findMany({
-          where: { id: { in: productIds }, isActive: true },
-          select: {
-            id: true,
-            code: true,
-            description: true,
-            baseUom: true,
-            sellingPrice: true,
-            trackInventory: true,
-            itemType: true,
-            batchTracking: true,
-            serialNumberTracking: true,
-          },
-        })
-      : Promise.resolve([]),
-    locationIds.length
-      ? tx.stockLocation.findMany({
-          where: { id: { in: locationIds }, isActive: true },
-          select: { id: true, code: true, name: true, isActive: true },
-        })
-      : Promise.resolve([]),
-    getTrackedSourceLines(tx, sourceLineIds),
-  ]);
-
-  const productMap = new Map<string, any>(products.map((item: any) => [item.id, item]));
-  const locationMap = new Map<string, any>(locations.map((item: any) => [item.id, item]));
-
-  const lines = rawLines.map((line, index) => buildInvoiceLine(line, index + 1, productMap, locationMap, sourceLineMap, numberFormat));
-
-  for (const line of lines) {
-    const product = line.inventoryProductId ? productMap.get(line.inventoryProductId) : null;
-    if (!product) throw new Error(`${line.productCode} product is invalid.`);
-    if (product.itemType !== "SERVICE_ITEM" && !product.trackInventory) {
-      throw new Error(`${line.productCode} is not a tracked stock item and cannot be delivered through Invoice stock out.`);
-    }
-  }
-
-  const subtotal = lines.reduce((sum, line) => sum.plus(line.lineSubtotal), new Prisma.Decimal(0)).toDecimalPlaces(2);
-  const discountTotal = lines.reduce((sum, line) => sum.plus(line.discountAmount), new Prisma.Decimal(0)).toDecimalPlaces(2);
-  const taxableSubtotal = subtotal.minus(discountTotal).toDecimalPlaces(2);
-  const taxTotal = new Prisma.Decimal(0);
-  const grandTotal = lines.reduce((sum, line) => sum.plus(line.lineTotal), new Prisma.Decimal(0)).toDecimalPlaces(2);
+function calculateTransactionTotals(lines: any[], taxSettings: Awaited<ReturnType<typeof loadTaxSettings>>, transactionTaxCodeId: string | null) {
+  const totals = calculateTransactionTotals(lines, taxSettings, normalizeText(body.transactionTaxCodeId));
+  const { subtotal, discountTotal, taxableSubtotal, taxTotal, grandTotal, transactionTaxCode } = totals;
 
   const sourceLines = Array.from(sourceLineMap.values()) as any[];
   const generatedFromDocNos = Array.from(new Set(sourceLines.map((line: any) => line.transaction?.docNo).filter(Boolean)));
@@ -633,6 +278,7 @@ async function buildCashSalesData(body: any, tx: Prisma.TransactionClient) {
     taxableSubtotal,
     taxTotal,
     grandTotal,
+    transactionTaxCode,
     lines,
     sourceTransactionIds: Array.from(new Set(lines.map((line) => line.sourceTransactionId).filter(Boolean))) as string[],
     sourceDocTypes,
@@ -933,6 +579,14 @@ export async function POST(req: Request) {
           subtotal: data.subtotal,
           discountTotal: data.discountTotal,
           taxableSubtotal: data.taxableSubtotal,
+          taxCodeId: data.transactionTaxCode?.id || null,
+          taxCode: data.transactionTaxCode?.code || null,
+          taxDescription: data.transactionTaxCode?.description || null,
+          taxDisplayLabel: data.transactionTaxCode?.displayLabel || data.transactionTaxCode?.code || null,
+          taxRate: data.transactionTaxCode?.rate || null,
+          taxCalculationMethod: data.transactionTaxCode?.calculationMethod || null,
+          taxCalculationModeSnapshot: data.taxCalculationModeSnapshot as any,
+          isTaxEnabledSnapshot: data.isTaxEnabledSnapshot,
           taxTotal: data.taxTotal,
           grandTotal: data.grandTotal,
           termsAndConditions: data.termsAndConditions,
