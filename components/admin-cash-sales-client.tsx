@@ -149,6 +149,12 @@ type CashSalesRecord = {
   footerRemarks?: string | null;
   status: "OPEN" | "PARTIAL" | "COMPLETED" | "CANCELLED";
   grandTotal: string | number;
+  cancelReason?: string | null;
+  cancelledAt?: string | Date | null;
+  cancelledBy?: string | null;
+  cancelledByName?: string | null;
+  cancelledByAdminName?: string | null;
+  cancelledByAdmin?: { id?: string | null; name?: string | null; email?: string | null } | null;
   revisedFrom?: { id: string; docNo?: string | null } | null;
   revisions?: Array<{ id: string; docNo?: string | null; status?: string | null }>;
   targetLinks?: Array<{ sourceTransaction?: { id: string; docType?: string | null; docNo?: string | null; status?: string | null } | null }>;
