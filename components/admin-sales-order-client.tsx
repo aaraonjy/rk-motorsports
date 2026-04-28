@@ -1589,20 +1589,16 @@ export function AdminSalesOrderClient({
             </div>
 
             <div className="mt-6 flex flex-wrap gap-2 border-b border-white/10 pb-4">
-              {(["HEADER", "BODY", "FOOTER"] as const).map((tab) => {
-                const isLockedTab = isGeneratedFromQuotationDocument && tab !== "HEADER";
-                return (
-                  <button
-                    key={tab}
-                    type="button"
-                    disabled={isLockedTab}
-                    onClick={() => { if (!isLockedTab) setActiveTab(tab); }}
-                    className={`rounded-xl px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-45 ${activeTab === tab ? "bg-red-600 text-white" : "border border-white/10 text-white/65 hover:bg-white/10 hover:text-white"}`}
-                  >
-                    {tab === "HEADER" ? "Header" : tab === "BODY" ? "Body" : "Footer"}
-                  </button>
-                );
-              })}
+              {(["HEADER", "BODY", "FOOTER"] as const).map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setActiveTab(tab)}
+                  className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${activeTab === tab ? "bg-red-600 text-white" : "border border-white/10 text-white/65 hover:bg-white/10 hover:text-white"}`}
+                >
+                  {tab === "HEADER" ? "Header" : tab === "BODY" ? "Body" : "Footer"}
+                </button>
+              ))}
             </div>
 
             {isGeneratedFromQuotationDocument ? (
