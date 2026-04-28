@@ -96,7 +96,9 @@ export function AdminSalesMenu() {
                 const phaseTwoEnabled =
                   item.href === "/admin/sales/quotation" ||
                   item.href === "/admin/sales/sales-order" ||
-                  item.href === "/admin/sales/delivery-order";
+                  item.href === "/admin/sales/delivery-order" ||
+                  item.href === "/admin/sales/sales-invoice" ||
+                  item.href === "/admin/sales/cash-sales";
 
                 if (!phaseTwoEnabled) {
                   return (
