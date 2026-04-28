@@ -614,7 +614,20 @@ function getBalanceDisplay(value: number | undefined, isLoading: boolean, decima
 
 
 function hasActiveDownstreamTransaction(transaction: SalesOrderRecord) {
-  return (transaction.targetLinks || []).some((link) => link.targetTransaction && link.targetTransaction.status !== "CANCELLED");
+  const targetLinks = Array.isArray(transaction.targetLinks) ? transaction.targetLinks : [];
+
+  const hasActiveTargetLink = targetLinks.some((link: any) => {
+    const downstream = link?.targetTransaction || null;
+    if (!downstream || downstream.status === "CANCELLED") return false;
+
+    const docType = String(downstream.docType || "").toUpperCase();
+    return ["DO", "INV", "CS"].includes(docType);
+  });
+
+  // Fallback for existing Sales Orders where downstream links may not be returned by the list API.
+  // In this sales flow, PARTIAL / COMPLETED SO usually means it has already been delivered or invoiced,
+  // so edit / revise / cancel actions must be locked to protect transaction trace integrity.
+  return hasActiveTargetLink || transaction.status === "PARTIAL" || transaction.status === "COMPLETED";
 }
 
 export function AdminSalesOrderClient({
