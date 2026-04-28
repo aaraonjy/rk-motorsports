@@ -168,7 +168,7 @@ function sumLinkedQty(
   line: {
     sourceLineLinks?: Array<{ linkType?: string | null; qty?: Prisma.Decimal | number | string | null; claimAmount?: Prisma.Decimal | number | string | null; targetTransaction?: { status?: string | null } | null }>;
   },
-  linkType: "INVOICED_TO" | "INVOICED_TO"
+  linkType: "INVOICED_TO"
 ) {
   return (line.sourceLineLinks || [])
     .filter((link) => link.linkType === linkType)
@@ -181,7 +181,7 @@ function sumLinkedAmount(
   line: {
     sourceLineLinks?: Array<{ linkType?: string | null; claimAmount?: Prisma.Decimal | number | string | null; targetTransaction?: { status?: string | null } | null }>;
   },
-  linkType: "INVOICED_TO" | "INVOICED_TO"
+  linkType: "INVOICED_TO"
 ) {
   return (line.sourceLineLinks || [])
     .filter((link) => link.linkType === linkType)
@@ -725,13 +725,13 @@ export async function POST(req: Request) {
           customerId: data.customer.id,
           customerAccountNo: data.customer.customerAccountNo,
           customerName: data.customer.name,
-          billingAddressLine1: data.customer.billingAddressLine1,
-          billingAddressLine2: data.customer.billingAddressLine2,
-          billingAddressLine3: data.customer.billingAddressLine3,
-          billingAddressLine4: data.customer.billingAddressLine4,
-          billingCity: data.customer.billingCity,
-          billingPostCode: data.customer.billingPostCode,
-          billingCountryCode: data.customer.billingCountryCode,
+          billingAddressLine1: normalizeText(body.billingAddressLine1) ?? data.customer.billingAddressLine1,
+          billingAddressLine2: normalizeText(body.billingAddressLine2) ?? data.customer.billingAddressLine2,
+          billingAddressLine3: normalizeText(body.billingAddressLine3) ?? data.customer.billingAddressLine3,
+          billingAddressLine4: normalizeText(body.billingAddressLine4) ?? data.customer.billingAddressLine4,
+          billingCity: normalizeText(body.billingCity) ?? data.customer.billingCity,
+          billingPostCode: normalizeText(body.billingPostCode) ?? data.customer.billingPostCode,
+          billingCountryCode: normalizeText(body.billingCountryCode) ?? data.customer.billingCountryCode,
           deliveryAddressLine1: normalizeText(body.deliveryAddressLine1) ?? data.customer.deliveryAddressLine1,
           deliveryAddressLine2: normalizeText(body.deliveryAddressLine2) ?? data.customer.deliveryAddressLine2,
           deliveryAddressLine3: normalizeText(body.deliveryAddressLine3) ?? data.customer.deliveryAddressLine3,

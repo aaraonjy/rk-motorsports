@@ -122,6 +122,13 @@ type SalesInvoiceRecord = {
   customerId?: string | null;
   customerName: string;
   customerAccountNo?: string | null;
+  billingAddressLine1?: string | null;
+  billingAddressLine2?: string | null;
+  billingAddressLine3?: string | null;
+  billingAddressLine4?: string | null;
+  billingCity?: string | null;
+  billingPostCode?: string | null;
+  billingCountryCode?: string | null;
   deliveryAddressLine1?: string | null;
   deliveryAddressLine2?: string | null;
   deliveryAddressLine3?: string | null;
@@ -785,14 +792,13 @@ export function AdminSalesInvoiceClient({
   const [contactNo, setContactNo] = useState("");
   const [email, setEmail] = useState("");
   const [currency, setCurrency] = useState("MYR");
-  const [deliveryAddressSource, setDeliveryAddressSource] = useState("DEFAULT");
-  const [deliveryAddressLine1, setDeliveryAddressLine1] = useState("");
-  const [deliveryAddressLine2, setDeliveryAddressLine2] = useState("");
-  const [deliveryAddressLine3, setDeliveryAddressLine3] = useState("");
-  const [deliveryAddressLine4, setDeliveryAddressLine4] = useState("");
-  const [deliveryCity, setDeliveryCity] = useState("");
-  const [deliveryPostCode, setDeliveryPostCode] = useState("");
-  const [deliveryCountryCode, setDeliveryCountryCode] = useState("MY");
+  const [billingAddressLine1, setBillingAddressLine1] = useState("");
+  const [billingAddressLine2, setBillingAddressLine2] = useState("");
+  const [billingAddressLine3, setBillingAddressLine3] = useState("");
+  const [billingAddressLine4, setBillingAddressLine4] = useState("");
+  const [billingCity, setBillingCity] = useState("");
+  const [billingPostCode, setBillingPostCode] = useState("");
+  const [billingCountryCode, setBillingCountryCode] = useState("MY");
   const [reference, setReference] = useState("");
   const [remarks, setRemarks] = useState("");
   const [agentId, setAgentId] = useState("");
@@ -906,8 +912,6 @@ export function AdminSalesInvoiceClient({
     return availableSourceOrders.filter((order) => selected.has(order.id));
   }, [availableSourceOrders, selectedSourceOrderIds]);
 
-  const selectedCustomer = useMemo(() => initialCustomers.find((item) => item.id === customerId) || null, [customerId, initialCustomers]);
-
   function isGeneratedFromSalesOrder(transaction: SalesInvoiceRecord) {
     return (transaction.targetLinks || []).some((link) => link.sourceTransaction?.docType === "SO" || String(link.sourceTransaction?.docNo || "").startsWith("SO-"));
   }
@@ -919,49 +923,14 @@ export function AdminSalesInvoiceClient({
   const hasGeneratedSalesOrderLines = lines.some((line) => isGeneratedLineFromSalesOrder(line));
 
 
-  const deliveryAddressOptions = useMemo<SearchableSelectOption[]>(() => {
-    if (!selectedCustomer) return [{ id: "DEFAULT", label: "Default Delivery Address", searchText: "default delivery address" }];
-
-    return [
-      { id: "DEFAULT", label: "Default Delivery Address", searchText: "default delivery address" },
-      ...(selectedCustomer.deliveryAddresses || []).map((address) => {
-        const label = address.label?.trim() || "Secondary Delivery Address";
-        const addressText = [address.addressLine1, address.addressLine2, address.addressLine3, address.addressLine4, address.postCode, address.city, address.countryCode]
-          .filter(Boolean)
-          .join(" ");
-        return {
-          id: address.id,
-          label,
-          searchText: `${label} ${addressText}`.toLowerCase(),
-        };
-      }),
-    ];
-  }, [selectedCustomer]);
-
-  function applyDeliveryAddressFromCustomer(customer: CustomerOption, sourceId = "DEFAULT") {
-    if (sourceId === "DEFAULT") {
-      setDeliveryAddressSource("DEFAULT");
-      setDeliveryAddressLine1(customer.deliveryAddressLine1 || "");
-      setDeliveryAddressLine2(customer.deliveryAddressLine2 || "");
-      setDeliveryAddressLine3(customer.deliveryAddressLine3 || "");
-      setDeliveryAddressLine4(customer.deliveryAddressLine4 || "");
-      setDeliveryCity(customer.deliveryCity || "");
-      setDeliveryPostCode(customer.deliveryPostCode || "");
-      setDeliveryCountryCode(customer.deliveryCountryCode || "MY");
-      return;
-    }
-
-    const selectedAddress = (customer.deliveryAddresses || []).find((address) => address.id === sourceId);
-    if (!selectedAddress) return;
-
-    setDeliveryAddressSource(sourceId);
-    setDeliveryAddressLine1(selectedAddress.addressLine1 || "");
-    setDeliveryAddressLine2(selectedAddress.addressLine2 || "");
-    setDeliveryAddressLine3(selectedAddress.addressLine3 || "");
-    setDeliveryAddressLine4(selectedAddress.addressLine4 || "");
-    setDeliveryCity(selectedAddress.city || "");
-    setDeliveryPostCode(selectedAddress.postCode || "");
-    setDeliveryCountryCode(selectedAddress.countryCode || "MY");
+  function applyBillingAddressFromCustomer(customer: CustomerOption) {
+    setBillingAddressLine1(customer.billingAddressLine1 || "");
+    setBillingAddressLine2(customer.billingAddressLine2 || "");
+    setBillingAddressLine3(customer.billingAddressLine3 || "");
+    setBillingAddressLine4(customer.billingAddressLine4 || "");
+    setBillingCity(customer.billingCity || "");
+    setBillingPostCode(customer.billingPostCode || "");
+    setBillingCountryCode(customer.billingCountryCode || "MY");
   }
 
   const normalizedLines = useMemo(() => {
@@ -1126,14 +1095,13 @@ export function AdminSalesInvoiceClient({
     setContactNo("");
     setEmail("");
     setCurrency("MYR");
-    setDeliveryAddressSource("DEFAULT");
-    setDeliveryAddressLine1("");
-    setDeliveryAddressLine2("");
-    setDeliveryAddressLine3("");
-    setDeliveryAddressLine4("");
-    setDeliveryCity("");
-    setDeliveryPostCode("");
-    setDeliveryCountryCode("MY");
+    setBillingAddressLine1("");
+    setBillingAddressLine2("");
+    setBillingAddressLine3("");
+    setBillingAddressLine4("");
+    setBillingCity("");
+    setBillingPostCode("");
+    setBillingCountryCode("MY");
     setReference("");
     setRemarks("");
     setAgentId("");
@@ -1211,14 +1179,13 @@ export function AdminSalesInvoiceClient({
     setContactNo(transaction.contactNo || "");
     setEmail(transaction.email || "");
     setCurrency(transaction.currency || "MYR");
-    setDeliveryAddressSource("DEFAULT");
-    setDeliveryAddressLine1(transaction.deliveryAddressLine1 || "");
-    setDeliveryAddressLine2(transaction.deliveryAddressLine2 || "");
-    setDeliveryAddressLine3(transaction.deliveryAddressLine3 || "");
-    setDeliveryAddressLine4(transaction.deliveryAddressLine4 || "");
-    setDeliveryCity(transaction.deliveryCity || "");
-    setDeliveryPostCode(transaction.deliveryPostCode || "");
-    setDeliveryCountryCode(transaction.deliveryCountryCode || "MY");
+    setBillingAddressLine1(transaction.billingAddressLine1 || "");
+    setBillingAddressLine2(transaction.billingAddressLine2 || "");
+    setBillingAddressLine3(transaction.billingAddressLine3 || "");
+    setBillingAddressLine4(transaction.billingAddressLine4 || "");
+    setBillingCity(transaction.billingCity || "");
+    setBillingPostCode(transaction.billingPostCode || "");
+    setBillingCountryCode(transaction.billingCountryCode || "MY");
     setReference(transaction.reference || "");
     setRemarks(transaction.remarks || "");
     setAgentId(transaction.agentId || "");
@@ -1261,7 +1228,7 @@ export function AdminSalesInvoiceClient({
   function openEdit(transaction: SalesInvoiceRecord) {
     if (isGeneratedFromSalesOrder(transaction)) {
       setSubmitSuccess("");
-      alert("Sales Invoice generated from Sales Order cannot be edited. Please cancel this DO and generate a new DO from the original SO.");
+      alert("Sales Invoice generated from Sales Order cannot be edited. Please cancel this Sales Invoice and generate a new Sales Invoice from the original source document.");
       return;
     }
     fillFormFromTransaction(transaction, "edit");
@@ -1270,7 +1237,7 @@ export function AdminSalesInvoiceClient({
   function openRevise(transaction: SalesInvoiceRecord) {
     if (isGeneratedFromSalesOrder(transaction)) {
       setSubmitSuccess("");
-      alert("Sales Invoice generated from Sales Order cannot be revised. Please cancel this DO and generate a new DO from the original SO.");
+      alert("Sales Invoice generated from Sales Order cannot be revised. Please cancel this Sales Invoice and generate a new Sales Invoice from the original source document.");
       return;
     }
     fillFormFromTransaction(transaction, "revise");
@@ -1295,7 +1262,7 @@ export function AdminSalesInvoiceClient({
     setEmail(customer.email || "");
     setCurrency(customer.currency || "MYR");
     setAgentId(customer.agentId || "");
-    applyDeliveryAddressFromCustomer(customer, "DEFAULT");
+    applyBillingAddressFromCustomer(customer);
   }
 
   function updateLine(index: number, patch: Partial<LineForm>) {
@@ -1428,14 +1395,13 @@ export function AdminSalesInvoiceClient({
     setDocDesc(`Generated from ${selectedSourceOrders.map((order) => order.docNo).join(", ")}`);
     setReference(selectedSourceOrders.map((order) => order.docNo).join(", "));
     setRemarks(first?.remarks || "");
-    setDeliveryAddressSource("DEFAULT");
-    setDeliveryAddressLine1(first?.deliveryAddressLine1 || "");
-    setDeliveryAddressLine2(first?.deliveryAddressLine2 || "");
-    setDeliveryAddressLine3(first?.deliveryAddressLine3 || "");
-    setDeliveryAddressLine4(first?.deliveryAddressLine4 || "");
-    setDeliveryCity(first?.deliveryCity || "");
-    setDeliveryPostCode(first?.deliveryPostCode || "");
-    setDeliveryCountryCode(first?.deliveryCountryCode || "MY");
+    setBillingAddressLine1(first?.billingAddressLine1 || "");
+    setBillingAddressLine2(first?.billingAddressLine2 || "");
+    setBillingAddressLine3(first?.billingAddressLine3 || "");
+    setBillingAddressLine4(first?.billingAddressLine4 || "");
+    setBillingCity(first?.billingCity || "");
+    setBillingPostCode(first?.billingPostCode || "");
+    setBillingCountryCode(first?.billingCountryCode || "MY");
     setProjectId(first?.projectId || "");
     setDepartmentId(first?.departmentId || "");
     setTermsAndConditions(first?.termsAndConditions || "");
@@ -1517,13 +1483,13 @@ export function AdminSalesInvoiceClient({
         docDesc,
         customerId,
         currency,
-        deliveryAddressLine1,
-        deliveryAddressLine2,
-        deliveryAddressLine3,
-        deliveryAddressLine4,
-        deliveryCity,
-        deliveryPostCode,
-        deliveryCountryCode,
+        billingAddressLine1,
+        billingAddressLine2,
+        billingAddressLine3,
+        billingAddressLine4,
+        billingCity,
+        billingPostCode,
+        billingCountryCode,
         reference,
         remarks,
         agentId,
@@ -1746,34 +1712,19 @@ export function AdminSalesInvoiceClient({
                 </div>
 
                 <div className="rounded-[1.75rem] border border-white/10 p-5">
-                  <div className="mb-5 flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold uppercase tracking-[0.24em] text-white/40">Delivery Address</p>
-                      <p className="mt-2 text-sm text-white/55">Select default or secondary delivery address for this Sales Invoice.</p>
-                    </div>
-                    <div className="w-full md:w-80">
-                      <SearchableSelect
-                        label="Address Source"
-                        placeholder="Select delivery address"
-                        options={deliveryAddressOptions}
-                        value={deliveryAddressSource}
-                        disabled={!customerId}
-                        onChange={(option) => {
-                          if (!selectedCustomer) return;
-                          applyDeliveryAddressFromCustomer(selectedCustomer, option?.id || "DEFAULT");
-                        }}
-                      />
-                    </div>
+                  <div className="mb-5">
+                    <p className="text-sm font-semibold uppercase tracking-[0.24em] text-white/40">Billing Address</p>
+                    <p className="mt-2 text-sm text-white/55">Billing address used for this Sales Invoice.</p>
                   </div>
 
                   <div className="mt-5 grid gap-5 md:grid-cols-2">
-                    <div><label className="label-rk">Delivery Address Line 1</label><input className="input-rk" value={deliveryAddressLine1} onChange={(e) => setDeliveryAddressLine1(e.target.value)} /></div>
-                    <div><label className="label-rk">Delivery Address Line 2</label><input className="input-rk" value={deliveryAddressLine2} onChange={(e) => setDeliveryAddressLine2(e.target.value)} /></div>
-                    <div><label className="label-rk">Delivery Address Line 3</label><input className="input-rk" value={deliveryAddressLine3} onChange={(e) => setDeliveryAddressLine3(e.target.value)} /></div>
-                    <div><label className="label-rk">Delivery Address Line 4</label><input className="input-rk" value={deliveryAddressLine4} onChange={(e) => setDeliveryAddressLine4(e.target.value)} /></div>
-                    <div><label className="label-rk">City</label><input className="input-rk" value={deliveryCity} onChange={(e) => setDeliveryCity(e.target.value)} /></div>
-                    <div><label className="label-rk">Post Code</label><input className="input-rk" value={deliveryPostCode} onChange={(e) => setDeliveryPostCode(e.target.value)} /></div>
-                    <div><label className="label-rk">Country Code</label><input className="input-rk" value={deliveryCountryCode} onChange={(e) => setDeliveryCountryCode(e.target.value.toUpperCase())} /></div>
+                    <div><label className="label-rk">Billing Address Line 1</label><input className="input-rk" value={billingAddressLine1} onChange={(e) => setBillingAddressLine1(e.target.value)} /></div>
+                    <div><label className="label-rk">Billing Address Line 2</label><input className="input-rk" value={billingAddressLine2} onChange={(e) => setBillingAddressLine2(e.target.value)} /></div>
+                    <div><label className="label-rk">Billing Address Line 3</label><input className="input-rk" value={billingAddressLine3} onChange={(e) => setBillingAddressLine3(e.target.value)} /></div>
+                    <div><label className="label-rk">Billing Address Line 4</label><input className="input-rk" value={billingAddressLine4} onChange={(e) => setBillingAddressLine4(e.target.value)} /></div>
+                    <div><label className="label-rk">City</label><input className="input-rk" value={billingCity} onChange={(e) => setBillingCity(e.target.value)} /></div>
+                    <div><label className="label-rk">Post Code</label><input className="input-rk" value={billingPostCode} onChange={(e) => setBillingPostCode(e.target.value)} /></div>
+                    <div><label className="label-rk">Country Code</label><input className="input-rk" value={billingCountryCode} onChange={(e) => setBillingCountryCode(e.target.value.toUpperCase())} /></div>
                   </div>
                 </div>
               </div>
