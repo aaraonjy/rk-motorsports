@@ -1303,7 +1303,7 @@ export function AdminDeliveryOrderClient({
     setBankAccount("");
     setFooterRemarks("");
     setSelectedTaxCodeId(taxConfig.taxModuleEnabled ? taxConfig.defaultAdminTaxCodeId || "" : "");
-    setLines(emptyLine(isLineItemTaxMode ? taxConfig.defaultAdminTaxCodeId || "" : "", defaultLocationId, qtyDecimalPlaces, priceDecimalPlaces)]);
+    setLines([emptyLine(isLineItemTaxMode ? taxConfig.defaultAdminTaxCodeId || "" : "", defaultLocationId, qtyDecimalPlaces, priceDecimalPlaces)]);
     setSubmitError("");
     setSubmitMessageType("success");
     setRecentCancelledTransaction(null);
