@@ -39,6 +39,69 @@ function getStatusClass(status: string) {
   return "border-amber-500/25 bg-amber-500/10 text-amber-200";
 }
 
+
+type AssemblyTraceComponent = {
+  id: string;
+  productCode: string;
+  productDescription: string;
+  qty: number;
+  uom: string;
+  batchNo: string | null;
+  expiryDate: Date | string | null;
+  locationLabel: string | null;
+  serialEntries: Array<{ id: string; serialNo: string; batchNo: string | null; expiryDate: Date | string | null }>;
+};
+
+type AssemblyTraceDisplay = {
+  id: string;
+  docNo: string;
+  docDate: Date | string | null;
+  components: AssemblyTraceComponent[];
+};
+
+function mapLocationLabel(location?: { code?: string | null; name?: string | null } | null) {
+  if (!location) return null;
+  return [location.code, location.name].filter(Boolean).join(" — ") || null;
+}
+
+function buildAssemblyTraceKey(productId?: string | null, batchNo?: string | null, locationId?: string | null) {
+  const normalizedProductId = String(productId || "").trim();
+  const normalizedBatchNo = String(batchNo || "").trim().toUpperCase();
+  const normalizedLocationId = String(locationId || "").trim();
+  if (!normalizedProductId || !normalizedBatchNo) return "";
+  return `${normalizedProductId}__${normalizedBatchNo}__${normalizedLocationId}`;
+}
+
+function buildBatchExpiryKey(productId?: string | null, batchNo?: string | null) {
+  const normalizedProductId = String(productId || "").trim();
+  const normalizedBatchNo = String(batchNo || "").trim().toUpperCase();
+  if (!normalizedProductId || !normalizedBatchNo) return "";
+  return `${normalizedProductId}__${normalizedBatchNo}`;
+}
+
+function formatTraceComponentMeta(component: AssemblyTraceComponent) {
+  const parts = [`Qty: ${money(component.qty)}${component.uom ? ` ${component.uom}` : ""}`];
+
+  if (component.batchNo) {
+    const expiryDate = formatDate(component.expiryDate);
+    parts.push(`Batch No: ${component.batchNo}${expiryDate !== "-" ? ` (Expiry Date: ${expiryDate})` : ""}`);
+  }
+
+  if (component.serialEntries.length > 0) {
+    const serialText = component.serialEntries
+      .map((entry) => {
+        const expiryDate = formatDate(entry.expiryDate);
+        const batchText = entry.batchNo ? ` / Batch No: ${entry.batchNo}${expiryDate !== "-" ? ` (Expiry Date: ${expiryDate})` : ""}` : "";
+        return `${entry.serialNo}${batchText}`;
+      })
+      .join(", ");
+    parts.push(`Serial No: ${serialText}`);
+  }
+
+  if (component.locationLabel) parts.push(`Location: ${component.locationLabel}`);
+  return parts.join(" • ");
+}
+
 function ReadonlyField({ label, value, className = "" }: { label: string; value: string; className?: string }) {
   return (
     <div className={className}>
@@ -125,6 +188,128 @@ export default async function AdminDeliveryOrderDetailPage({ params }: Params) {
       },
     },
   });
+
+  const stockLines = stockIssue?.lines || [];
+  const traceLookupKeys = stockLines
+    .map((line) => ({
+      inventoryProductId: line.inventoryProductId,
+      batchNo: line.batchNo,
+      locationId: line.locationId,
+      key: buildAssemblyTraceKey(line.inventoryProductId, line.batchNo, line.locationId),
+    }))
+    .filter((item) => item.inventoryProductId && item.batchNo && item.key);
+
+  const assemblyTransactions = traceLookupKeys.length
+    ? await db.stockTransaction.findMany({
+        where: {
+          transactionType: "AS",
+          status: "POSTED",
+          lines: {
+            some: {
+              OR: traceLookupKeys.map((item) => ({
+                inventoryProductId: item.inventoryProductId,
+                batchNo: item.batchNo,
+                locationId: item.locationId,
+                adjustmentDirection: "IN",
+              })),
+            },
+          },
+        },
+        orderBy: [{ transactionDate: "desc" }, { createdAt: "desc" }],
+        include: {
+          lines: {
+            orderBy: [{ createdAt: "asc" }],
+            include: {
+              inventoryProduct: { select: { id: true, code: true, description: true, baseUom: true } },
+              location: { select: { id: true, code: true, name: true } },
+              fromLocation: { select: { id: true, code: true, name: true } },
+              toLocation: { select: { id: true, code: true, name: true } },
+              serialEntries: {
+                orderBy: [{ serialNo: "asc" }],
+                include: {
+                  inventoryBatch: { select: { id: true, batchNo: true, expiryDate: true } },
+                },
+              },
+            },
+          },
+        },
+      })
+    : [];
+
+  const batchExpiryConditions = new Map<string, { inventoryProductId: string; batchNo: string }>();
+  for (const assemblyTransaction of assemblyTransactions) {
+    for (const line of assemblyTransaction.lines) {
+      const lineBatchKey = buildBatchExpiryKey(line.inventoryProductId, line.batchNo);
+      if (lineBatchKey && !batchExpiryConditions.has(lineBatchKey)) {
+        batchExpiryConditions.set(lineBatchKey, { inventoryProductId: line.inventoryProductId, batchNo: String(line.batchNo) });
+      }
+
+      for (const entry of line.serialEntries || []) {
+        const entryBatchNo = entry.inventoryBatch?.batchNo || line.batchNo || null;
+        const entryBatchKey = buildBatchExpiryKey(line.inventoryProductId, entryBatchNo);
+        if (entryBatchKey && !batchExpiryConditions.has(entryBatchKey)) {
+          batchExpiryConditions.set(entryBatchKey, { inventoryProductId: line.inventoryProductId, batchNo: String(entryBatchNo) });
+        }
+      }
+    }
+  }
+
+  const batchExpiryRows = batchExpiryConditions.size
+    ? await db.inventoryBatch.findMany({
+        where: { OR: Array.from(batchExpiryConditions.values()) },
+        select: { inventoryProductId: true, batchNo: true, expiryDate: true },
+      })
+    : [];
+
+  const batchExpiryMap = new Map<string, Date | null>();
+  for (const batch of batchExpiryRows) {
+    batchExpiryMap.set(buildBatchExpiryKey(batch.inventoryProductId, batch.batchNo), batch.expiryDate ?? null);
+  }
+
+  const assemblyTraceMap = new Map<string, AssemblyTraceDisplay[]>();
+  const traceKeySet = new Set(traceLookupKeys.map((item) => item.key));
+
+  for (const assemblyTransaction of assemblyTransactions) {
+    const componentLines: AssemblyTraceComponent[] = assemblyTransaction.lines
+      .filter((line) => line.adjustmentDirection === "OUT")
+      .map((line) => {
+        const lineBatchKey = buildBatchExpiryKey(line.inventoryProductId, line.batchNo);
+        return {
+          id: line.id,
+          productCode: line.inventoryProduct?.code || "",
+          productDescription: line.inventoryProduct?.description || "",
+          qty: Number(line.qty || 0),
+          uom: line.inventoryProduct?.baseUom || "",
+          batchNo: line.batchNo || null,
+          expiryDate: line.expiryDate || (lineBatchKey ? batchExpiryMap.get(lineBatchKey) || null : null),
+          locationLabel: mapLocationLabel(line.location) || mapLocationLabel(line.fromLocation) || mapLocationLabel(line.toLocation) || null,
+          serialEntries: (line.serialEntries || []).map((entry) => {
+            const entryBatchNo = entry.inventoryBatch?.batchNo || line.batchNo || null;
+            const entryBatchKey = buildBatchExpiryKey(line.inventoryProductId, entryBatchNo);
+            return {
+              id: entry.id,
+              serialNo: entry.serialNo,
+              batchNo: entryBatchNo,
+              expiryDate: entry.inventoryBatch?.expiryDate || (entryBatchKey ? batchExpiryMap.get(entryBatchKey) || null : null),
+            };
+          }),
+        };
+      });
+
+    for (const finishedGoodLine of assemblyTransaction.lines.filter((line) => line.adjustmentDirection === "IN")) {
+      const key = buildAssemblyTraceKey(finishedGoodLine.inventoryProductId, finishedGoodLine.batchNo, finishedGoodLine.locationId);
+      if (!key || !traceKeySet.has(key)) continue;
+
+      const current = assemblyTraceMap.get(key) || [];
+      current.push({
+        id: assemblyTransaction.id,
+        docNo: assemblyTransaction.docNo || assemblyTransaction.transactionNo,
+        docDate: assemblyTransaction.docDate || assemblyTransaction.transactionDate,
+        components: componentLines,
+      });
+      assemblyTraceMap.set(key, current);
+    }
+  }
 
   const currency = transaction.currency || "MYR";
   const generatedFrom = transaction.targetLinks.map((link) => link.sourceTransaction).filter(Boolean);
@@ -227,6 +412,8 @@ export default async function AdminDeliveryOrderDetailPage({ params }: Params) {
                       const serialNos = stockLine?.serialEntries.map((entry) => entry.serialNo).filter(Boolean) || [];
                       const serialBatchNo = stockLine?.serialEntries.find((entry) => entry.inventoryBatch?.batchNo)?.inventoryBatch?.batchNo || null;
                       const batchNo = stockLine?.batchNo || serialBatchNo || null;
+                      const assemblyTraceKey = buildAssemblyTraceKey(stockLine?.inventoryProductId || line.inventoryProductId, batchNo, stockLine?.locationId || line.locationId);
+                      const assemblyTraces = assemblyTraceKey ? assemblyTraceMap.get(assemblyTraceKey) || [] : [];
 
                       return (
                         <tr key={line.id}>
@@ -235,6 +422,34 @@ export default async function AdminDeliveryOrderDetailPage({ params }: Params) {
                             <div className="mt-1 text-xs text-white/50">{line.productDescription}</div>
                             {batchNo ? <div className="mt-2 text-xs text-amber-100/80">Batch No: {batchNo}</div> : null}
                             {serialNos.length > 0 ? <div className="mt-1 text-xs text-sky-100/80">S/N No: {serialNos.join(", ")}</div> : null}
+                            {assemblyTraces.length > 0 ? (
+                              <div className="mt-3 rounded-2xl border border-sky-500/20 bg-sky-500/10 p-3 text-xs text-white/70">
+                                <div className="font-semibold text-sky-100">Assembly Trace</div>
+                                <div className="mt-2 space-y-3">
+                                  {assemblyTraces.map((trace) => (
+                                    <div key={trace.id} className="rounded-xl border border-white/10 bg-black/20 p-3">
+                                      <div className="font-semibold tracking-[0.16em] text-white/55">
+                                        {trace.docNo} • {formatDate(trace.docDate)}
+                                      </div>
+                                      <div className="mt-2 space-y-2">
+                                        {trace.components.length > 0 ? (
+                                          trace.components.map((component) => (
+                                            <div key={component.id} className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                                              <div className="font-semibold text-white">
+                                                {component.productCode} — {component.productDescription}
+                                              </div>
+                                              <div className="mt-1 text-white/65">{formatTraceComponentMeta(component)}</div>
+                                            </div>
+                                          ))
+                                        ) : (
+                                          <div className="text-white/45">No assembly component line found.</div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ) : null}
                             {line.remarks ? <div className="mt-2 text-xs text-white/40">Remarks: {line.remarks}</div> : null}
                           </td>
                           <td className="px-4 py-4">{line.sourceLineLinks.map((link) => link.sourceTransaction?.docNo).filter(Boolean).join(", ") || "-"}</td>
