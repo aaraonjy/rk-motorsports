@@ -113,6 +113,19 @@ function toNumber(value: Prisma.Decimal | number | string | null | undefined) {
   return Number.isFinite(numeric) ? numeric : 0;
 }
 
+function withCancellationDetails<T extends Record<string, any>>(transaction: T) {
+  return {
+    ...transaction,
+    cancelReason: transaction.cancelReason ?? null,
+    cancelledAt: transaction.cancelledAt ?? null,
+    cancelledBy: transaction.cancelledByAdmin?.name ?? null,
+    cancelledByName: transaction.cancelledByAdmin?.name ?? null,
+    cancelledByAdminName: transaction.cancelledByAdmin?.name ?? null,
+  };
+}
+
+
+
 function getMalaysiaDateParts(date: Date) {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Kuala_Lumpur",
@@ -713,7 +726,7 @@ export async function GET(req: Request) {
     const transactions = rows.map((row) => {
       const stockIssue = stockIssueByReference.get(row.docNo);
       return {
-        ...row,
+        ...withCancellationDetails(row),
         lines: row.lines.map((line, index) => ({
           ...line,
           batchNo: stockIssue?.lines[index]?.batchNo || null,

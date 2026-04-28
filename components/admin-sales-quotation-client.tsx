@@ -107,6 +107,12 @@ type QuotationRecord = {
   footerRemarks?: string | null;
   status: "PENDING" | "CONFIRMED" | "CANCELLED";
   grandTotal: string | number;
+  cancelReason?: string | null;
+  cancelledAt?: string | Date | null;
+  cancelledBy?: string | null;
+  cancelledByName?: string | null;
+  cancelledByAdminName?: string | null;
+  cancelledByAdmin?: { id?: string | null; name?: string | null; email?: string | null } | null;
   revisedFrom?: { id: string; docNo?: string | null } | null;
   revisions?: Array<{ id: string; docNo?: string | null; status?: string | null }>;
   targetLinks?: Array<{ targetTransaction?: { id: string; docType?: string | null; docNo?: string | null; status?: string | null } | null }>;
@@ -258,6 +264,85 @@ function formatDateInput(value: string | Date | null | undefined) {
   const month = parts.find((part) => part.type === "month")?.value;
   const day = parts.find((part) => part.type === "day")?.value;
   return year && month && day ? `${year}-${month}-${day}` : todayInput();
+}
+
+function formatCancelDateTime(value: string | Date | null | undefined) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleString("en-MY", {
+    timeZone: "Asia/Kuala_Lumpur",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function getCancelledByName(transaction: {
+  cancelledBy?: string | null;
+  cancelledByName?: string | null;
+  cancelledByAdminName?: string | null;
+  cancelledByAdmin?: { name?: string | null } | null;
+}) {
+  return transaction.cancelledBy || transaction.cancelledByName || transaction.cancelledByAdminName || transaction.cancelledByAdmin?.name || "-";
+}
+
+function getCancelReason(transaction: { cancelReason?: string | null }) {
+  return transaction.cancelReason && transaction.cancelReason.trim() ? transaction.cancelReason : "-";
+}
+
+function CancelledTransactionNotice({
+  transaction,
+  label,
+}: {
+  transaction: {
+    cancelReason?: string | null;
+    cancelledAt?: string | Date | null;
+    cancelledBy?: string | null;
+    cancelledByName?: string | null;
+    cancelledByAdminName?: string | null;
+    cancelledByAdmin?: { name?: string | null } | null;
+  };
+  label: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-4 text-sm text-red-100">
+      <div className="font-semibold">This {label} has been cancelled.</div>
+      <div className="mt-3 space-y-2 text-white/85">
+        <div>Cancelled At: {formatCancelDateTime(transaction.cancelledAt)}</div>
+        <div>Cancelled By: {getCancelledByName(transaction)}</div>
+        <div>Reason: {getCancelReason(transaction)}</div>
+      </div>
+    </div>
+  );
+}
+
+function CancelledInlineDetails({
+  transaction,
+}: {
+  transaction: {
+    cancelReason?: string | null;
+    cancelledAt?: string | Date | null;
+    cancelledBy?: string | null;
+    cancelledByName?: string | null;
+    cancelledByAdminName?: string | null;
+    cancelledByAdmin?: { name?: string | null } | null;
+  };
+}) {
+  return (
+    <div className="space-y-1 text-xs text-white/45">
+      <div className="text-red-200/80">Cancelled</div>
+      <div>{formatCancelDateTime(transaction.cancelledAt)}</div>
+      <div>By: {getCancelledByName(transaction)}</div>
+      <div className="max-w-[220px] truncate" title={getCancelReason(transaction)}>Reason: {getCancelReason(transaction)}</div>
+    </div>
+  );
+}
+
+function getSalesDocumentLabel(_transaction: QuotationRecord) {
+  return "quotation";
 }
 
 function getStatusClass(status: string) {
@@ -593,6 +678,7 @@ export function AdminSalesQuotationClient({
   const [submitError, setSubmitError] = useState("");
   const [submitSuccess, setSubmitSuccess] = useState("");
   const [submitMessageType, setSubmitMessageType] = useState<"success" | "cancel">("success");
+  const [recentCancelledTransaction, setRecentCancelledTransaction] = useState<QuotationRecord | null>(null);
   const [cancelTarget, setCancelTarget] = useState<QuotationRecord | null>(null);
   const [cancelReason, setCancelReason] = useState("");
   const [formMode, setFormMode] = useState<"create" | "edit" | "revise">("create");
@@ -938,6 +1024,7 @@ export function AdminSalesQuotationClient({
     ]);
     setSubmitError("");
     setSubmitMessageType("success");
+    setRecentCancelledTransaction(null);
     setSubmitSuccess("");
   }
 
@@ -1001,6 +1088,7 @@ export function AdminSalesQuotationClient({
     );
     setSubmitError("");
     setSubmitMessageType("success");
+    setRecentCancelledTransaction(null);
     setSubmitSuccess("");
     setIsCreateOpen(true);
   }
@@ -1121,6 +1209,7 @@ export function AdminSalesQuotationClient({
   async function submitQuotation() {
     setSubmitError("");
     setSubmitMessageType("success");
+    setRecentCancelledTransaction(null);
     setSubmitSuccess("");
     setIsSubmitting(true);
     try {
@@ -1173,6 +1262,7 @@ export function AdminSalesQuotationClient({
       const data = await response.json();
       if (!response.ok || !data.ok) throw new Error(data.error || "Unable to save quotation.");
       setSubmitMessageType("success");
+    setRecentCancelledTransaction(null);
       setSubmitSuccess(formMode === "revise" ? "Quotation revised successfully." : formMode === "edit" ? "Quotation updated successfully." : "Quotation created successfully.");
       setIsCreateOpen(false);
       setEditTarget(null);
@@ -1207,6 +1297,7 @@ export function AdminSalesQuotationClient({
       setCancelReason("");
       setSubmitMessageType("cancel");
       setSubmitSuccess("Quotation cancelled successfully.");
+      setRecentCancelledTransaction((data.transaction || { ...cancelTarget, status: "CANCELLED", cancelReason, cancelledAt: new Date().toISOString() }) as QuotationRecord);
       await loadTransactions();
       router.refresh();
     } catch (error) {
@@ -1233,6 +1324,10 @@ export function AdminSalesQuotationClient({
         >
           {submitSuccess}
         </div>
+      ) : null}
+
+      {submitMessageType === "cancel" && recentCancelledTransaction && !isCreateOpen ? (
+        <CancelledTransactionNotice transaction={recentCancelledTransaction} label={getSalesDocumentLabel(recentCancelledTransaction)} />
       ) : null}
 
       <div className="rounded-[2rem] border border-white/10 bg-black/45 p-5 backdrop-blur-md md:p-8">
@@ -1324,7 +1419,7 @@ export function AdminSalesQuotationClient({
                           </div>
                         )
                       ) : (
-                        <span className="text-xs text-white/35">Cancelled</span>
+                        <CancelledInlineDetails transaction={item} />
                       )}
                     </td>
                   </tr>

@@ -143,6 +143,12 @@ type DeliveryOrderRecord = {
   footerRemarks?: string | null;
   status: "OPEN" | "PARTIAL" | "COMPLETED" | "CANCELLED";
   grandTotal: string | number;
+  cancelReason?: string | null;
+  cancelledAt?: string | Date | null;
+  cancelledBy?: string | null;
+  cancelledByName?: string | null;
+  cancelledByAdminName?: string | null;
+  cancelledByAdmin?: { id?: string | null; name?: string | null; email?: string | null } | null;
   revisedFrom?: { id: string; docNo?: string | null } | null;
   revisions?: Array<{ id: string; docNo?: string | null; status?: string | null }>;
   targetLinks?: Array<{ sourceTransaction?: { id: string; docType?: string | null; docNo?: string | null; status?: string | null } | null }>;
@@ -461,6 +467,85 @@ function buildDeliveryOrderRevisionDocNoPreview(transaction: DeliveryOrderRecord
   return `${baseDocNo}-${maxRevision + 1}`;
 }
 
+function formatCancelDateTime(value: string | Date | null | undefined) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleString("en-MY", {
+    timeZone: "Asia/Kuala_Lumpur",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function getCancelledByName(transaction: {
+  cancelledBy?: string | null;
+  cancelledByName?: string | null;
+  cancelledByAdminName?: string | null;
+  cancelledByAdmin?: { name?: string | null } | null;
+}) {
+  return transaction.cancelledBy || transaction.cancelledByName || transaction.cancelledByAdminName || transaction.cancelledByAdmin?.name || "-";
+}
+
+function getCancelReason(transaction: { cancelReason?: string | null }) {
+  return transaction.cancelReason && transaction.cancelReason.trim() ? transaction.cancelReason : "-";
+}
+
+function CancelledTransactionNotice({
+  transaction,
+  label,
+}: {
+  transaction: {
+    cancelReason?: string | null;
+    cancelledAt?: string | Date | null;
+    cancelledBy?: string | null;
+    cancelledByName?: string | null;
+    cancelledByAdminName?: string | null;
+    cancelledByAdmin?: { name?: string | null } | null;
+  };
+  label: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-4 text-sm text-red-100">
+      <div className="font-semibold">This {label} has been cancelled.</div>
+      <div className="mt-3 space-y-2 text-white/85">
+        <div>Cancelled At: {formatCancelDateTime(transaction.cancelledAt)}</div>
+        <div>Cancelled By: {getCancelledByName(transaction)}</div>
+        <div>Reason: {getCancelReason(transaction)}</div>
+      </div>
+    </div>
+  );
+}
+
+function CancelledInlineDetails({
+  transaction,
+}: {
+  transaction: {
+    cancelReason?: string | null;
+    cancelledAt?: string | Date | null;
+    cancelledBy?: string | null;
+    cancelledByName?: string | null;
+    cancelledByAdminName?: string | null;
+    cancelledByAdmin?: { name?: string | null } | null;
+  };
+}) {
+  return (
+    <div className="space-y-1 text-xs text-white/45">
+      <div className="text-red-200/80">Cancelled</div>
+      <div>{formatCancelDateTime(transaction.cancelledAt)}</div>
+      <div>By: {getCancelledByName(transaction)}</div>
+      <div className="max-w-[220px] truncate" title={getCancelReason(transaction)}>Reason: {getCancelReason(transaction)}</div>
+    </div>
+  );
+}
+
+function getSalesDocumentLabel(_transaction: DeliveryOrderRecord) {
+  return "delivery order";
+}
+
 function getStatusClass(status: string) {
   if (status === "CANCELLED") return "border-red-500/25 bg-red-500/10 text-red-200";
   if (status === "COMPLETED") return "border-sky-500/25 bg-sky-500/10 text-sky-200";
@@ -772,6 +857,7 @@ export function AdminDeliveryOrderClient({
   const [submitError, setSubmitError] = useState("");
   const [submitSuccess, setSubmitSuccess] = useState("");
   const [submitMessageType, setSubmitMessageType] = useState<"success" | "cancel">("success");
+  const [recentCancelledTransaction, setRecentCancelledTransaction] = useState<DeliveryOrderRecord | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [cancelTarget, setCancelTarget] = useState<DeliveryOrderRecord | null>(null);
   const [cancelReason, setCancelReason] = useState("");
@@ -1154,6 +1240,7 @@ export function AdminDeliveryOrderClient({
     setLines([emptyLine(defaultLocationId, qtyDecimalPlaces, priceDecimalPlaces)]);
     setSubmitError("");
     setSubmitMessageType("success");
+    setRecentCancelledTransaction(null);
     setSubmitSuccess("");
     setGenerateFromError("");
     setSelectedSourceOrderIds([]);
@@ -1262,6 +1349,7 @@ export function AdminDeliveryOrderClient({
     );
     setSubmitError("");
     setSubmitMessageType("success");
+    setRecentCancelledTransaction(null);
     setSubmitSuccess("");
     setGenerateFromError("");
     setSelectedSourceOrderIds([]);
@@ -1272,6 +1360,7 @@ export function AdminDeliveryOrderClient({
   function openEdit(transaction: DeliveryOrderRecord) {
     if (isGeneratedFromSalesOrder(transaction)) {
       setSubmitMessageType("success");
+    setRecentCancelledTransaction(null);
       setSubmitSuccess("");
       alert("Delivery Order generated from Sales Order cannot be edited. Please cancel this DO and generate a new DO from the original SO.");
       return;
@@ -1282,6 +1371,7 @@ export function AdminDeliveryOrderClient({
   function openRevise(transaction: DeliveryOrderRecord) {
     if (isGeneratedFromSalesOrder(transaction)) {
       setSubmitMessageType("success");
+    setRecentCancelledTransaction(null);
       setSubmitSuccess("");
       alert("Delivery Order generated from Sales Order cannot be revised. Please cancel this DO and generate a new DO from the original SO.");
       return;
@@ -1484,6 +1574,7 @@ export function AdminDeliveryOrderClient({
     setIsGenerateFromOpen(false);
     setActiveTab("BODY");
     setSubmitMessageType("success");
+    setRecentCancelledTransaction(null);
     setSubmitSuccess(`Imported ${validLines.length} Sales Order line(s). Please review and save the Delivery Order.`);
   }
 
@@ -1518,6 +1609,7 @@ export function AdminDeliveryOrderClient({
   async function submitDeliveryOrder() {
     setSubmitError("");
     setSubmitMessageType("success");
+    setRecentCancelledTransaction(null);
     setSubmitSuccess("");
     const validationMessage = validateDeliveryOrderForm();
     if (validationMessage) {
@@ -1565,6 +1657,7 @@ export function AdminDeliveryOrderClient({
       setIsCreateOpen(false);
       resetForm();
       setSubmitMessageType("success");
+    setRecentCancelledTransaction(null);
       setSubmitSuccess(successMessage);
       setBalances({});
       setLoadingBalances({});
@@ -1597,6 +1690,7 @@ export function AdminDeliveryOrderClient({
       setCancelReason("");
       setSubmitMessageType("cancel");
       setSubmitSuccess("Delivery Order cancelled successfully.");
+      setRecentCancelledTransaction((data.transaction || { ...cancelTarget, status: "CANCELLED", cancelReason, cancelledAt: new Date().toISOString() }) as DeliveryOrderRecord);
       setBalances({});
       setLoadingBalances({});
       setAvailableBatches({});
@@ -1631,6 +1725,10 @@ export function AdminDeliveryOrderClient({
         >
           {submitSuccess}
         </div>
+      ) : null}
+
+      {submitMessageType === "cancel" && recentCancelledTransaction && !isCreateOpen ? (
+        <CancelledTransactionNotice transaction={recentCancelledTransaction} label={getSalesDocumentLabel(recentCancelledTransaction)} />
       ) : null}
 
       <div className="rounded-[2rem] border border-white/10 bg-black/45 p-5 backdrop-blur-md md:p-8">
@@ -1704,7 +1802,7 @@ export function AdminDeliveryOrderClient({
                           )}
                         </div>
                       ) : (
-                        <span className="text-xs text-white/35">Cancelled</span>
+                        <CancelledInlineDetails transaction={item} />
                       )}
                     </td>
 

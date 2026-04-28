@@ -24,6 +24,19 @@ function toNumber(value: Prisma.Decimal | number | string | null | undefined) {
   return Number.isFinite(numeric) ? numeric : 0;
 }
 
+function withCancellationDetails<T extends Record<string, any>>(transaction: T) {
+  return {
+    ...transaction,
+    cancelReason: transaction.cancelReason ?? null,
+    cancelledAt: transaction.cancelledAt ?? null,
+    cancelledBy: transaction.cancelledByAdmin?.name ?? null,
+    cancelledByName: transaction.cancelledByAdmin?.name ?? null,
+    cancelledByAdminName: transaction.cancelledByAdmin?.name ?? null,
+  };
+}
+
+
+
 function roundQty(value: unknown) {
   return roundToDecimalPlaces(Number(value ?? 0), STOCK_STORAGE_DECIMAL_PLACES.qty);
 }
@@ -663,7 +676,7 @@ export async function GET(_req: Request, context: Params) {
     });
 
     const transactionWithStockPicking = {
-      ...transaction,
+      ...withCancellationDetails(transaction),
       lines: transaction.lines.map((line, index) => ({
         ...line,
         batchNo: stockIssue?.lines[index]?.batchNo || null,

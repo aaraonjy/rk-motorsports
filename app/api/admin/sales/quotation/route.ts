@@ -139,6 +139,19 @@ function toNumber(value: Prisma.Decimal | number | string | null | undefined) {
   return Number.isFinite(numeric) ? numeric : 0;
 }
 
+function withCancellationDetails<T extends Record<string, any>>(transaction: T) {
+  return {
+    ...transaction,
+    cancelReason: transaction.cancelReason ?? null,
+    cancelledAt: transaction.cancelledAt ?? null,
+    cancelledBy: transaction.cancelledByAdmin?.name ?? null,
+    cancelledByName: transaction.cancelledByAdmin?.name ?? null,
+    cancelledByAdminName: transaction.cancelledByAdmin?.name ?? null,
+  };
+}
+
+
+
 function taxSnapshot(taxCode: TaxCodeSnapshot | null) {
   if (!taxCode) {
     return {
@@ -280,7 +293,7 @@ export async function GET(req: Request) {
       },
     });
 
-    return NextResponse.json({ ok: true, transactions: rows });
+    return NextResponse.json({ ok: true, transactions: rows.map((row) => withCancellationDetails(row)) });
   } catch (error) {
     return NextResponse.json(
       { ok: false, error: error instanceof Error ? error.message : "Unable to load quotations." },

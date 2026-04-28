@@ -139,6 +139,19 @@ function toNumber(value: Prisma.Decimal | number | string | null | undefined) {
   return Number.isFinite(numeric) ? numeric : 0;
 }
 
+function withCancellationDetails<T extends Record<string, any>>(transaction: T) {
+  return {
+    ...transaction,
+    cancelReason: transaction.cancelReason ?? null,
+    cancelledAt: transaction.cancelledAt ?? null,
+    cancelledBy: transaction.cancelledByAdmin?.name ?? null,
+    cancelledByName: transaction.cancelledByAdmin?.name ?? null,
+    cancelledByAdminName: transaction.cancelledByAdmin?.name ?? null,
+  };
+}
+
+
+
 function sumLinkedQty(
   line: {
     sourceLineLinks?: Array<{ linkType?: string | null; qty?: Prisma.Decimal | number | string | null; claimAmount?: Prisma.Decimal | number | string | null; targetTransaction?: { status?: string | null } | null }>;
@@ -369,7 +382,7 @@ export async function GET(req: Request) {
       const lines = row.lines.map((line) => withSalesOrderLineProgress(line));
       const progressStatus = getSalesOrderProgressStatus(lines);
       return {
-        ...row,
+        ...withCancellationDetails(row),
         status: row.status === "CANCELLED" ? row.status : progressStatus,
         lines,
         progressStatus,
