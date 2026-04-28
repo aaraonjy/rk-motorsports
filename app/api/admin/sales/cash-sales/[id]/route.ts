@@ -127,6 +127,7 @@ async function createSalesTransactionPaymentIfNeeded(
 async function loadTaxSettings(tx: Prisma.TransactionClient) {
   const config = await tx.taxConfiguration.findUnique({ where: { id: "default" } });
   const taxCodes = await tx.taxCode.findMany({ where: { isActive: true } });
+
   return {
     enabled: Boolean(config?.taxModuleEnabled),
     mode: config?.taxCalculationMode === "LINE_ITEM" ? "LINE_ITEM" : "TRANSACTION",
@@ -163,7 +164,356 @@ function applyLineTax(line: any, taxSettings: Awaited<ReturnType<typeof loadTaxS
   };
 }
 
-function calculateTransactionTotals(lines: any[], taxSettings: Awaited<ReturnType<typeof loadTaxSettings>>, transactionTaxCodeId: string | null) {
+function calculateTransactionTotals(
+  lines: any[],
+  taxSettings: Awaited<ReturnType<typeof loadTaxSettings>>,
+  transactionTaxCodeId: string | null
+): {
+  subtotal: Prisma.Decimal;
+  discountTotal: Prisma.Decimal;
+  taxableSubtotal: Prisma.Decimal;
+  taxTotal: Prisma.Decimal;
+  grandTotal: Prisma.Decimal;
+  transactionTaxCode: any | null;
+} {
+  const subtotal = lines.reduce((sum, line) => sum.plus(line.lineSubtotal), new Prisma.Decimal(0)).toDecimalPlaces(2);
+  const discountTotal = lines.reduce((sum, line) => sum.plus(line.discountAmount), new Prisma.Decimal(0)).toDecimalPlaces(2);
+  const taxableSubtotal = subtotal.minus(discountTotal).toDecimalPlaces(2);
+
+  if (taxSettings.enabled && taxSettings.mode === "LINE_ITEM") {
+    return {
+      subtotal,
+      discountTotal,
+      taxableSubtotal,
+      taxTotal: lines.reduce((sum, line) => sum.plus(line.taxAmount), new Prisma.Decimal(0)).toDecimalPlaces(2),
+      grandTotal: lines.reduce((sum, line) => sum.plus(line.lineTotal), new Prisma.Decimal(0)).toDecimalPlaces(2),
+      transactionTaxCode: null,
+    };
+  }
+
+  const transactionTaxCode = taxSettings.enabled && transactionTaxCodeId ? taxSettings.taxCodes.get(transactionTaxCodeId) || null : null;
+  const taxTotal = transactionTaxCode ? calculateTaxAmount(taxableSubtotal, transactionTaxCode.rate, transactionTaxCode.calculationMethod) : new Prisma.Decimal(0);
+  const grandTotal = transactionTaxCode?.calculationMethod === "INCLUSIVE" ? taxableSubtotal : taxableSubtotal.plus(taxTotal).toDecimalPlaces(2);
+
+  return {
+    subtotal,
+    discountTotal,
+    taxableSubtotal,
+    taxTotal,
+    grandTotal,
+    transactionTaxCode,
+  };
+}
+
+
+function roundQty(value: unknown) {
+  return roundToDecimalPlaces(Number(value ?? 0), STOCK_STORAGE_DECIMAL_PLACES.qty);
+}
+
+function sumLinkedQty(
+  line: {
+    sourceLineLinks?: Array<{ linkType?: string | null; qty?: Prisma.Decimal | number | string | null; claimAmount?: Prisma.Decimal | number | string | null; targetTransaction?: { status?: string | null } | null }>;
+  },
+  linkType: "INVOICED_TO" | "INVOICED_TO"
+) {
+  return (line.sourceLineLinks || [])
+    .filter((link) => link.linkType === linkType)
+    .filter((link) => link.targetTransaction?.status !== "CANCELLED")
+    .reduce((sum, link) => sum + toNumber(link.qty), 0);
+}
+
+
+function sumLinkedAmount(
+  line: {
+    sourceLineLinks?: Array<{ linkType?: string | null; claimAmount?: Prisma.Decimal | number | string | null; targetTransaction?: { status?: string | null } | null }>;
+  },
+  linkType: "INVOICED_TO" | "INVOICED_TO"
+) {
+  return (line.sourceLineLinks || [])
+    .filter((link) => link.linkType === linkType)
+    .filter((link) => link.targetTransaction?.status !== "CANCELLED")
+    .reduce((sum, link) => sum + toNumber(link.claimAmount), 0);
+}
+
+function withSalesLineProgress(line: any) {
+  const itemType = line.inventoryProduct?.itemType || line.itemType || "STOCK_ITEM";
+  const orderedQty = toNumber(line.qty);
+  const invoicedQty = sumLinkedQty(line, "INVOICED_TO");
+  const orderedAmount = toNumber(line.lineTotal);
+  const invoicedAmount = sumLinkedAmount(line, "INVOICED_TO");
+
+  return {
+    ...line,
+    itemType,
+    orderedQty,
+    invoicedQty,
+    orderedAmount,
+    invoicedAmount,
+    remainingInvoiceQty: Math.max(0, orderedQty - invoicedQty),
+    remainingInvoiceAmount: Math.max(0, orderedAmount - invoicedAmount),
+  };
+}
+
+function calculateSalesOrderStatus(lines: Array<{ itemType?: string; orderedQty: number; invoicedQty: number; orderedAmount?: number; invoicedAmount?: number }>) {
+  if (lines.length === 0) return "OPEN" as SalesTransactionStatus;
+
+  const hasAnyProgress = lines.some((line) =>
+    line.itemType === "SERVICE_ITEM"
+      ? Number(line.invoicedAmount || 0) > 0
+      : line.invoicedQty > 0
+  );
+  const isFullyInvoiced = lines.every((line) =>
+    line.itemType === "SERVICE_ITEM"
+      ? Number(line.invoicedAmount || 0) >= Number(line.orderedAmount || 0)
+      : line.invoicedQty >= line.orderedQty
+  );
+
+  if (isFullyInvoiced) return "COMPLETED" as SalesTransactionStatus;
+  if (hasAnyProgress) return "PARTIAL" as SalesTransactionStatus;
+  return "OPEN" as SalesTransactionStatus;
+}
+
+async function refreshSalesOrderStatuses(tx: Prisma.TransactionClient, sourceTransactionIds: string[]) {
+  const uniqueIds = Array.from(new Set(sourceTransactionIds.filter(Boolean)));
+  for (const sourceTransactionId of uniqueIds) {
+    const source = await tx.salesTransaction.findUnique({
+      where: { id: sourceTransactionId },
+      select: {
+        id: true,
+        docType: true,
+        status: true,
+        payments: {
+          orderBy: { paymentDate: "asc" },
+          include: { createdByAdmin: { select: { id: true, name: true, email: true } } },
+        },
+        lines: {
+          orderBy: { lineNo: "asc" },
+          include: {
+            inventoryProduct: { select: { itemType: true } },
+            sourceLineLinks: {
+              include: {
+                targetTransaction: { select: { id: true, status: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!source || source.docType !== "SO" || source.status === "CANCELLED") continue;
+
+    const lines = source.lines.map((line) => withSalesLineProgress(line));
+    const nextStatus = calculateSalesOrderStatus(lines);
+    if (source.status !== nextStatus) {
+      await tx.salesTransaction.update({ where: { id: source.id }, data: { status: nextStatus } });
+    }
+  }
+}
+
+
+type DirectCashSalesLinePayload = {
+  inventoryProductId?: string | null;
+  productCode?: string | null;
+  productDescription?: string | null;
+  uom?: string | null;
+  qty?: number | string | null;
+  unitPrice?: number | string | null;
+  claimAmount?: number | string | null;
+  discountRate?: number | string | null;
+  discountType?: string | null;
+  locationId?: string | null;
+  batchNo?: string | null;
+  serialNos?: string[] | null;
+  taxCodeId?: string | null;
+  remarks?: string | null;
+};
+
+function normalizeDate(value: unknown) {
+  const raw = typeof value === "string" && value.trim() ? value.trim() : new Date().toISOString().slice(0, 10);
+  const date = new Date(`${raw}T00:00:00.000+08:00`);
+  if (Number.isNaN(date.getTime())) throw new Error("Document Date is invalid.");
+  return date;
+}
+
+function getDecimalPlaces(value: unknown, fallback = 2) {
+  const numeric = Number(value ?? fallback);
+  if (!Number.isFinite(numeric)) return fallback;
+  return Math.max(0, Math.min(6, Math.trunc(numeric)));
+}
+
+async function loadStockNumberFormat(tx: Prisma.TransactionClient) {
+  const config = await tx.stockConfiguration.findUnique({
+    where: { id: "default" },
+    select: { qtyDecimalPlaces: true, unitCostDecimalPlaces: true, priceDecimalPlaces: true },
+  });
+
+  return {
+    qtyDecimalPlaces: getDecimalPlaces(config?.qtyDecimalPlaces, 2),
+    priceDecimalPlaces: getDecimalPlaces(config?.priceDecimalPlaces, 2),
+  };
+}
+
+function normalizeText(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function normalizeSerialNumbers(value: unknown) {
+  const items = Array.isArray(value) ? value : [];
+  const normalized = items.map((item) => (typeof item === "string" ? item.trim() : "")).filter(Boolean);
+  const seen = new Set<string>();
+  const unique: string[] = [];
+  for (const serialNo of normalized) {
+    const key = serialNo.toUpperCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(serialNo);
+  }
+  return unique;
+}
+
+function decimalWithPlaces(value: number | string | null | undefined, decimalPlaces: number, fallback = 0) {
+  const numeric = Number(value ?? fallback);
+  if (!Number.isFinite(numeric)) return new Prisma.Decimal(fallback);
+  return new Prisma.Decimal(numeric.toFixed(decimalPlaces));
+}
+
+function qtyDecimalWithPlaces(value: number | string | null | undefined, decimalPlaces: number) {
+  const numeric = Number(value ?? 0);
+  if (!Number.isFinite(numeric) || numeric <= 0) throw new Error("Quantity must be greater than zero.");
+  return new Prisma.Decimal(numeric.toFixed(decimalPlaces));
+}
+
+function basicDecimal(value: number | string | null | undefined, fallback = 0) {
+  const numeric = Number(value ?? fallback);
+  if (!Number.isFinite(numeric)) return new Prisma.Decimal(fallback);
+  return new Prisma.Decimal(numeric.toFixed(2));
+}
+
+function hasSalesOrderSource(transaction: { targetLinks?: Array<{ sourceTransaction?: { docType?: string | null; status?: string | null } | null }> }) {
+  return (transaction.targetLinks || []).some((link) => link.sourceTransaction?.docType === "SO" && link.sourceTransaction?.status !== "CANCELLED");
+}
+
+function getBaseCashSalesDocNo(docNo: string | null | undefined) {
+  const value = String(docNo || "").trim().toUpperCase();
+  const match = value.match(/^(CS-\d{8}-\d{4})(?:-(\d+))?$/);
+  return match ? match[1] : value;
+}
+
+async function generateCashSalesRevisionNo(tx: Prisma.TransactionClient, current: { id: string; docNo: string; revisedFromId?: string | null; revisedFrom?: { docNo?: string | null } | null }) {
+  const baseDocNo = getBaseCashSalesDocNo(current.revisedFrom?.docNo || current.docNo);
+  const rows = await tx.salesTransaction.findMany({
+    where: {
+      docType: "CS",
+      OR: [{ docNo: baseDocNo }, { docNo: { startsWith: `${baseDocNo}-` } }, { revisedFromId: current.revisedFromId || current.id }],
+    },
+    select: { docNo: true },
+  });
+
+  let maxRevision = 0;
+  const pattern = new RegExp(`^${baseDocNo.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}-(\\d+)$`);
+  for (const row of rows) {
+    const match = String(row.docNo || "").match(pattern);
+    if (!match) continue;
+    const revisionNo = Number(match[1]);
+    if (Number.isFinite(revisionNo) && revisionNo > maxRevision) maxRevision = revisionNo;
+  }
+
+  return `${baseDocNo}-${maxRevision + 1}`;
+}
+
+async function buildDirectCashSalesData(body: any, tx: Prisma.TransactionClient) {
+  const docDate = normalizeDate(body.docDate);
+  const customerId = normalizeText(body.customerId);
+  if (!customerId) throw new Error("Customer is required.");
+
+  const rawLines = Array.isArray(body.lines) ? (body.lines as DirectCashSalesLinePayload[]) : [];
+  if (rawLines.length === 0) throw new Error("Please add at least one product line.");
+  if (rawLines.some((line) => normalizeText((line as any).sourceLineId) || normalizeText((line as any).sourceTransactionId))) {
+    throw new Error("Generated Cash Sales lines cannot be edited directly. Please cancel and generate a new DO from the Sales Order.");
+  }
+
+  const customer = await tx.user.findFirst({ where: { id: customerId, role: "CUSTOMER" } });
+  if (!customer) throw new Error("Selected customer is invalid.");
+
+  const numberFormat = await loadStockNumberFormat(tx);
+  const taxSettings = await loadTaxSettings(tx);
+  const productIds = Array.from(new Set(rawLines.map((line) => normalizeText(line.inventoryProductId)).filter(Boolean))) as string[];
+  const locationIds = Array.from(new Set(rawLines.map((line) => normalizeText(line.locationId)).filter(Boolean))) as string[];
+
+  const [products, locations] = await Promise.all([
+    tx.inventoryProduct.findMany({
+      where: { id: { in: productIds }, isActive: true },
+      select: { id: true, code: true, description: true, baseUom: true, sellingPrice: true, trackInventory: true, itemType: true, batchTracking: true, serialNumberTracking: true },
+    }),
+    tx.stockLocation.findMany({ where: { id: { in: locationIds }, isActive: true }, select: { id: true, code: true, name: true } }),
+  ]);
+
+  const productMap = new Map(products.map((item) => [item.id, item]));
+  const locationMap = new Map(locations.map((item) => [item.id, item]));
+
+  const baseLines = rawLines.map((line, index) => {
+    const lineNo = index + 1;
+    const inventoryProductId = normalizeText(line.inventoryProductId);
+    const product = inventoryProductId ? productMap.get(inventoryProductId) : null;
+    const locationId = normalizeText(line.locationId);
+    const location = locationId ? locationMap.get(locationId) : null;
+
+    if (!product) throw new Error(`Product line ${lineNo} is missing product information.`);
+    const isServiceItem = product.itemType === "SERVICE_ITEM";
+    if (!isServiceItem && !product.trackInventory) throw new Error(`${product.code} is not a tracked stock item and cannot be delivered through DO stock out.`);
+    if (!isServiceItem && !location) throw new Error(`Product line ${lineNo} requires a valid stock location.`);
+
+    const qty = qtyDecimalWithPlaces(line.qty, numberFormat.qtyDecimalPlaces);
+    const batchNo = isServiceItem ? null : normalizeText((line as any).batchNo)?.toUpperCase() || null;
+    const serialNos = isServiceItem ? [] : normalizeSerialNumbers((line as any).serialNos);
+    if (!isServiceItem && product.batchTracking && !batchNo) throw new Error(`${product.code} requires Batch No.`);
+    if (!isServiceItem && product.serialNumberTracking) {
+      if (serialNos.length === 0) throw new Error(`${product.code} requires S/N No.`);
+      if (toNumber(qty) !== serialNos.length) throw new Error(`${product.code} quantity must match selected S/N count.`);
+    }
+    const claimAmount = isServiceItem ? decimalWithPlaces(line.claimAmount ?? line.unitPrice, numberFormat.priceDecimalPlaces, Number(product.sellingPrice ?? 0)) : null;
+    const unitPrice = isServiceItem ? claimAmount! : decimalWithPlaces(line.unitPrice, numberFormat.priceDecimalPlaces, Number(product.sellingPrice ?? 0));
+    const discountType = String(line.discountType || "PERCENT").toUpperCase() === "AMOUNT" ? "AMOUNT" : "PERCENT";
+    const discountRate = discountType === "PERCENT" ? basicDecimal(line.discountRate, 0) : new Prisma.Decimal(0);
+    const rawDiscountValue = basicDecimal(line.discountRate, 0);
+    const lineSubtotal = qty.mul(unitPrice).toDecimalPlaces(2);
+    const discountAmount = discountType === "AMOUNT" ? Prisma.Decimal.min(rawDiscountValue, lineSubtotal).toDecimalPlaces(2) : lineSubtotal.mul(discountRate).div(100).toDecimalPlaces(2);
+    const lineTotal = lineSubtotal.minus(discountAmount).toDecimalPlaces(2);
+
+    return {
+      lineNo,
+      inventoryProductId: product.id,
+      productCode: product.code,
+      productDescription: normalizeText(line.productDescription) || product.description,
+      itemType: product.itemType,
+      claimAmount,
+      uom: (normalizeText(line.uom) || product.baseUom || "UNIT").toUpperCase(),
+      qty,
+      unitPrice,
+      discountRate,
+      discountType,
+      discountAmount,
+      locationId: location?.id || null,
+      batchNo,
+      serialNos,
+      batchTracking: !isServiceItem && Boolean(product.batchTracking),
+      serialNumberTracking: !isServiceItem && Boolean(product.serialNumberTracking),
+      locationCode: location?.code || null,
+      locationName: location?.name || null,
+      taxCodeId: null,
+      taxCode: null,
+      taxDescription: null,
+      taxDisplayLabel: null,
+      taxRate: new Prisma.Decimal(0),
+      taxCalculationMethod: null,
+      taxAmount: new Prisma.Decimal(0),
+      lineSubtotal,
+      lineTotal,
+      remarks: normalizeText(line.remarks),
+    };
+  });
+
+  const lines = baseLines.map((line, index) => applyLineTax(line, taxSettings, normalizeText(rawLines[index]?.taxCodeId)));
   const totals = calculateTransactionTotals(lines, taxSettings, normalizeText(body.transactionTaxCodeId));
   const { subtotal, discountTotal, taxableSubtotal, taxTotal, grandTotal, transactionTaxCode } = totals;
 
@@ -584,7 +934,7 @@ export async function PATCH(req: Request, context: Params) {
       }
 
       if (hasSalesOrderSource(current)) {
-        throw new Error("Cash Sales generated from Sales Order cannot be edited. Please cancel this DO and generate a new DO from the original SO.");
+        throw new Error("Cash Sales generated from Sales Order cannot be edited. Please cancel this Cash Sales and create a new Cash Sales.");
       }
 
       const data = await buildDirectCashSalesData(body, tx);
