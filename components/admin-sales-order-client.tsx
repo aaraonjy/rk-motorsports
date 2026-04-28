@@ -1702,7 +1702,7 @@ export function AdminSalesOrderClient({
             ) : null}
 
             {activeTab === "BODY" ? (
-              <div className={`mt-6 space-y-5 ${isGeneratedFromQuotationDocument ? "rounded-[1.75rem] border border-white/10 bg-white/[0.04] p-4 opacity-70 grayscale" : ""}`}>
+              <div className={`mt-6 space-y-5 ${isGeneratedFromQuotationDocument ? "pointer-events-none rounded-[1.75rem] border border-white/10 bg-white/[0.04] p-4 opacity-70 grayscale" : ""}`}>
                 {isGeneratedFromQuotationDocument ? (
                   <div className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white/55">
                     Read-only body section. This Sales Order was generated from Quotation, so product, qty, price, discount, tax, and line pricing details are locked.
@@ -1793,7 +1793,7 @@ export function AdminSalesOrderClient({
             ) : null}
 
             {activeTab === "FOOTER" ? (
-              <div className={`mt-6 grid gap-6 lg:grid-cols-[1fr_360px] ${isGeneratedFromQuotationDocument ? "rounded-[1.75rem] border border-white/10 bg-white/[0.04] p-4 opacity-70 grayscale" : ""}`}>
+              <div className={`mt-6 grid gap-6 lg:grid-cols-[1fr_360px] ${isGeneratedFromQuotationDocument ? "pointer-events-none rounded-[1.75rem] border border-white/10 bg-white/[0.04] p-4 opacity-70 grayscale" : ""}`}>
                 {isGeneratedFromQuotationDocument ? (
                   <div className="lg:col-span-2 rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white/55">
                     Read-only footer section. This Sales Order was generated from Quotation, so footer pricing details are locked.

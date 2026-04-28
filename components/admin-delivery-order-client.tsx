@@ -1858,6 +1858,7 @@ export function AdminDeliveryOrderClient({
                             placeholder="Search or select location"
                             options={locationOptions}
                             value={line.locationId}
+                            disabled={isGeneratedLine && formMode !== "create"}
                             onChange={(option) => {
                               updateLine(index, { locationId: option?.id || "", batchNo: "", serialNos: [], serialSearch: "" });
                               setAvailableBatches((prev) => { const next = { ...prev }; delete next[index]; return next; });
@@ -1889,7 +1890,7 @@ export function AdminDeliveryOrderClient({
                                 searchText: `${batch.batchNo} ${batch.expiryDate || ""}`.toLowerCase(),
                               }))}
                               value={line.batchNo}
-                              disabled={!line.inventoryProductId || !line.locationId || Boolean(loadingBatches[index])}
+                              disabled={!line.inventoryProductId || !line.locationId || Boolean(loadingBatches[index]) || (isGeneratedLine && formMode !== "create")}
                               onChange={(option) => {
                                 updateLine(index, { batchNo: option?.id || "", serialNos: [], serialSearch: "" });
                                 setAvailableSerials((prev) => { const next = { ...prev }; delete next[index]; return next; });
@@ -1944,7 +1945,7 @@ export function AdminDeliveryOrderClient({
                                 const exists = line.serialNos.some((item) => item.toUpperCase() === serialNo.toUpperCase());
                                 updateLine(index, { serialNos: exists ? line.serialNos.filter((item) => item.toUpperCase() !== serialNo.toUpperCase()) : uniqueSerialNos([...line.serialNos, serialNo]) });
                               }}
-                              disabled={!line.inventoryProductId || !line.locationId || (selectedProduct.batchTracking && !line.batchNo) || Boolean(loadingSerials[index])}
+                              disabled={!line.inventoryProductId || !line.locationId || (selectedProduct.batchTracking && !line.batchNo) || Boolean(loadingSerials[index]) || (isGeneratedLine && formMode !== "create")}
                             />
                             {line.inventoryProductId && line.locationId && (!selectedProduct.batchTracking || line.batchNo) && !loadingSerials[index] && (availableSerials[index] || []).length === 0 ? (
                               <p className="mt-2 text-xs text-amber-200">No available S/N found for this product/location{selectedProduct.batchTracking ? " and batch" : ""}.</p>
@@ -1965,7 +1966,7 @@ export function AdminDeliveryOrderClient({
                         </div>
                         <div className="md:col-span-4">
                           <label className="label-rk">Product Remarks</label>
-                          <textarea className="input-rk min-h-[90px]" value={line.remarks} onChange={(e) => updateLine(index, { remarks: e.target.value })} />
+                          <textarea className="input-rk min-h-[90px]" value={line.remarks} disabled={isGeneratedLine} onChange={(e) => updateLine(index, { remarks: e.target.value })} />
                         </div>
                       </div>
                     </div>
@@ -1978,7 +1979,7 @@ export function AdminDeliveryOrderClient({
             ) : null}
 
             {activeTab === "FOOTER" ? (
-              <div className={`mt-6 grid gap-6 lg:grid-cols-[1fr_360px] ${hasGeneratedSalesOrderLines ? "rounded-[1.75rem] border border-white/10 bg-white/[0.04] p-4 opacity-70 grayscale" : ""}`}>
+              <div className={`mt-6 grid gap-6 lg:grid-cols-[1fr_360px] ${hasGeneratedSalesOrderLines ? "pointer-events-none rounded-[1.75rem] border border-white/10 bg-white/[0.04] p-4 opacity-70 grayscale" : ""}`}>
                 {hasGeneratedSalesOrderLines ? (
                   <div className="lg:col-span-2 rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white/55">
                     Read-only generated footer section. This Delivery Order was generated from Sales Order, so footer pricing details are locked.
