@@ -1024,6 +1024,10 @@ export async function POST(req: Request) {
       });
     });
 
+    if (!created) {
+      throw new Error("Unable to create cash sales.");
+    }
+
     await createAuditLogFromRequest({
       req,
       user: admin,
@@ -1034,7 +1038,7 @@ export async function POST(req: Request) {
       description: `Created Cash Sales ${created.docNo}.`,
     });
 
-    return NextResponse.json({ ok: true, transaction: withPaymentSummary(created || {}) });
+    return NextResponse.json({ ok: true, transaction: withPaymentSummary(created) });
   } catch (error) {
     return NextResponse.json(
       { ok: false, error: error instanceof Error ? error.message : "Unable to create cash sales." },
