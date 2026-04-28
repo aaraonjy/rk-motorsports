@@ -213,6 +213,96 @@ function getSalesOrderProgressStatus(lines: Array<{ itemType?: string; orderedQt
   return "OPEN" as SalesTransactionStatus;
 }
 
+function taxSnapshot(taxCode: TaxCodeSnapshot | null) {
+  if (!taxCode) {
+    return {
+      taxCodeId: null,
+      taxCode: null,
+      taxDescription: null,
+      taxDisplayLabel: null,
+      taxRate: new Prisma.Decimal(0),
+      taxCalculationMethod: null,
+    };
+  }
+
+  return {
+    taxCodeId: taxCode.id,
+    taxCode: taxCode.code,
+    taxDescription: taxCode.description,
+    taxDisplayLabel: taxCode.displayLabel || null,
+    taxRate: decimal(toNumber(taxCode.rate), 0),
+    taxCalculationMethod: taxCode.calculationMethod,
+  };
+}
+
+function calculateLine(
+  line: SalesOrderLinePayload,
+  lineNo: number,
+  productMap: Map<string, any>,
+  locationMap: Map<string, { id: string; code: string; name: string }>,
+  taxCodeMap: Map<string, TaxCodeSnapshot>,
+  options: {
+    taxModuleEnabled: boolean;
+    taxCalculationMode: TaxCalculationModeValue;
+    numberFormat: { qtyDecimalPlaces: number; priceDecimalPlaces: number };
+  }
+) {
+  const inventoryProductId = typeof line.inventoryProductId === "string" && line.inventoryProductId.trim() ? line.inventoryProductId.trim() : null;
+  const product = inventoryProductId ? productMap.get(inventoryProductId) : null;
+  const locationId = typeof line.locationId === "string" && line.locationId.trim() ? line.locationId.trim() : null;
+  const location = locationId ? locationMap.get(locationId) || null : null;
+
+  const productCode = normalizeText(line.productCode) || product?.code || "";
+  const productDescription = normalizeText(line.productDescription) || product?.description || "";
+  const uom = (normalizeText(line.uom) || product?.baseUom || "UNIT").toUpperCase();
+
+  if (!productCode || !productDescription) throw new Error(`Product line ${lineNo} is missing product information.`);
+
+  const qty = qtyDecimalWithPlaces(line.qty, options.numberFormat.qtyDecimalPlaces);
+  const unitPrice = decimalWithPlaces(line.unitPrice, options.numberFormat.priceDecimalPlaces, product ? Number(product.sellingPrice ?? 0) : 0);
+  const rawDiscountValue = decimal(line.discountRate, 0);
+  const discountType = String(line.discountType || "PERCENT").toUpperCase() === "AMOUNT" ? "AMOUNT" : "PERCENT";
+  const discountRate = discountType === "PERCENT" ? rawDiscountValue : new Prisma.Decimal(0);
+  const lineSubtotal = qty.mul(unitPrice).toDecimalPlaces(2);
+  const discountAmount = discountType === "AMOUNT"
+    ? Prisma.Decimal.min(rawDiscountValue, lineSubtotal).toDecimalPlaces(2)
+    : lineSubtotal.mul(rawDiscountValue).div(100).toDecimalPlaces(2);
+  const taxableAmount = lineSubtotal.minus(discountAmount).toDecimalPlaces(2);
+
+  const lineTaxCode =
+    options.taxModuleEnabled && options.taxCalculationMode === "LINE_ITEM"
+      ? taxCodeMap.get(normalizeTaxCodeId(line.taxCodeId) || "") || null
+      : null;
+
+  const lineTaxBreakdown = calculateLineItemTaxBreakdown({
+    lineTotal: Number(taxableAmount),
+    taxRate: lineTaxCode ? toNumber(lineTaxCode.rate) : null,
+    calculationMethod: lineTaxCode?.calculationMethod ?? null,
+    taxEnabled: Boolean(lineTaxCode),
+  });
+
+  return {
+    lineNo,
+    inventoryProductId,
+    productCode,
+    productDescription,
+    uom,
+    qty,
+    unitPrice,
+    discountRate,
+    discountType,
+    discountAmount,
+    locationId: location?.id || null,
+    locationCode: location?.code || null,
+    locationName: location?.name || null,
+    ...taxSnapshot(lineTaxCode),
+    taxAmount: decimal(lineTaxBreakdown.taxAmount, 0),
+    lineSubtotal,
+    lineTotal: decimal(lineTaxBreakdown.lineGrandTotalAfterTax, Number(taxableAmount)),
+    remarks: normalizeText(line.remarks),
+  };
+}
+
 export async function GET(req: Request) {
   try {
     await requireAdmin();
@@ -344,7 +434,7 @@ export async function POST(req: Request) {
       productIds.length
         ? db.inventoryProduct.findMany({
             where: { id: { in: productIds }, isActive: true },
-            select: { id: true, code: true, description: true, baseUom: true, sellingPrice: true },
+            select: { id: true, code: true, description: true, baseUom: true, sellingPrice: true, itemType: true },
           })
         : Promise.resolve([]),
       locationIds.length
