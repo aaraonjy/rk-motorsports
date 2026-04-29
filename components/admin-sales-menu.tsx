@@ -98,7 +98,8 @@ export function AdminSalesMenu() {
                   item.href === "/admin/sales/sales-order" ||
                   item.href === "/admin/sales/delivery-order" ||
                   item.href === "/admin/sales/sales-invoice" ||
-                  item.href === "/admin/sales/cash-sales";
+                  item.href === "/admin/sales/cash-sales" ||
+                  item.href === "/admin/sales/credit-note";
 
                 if (!phaseTwoEnabled) {
                   return (
