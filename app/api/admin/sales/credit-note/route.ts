@@ -46,19 +46,19 @@ function toNumber(value: Prisma.Decimal | number | string | null | undefined) {
   return Number.isFinite(numeric) ? numeric : 0;
 }
 
-function decimal(value: number | string | null | undefined, fallback = 0) {
+function decimal(value: Prisma.Decimal | number | string | null | undefined, fallback = 0) {
   const numeric = Number(value ?? fallback);
   if (!Number.isFinite(numeric)) return new Prisma.Decimal(fallback);
   return new Prisma.Decimal(numeric.toFixed(2));
 }
 
-function qtyDecimal(value: number | string | null | undefined) {
+function qtyDecimal(value: Prisma.Decimal | number | string | null | undefined) {
   const numeric = Number(value ?? 0);
   if (!Number.isFinite(numeric) || numeric <= 0) throw new Error("Credit quantity must be greater than zero.");
   return new Prisma.Decimal(numeric.toFixed(3));
 }
 
-function sanitizeMoney(value: number | string | null | undefined) {
+function sanitizeMoney(value: Prisma.Decimal | number | string | null | undefined) {
   const numeric = Number(value ?? 0);
   if (!Number.isFinite(numeric) || numeric < 0) return new Prisma.Decimal(0);
   return new Prisma.Decimal(numeric.toFixed(2));
