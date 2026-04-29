@@ -489,10 +489,6 @@ export default async function AdminSalesInvoiceDetailPage({ params }: Params) {
               </div>
             </div>
           </div>
-
-          <div className="mt-8 rounded-[1.5rem] border border-white/10 bg-white/[0.02] p-4 text-sm text-white/55">
-            Stock Issue is auto-created with reference <span className="font-semibold text-white/75">{transaction.docNo}</span>. Cancelling this DO will reverse the stock issue automatically.
-          </div>
         </div>
       </div>
     </section>
