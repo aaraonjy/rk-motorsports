@@ -154,6 +154,8 @@ export default async function AdminDeliveryOrderDetailPage({ params }: Params) {
       agent: { select: { id: true, code: true, name: true } },
       project: { select: { id: true, code: true, name: true } },
       department: { select: { id: true, code: true, name: true } },
+      revisedFrom: { select: { id: true, docNo: true } },
+      revisions: { select: { id: true, docNo: true, status: true } },
       sourceLinks: {
         include: {
           targetTransaction: { select: { id: true, docType: true, docNo: true, status: true } },
@@ -390,6 +392,14 @@ export default async function AdminDeliveryOrderDetailPage({ params }: Params) {
                   );
                 })}
               </div>
+            ) : null}
+            {transaction.revisedFrom?.docNo ? (
+              <Link
+                href={`/admin/sales/delivery-order/${transaction.revisedFrom.id}`}
+                className="mt-3 block w-fit rounded-lg px-2 py-1 text-sm text-white/45 transition hover:bg-white/5 hover:text-white/80"
+              >
+                ↳ Revision of {transaction.revisedFrom.docNo}
+              </Link>
             ) : null}
           </div>
           <div className="flex flex-wrap gap-3">

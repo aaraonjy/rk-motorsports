@@ -1175,8 +1175,8 @@ export function AdminDeliveryOrderClient({
   }, [searchKeyword, statusFilter]);
 
   useEffect(() => {
-    if (isCreateOpen && !docNo) void loadNextDocNo(docDate);
-  }, [docDate, isCreateOpen, docNo]);
+    if (isCreateOpen && formMode === "create" && !docNo) void loadNextDocNo(docDate);
+  }, [docDate, isCreateOpen, formMode, docNo]);
 
   useEffect(() => {
     lines.forEach((line, index) => {
