@@ -170,7 +170,6 @@ export function AdminCreditNoteClient({ initialTaxCodes }: Props) {
   const [cancelReason, setCancelReason] = useState("");
 
   const selectedInvoice = useMemo(() => sourceInvoices.find((item) => item.id === selectedInvoiceId) || null, [sourceInvoices, selectedInvoiceId]);
-  const selectedCustomer = useMemo(() => customerOptions.find((item) => item.id === selectedCustomerId) || null, [customerOptions, selectedCustomerId]);
 
   const customerOptions = useMemo(() => {
     const map = new Map<string, { id: string; label: string; searchText: string }>();
@@ -186,6 +185,8 @@ export function AdminCreditNoteClient({ initialTaxCodes }: Props) {
     }
     return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label));
   }, [sourceInvoices]);
+
+  const selectedCustomer = useMemo(() => customerOptions.find((item) => item.id === selectedCustomerId) || null, [customerOptions, selectedCustomerId]);
 
   const filteredInvoices = useMemo(() => {
     if (!selectedCustomerId) return [];
