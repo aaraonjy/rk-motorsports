@@ -1845,6 +1845,13 @@ export function AdminSalesInvoiceClient({
     }
   }
 
+  const filteredTransactions = useMemo(() => {
+    return transactions.filter((item) => {
+      const hasRevisionChildren = Array.isArray(item.revisions) && item.revisions.length > 0;
+      return !hasRevisionChildren;
+    });
+  }, [transactions]);
+
   async function cancelDeliveryOrder() {
     if (!cancelTarget) return;
     try {
@@ -1937,12 +1944,26 @@ export function AdminSalesInvoiceClient({
             <tbody className="divide-y divide-white/10">
               {isLoading ? (
                 <tr><td colSpan={6} className="px-4 py-8 text-center text-white/50">{"Loading sales invoices..."}</td></tr>
-              ) : transactions.length === 0 ? (
+              ) : filteredTransactions.length === 0 ? (
                 <tr><td colSpan={6} className="px-4 py-8 text-center text-white/50">{"No sales invoice found."}</td></tr>
               ) : (
-                transactions.map((item) => (
+                filteredTransactions.map((item) => (
                   <tr key={item.id} onClick={() => router.push(`/admin/sales/sales-invoice/${item.id}`)} className="cursor-pointer text-white/80 transition hover:bg-white/[0.04]">
-                    <td className="px-4 py-4 font-semibold text-white">{item.docNo}</td>
+                    <td className="px-4 py-4">
+                      <div className="font-semibold text-white">{item.docNo}</div>
+                      {item.revisedFrom?.docNo ? (
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            if (item.revisedFrom?.id) router.push(`/admin/sales/sales-invoice/${item.revisedFrom.id}`);
+                          }}
+                          className="mt-2 rounded-md px-1 py-0.5 text-left text-xs text-white/40 transition hover:bg-white/10 hover:text-white/80"
+                        >
+                          ↳ Revision of {item.revisedFrom.docNo}
+                        </button>
+                      ) : null}
+                    </td>
                     <td className="px-4 py-4">
                       <div className="font-medium text-white/90">{item.customerName}</div>
                       <div className="text-xs text-white/45">{item.customerAccountNo || "-"}</div>
