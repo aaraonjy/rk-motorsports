@@ -255,6 +255,7 @@ export function AdminCreditNoteClient({ initialTaxCodes }: Props) {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"HEADER" | "BODY" | "FOOTER">("HEADER");
   const [sourceSearch, setSourceSearch] = useState("");
+  const [isInvoicePickerOpen, setIsInvoicePickerOpen] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState("");
   const [selectedInvoiceId, setSelectedInvoiceId] = useState("");
   const [pickLines, setPickLines] = useState<PickLine[]>([]);
@@ -361,6 +362,7 @@ export function AdminCreditNoteClient({ initialTaxCodes }: Props) {
     setSelectedInvoiceId("");
     setPickLines([]);
     setSourceSearch("");
+    setIsInvoicePickerOpen(false);
     setSubmitError("");
     setSubmitSuccess("");
     setActiveTab("HEADER");
@@ -376,6 +378,7 @@ export function AdminCreditNoteClient({ initialTaxCodes }: Props) {
     setReason("");
     setFooterRemarks("");
     setSubmitError("");
+    setIsInvoicePickerOpen(false);
   }
 
   function openDocNoModal() {
@@ -400,10 +403,12 @@ export function AdminCreditNoteClient({ initialTaxCodes }: Props) {
     setSelectedInvoiceId("");
     setPickLines([]);
     setSourceSearch("");
+    setIsInvoicePickerOpen(false);
   }
 
   function preparePickLines(invoiceId: string) {
     setSelectedInvoiceId(invoiceId);
+    setIsInvoicePickerOpen(false);
     const invoice = sourceInvoices.find((item) => item.id === invoiceId);
     if (!invoice) {
       setPickLines([]);
@@ -615,11 +620,14 @@ export function AdminCreditNoteClient({ initialTaxCodes }: Props) {
         <div className="mt-8 rounded-2xl border border-white/10 bg-black/20 p-4">
           <div className="grid gap-4 md:grid-cols-3">
             <input className="input-rk" value={searchKeyword} onChange={(e) => setSearchKeyword(e.target.value)} placeholder="Search credit note no / customer" />
-            <select className="input-rk max-w-[366px] pr-12" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-              <option value="ALL">All Status</option>
-              <option value="COMPLETED">Completed</option>
-              <option value="CANCELLED">Cancelled</option>
-            </select>
+            <div className="relative max-w-[366px]">
+              <select className="input-rk w-full appearance-none pr-16" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                <option value="ALL">All Status</option>
+                <option value="COMPLETED">Completed</option>
+                <option value="CANCELLED">Cancelled</option>
+              </select>
+              <span className="pointer-events-none absolute right-10 top-1/2 -translate-y-1/2 text-xs text-white/55">▾</span>
+            </div>
           </div>
         </div>
 
@@ -798,49 +806,65 @@ export function AdminCreditNoteClient({ initialTaxCodes }: Props) {
                 </div>
 
                 <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                  <div className="grid gap-4 md:grid-cols-[1fr_2fr]">
-                    <div>
-                      <label className="label-rk">A/C No</label>
-                      <input className="input-rk" value={selectedCustomer?.label || ""} readOnly disabled placeholder="Select customer in Header first" />
-                    </div>
-                    <div>
-                      <label className="label-rk">Search Sales Invoice</label>
-                      <input
-                        className="input-rk"
-                        value={sourceSearch}
-                        onChange={(e) => setSourceSearch(e.target.value)}
-                        disabled={!selectedCustomerId}
-                        placeholder="Search sales invoice no / customer"
-                      />
-                    </div>
+                  <div className="relative">
+                    <label className="label-rk">Sales Invoice</label>
+                    <button
+                      type="button"
+                      disabled={!selectedCustomerId}
+                      onClick={() => {
+                        if (!selectedCustomerId) return;
+                        setIsInvoicePickerOpen((prev) => !prev);
+                      }}
+                      className={`input-rk flex items-center justify-between gap-3 pr-16 text-left ${!selectedCustomerId ? "cursor-not-allowed opacity-60" : ""}`}
+                    >
+                      <span className={selectedInvoice ? "truncate text-white" : "truncate text-white/45"}>
+                        {selectedInvoice ? `${selectedInvoice.docNo} — ${selectedInvoice.customerName}` : "Search or select sales invoice"}
+                      </span>
+                      <span className="shrink-0 pr-5 text-white/60">▾</span>
+                    </button>
+
+                    {isInvoicePickerOpen ? (
+                      <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-[150] overflow-hidden rounded-2xl border border-white/10 bg-[#0b0b0f] shadow-2xl">
+                        <div className="border-b border-white/10 p-3">
+                          <input
+                            autoFocus
+                            className="input-rk"
+                            value={sourceSearch}
+                            onChange={(e) => setSourceSearch(e.target.value)}
+                            placeholder="Search Sales Invoice"
+                          />
+                        </div>
+                        <div className="max-h-64 overflow-y-auto p-2">
+                          {filteredInvoices.length === 0 ? (
+                            <div className="rounded-xl px-3 py-3 text-sm text-white/45">No available sales invoice found for this customer.</div>
+                          ) : (
+                            filteredInvoices.map((invoice) => (
+                              <button
+                                key={invoice.id}
+                                type="button"
+                                onClick={() => preparePickLines(invoice.id)}
+                                className={`flex w-full items-center justify-between gap-4 rounded-xl px-3 py-3 text-left text-sm transition ${
+                                  selectedInvoiceId === invoice.id ? "bg-white/10 text-white" : "text-white/85 hover:bg-white/10 hover:text-white"
+                                }`}
+                              >
+                                <div>
+                                  <div className="font-semibold">{invoice.docNo}</div>
+                                  <div className="mt-1 text-xs text-white/45">{invoice.customerName} • {formatDate(invoice.docDate)}</div>
+                                </div>
+                                <div className="text-right font-semibold">{invoice.currency || "MYR"} {money(invoice.grandTotal)}</div>
+                              </button>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
 
-                  <div className="mt-4 rounded-2xl border border-white/10">
-                    {!selectedCustomerId ? (
-                      <div className="px-4 py-6 text-sm text-white/45">Please select customer in Header first.</div>
-                    ) : filteredInvoices.length === 0 ? (
-                      <div className="px-4 py-6 text-sm text-white/45">No available sales invoice found for this customer.</div>
-                    ) : (
-                      <div className="max-h-64 overflow-y-auto">
-                        {filteredInvoices.map((invoice) => (
-                          <button
-                            key={invoice.id}
-                            type="button"
-                            onClick={() => preparePickLines(invoice.id)}
-                            className={`flex w-full items-center justify-between gap-4 border-b border-white/10 px-4 py-4 text-left text-sm transition last:border-0 ${
-                              selectedInvoiceId === invoice.id ? "bg-white/10 text-white" : "text-white/80 hover:bg-white/5"
-                            }`}
-                          >
-                            <div>
-                              <div className="font-semibold">{invoice.docNo}</div>
-                              <div className="mt-1 text-xs text-white/45">{invoice.customerName} • {formatDate(invoice.docDate)}</div>
-                            </div>
-                            <div className="text-right font-semibold">{invoice.currency || "MYR"} {money(invoice.grandTotal)}</div>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                  {!selectedCustomerId ? (
+                    <div className="mt-4 rounded-2xl border border-white/10 px-4 py-6 text-sm text-white/45">Please select customer in Header first.</div>
+                  ) : !selectedInvoice ? (
+                    <div className="mt-4 rounded-2xl border border-white/10 px-4 py-6 text-sm text-white/45">Click Sales Invoice to search and select source invoice.</div>
+                  ) : null}
                 </div>
 
                 {selectedInvoice ? (
@@ -929,18 +953,14 @@ export function AdminCreditNoteClient({ initialTaxCodes }: Props) {
       ) : null}
 
       {isDocNoModalOpen ? (
-        <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-3xl border border-white/10 bg-[#0b0b0f] p-6 shadow-2xl">
-            <h3 className="text-xl font-bold text-white">Override Credit Note No</h3>
-            <p className="mt-3 text-sm text-white/60">Leave blank to use the system generated document number.</p>
-            <div className="mt-5">
-              <label className="label-rk">Document No</label>
-              <input className="input-rk" value={docNoDraft} onChange={(e) => setDocNoDraft(normalizeDocNoInput(e.target.value))} placeholder={docNoPreview} autoFocus />
-            </div>
+        <div className="fixed inset-0 z-[160] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-[2rem] border border-white/10 bg-[#08080c] p-6 shadow-2xl">
+            <h3 className="text-xl font-bold">Override Document No</h3>
+            <p className="mt-2 text-sm text-white/55">Format: CN-YYYYMMDD-0001</p>
+            <input className="input-rk mt-5" value={docNoDraft} onChange={(e) => setDocNoDraft(normalizeDocNoInput(e.target.value))} placeholder={docNoPreview} autoFocus />
             <div className="mt-6 flex justify-end gap-3">
-              <button type="button" onClick={() => setIsDocNoModalOpen(false)} className="rounded-xl border border-white/15 px-5 py-3 text-sm text-white/75 hover:bg-white/10">Close</button>
-              <button type="button" onClick={clearDocNoOverride} className="rounded-xl border border-white/15 px-5 py-3 text-sm text-white/75 hover:bg-white/10">Use System No</button>
-              <button type="button" onClick={applyDocNoOverride} className="rounded-xl bg-red-500 px-5 py-3 text-sm font-bold text-white hover:bg-red-400">Save</button>
+              <button type="button" onClick={() => setIsDocNoModalOpen(false)} className="rounded-xl border border-white/15 px-4 py-2 text-sm text-white/75">Cancel</button>
+              <button type="button" onClick={applyDocNoOverride} className="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white">Save</button>
             </div>
           </div>
         </div>
