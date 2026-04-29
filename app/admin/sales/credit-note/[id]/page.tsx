@@ -32,6 +32,33 @@ function formatDateTime(value: Date | string | null | undefined) {
   }).replace(/am|pm/i, (value) => value.toLowerCase());
 }
 
+
+function extractSerialNo(value: string | null | undefined) {
+  const match = String(value || "").match(/SERIAL_NO=([^|]+)/);
+  return match ? match[1].trim() : "";
+}
+
+function uniqueText(values: Array<string | null | undefined>) {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const value of values) {
+    const text = String(value || "").trim();
+    if (!text) continue;
+    const key = text.toUpperCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(text);
+  }
+  return result;
+}
+
+function buildBatchExpiryKey(productId?: string | null, batchNo?: string | null) {
+  const normalizedProductId = String(productId || "").trim();
+  const normalizedBatchNo = String(batchNo || "").trim().toUpperCase();
+  if (!normalizedProductId || !normalizedBatchNo) return "";
+  return `${normalizedProductId}__${normalizedBatchNo}`;
+}
+
 function ReadonlyField({ label, value, className = "" }: { label: string; value: string; className?: string }) {
   return (
     <div className={className}>
@@ -105,6 +132,33 @@ export default async function AdminCreditNoteDetailPage({ params }: Params) {
   const currency = transaction.currency || "MYR";
   const sourceInvoices = transaction.targetLinks.map((link) => link.sourceTransaction).filter((source) => source && source.docType === "INV");
   const primarySourceInvoice = sourceInvoices[0] || null;
+
+  const stockLedgerRows = await db.stockLedger.findMany({
+    where: { sourceType: "CREDIT_NOTE", sourceId: transaction.id, movementDirection: "IN" },
+    orderBy: [{ createdAt: "asc" }],
+    select: { inventoryProductId: true, locationId: true, batchNo: true, remarks: true },
+  });
+
+  const batchExpiryConditions = new Map<string, { inventoryProductId: string; batchNo: string }>();
+  for (const row of stockLedgerRows) {
+    const rowBatchKey = buildBatchExpiryKey(row.inventoryProductId, row.batchNo);
+    if (rowBatchKey && !batchExpiryConditions.has(rowBatchKey)) {
+      batchExpiryConditions.set(rowBatchKey, { inventoryProductId: row.inventoryProductId, batchNo: String(row.batchNo) });
+    }
+  }
+
+  const batchExpiryRows = batchExpiryConditions.size
+    ? await db.inventoryBatch.findMany({
+        where: { OR: Array.from(batchExpiryConditions.values()) },
+        select: { inventoryProductId: true, batchNo: true, expiryDate: true },
+      })
+    : [];
+
+  const batchExpiryMap = new Map<string, Date | null>();
+  for (const batch of batchExpiryRows) {
+    batchExpiryMap.set(buildBatchExpiryKey(batch.inventoryProductId, batch.batchNo), batch.expiryDate ?? null);
+  }
+
 
   return (
     <section className="section-pad">
@@ -195,13 +249,22 @@ export default async function AdminCreditNoteDetailPage({ params }: Params) {
                   {transaction.lines.length === 0 ? (
                     <tr><td colSpan={7} className="px-4 py-8 text-center text-white/50">No product line found.</td></tr>
                   ) : (
-                    transaction.lines.map((line) => (
+                    transaction.lines.map((line) => {
+                      const ledgerRows = stockLedgerRows.filter((row) =>
+                        row.inventoryProductId === line.inventoryProductId && (!line.locationId || row.locationId === line.locationId)
+                      );
+                      const fallbackLedgerRows = ledgerRows.length > 0 ? ledgerRows : stockLedgerRows.filter((row) => row.inventoryProductId === line.inventoryProductId);
+                      const serialNos = uniqueText(fallbackLedgerRows.map((row) => extractSerialNo(row.remarks)).filter(Boolean));
+                      const batchNo = fallbackLedgerRows.find((row) => row.batchNo)?.batchNo || null;
+                      const batchExpiryDate = batchNo ? batchExpiryMap.get(buildBatchExpiryKey(line.inventoryProductId, batchNo)) || null : null;
+
+                      return (
                       <tr key={line.id}>
                         <td className="px-4 py-4">
                           <div className="font-semibold text-white">{line.productCode}</div>
                           <div className="mt-1 text-xs text-white/50">{line.productDescription}</div>
-                          {(line as any).batchNo ? <div className="mt-2 text-xs text-amber-100/80">Batch No: {(line as any).batchNo}</div> : null}
-                          {Array.isArray((line as any).serialNos) && (line as any).serialNos.length > 0 ? <div className="mt-1 text-xs text-sky-100/80">S/N No: {(line as any).serialNos.join(", ")}</div> : null}
+                          {batchNo ? <div className="mt-2 text-xs text-amber-100/80">Batch No: {batchNo}{batchExpiryDate ? ` (Expiry Date: ${formatDate(batchExpiryDate)})` : ""}</div> : null}
+                          {serialNos.length > 0 ? <div className="mt-1 text-xs text-sky-100/80">S/N No: {serialNos.join(", ")}</div> : null}
                           {line.remarks ? <div className="mt-2 text-xs text-white/40">Remarks: {line.remarks}</div> : null}
                         </td>
                         <td className="px-4 py-4">{getSourceDocNos(line)}</td>
@@ -211,7 +274,8 @@ export default async function AdminCreditNoteDetailPage({ params }: Params) {
                         <td className="px-4 py-4">{(line as any).locationCode ? `${(line as any).locationCode} — ${(line as any).locationName || ""}` : "-"}</td>
                         <td className="px-4 py-4 text-right">{money(line.lineTotal)}</td>
                       </tr>
-                    ))
+                      );
+                    })
                   )}
                 </tbody>
               </table>

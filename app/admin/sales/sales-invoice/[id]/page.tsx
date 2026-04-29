@@ -135,6 +135,26 @@ function formatTraceComponentMeta(component: AssemblyTraceComponent) {
   return parts.join(" • ");
 }
 
+
+function extractSerialNo(value: string | null | undefined) {
+  const match = String(value || "").match(/SERIAL_NO=([^|]+)/);
+  return match ? match[1].trim() : "";
+}
+
+function uniqueText(values: Array<string | null | undefined>) {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const value of values) {
+    const text = String(value || "").trim();
+    if (!text) continue;
+    const key = text.toUpperCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(text);
+  }
+  return result;
+}
+
 function ReadonlyField({ label, value, className = "" }: { label: string; value: string; className?: string }) {
   return (
     <div className={className}>
@@ -234,6 +254,12 @@ export default async function AdminSalesInvoiceDetailPage({ params }: Params) {
   });
 
   const stockLines = stockIssue?.lines || [];
+  const stockLedgerRows = await db.stockLedger.findMany({
+    where: { sourceType: "SALES_INVOICE", sourceId: transaction.id, movementDirection: "OUT" },
+    orderBy: [{ createdAt: "asc" }],
+    select: { inventoryProductId: true, locationId: true, batchNo: true, remarks: true },
+  });
+
   const traceLookupKeys = stockLines
     .filter((line) => Boolean(line.inventoryProduct?.isAssemblyItem))
     .map((line) => ({
@@ -282,6 +308,13 @@ export default async function AdminSalesInvoiceDetailPage({ params }: Params) {
     : [];
 
   const batchExpiryConditions = new Map<string, { inventoryProductId: string; batchNo: string }>();
+  for (const row of [...stockLines, ...stockLedgerRows]) {
+    const rowBatchKey = buildBatchExpiryKey(row.inventoryProductId, row.batchNo);
+    if (rowBatchKey && !batchExpiryConditions.has(rowBatchKey)) {
+      batchExpiryConditions.set(rowBatchKey, { inventoryProductId: row.inventoryProductId, batchNo: String(row.batchNo) });
+    }
+  }
+
   for (const assemblyTransaction of assemblyTransactions) {
     for (const line of assemblyTransaction.lines) {
       const lineBatchKey = buildBatchExpiryKey(line.inventoryProductId, line.batchNo);
@@ -379,7 +412,27 @@ export default async function AdminSalesInvoiceDetailPage({ params }: Params) {
               </div>
             ) : null}
             {generatedTo.length > 0 ? (
-              <div className="mt-2 text-sm text-sky-200">Generated to: {generatedTo.map((target) => target?.docNo).join(", ")}</div>
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+                <span className="text-sky-200">Generated to:</span>
+                {generatedTo.map((target, index) => {
+                  const href = target?.docType === "CN"
+                    ? `/admin/sales/credit-note/${target.id}`
+                    : target?.docType === "INV"
+                      ? `/admin/sales/sales-invoice/${target.id}`
+                      : target?.docType === "CS"
+                        ? `/admin/sales/cash-sales/${target.id}`
+                        : target?.docType === "DO"
+                          ? `/admin/sales/delivery-order/${target.id}`
+                          : target?.docType === "SO"
+                            ? `/admin/sales/sales-order/${target.id}`
+                            : "#";
+                  return (
+                    <Link key={target?.id} href={href} className="text-sky-200 underline-offset-4 hover:underline">
+                      {target?.docNo}{generatedTo.length > 1 && index < generatedTo.length - 1 ? "," : ""}
+                    </Link>
+                  );
+                })}
+              </div>
             ) : null}
           </div>
           <div className="flex flex-wrap gap-3">
@@ -454,9 +507,17 @@ export default async function AdminSalesInvoiceDetailPage({ params }: Params) {
                   ) : (
                     transaction.lines.map((line, index) => {
                       const stockLine = stockIssue?.lines[index];
-                      const serialNos = stockLine?.serialEntries.map((entry) => entry.serialNo).filter(Boolean) || [];
+                      const directLedgerRows = stockLedgerRows.filter((row) =>
+                        row.inventoryProductId === line.inventoryProductId && (!line.locationId || row.locationId === line.locationId)
+                      );
+                      const fallbackLedgerRows = directLedgerRows.length > 0 ? directLedgerRows : stockLedgerRows.filter((row) => row.inventoryProductId === line.inventoryProductId);
+                      const stockSerialNos = stockLine?.serialEntries.map((entry) => entry.serialNo).filter(Boolean) || [];
+                      const ledgerSerialNos = fallbackLedgerRows.map((row) => extractSerialNo(row.remarks)).filter(Boolean);
+                      const serialNos = uniqueText([...stockSerialNos, ...ledgerSerialNos]);
                       const serialBatchNo = stockLine?.serialEntries.find((entry) => entry.inventoryBatch?.batchNo)?.inventoryBatch?.batchNo || null;
-                      const batchNo = stockLine?.batchNo || serialBatchNo || null;
+                      const ledgerBatchNo = fallbackLedgerRows.find((row) => row.batchNo)?.batchNo || null;
+                      const batchNo = stockLine?.batchNo || serialBatchNo || ledgerBatchNo || null;
+                      const batchExpiryDate = batchNo ? batchExpiryMap.get(buildBatchExpiryKey(stockLine?.inventoryProductId || line.inventoryProductId, batchNo)) || null : null;
                       const assemblyTraceKey = buildAssemblyTraceKey(stockLine?.inventoryProductId || line.inventoryProductId, batchNo, stockLine?.locationId || line.locationId);
                       const assemblyTraces = assemblyTraceKey ? assemblyTraceMap.get(assemblyTraceKey) || [] : [];
 
@@ -465,7 +526,7 @@ export default async function AdminSalesInvoiceDetailPage({ params }: Params) {
                           <td className="px-4 py-4">
                             <div className="font-semibold text-white">{line.productCode}</div>
                             <div className="mt-1 text-xs text-white/50">{line.productDescription}</div>
-                            {batchNo ? <div className="mt-2 text-xs text-amber-100/80">Batch No: {batchNo}</div> : null}
+                            {batchNo ? <div className="mt-2 text-xs text-amber-100/80">Batch No: {batchNo}{batchExpiryDate ? ` (Expiry Date: ${formatDate(batchExpiryDate)})` : ""}</div> : null}
                             {serialNos.length > 0 ? <div className="mt-1 text-xs text-sky-100/80">S/N No: {serialNos.join(", ")}</div> : null}
                             {assemblyTraces.length > 0 ? (
                               <div className="mt-3 rounded-2xl border border-sky-500/20 bg-sky-500/10 p-3 text-xs text-white/70">
