@@ -230,14 +230,17 @@ export async function PATCH(req: Request, { params }: Params) {
         },
       });
 
-      await createAuditLogFromRequest(tx, req, {
-        action: "CANCEL",
-        entityType: "SalesTransaction",
-        entityId: id,
-        description: `Cancelled Credit Note ${current.docNo}`,
-      });
-
       return updated;
+    });
+
+    await createAuditLogFromRequest({
+      req,
+      user: admin,
+      module: "SALES",
+      action: "CANCEL",
+      entityType: "SALES_CREDIT_NOTE",
+      entityId: cancelled.id,
+      description: `Cancelled Credit Note ${cancelled.docNo}.`,
     });
 
     return NextResponse.json({ ok: true, transaction: withCancellationDetails(cancelled) });
