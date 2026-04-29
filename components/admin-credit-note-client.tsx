@@ -432,7 +432,7 @@ export function AdminCreditNoteClient({ initialTaxCodes, initialAgents, initialP
   }
 
   function openDocNoModal() {
-    setDocNoDraft(docNo || docNoPreview);
+    setDocNoDraft("");
     setIsDocNoModalOpen(true);
   }
 
@@ -712,7 +712,7 @@ export function AdminCreditNoteClient({ initialTaxCodes, initialAgents, initialP
                 transactions.map((transaction) => {
                   const sourceInv = transaction.sourceLinks?.[0]?.sourceTransaction?.docNo || transaction.reference || "-";
                   return (
-                    <tr key={transaction.id} className="text-white/85">
+                    <tr key={transaction.id} onClick={() => router.push(`/admin/sales/credit-note/${transaction.id}`)} className="cursor-pointer text-white/85 transition hover:bg-white/[0.03]">
                       <td className="px-4 py-5 font-semibold text-white">
                         <a className="hover:text-rk-red" href={`/admin/sales/credit-note/${transaction.id}`}>{transaction.docNo}</a>
                         <div className="mt-1 text-xs font-normal text-white/45">{formatDate(transaction.docDate)}</div>
@@ -728,7 +728,7 @@ export function AdminCreditNoteClient({ initialTaxCodes, initialAgents, initialP
                       <td className="px-4 py-5 text-right font-semibold">{transaction.currency || "MYR"} {money(transaction.grandTotal)}</td>
                       <td className="px-4 py-5 text-right">
                         {transaction.status !== "CANCELLED" ? (
-                          <button type="button" onClick={() => setCancelTarget(transaction)} className="rounded-xl border border-red-500/40 px-4 py-2 text-xs text-red-100 transition hover:bg-red-500/10">
+                          <button type="button" onClick={(event) => { event.stopPropagation(); setCancelTarget(transaction); }} className="rounded-xl border border-red-500/40 px-4 py-2 text-xs text-red-100 transition hover:bg-red-500/10">
                             Cancel
                           </button>
                         ) : <span className="text-xs text-white/35">-</span>}
@@ -752,24 +752,22 @@ export function AdminCreditNoteClient({ initialTaxCodes, initialAgents, initialP
               </div>
             </div>
 
-            <div className="mt-7 flex flex-wrap gap-2">
+            <div className="mt-6 flex flex-wrap gap-2 border-b border-white/10 pb-4">
               {(["HEADER", "BODY", "FOOTER"] as const).map((tab) => (
                 <button
                   key={tab}
                   type="button"
                   onClick={() => setActiveTab(tab)}
-                  className={`rounded-xl border px-5 py-3 text-sm font-bold transition ${
+                  className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
                     activeTab === tab
-                      ? "border-red-500 bg-red-500 text-white"
-                      : "border-white/10 bg-black/20 text-white/55 hover:bg-white/10 hover:text-white"
+                      ? "bg-red-600 text-white"
+                      : "border border-white/10 text-white/65 hover:bg-white/10 hover:text-white"
                   }`}
                 >
                   {tab === "HEADER" ? "Header" : tab === "BODY" ? "Body" : "Footer"}
                 </button>
               ))}
             </div>
-
-            <div className="mt-6 border-t border-white/10" />
 
             {submitError ? <div className="mt-6 rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-red-100">{submitError}</div> : null}
 
@@ -859,6 +857,10 @@ export function AdminCreditNoteClient({ initialTaxCodes, initialAgents, initialP
                     <div>
                       <label className="label-rk">Post Code</label>
                       <input className="input-rk" value={selectedInvoice?.billingPostCode || selectedCustomerInvoice?.billingPostCode || ""} readOnly disabled />
+                    </div>
+                    <div>
+                      <label className="label-rk">Country</label>
+                      <input className="input-rk" value={selectedInvoice?.billingCountryCode || selectedCustomerInvoice?.billingCountryCode || ""} readOnly disabled />
                     </div>
                   </div>
                 </div>
@@ -1028,8 +1030,8 @@ export function AdminCreditNoteClient({ initialTaxCodes, initialAgents, initialP
             <p className="mt-2 text-sm text-white/55">Format: CN-YYYYMMDD-0001</p>
             <input className="input-rk mt-5" value={docNoDraft} onChange={(e) => setDocNoDraft(normalizeDocNoInput(e.target.value))} placeholder={docNoPreview} />
             <div className="mt-6 flex justify-end gap-3">
-              <button type="button" onClick={() => setIsDocNoModalOpen(false)} className="rounded-xl border border-white/15 px-5 py-3 text-sm text-white/75">Cancel</button>
-              <button type="button" onClick={applyDocNoOverride} className="rounded-xl bg-red-600 px-5 py-3 text-sm font-semibold text-white">Save</button>
+              <button type="button" onClick={() => setIsDocNoModalOpen(false)} className="rounded-xl border border-white/15 px-4 py-2 text-sm text-white/75">Cancel</button>
+              <button type="button" onClick={applyDocNoOverride} className="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white">Save</button>
             </div>
           </div>
         </div>
