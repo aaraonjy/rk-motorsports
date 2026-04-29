@@ -40,6 +40,39 @@ function getStatusClass(status: string) {
 }
 
 
+type PaymentHistoryItem = {
+  id: string;
+  paymentDate: Date | string | null;
+  paymentMode: string;
+  amount: unknown;
+  createdByAdmin?: { id?: string | null; name?: string | null; email?: string | null } | null;
+};
+
+function getPaymentModeLabel(value: string | null | undefined) {
+  switch (value) {
+    case "CASH": return "Cash";
+    case "CARD": return "Card Payment";
+    case "BANK_TRANSFER": return "Bank Transfer";
+    case "QR": return "QR Payment";
+    default: return value || "-";
+  }
+}
+
+function getPaymentStatusLabel(value: string | null | undefined) {
+  switch (value) {
+    case "PAID": return "PAID";
+    case "PARTIALLY_PAID": return "PARTIAL";
+    case "UNPAID": return "UNPAID";
+    default: return value || "UNPAID";
+  }
+}
+
+function getPaymentStatusClass(value: string | null | undefined) {
+  if (value === "PAID") return "border-emerald-500/25 bg-emerald-500/10 text-emerald-200";
+  if (value === "PARTIALLY_PAID") return "border-amber-500/25 bg-amber-500/10 text-amber-200";
+  return "border-white/15 bg-white/5 text-white/55";
+}
+
 type AssemblyTraceComponent = {
   id: string;
   productCode: string;
@@ -139,6 +172,10 @@ export default async function AdminSalesInvoiceDetailPage({ params }: Params) {
           targetTransaction: { select: { id: true, docType: true, docNo: true, status: true } },
         },
       },
+      payments: {
+        orderBy: [{ paymentDate: "asc" }, { createdAt: "asc" }],
+        include: { createdByAdmin: { select: { id: true, name: true, email: true } } },
+      },
       targetLinks: {
         include: {
           sourceTransaction: { select: { id: true, docType: true, docNo: true, status: true } },
@@ -167,6 +204,12 @@ export default async function AdminSalesInvoiceDetailPage({ params }: Params) {
       </section>
     );
   }
+
+  const payments = (transaction.payments || []) as PaymentHistoryItem[];
+  const totalPaid = payments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
+  const grandTotal = Number(transaction.grandTotal || 0);
+  const outstandingBalance = Math.max(0, Math.round((grandTotal - totalPaid + Number.EPSILON) * 100) / 100);
+  const paymentStatus = grandTotal <= 0 || totalPaid >= grandTotal ? "PAID" : totalPaid > 0 ? "PARTIALLY_PAID" : "UNPAID";
 
   const stockIssue = await db.stockTransaction.findFirst({
     where: {
@@ -485,6 +528,33 @@ export default async function AdminSalesInvoiceDetailPage({ params }: Params) {
                     <span>Grand Total ({currency})</span>
                     <span>{money(transaction.grandTotal)}</span>
                   </div>
+                </div>
+
+                <div className="border-t border-white/10 pt-4">
+                  <div className="flex justify-between gap-4"><span className="text-white/65">Total Paid</span><span>{currency} {money(totalPaid)}</span></div>
+                  <div className="mt-3 flex justify-between gap-4"><span className="text-white/65">Outstanding</span><span>{currency} {money(outstandingBalance)}</span></div>
+                  <div className="mt-4">
+                    <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getPaymentStatusClass(paymentStatus)}`}>{getPaymentStatusLabel(paymentStatus)}</span>
+                  </div>
+                </div>
+
+                <div className="border-t border-white/10 pt-4">
+                  <div className="text-xs font-semibold uppercase tracking-[0.2em] text-white/45">Payment History</div>
+                  {payments.length > 0 ? (
+                    <div className="mt-4 space-y-3">
+                      {payments.map((payment) => (
+                        <div key={payment.id} className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-3 text-sm text-white/75">
+                          <div className="flex items-center justify-between gap-3">
+                            <span>{formatDate(payment.paymentDate)} • {getPaymentModeLabel(payment.paymentMode)}</span>
+                            <span className="font-semibold text-white">{currency} {money(payment.amount)}</span>
+                          </div>
+                          <div className="mt-1 text-xs text-white/45">Recorded By: {payment.createdByAdmin?.name || payment.createdByAdmin?.email || "-"}</div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-3 text-sm text-white/45">No payment recorded.</div>
+                  )}
                 </div>
               </div>
             </div>
