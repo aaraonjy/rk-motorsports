@@ -191,6 +191,24 @@ async function getSourceInvoices(tx: Prisma.TransactionClient) {
     },
   });
 
+  const invoiceIds = invoices.map((invoice) => invoice.id);
+  const ledgerRows = invoiceIds.length > 0
+    ? await tx.stockLedger.findMany({
+        where: { sourceType: "SALES_INVOICE", sourceId: { in: invoiceIds }, movementDirection: "OUT" },
+        select: { sourceId: true, inventoryProductId: true, locationId: true, batchNo: true, remarks: true },
+      })
+    : [];
+
+  const stockMetaByInvoiceProduct = new Map<string, { batchNos: Set<string>; serialNos: Set<string> }>();
+  for (const row of ledgerRows) {
+    const key = `${row.sourceId || ""}__${row.inventoryProductId || ""}__${row.locationId || ""}`;
+    const current = stockMetaByInvoiceProduct.get(key) || { batchNos: new Set<string>(), serialNos: new Set<string>() };
+    if (row.batchNo) current.batchNos.add(row.batchNo);
+    const serialMatch = String(row.remarks || "").match(/SERIAL_NO=([^|]+)/);
+    if (serialMatch?.[1]) current.serialNos.add(serialMatch[1].trim());
+    stockMetaByInvoiceProduct.set(key, current);
+  }
+
   return invoices
     .map((invoice) => ({
       ...invoice,
@@ -199,9 +217,14 @@ async function getSourceInvoices(tx: Prisma.TransactionClient) {
         const creditedAmount = sumCreditedAmount(line as any);
         const qty = toNumber(line.qty);
         const lineTotal = toNumber(line.lineTotal);
+        const stockMeta = stockMetaByInvoiceProduct.get(`${invoice.id}__${line.inventoryProductId || ""}__${line.locationId || ""}`);
+        const batchNos = stockMeta ? Array.from(stockMeta.batchNos) : [];
+        const serialNos = stockMeta ? Array.from(stockMeta.serialNos) : [];
         return {
           ...line,
           itemType: line.inventoryProduct?.itemType || "STOCK_ITEM",
+          batchNo: batchNos.join(", "),
+          serialNos,
           creditedQty,
           creditedAmount,
           remainingCreditQty: Math.max(0, qty - creditedQty),

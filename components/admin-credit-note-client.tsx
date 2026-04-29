@@ -11,6 +11,10 @@ type TaxCodeOption = {
   calculationMethod: string;
 };
 
+type AgentOption = { id: string; code: string; name: string; isActive: boolean };
+type ProjectOption = { id: string; code: string; name: string; isActive: boolean };
+type DepartmentOption = { id: string; code: string; name: string; projectId: string; isActive: boolean };
+
 type InvoiceLine = {
   id: string;
   inventoryProductId?: string | null;
@@ -29,6 +33,8 @@ type InvoiceLine = {
   creditedAmount?: string | number | null;
   remainingCreditQty?: string | number | null;
   remainingCreditAmount?: string | number | null;
+  batchNo?: string | null;
+  serialNos?: string[] | null;
 };
 
 type SourceInvoice = {
@@ -47,6 +53,10 @@ type SourceInvoice = {
   billingCity?: string | null;
   billingPostCode?: string | null;
   billingCountryCode?: string | null;
+  attention?: string | null;
+  agentId?: string | null;
+  projectId?: string | null;
+  departmentId?: string | null;
   currency?: string | null;
   grandTotal: string | number;
   lines?: InvoiceLine[];
@@ -107,6 +117,8 @@ type PickLine = {
   creditQty: string;
   creditAmount: string;
   remarks: string;
+  batchNo: string;
+  serialNos: string[];
 };
 
 type SearchableSelectOption = { id: string; label: string; searchText: string };
@@ -201,6 +213,9 @@ function SearchableSelect({
 
 type Props = {
   initialTaxCodes: TaxCodeOption[];
+  initialAgents: AgentOption[];
+  initialProjects: ProjectOption[];
+  initialDepartments: DepartmentOption[];
 };
 
 function todayInput() {
@@ -245,7 +260,7 @@ function normalizeDocNoInput(value: string) {
   return value.toUpperCase().replace(/\s+/g, "").slice(0, 30);
 }
 
-export function AdminCreditNoteClient({ initialTaxCodes }: Props) {
+export function AdminCreditNoteClient({ initialTaxCodes, initialAgents, initialProjects, initialDepartments }: Props) {
   const router = useRouter();
   const [transactions, setTransactions] = useState<CreditNoteRecord[]>([]);
   const [sourceInvoices, setSourceInvoices] = useState<SourceInvoice[]>([]);
@@ -266,6 +281,9 @@ export function AdminCreditNoteClient({ initialTaxCodes }: Props) {
   const [docNoDraft, setDocNoDraft] = useState("");
   const [reason, setReason] = useState("");
   const [footerRemarks, setFooterRemarks] = useState("");
+  const [agentId, setAgentId] = useState("");
+  const [projectId, setProjectId] = useState("");
+  const [departmentId, setDepartmentId] = useState("");
   const [submitError, setSubmitError] = useState("");
   const [submitSuccess, setSubmitSuccess] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -288,6 +306,32 @@ export function AdminCreditNoteClient({ initialTaxCodes }: Props) {
     }
     return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label));
   }, [sourceInvoices]);
+
+  const agentOptions = useMemo<SearchableSelectOption[]>(
+    () => [
+      { id: "", label: "No Agent", searchText: "no agent" },
+      ...initialAgents.map((agent) => ({ id: agent.id, label: `${agent.code} — ${agent.name}`, searchText: `${agent.code} ${agent.name}`.toLowerCase() })),
+    ],
+    [initialAgents]
+  );
+
+  const projectOptions = useMemo<SearchableSelectOption[]>(
+    () => [
+      { id: "", label: "No Project", searchText: "no project" },
+      ...initialProjects.map((project) => ({ id: project.id, label: `${project.code} — ${project.name}`, searchText: `${project.code} ${project.name}`.toLowerCase() })),
+    ],
+    [initialProjects]
+  );
+
+  const departmentOptions = useMemo<SearchableSelectOption[]>(
+    () => [
+      { id: "", label: "No Department", searchText: "no department" },
+      ...initialDepartments
+        .filter((department) => !projectId || department.projectId === projectId)
+        .map((department) => ({ id: department.id, label: `${department.code} — ${department.name}`, searchText: `${department.code} ${department.name}`.toLowerCase() })),
+    ],
+    [initialDepartments, projectId]
+  );
 
   const selectedCustomer = useMemo(() => customerOptions.find((item) => item.id === selectedCustomerId) || null, [customerOptions, selectedCustomerId]);
   const selectedCustomerInvoice = useMemo(() => sourceInvoices.find((item) => item.customerId === selectedCustomerId) || null, [sourceInvoices, selectedCustomerId]);
@@ -358,6 +402,9 @@ export function AdminCreditNoteClient({ initialTaxCodes }: Props) {
     setDocNoPreview("Auto Generated");
     setReason("");
     setFooterRemarks("");
+    setAgentId("");
+    setProjectId("");
+    setDepartmentId("");
     setSelectedCustomerId("");
     setSelectedInvoiceId("");
     setPickLines([]);
@@ -377,6 +424,9 @@ export function AdminCreditNoteClient({ initialTaxCodes }: Props) {
     setPickLines([]);
     setReason("");
     setFooterRemarks("");
+    setAgentId("");
+    setProjectId("");
+    setDepartmentId("");
     setSubmitError("");
     setIsInvoicePickerOpen(false);
   }
@@ -414,6 +464,9 @@ export function AdminCreditNoteClient({ initialTaxCodes }: Props) {
       setPickLines([]);
       return;
     }
+    setAgentId(invoice.agentId || "");
+    setProjectId(invoice.projectId || "");
+    setDepartmentId(invoice.departmentId || "");
 
     setPickLines(
       (invoice.lines || [])
@@ -451,6 +504,8 @@ export function AdminCreditNoteClient({ initialTaxCodes }: Props) {
             creditQty: itemType === "SERVICE_ITEM" ? "1" : String(remainingQty),
             creditAmount: itemType === "SERVICE_ITEM" ? money(remainingAmount).replace(/,/g, "") : "0",
             remarks: line.remarks || "",
+            batchNo: line.batchNo || "",
+            serialNos: Array.isArray(line.serialNos) ? line.serialNos : [],
           };
         })
     );
@@ -526,6 +581,9 @@ export function AdminCreditNoteClient({ initialTaxCodes }: Props) {
           reason,
           remarks: reason,
           footerRemarks,
+          agentId,
+          projectId,
+          departmentId,
           lines: selectedLines.map((line) => ({
             sourceLineId: line.sourceLineId,
             sourceTransactionId: line.sourceTransactionId,
@@ -541,6 +599,8 @@ export function AdminCreditNoteClient({ initialTaxCodes }: Props) {
             discountType: line.discountType,
             locationId: line.locationId,
             taxCodeId: line.taxCodeId,
+            batchNo: line.batchNo,
+            serialNos: line.serialNos,
             remarks: line.remarks,
           })),
         }),
@@ -762,6 +822,15 @@ export function AdminCreditNoteClient({ initialTaxCodes }: Props) {
                   </div>
                 </div>
 
+                <div className="grid gap-5 md:grid-cols-4">
+                  <div>
+                    <label className="label-rk">Attention</label>
+                    <input className="input-rk" value={selectedInvoice?.attention || selectedCustomerInvoice?.attention || ""} readOnly disabled />
+                  </div>
+                  <SearchableSelect label="Agent" placeholder="No Agent" options={agentOptions} value={agentId} onChange={(option) => setAgentId(option?.id || "")} />
+                  <SearchableSelect label="Project" placeholder="No Project" options={projectOptions} value={projectId} onChange={(option) => { setProjectId(option?.id || ""); setDepartmentId(""); }} />
+                  <SearchableSelect label="Department" placeholder="No Department" options={departmentOptions} value={departmentId} onChange={(option) => setDepartmentId(option?.id || "")} disabled={!projectId && departmentOptions.length <= 1} />
+                </div>
 
                 <div className="rounded-[1.5rem] border border-white/10 bg-black/20 p-5">
                   <p className="text-sm font-semibold uppercase tracking-[0.24em] text-white/45">Billing Address</p>
@@ -862,8 +931,6 @@ export function AdminCreditNoteClient({ initialTaxCodes }: Props) {
 
                   {!selectedCustomerId ? (
                     <div className="mt-4 rounded-2xl border border-white/10 px-4 py-6 text-sm text-white/45">Please select customer in Header first.</div>
-                  ) : !selectedInvoice ? (
-                    <div className="mt-4 rounded-2xl border border-white/10 px-4 py-6 text-sm text-white/45">Click Sales Invoice to search and select source invoice.</div>
                   ) : null}
                 </div>
 
@@ -887,6 +954,8 @@ export function AdminCreditNoteClient({ initialTaxCodes }: Props) {
                             <td className="px-4 py-4">
                               <div className="font-semibold text-white">{line.productCode}</div>
                               <div className="mt-1 text-xs text-white/45">{line.productDescription}</div>
+                              {line.batchNo ? <div className="mt-1 text-xs text-white/45">Batch No: {line.batchNo}</div> : null}
+                              {line.serialNos.length > 0 ? <div className="mt-1 text-xs text-white/45">Serial No: {line.serialNos.join(", ")}</div> : null}
                             </td>
                             <td className="px-4 py-4 text-right text-white/75">
                               {line.itemType === "SERVICE_ITEM" ? money(line.invoicedAmount) : `${money(line.invoicedQty)} ${line.uom}`}
@@ -957,10 +1026,10 @@ export function AdminCreditNoteClient({ initialTaxCodes }: Props) {
           <div className="w-full max-w-md rounded-[2rem] border border-white/10 bg-[#08080c] p-6 shadow-2xl">
             <h3 className="text-xl font-bold">Override Document No</h3>
             <p className="mt-2 text-sm text-white/55">Format: CN-YYYYMMDD-0001</p>
-            <input className="input-rk mt-5" value={docNoDraft} onChange={(e) => setDocNoDraft(normalizeDocNoInput(e.target.value))} placeholder={docNoPreview} autoFocus />
+            <input className="input-rk mt-5" value={docNoDraft} onChange={(e) => setDocNoDraft(normalizeDocNoInput(e.target.value))} placeholder={docNoPreview} />
             <div className="mt-6 flex justify-end gap-3">
-              <button type="button" onClick={() => setIsDocNoModalOpen(false)} className="rounded-xl border border-white/15 px-4 py-2 text-sm text-white/75">Cancel</button>
-              <button type="button" onClick={applyDocNoOverride} className="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white">Save</button>
+              <button type="button" onClick={() => setIsDocNoModalOpen(false)} className="rounded-xl border border-white/15 px-5 py-3 text-sm text-white/75">Cancel</button>
+              <button type="button" onClick={applyDocNoOverride} className="rounded-xl bg-red-600 px-5 py-3 text-sm font-semibold text-white">Save</button>
             </div>
           </div>
         </div>

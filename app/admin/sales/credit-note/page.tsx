@@ -8,11 +8,16 @@ export default async function AdminCreditNotePage() {
   if (!user) redirect("/login");
   if (user.role !== "ADMIN") redirect("/dashboard");
 
-  const taxCodes = await db.taxCode.findMany({
-    where: { isActive: true },
-    orderBy: [{ sortOrder: "asc" }, { code: "asc" }],
-    select: { id: true, code: true, description: true, rate: true, calculationMethod: true },
-  });
+  const [taxCodes, agents, projects, departments] = await Promise.all([
+    db.taxCode.findMany({
+      where: { isActive: true },
+      orderBy: [{ sortOrder: "asc" }, { code: "asc" }],
+      select: { id: true, code: true, description: true, rate: true, calculationMethod: true },
+    }),
+    db.agent.findMany({ where: { isActive: true }, orderBy: [{ code: "asc" }], select: { id: true, code: true, name: true, isActive: true } }),
+    db.project.findMany({ where: { isActive: true }, orderBy: [{ code: "asc" }], select: { id: true, code: true, name: true, isActive: true } }),
+    db.department.findMany({ where: { isActive: true }, orderBy: [{ code: "asc" }], select: { id: true, code: true, name: true, projectId: true, isActive: true } }),
+  ]);
 
   return (
     <section className="section-pad">
@@ -25,6 +30,9 @@ export default async function AdminCreditNotePage() {
             rate: Number(taxCode.rate ?? 0),
             calculationMethod: taxCode.calculationMethod,
           }))}
+          initialAgents={agents}
+          initialProjects={projects}
+          initialDepartments={departments}
         />
       </div>
     </section>
