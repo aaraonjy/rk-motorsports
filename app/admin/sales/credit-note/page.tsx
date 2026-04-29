@@ -1,17 +1,31 @@
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { AdminCreditNoteClient } from "@/components/admin-credit-note-client";
 
-export default async function Page() {
+export default async function AdminCreditNotePage() {
   const user = await getSessionUser();
   if (!user) redirect("/login");
   if (user.role !== "ADMIN") redirect("/dashboard");
 
+  const taxCodes = await db.taxCode.findMany({
+    where: { isActive: true },
+    orderBy: [{ sortOrder: "asc" }, { code: "asc" }],
+    select: { id: true, code: true, description: true, rate: true, calculationMethod: true },
+  });
+
   return (
     <section className="section-pad">
-      <div className="container-rk max-w-5xl">
-        <p className="text-sm font-semibold uppercase tracking-[0.24em] text-red-400/80">Sales</p>
-        <h1 className="mt-3 text-4xl font-bold">Credit Note</h1>
-        <p className="mt-4 text-white/70">This transaction will be developed in the next sales module phase.</p>
+      <div className="container-rk max-w-7xl">
+        <AdminCreditNoteClient
+          initialTaxCodes={taxCodes.map((taxCode) => ({
+            id: taxCode.id,
+            code: taxCode.code,
+            description: taxCode.description,
+            rate: Number(taxCode.rate ?? 0),
+            calculationMethod: taxCode.calculationMethod,
+          }))}
+        />
       </div>
     </section>
   );
