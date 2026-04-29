@@ -142,6 +142,10 @@ function calculateLine(line: PickLine) {
   return { subtotal, discountAmount, lineTotal };
 }
 
+function normalizeDocNoInput(value: string) {
+  return value.toUpperCase().replace(/\s+/g, "").slice(0, 30);
+}
+
 export function AdminCreditNoteClient({ initialTaxCodes }: Props) {
   const router = useRouter();
   const [transactions, setTransactions] = useState<CreditNoteRecord[]>([]);
@@ -151,6 +155,7 @@ export function AdminCreditNoteClient({ initialTaxCodes }: Props) {
   const [isLoading, setIsLoading] = useState(true);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [sourceSearch, setSourceSearch] = useState("");
+  const [selectedCustomerId, setSelectedCustomerId] = useState("");
   const [selectedInvoiceId, setSelectedInvoiceId] = useState("");
   const [pickLines, setPickLines] = useState<PickLine[]>([]);
   const [docDate, setDocDate] = useState(todayInput());
@@ -165,13 +170,30 @@ export function AdminCreditNoteClient({ initialTaxCodes }: Props) {
 
   const selectedInvoice = useMemo(() => sourceInvoices.find((item) => item.id === selectedInvoiceId) || null, [sourceInvoices, selectedInvoiceId]);
 
+  const customerOptions = useMemo(() => {
+    const map = new Map<string, { id: string; label: string; searchText: string }>();
+    for (const invoice of sourceInvoices) {
+      if (!invoice.customerId) continue;
+      if (map.has(invoice.customerId)) continue;
+      const accountNo = invoice.customerAccountNo || "-";
+      map.set(invoice.customerId, {
+        id: invoice.customerId,
+        label: `${accountNo} — ${invoice.customerName}`,
+        searchText: `${accountNo} ${invoice.customerName}`.toLowerCase(),
+      });
+    }
+    return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label));
+  }, [sourceInvoices]);
+
   const filteredInvoices = useMemo(() => {
+    if (!selectedCustomerId) return [];
     const keyword = sourceSearch.trim().toLowerCase();
-    if (!keyword) return sourceInvoices;
-    return sourceInvoices.filter((invoice) =>
+    const customerInvoices = sourceInvoices.filter((invoice) => invoice.customerId === selectedCustomerId);
+    if (!keyword) return customerInvoices;
+    return customerInvoices.filter((invoice) =>
       `${invoice.docNo} ${invoice.customerName} ${invoice.customerAccountNo || ""}`.toLowerCase().includes(keyword)
     );
-  }, [sourceInvoices, sourceSearch]);
+  }, [selectedCustomerId, sourceInvoices, sourceSearch]);
 
   const totals = useMemo(() => {
     const calculated = pickLines
@@ -228,21 +250,30 @@ export function AdminCreditNoteClient({ initialTaxCodes }: Props) {
     setDocNo("");
     setDocNoPreview("Auto Generated");
     setReason("");
+    setSelectedCustomerId("");
     setSelectedInvoiceId("");
     setPickLines([]);
     setSourceSearch("");
     setSubmitError("");
     setSubmitSuccess("");
-    await Promise.all([loadSourceInvoices(), loadNextDocNo(todayInput())]);
     setIsCreateOpen(true);
+    await Promise.all([loadSourceInvoices(), loadNextDocNo(todayInput())]);
   }
 
   function closeCreate() {
     setIsCreateOpen(false);
+    setSelectedCustomerId("");
     setSelectedInvoiceId("");
     setPickLines([]);
     setReason("");
     setSubmitError("");
+  }
+
+  function handleCustomerChange(customerId: string) {
+    setSelectedCustomerId(customerId);
+    setSelectedInvoiceId("");
+    setPickLines([]);
+    setSourceSearch("");
   }
 
   function preparePickLines(invoiceId: string) {
@@ -299,6 +330,10 @@ export function AdminCreditNoteClient({ initialTaxCodes }: Props) {
   }
 
   async function submitCreditNote() {
+    if (!selectedCustomerId) {
+      setSubmitError("Customer is required.");
+      return;
+    }
     if (!selectedInvoice) {
       setSubmitError("Please select Sales Invoice.");
       return;
@@ -367,8 +402,8 @@ export function AdminCreditNoteClient({ initialTaxCodes }: Props) {
       const data = await response.json();
       if (!response.ok || !data.ok) throw new Error(data.error || "Unable to create credit note.");
 
-      setSubmitSuccess(`Credit Note ${data.transaction?.docNo || ""} created successfully.`);
       closeCreate();
+      setSubmitSuccess(`Credit Note ${data.transaction?.docNo || ""} created successfully.`);
       await Promise.all([loadTransactions(), loadSourceInvoices()]);
       router.refresh();
     } catch (error) {
@@ -408,27 +443,35 @@ export function AdminCreditNoteClient({ initialTaxCodes }: Props) {
   }
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-4xl font-black tracking-tight text-white">Credit Note</h1>
-        <p className="mt-3 text-sm text-white/70">Create and manage credit notes against sales invoices.</p>
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="mt-3 text-4xl font-bold">Credit Note</h1>
+          <p className="mt-4 max-w-3xl text-white/70">Create and manage credit note documents against sales invoices.</p>
+        </div>
       </div>
 
-      {submitSuccess ? <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">{submitSuccess}</div> : null}
-      {submitError ? <div className="rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-red-100">{submitError}</div> : null}
+      {submitSuccess && !isCreateOpen ? (
+        <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+          {submitSuccess}
+        </div>
+      ) : null}
+      {submitError && !isCreateOpen ? <div className="rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-red-100">{submitError}</div> : null}
 
-      <div className="card-rk p-8">
-        <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+      <div className="rounded-[2rem] border border-white/10 bg-black/45 p-5 backdrop-blur-md md:p-8">
+        <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <div className="tracking-[0.35em] text-rk-red text-sm font-semibold">CREDIT NOTE</div>
-            <h2 className="mt-6 text-2xl font-extrabold text-white">Existing Credit Note Records</h2>
-            <p className="mt-4 text-sm text-white/70">Credit Note reduces sales amount and stocks returned items back into inventory.</p>
+            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-red-400/80">Credit Note</p>
+            <h2 className="mt-4 text-2xl font-bold">Existing Credit Note Records</h2>
+            <p className="mt-4 max-w-3xl text-sm leading-6 text-white/70">Use Credit Note to reduce sales amount and stock returned items back into inventory.</p>
           </div>
-          <button type="button" onClick={openCreate} className="btn-rk">Create Credit Note</button>
+          <button type="button" onClick={openCreate} className="inline-flex items-center justify-center rounded-xl bg-red-500 px-5 py-3 font-semibold text-white transition hover:bg-red-400">
+            Create Credit Note
+          </button>
         </div>
 
-        <div className="mt-10 rounded-2xl border border-white/10 p-4">
-          <div className="grid gap-4 md:grid-cols-[1fr_260px]">
+        <div className="mt-8 rounded-2xl border border-white/10 bg-black/20 p-4">
+          <div className="grid gap-4 md:grid-cols-3">
             <input className="input-rk" value={searchKeyword} onChange={(e) => setSearchKeyword(e.target.value)} placeholder="Search credit note no / customer" />
             <select className="input-rk" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
               <option value="ALL">All Status</option>
@@ -438,21 +481,21 @@ export function AdminCreditNoteClient({ initialTaxCodes }: Props) {
           </div>
         </div>
 
-        <div className="mt-8 overflow-x-auto">
-          <table className="min-w-full text-left text-sm">
-            <thead className="border-b border-white/10 text-xs uppercase tracking-wide text-white/45">
+        <div className="mt-6 overflow-x-auto">
+          <table className="min-w-full divide-y divide-white/10 text-sm">
+            <thead className="text-left text-white/45">
               <tr>
-                <th className="px-4 py-4">Doc No</th>
-                <th className="px-4 py-4">Customer</th>
-                <th className="px-4 py-4">Source INV</th>
-                <th className="px-4 py-4">Status</th>
-                <th className="px-4 py-4 text-right">Grand Total</th>
-                <th className="px-4 py-4 text-right">Action</th>
+                <th className="px-4 py-3">Doc No</th>
+                <th className="px-4 py-3">Customer</th>
+                <th className="px-4 py-3">Source INV</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3 text-right">Grand Total</th>
+                <th className="px-4 py-3 text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/10">
               {isLoading ? (
-                <tr><td colSpan={6} className="px-4 py-8 text-center text-white/50">Loading...</td></tr>
+                <tr><td colSpan={6} className="px-4 py-8 text-center text-white/50">Loading credit notes...</td></tr>
               ) : transactions.length === 0 ? (
                 <tr><td colSpan={6} className="px-4 py-8 text-center text-white/50">No credit note found.</td></tr>
               ) : (
@@ -491,14 +534,14 @@ export function AdminCreditNoteClient({ initialTaxCodes }: Props) {
 
       {isCreateOpen ? (
         <div className="fixed inset-0 z-[120] overflow-y-auto bg-black/70 px-4 py-8 backdrop-blur-sm">
-          <div className="mx-auto max-w-6xl rounded-3xl border border-white/10 bg-[#0b0b0f] p-6 shadow-2xl">
-            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-              <div>
-                <div className="text-sm font-semibold uppercase tracking-[0.35em] text-rk-red">New Credit Note</div>
-                <h2 className="mt-3 text-2xl font-black text-white">{docNo || docNoPreview}</h2>
-              </div>
-              <button type="button" onClick={closeCreate} className="rounded-xl border border-white/15 px-4 py-2 text-sm text-white/75 hover:bg-white/10">Close</button>
+          <div className="mx-auto max-w-7xl rounded-[2rem] border border-white/10 bg-[#0b0b0f] p-5 shadow-2xl md:p-8">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.24em] text-red-400/80">New Credit Note</p>
+              <h2 className="mt-3 text-3xl font-bold">Create Credit Note</h2>
+              <p className="mt-2 text-sm text-white/50">CN No: <span className="font-semibold text-white">{docNo || docNoPreview}</span></p>
             </div>
+
+            {submitError ? <div className="mt-6 rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-red-100">{submitError}</div> : null}
 
             <div className="mt-8 grid gap-4 md:grid-cols-3">
               <div>
@@ -507,7 +550,7 @@ export function AdminCreditNoteClient({ initialTaxCodes }: Props) {
               </div>
               <div>
                 <label className="label-rk">Manual CN No (Optional)</label>
-                <input className="input-rk" value={docNo} onChange={(e) => setDocNo(e.target.value.toUpperCase().replace(/\s+/g, ""))} placeholder={docNoPreview} />
+                <input className="input-rk" value={docNo} onChange={(e) => setDocNo(normalizeDocNoInput(e.target.value))} placeholder={docNoPreview} />
               </div>
               <div>
                 <label className="label-rk">Reason <span className="text-rk-red">*</span></label>
@@ -515,29 +558,53 @@ export function AdminCreditNoteClient({ initialTaxCodes }: Props) {
               </div>
             </div>
 
-            <div className="mt-8 rounded-2xl border border-white/10 p-4">
-              <label className="label-rk">Generate From Sales Invoice</label>
-              <input className="input-rk mb-4" value={sourceSearch} onChange={(e) => setSourceSearch(e.target.value)} placeholder="Search invoice no / customer" />
-              <div className="max-h-64 overflow-y-auto rounded-2xl border border-white/10">
-                {filteredInvoices.length === 0 ? (
-                  <div className="px-4 py-6 text-sm text-white/45">No available invoice found.</div>
+            <div className="mt-8 rounded-2xl border border-white/10 bg-black/20 p-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <label className="label-rk">Customer</label>
+                  <select className="input-rk" value={selectedCustomerId} onChange={(e) => handleCustomerChange(e.target.value)}>
+                    <option value="">Select customer first</option>
+                    {customerOptions.map((customer) => (
+                      <option key={customer.id} value={customer.id}>{customer.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="label-rk">Search Sales Invoice</label>
+                  <input
+                    className="input-rk"
+                    value={sourceSearch}
+                    onChange={(e) => setSourceSearch(e.target.value)}
+                    disabled={!selectedCustomerId}
+                    placeholder={selectedCustomerId ? "Search invoice no" : "Select customer first"}
+                  />
+                </div>
+              </div>
+
+              <div className="mt-4 rounded-2xl border border-white/10">
+                {!selectedCustomerId ? (
+                  <div className="px-4 py-6 text-sm text-white/45">Please select customer profile first before selecting Sales Invoice.</div>
+                ) : filteredInvoices.length === 0 ? (
+                  <div className="px-4 py-6 text-sm text-white/45">No available invoice found for this customer.</div>
                 ) : (
-                  filteredInvoices.map((invoice) => (
-                    <button
-                      key={invoice.id}
-                      type="button"
-                      onClick={() => preparePickLines(invoice.id)}
-                      className={`flex w-full items-center justify-between gap-4 border-b border-white/10 px-4 py-4 text-left text-sm transition last:border-0 ${
-                        selectedInvoiceId === invoice.id ? "bg-white/10 text-white" : "text-white/80 hover:bg-white/5"
-                      }`}
-                    >
-                      <div>
-                        <div className="font-semibold">{invoice.docNo}</div>
-                        <div className="mt-1 text-xs text-white/45">{invoice.customerName} • {formatDate(invoice.docDate)}</div>
-                      </div>
-                      <div className="text-right font-semibold">{invoice.currency || "MYR"} {money(invoice.grandTotal)}</div>
-                    </button>
-                  ))
+                  <div className="max-h-64 overflow-y-auto">
+                    {filteredInvoices.map((invoice) => (
+                      <button
+                        key={invoice.id}
+                        type="button"
+                        onClick={() => preparePickLines(invoice.id)}
+                        className={`flex w-full items-center justify-between gap-4 border-b border-white/10 px-4 py-4 text-left text-sm transition last:border-0 ${
+                          selectedInvoiceId === invoice.id ? "bg-white/10 text-white" : "text-white/80 hover:bg-white/5"
+                        }`}
+                      >
+                        <div>
+                          <div className="font-semibold">{invoice.docNo}</div>
+                          <div className="mt-1 text-xs text-white/45">{invoice.customerName} • {formatDate(invoice.docDate)}</div>
+                        </div>
+                        <div className="text-right font-semibold">{invoice.currency || "MYR"} {money(invoice.grandTotal)}</div>
+                      </button>
+                    ))}
+                  </div>
                 )}
               </div>
             </div>
@@ -589,20 +656,20 @@ export function AdminCreditNoteClient({ initialTaxCodes }: Props) {
             ) : null}
 
             <div className="mt-8 grid gap-4 md:grid-cols-[1fr_360px]">
-              <div className="rounded-2xl border border-white/10 p-4 text-sm text-white/55">
+              <div className="rounded-2xl border border-white/10 p-4 text-sm leading-6 text-white/55">
                 Credit Note is posted immediately. Stock items will be stocked-in. Cancelling the CN will reverse the stock movement.
               </div>
               <div className="rounded-2xl border border-white/10 p-5">
                 <div className="flex justify-between text-white/70"><span>Subtotal</span><span>{money(totals.subtotal)}</span></div>
                 <div className="mt-3 flex justify-between text-white/70"><span>Discount</span><span>{money(totals.discount)}</span></div>
                 <div className="mt-3 flex justify-between text-white/70"><span>Tax</span><span>{money(totals.tax)}</span></div>
-                <div className="mt-5 border-t border-white/10 pt-5 flex justify-between text-xl font-bold text-white"><span>Grand Total</span><span>{money(totals.grandTotal)}</span></div>
+                <div className="mt-5 flex justify-between border-t border-white/10 pt-5 text-xl font-bold text-white"><span>Grand Total</span><span>{money(totals.grandTotal)}</span></div>
               </div>
             </div>
 
             <div className="mt-8 flex justify-end gap-3">
               <button type="button" onClick={closeCreate} className="rounded-xl border border-white/15 px-6 py-3 text-sm text-white/75 hover:bg-white/10">Close</button>
-              <button type="button" disabled={isSubmitting} onClick={submitCreditNote} className="btn-rk disabled:opacity-60">
+              <button type="button" disabled={isSubmitting} onClick={submitCreditNote} className="inline-flex items-center justify-center rounded-xl bg-red-500 px-6 py-3 font-semibold text-white transition hover:bg-red-400 disabled:opacity-60">
                 {isSubmitting ? "Creating..." : "Create Credit Note"}
               </button>
             </div>
