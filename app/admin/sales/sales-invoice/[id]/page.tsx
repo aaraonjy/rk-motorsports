@@ -254,11 +254,29 @@ export default async function AdminSalesInvoiceDetailPage({ params }: Params) {
   });
 
   const stockLines = stockIssue?.lines || [];
-  const stockLedgerRows = await db.stockLedger.findMany({
+  const invoiceStockLedgerRows = await db.stockLedger.findMany({
     where: { sourceType: "SALES_INVOICE", sourceId: transaction.id, movementDirection: "OUT" },
     orderBy: [{ createdAt: "asc" }],
     select: { inventoryProductId: true, locationId: true, batchNo: true, remarks: true },
   });
+
+  const sourceDeliveryOrdersForStockMeta = transaction.targetLinks
+    .map((link) => link.sourceTransaction)
+    .filter((source) => source && source.docType === "DO" && source.status !== "CANCELLED");
+
+  const sourceDeliveryStockLedgerRows = sourceDeliveryOrdersForStockMeta.length > 0
+    ? await db.stockLedger.findMany({
+        where: {
+          sourceType: "SALES_DELIVERY_ORDER",
+          sourceId: { in: sourceDeliveryOrdersForStockMeta.map((source) => source!.id) },
+          movementDirection: "OUT",
+        },
+        orderBy: [{ createdAt: "asc" }],
+        select: { inventoryProductId: true, locationId: true, batchNo: true, remarks: true },
+      })
+    : [];
+
+  const stockLedgerRows = invoiceStockLedgerRows.length > 0 ? invoiceStockLedgerRows : sourceDeliveryStockLedgerRows;
 
   const traceLookupKeys = stockLines
     .filter((line) => Boolean(line.inventoryProduct?.isAssemblyItem))

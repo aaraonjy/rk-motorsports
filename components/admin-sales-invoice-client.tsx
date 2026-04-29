@@ -1927,7 +1927,7 @@ export function AdminSalesInvoiceClient({
                     <td className="px-4 py-4 text-right">
                       {item.status !== "CANCELLED" ? (
                         <div className="flex flex-wrap justify-end gap-2">
-                          {!isGeneratedFromSalesOrder(item) && !isFullyPaidSalesInvoice(item) ? (
+                          {!isFullyPaidSalesInvoice(item) ? (
                             <>
                               <button type="button" onClick={(event) => { event.stopPropagation(); openEdit(item); }} className="rounded-xl border border-white/15 px-3 py-2 text-xs text-white/75 transition hover:bg-white/10 hover:text-white">
                                 Edit
