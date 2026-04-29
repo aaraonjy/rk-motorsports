@@ -1119,6 +1119,32 @@ export function AdminSalesInvoiceClient({
     return Boolean(line.sourceLineId || line.sourceTransactionId);
   }
 
+  function getGeneratedEditStockMeta(transaction: SalesInvoiceRecord, line: NonNullable<SalesInvoiceRecord["lines"]>[number], index: number) {
+    const sourceIds = new Set(
+      (transaction.targetLinks || [])
+        .map((link) => link.sourceTransaction)
+        .filter((source) => ["SO", "DO"].includes(String(source?.docType || "")) && source?.status !== "CANCELLED")
+        .map((source) => String(source?.id || ""))
+        .filter(Boolean)
+    );
+
+    const sourceLines = initialSalesOrders
+      .filter((order) => sourceIds.has(order.id))
+      .flatMap((order) => order.lines || []);
+
+    const matchingLine =
+      sourceLines.find((sourceLine) =>
+        String(sourceLine.inventoryProductId || "") === String(line.inventoryProductId || "") &&
+        String(sourceLine.locationId || "") === String(line.locationId || "") &&
+        String(sourceLine.productCode || "") === String(line.productCode || "")
+      ) || sourceLines[index] || null;
+
+    return {
+      batchNo: matchingLine?.batchNo || "",
+      serialNos: uniqueSerialNos(Array.isArray(matchingLine?.serialNos) ? matchingLine!.serialNos! : []),
+    };
+  }
+
   const hasGeneratedSalesOrderLines = lines.some((line) => isGeneratedLineFromSalesOrder(line));
   const isGeneratedEditMode = formMode === "edit" && Boolean(editTarget && isGeneratedFromSalesOrder(editTarget));
   const isGeneratedBodyLocked = hasGeneratedSalesOrderLines || isGeneratedEditMode;
@@ -1454,7 +1480,9 @@ export function AdminSalesInvoiceClient({
     setSelectedTaxCodeId((transaction as any).taxCodeId || (taxConfig.taxModuleEnabled ? taxConfig.defaultAdminTaxCodeId || "" : ""));
     setLines(
       Array.isArray(transaction.lines) && transaction.lines.length > 0
-        ? transaction.lines.map((line) => ({
+        ? transaction.lines.map((line, index) => {
+            const sourceStockMeta = getGeneratedEditStockMeta(transaction, line, index);
+            return {
             sourceLineId: "",
             sourceTransactionId: "",
             inventoryProductId: line.inventoryProductId || "",
@@ -1469,11 +1497,12 @@ export function AdminSalesInvoiceClient({
             discountType: line.discountType === "AMOUNT" ? "AMOUNT" : "PERCENT",
             locationId: line.locationId || defaultLocationId,
             taxCodeId: line.taxCodeId || "",
-            batchNo: (line as any).batchNo || "",
-            serialNos: uniqueSerialNos(((line as any).serialNos || []) as string[]),
+            batchNo: line.batchNo || sourceStockMeta.batchNo || "",
+            serialNos: uniqueSerialNos([...(Array.isArray(line.serialNos) ? line.serialNos : []), ...sourceStockMeta.serialNos]),
             serialSearch: "",
             remarks: line.remarks || "",
-          }))
+          };
+        })
         : [emptyLine(isLineItemTaxMode ? taxConfig.defaultAdminTaxCodeId || "" : "", defaultLocationId, qtyDecimalPlaces, priceDecimalPlaces)]
     );
     setSubmitError("");
@@ -1710,6 +1739,7 @@ export function AdminSalesInvoiceClient({
   }
 
   function validateDeliveryOrderForm() {
+    if (isGeneratedEditMode) return "";
     if (!customerId) return "Customer is required.";
     if (!lines.length) return "Please add at least one product line.";
 
