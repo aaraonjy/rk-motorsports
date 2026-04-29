@@ -768,7 +768,7 @@ export async function GET(_req: Request, context: Params) {
         },
         targetLinks: {
           include: {
-            targetTransaction: { select: { id: true, docType: true, docNo: true, status: true } },
+            sourceTransaction: { select: { id: true, docType: true, docNo: true, status: true } },
           },
         },
         lines: {
@@ -921,12 +921,35 @@ export async function PATCH(req: Request, context: Params) {
         return { transaction: updated, auditAction: "CANCEL" as const, description: `Cancelled Sales Invoice ${updated.docNo}.` };
       }
 
-      if (hasSalesOrderSource(current)) {
-        throw new Error("Sales Invoice generated from source document cannot be edited. Please cancel this Sales Invoice and generate a new Sales Invoice from the original source document.");
+      const paymentInput = getPaymentInput(body);
+      const isGeneratedFromSource = hasSalesOrderSource(current);
+
+      if (isGeneratedFromSource) {
+        if (action !== "edit") {
+          throw new Error("Sales Invoice generated from source document cannot be revised. Please cancel this Sales Invoice and generate a new Sales Invoice from the original source document.");
+        }
+
+        const existingTotalPaid = (current.payments || []).reduce((sum, payment) => sum + toNumber(payment.amount), 0);
+        validatePaymentAmount(paymentInput.amount, current.grandTotal, existingTotalPaid);
+        await createSalesTransactionPaymentIfNeeded(tx, current.id, admin.id, paymentInput);
+
+        const nextTotalPaid = Math.round((existingTotalPaid + paymentInput.amount + Number.EPSILON) * 100) / 100;
+        const updated = await tx.salesTransaction.update({
+          where: { id: current.id },
+          data: { status: getSalesInvoiceStatusForPayment(current.grandTotal, nextTotalPaid) },
+          include: {
+            lines: true,
+            payments: {
+              orderBy: [{ paymentDate: "asc" }, { createdAt: "asc" }],
+              include: { createdByAdmin: { select: { id: true, name: true, email: true } } },
+            },
+          },
+        });
+
+        return { transaction: updated, auditAction: "UPDATE" as const, description: `Recorded payment for Sales Invoice ${updated.docNo}.` };
       }
 
       const data = await buildDirectSalesInvoiceData(body, tx);
-      const paymentInput = getPaymentInput(body);
       await reverseStockIssueForSalesInvoice(tx, current, admin.id, action === "revise" ? "Revised Sales Invoice" : "Edited Sales Invoice");
 
       if (action === "edit") {
