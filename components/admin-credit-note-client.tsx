@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 type TaxCodeOption = {
@@ -100,6 +100,96 @@ type PickLine = {
   remarks: string;
 };
 
+type SearchableSelectOption = { id: string; label: string; searchText: string };
+
+function SearchableSelect({
+  label,
+  placeholder,
+  options,
+  value,
+  disabled = false,
+  onChange,
+}: {
+  label: string;
+  placeholder: string;
+  options: SearchableSelectOption[];
+  value: string;
+  disabled?: boolean;
+  onChange: (option: SearchableSelectOption | null) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const selectedOption = useMemo(() => options.find((item) => item.id === value) || null, [options, value]);
+
+  useEffect(() => setSearch(selectedOption?.label || ""), [selectedOption?.label]);
+
+  useEffect(() => {
+    function handleOutsideClick(event: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) setIsOpen(false);
+    }
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, []);
+
+  const filteredOptions = useMemo(() => {
+    const keyword = search.trim().toLowerCase();
+    if (!keyword) return options;
+    return options.filter((item) => item.searchText.includes(keyword));
+  }, [options, search]);
+
+  return (
+    <div ref={containerRef} className="relative">
+      <label className="label-rk">{label}</label>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => {
+          if (disabled) return;
+          setIsOpen((prev) => !prev);
+          setSearch("");
+        }}
+        className={`input-rk flex items-center justify-between gap-3 pr-20 text-left ${disabled ? "cursor-not-allowed opacity-60" : ""}`}
+      >
+        <span className={selectedOption ? "truncate text-white" : "truncate text-white/45"}>
+          {selectedOption ? selectedOption.label : placeholder}
+        </span>
+        <span className="shrink-0 pr-5 text-white/60">▾</span>
+      </button>
+
+      {isOpen ? (
+        <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-[140] overflow-hidden rounded-2xl border border-white/10 bg-[#0b0b0f] shadow-2xl">
+          <div className="border-b border-white/10 p-3">
+            <input autoFocus className="input-rk" value={search} onChange={(e) => setSearch(e.target.value)} placeholder={`Search ${label.toLowerCase()}`} />
+          </div>
+          <div className="max-h-56 overflow-y-auto p-2">
+            {filteredOptions.length === 0 ? (
+              <div className="rounded-xl px-3 py-3 text-sm text-white/45">No matching {label.toLowerCase()} found.</div>
+            ) : (
+              filteredOptions.map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  onClick={() => {
+                    onChange(option);
+                    setSearch(option.label);
+                    setIsOpen(false);
+                  }}
+                  className={`flex w-full items-center rounded-xl px-3 py-3 text-left text-sm transition ${
+                    selectedOption?.id === option.id ? "bg-white/10 text-white" : "text-white/85 hover:bg-white/10 hover:text-white"
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 type Props = {
   initialTaxCodes: TaxCodeOption[];
 };
@@ -162,6 +252,8 @@ export function AdminCreditNoteClient({ initialTaxCodes }: Props) {
   const [docDate, setDocDate] = useState(todayInput());
   const [docNo, setDocNo] = useState("");
   const [docNoPreview, setDocNoPreview] = useState("Auto Generated");
+  const [isDocNoModalOpen, setIsDocNoModalOpen] = useState(false);
+  const [docNoDraft, setDocNoDraft] = useState("");
   const [reason, setReason] = useState("");
   const [submitError, setSubmitError] = useState("");
   const [submitSuccess, setSubmitSuccess] = useState("");
@@ -271,6 +363,23 @@ export function AdminCreditNoteClient({ initialTaxCodes }: Props) {
     setPickLines([]);
     setReason("");
     setSubmitError("");
+  }
+
+  function openDocNoModal() {
+    setDocNoDraft(docNo || docNoPreview);
+    setIsDocNoModalOpen(true);
+  }
+
+  function applyDocNoOverride() {
+    const normalized = normalizeDocNoInput(docNoDraft);
+    setDocNo(normalized);
+    setIsDocNoModalOpen(false);
+  }
+
+  function clearDocNoOverride() {
+    setDocNo("");
+    setDocNoDraft("");
+    setIsDocNoModalOpen(false);
   }
 
   function handleCustomerChange(customerId: string) {
@@ -576,20 +685,21 @@ export function AdminCreditNoteClient({ initialTaxCodes }: Props) {
                   </div>
                   <div>
                     <label className="label-rk">System Doc No</label>
-                    <input className="input-rk" value={docNo || docNoPreview} readOnly disabled />
+                    <button type="button" onClick={openDocNoModal} className="input-rk flex items-center justify-between gap-3 text-left">
+                      <span>{docNo || docNoPreview}</span>
+                      <span className="text-xs text-white/45">Click to override</span>
+                    </button>
                   </div>
                 </div>
 
                 <div className="grid gap-5 md:grid-cols-4">
-                  <div>
-                    <label className="label-rk">A/C No</label>
-                    <select className="input-rk" value={selectedCustomerId} onChange={(e) => handleCustomerChange(e.target.value)}>
-                      <option value="">Search or select customer</option>
-                      {customerOptions.map((customer) => (
-                        <option key={customer.id} value={customer.id}>{customer.label}</option>
-                      ))}
-                    </select>
-                  </div>
+                  <SearchableSelect
+                    label="A/C No"
+                    placeholder="Search or select customer"
+                    options={customerOptions}
+                    value={selectedCustomerId}
+                    onChange={(option) => handleCustomerChange(option?.id || "")}
+                  />
                   <div>
                     <label className="label-rk">Customer Name</label>
                     <input className="input-rk" value={selectedCustomer?.label?.split(" — ").slice(1).join(" — ") || ""} readOnly disabled />
@@ -615,12 +725,6 @@ export function AdminCreditNoteClient({ initialTaxCodes }: Props) {
                   </div>
                 </div>
 
-                <div className="grid gap-5 md:grid-cols-2">
-                  <div>
-                    <label className="label-rk">Manual CN No (Optional)</label>
-                    <input className="input-rk" value={docNo} onChange={(e) => setDocNo(normalizeDocNoInput(e.target.value))} placeholder={docNoPreview} />
-                  </div>
-                </div>
 
                 <div className="rounded-[1.5rem] border border-white/10 bg-black/20 p-5">
                   <p className="text-sm font-semibold uppercase tracking-[0.24em] text-white/45">Billing Address</p>
@@ -640,15 +744,13 @@ export function AdminCreditNoteClient({ initialTaxCodes }: Props) {
 
                 <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
                   <div className="grid gap-4 md:grid-cols-2">
-                    <div>
-                      <label className="label-rk">A/C No</label>
-                      <select className="input-rk" value={selectedCustomerId} onChange={(e) => handleCustomerChange(e.target.value)}>
-                        <option value="">Search or select customer</option>
-                        {customerOptions.map((customer) => (
-                          <option key={customer.id} value={customer.id}>{customer.label}</option>
-                        ))}
-                      </select>
-                    </div>
+                    <SearchableSelect
+                      label="A/C No"
+                      placeholder="Search or select customer"
+                      options={customerOptions}
+                      value={selectedCustomerId}
+                      onChange={(option) => handleCustomerChange(option?.id || "")}
+                    />
                     <div>
                       <label className="label-rk">Search Sales Invoice</label>
                       <input
@@ -756,6 +858,24 @@ export function AdminCreditNoteClient({ initialTaxCodes }: Props) {
               <button type="button" disabled={isSubmitting} onClick={submitCreditNote} className="inline-flex items-center justify-center rounded-xl bg-red-500 px-6 py-3 font-semibold text-white transition hover:bg-red-400 disabled:opacity-60">
                 {isSubmitting ? "Creating..." : "Create Credit Note"}
               </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {isDocNoModalOpen ? (
+        <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-3xl border border-white/10 bg-[#0b0b0f] p-6 shadow-2xl">
+            <h3 className="text-xl font-bold text-white">Override Credit Note No</h3>
+            <p className="mt-3 text-sm text-white/60">Leave blank to use the system generated document number.</p>
+            <div className="mt-5">
+              <label className="label-rk">Document No</label>
+              <input className="input-rk" value={docNoDraft} onChange={(e) => setDocNoDraft(normalizeDocNoInput(e.target.value))} placeholder={docNoPreview} autoFocus />
+            </div>
+            <div className="mt-6 flex justify-end gap-3">
+              <button type="button" onClick={() => setIsDocNoModalOpen(false)} className="rounded-xl border border-white/15 px-5 py-3 text-sm text-white/75 hover:bg-white/10">Close</button>
+              <button type="button" onClick={clearDocNoOverride} className="rounded-xl border border-white/15 px-5 py-3 text-sm text-white/75 hover:bg-white/10">Use System No</button>
+              <button type="button" onClick={applyDocNoOverride} className="rounded-xl bg-red-500 px-5 py-3 text-sm font-bold text-white hover:bg-red-400">Save</button>
             </div>
           </div>
         </div>
