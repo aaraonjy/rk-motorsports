@@ -746,9 +746,25 @@ async function reverseStockIssueForCashSales(tx: Prisma.TransactionClient, cashS
     return;
   }
 
+  const latestReversal = await tx.stockLedger.findFirst({
+    where: {
+      sourceType: "SALES_CASH_SALES_CANCEL",
+      sourceId: cashSales.id,
+      movementDirection: "IN",
+    },
+    orderBy: { createdAt: "desc" },
+    select: { createdAt: true },
+  });
+
+  const activeLedgerEntries = latestReversal
+    ? ledgerEntries.filter((entry) => entry.createdAt > latestReversal.createdAt)
+    : ledgerEntries;
+
+  if (activeLedgerEntries.length === 0) return;
+
   await acquireStockMutationLocks(
     tx,
-    ledgerEntries.map((entry) => {
+    activeLedgerEntries.map((entry) => {
       const serialMatch = String(entry.remarks || "").match(/SERIAL_NO=([^|]+)/);
       return {
         inventoryProductId: entry.inventoryProductId,
@@ -759,7 +775,7 @@ async function reverseStockIssueForCashSales(tx: Prisma.TransactionClient, cashS
     })
   );
 
-  for (const entry of ledgerEntries) {
+  for (const entry of activeLedgerEntries) {
     const ledgerValues = buildLedgerValues(createStoredQtyDecimal(entry.qty), "IN");
     await tx.stockLedger.create({
       data: {
@@ -776,7 +792,7 @@ async function reverseStockIssueForCashSales(tx: Prisma.TransactionClient, cashS
         referenceText: `Cancel Cash Sales ${cashSales.docNo}`,
         sourceType: "SALES_CASH_SALES_CANCEL",
         sourceId: cashSales.id,
-        remarks: cancelReason || `Cancellation reversal for ${cashSales.docNo}`,
+        remarks: [cancelReason || `Cancellation reversal for ${cashSales.docNo}`, `REVERSAL_OF_LEDGER_ID=${entry.id}`].filter(Boolean).join(" | "),
       },
     });
 
