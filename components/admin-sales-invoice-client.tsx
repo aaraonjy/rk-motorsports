@@ -1118,6 +1118,8 @@ export function AdminSalesInvoiceClient({
   }
 
   const hasGeneratedSalesOrderLines = lines.some((line) => isGeneratedLineFromSalesOrder(line));
+  const isGeneratedEditMode = formMode === "edit" && Boolean(editTarget && isGeneratedFromSalesOrder(editTarget));
+  const isGeneratedBodyLocked = hasGeneratedSalesOrderLines || isGeneratedEditMode;
 
 
   function applyBillingAddressFromCustomer(customer: CustomerOption) {
@@ -1483,14 +1485,13 @@ export function AdminSalesInvoiceClient({
   }
 
   function openEdit(transaction: SalesInvoiceRecord) {
+    fillFormFromTransaction(transaction, "edit");
     if (isGeneratedFromSalesOrder(transaction)) {
+      setActiveTab("FOOTER");
       setSubmitMessageType("success");
       setRecentCancelledTransaction(null);
-      setSubmitSuccess("");
-      alert("Sales Invoice generated from source document cannot be edited. Please cancel this Sales Invoice and generate a new Sales Invoice from the original source document.");
-      return;
+      setSubmitSuccess("Generated Sales Invoice opened for payment update only. Header and Body are locked.");
     }
-    fillFormFromTransaction(transaction, "edit");
   }
 
   function openRevise(transaction: SalesInvoiceRecord) {
@@ -1932,9 +1933,11 @@ export function AdminSalesInvoiceClient({
                               <button type="button" onClick={(event) => { event.stopPropagation(); openEdit(item); }} className="rounded-xl border border-white/15 px-3 py-2 text-xs text-white/75 transition hover:bg-white/10 hover:text-white">
                                 Edit
                               </button>
-                              <button type="button" onClick={(event) => { event.stopPropagation(); openRevise(item); }} className="rounded-xl border border-sky-500/30 px-3 py-2 text-xs text-sky-200 transition hover:bg-sky-500/10">
-                                Edit Revise
-                              </button>
+                              {!isGeneratedFromSalesOrder(item) ? (
+                                <button type="button" onClick={(event) => { event.stopPropagation(); openRevise(item); }} className="rounded-xl border border-sky-500/30 px-3 py-2 text-xs text-sky-200 transition hover:bg-sky-500/10">
+                                  Edit Revise
+                                </button>
+                              ) : null}
                             </>
                           ) : null}
                           <button type="button" onClick={(event) => { event.stopPropagation(); setCancelTarget(item); }} className="rounded-xl border border-red-500/30 px-3 py-2 text-xs text-red-200 transition hover:bg-red-500/10">
@@ -1965,9 +1968,11 @@ export function AdminSalesInvoiceClient({
                   <p className="mt-3 text-sm text-sky-200">Generated from: {reference || "-"}</p>
                 ) : null}
               </div>
-              <button type="button" onClick={openGenerateFromSalesOrder} className="rounded-xl border border-sky-500/30 bg-sky-500/10 px-5 py-3 text-sm font-semibold text-sky-100 transition hover:bg-sky-500/20">
-                Generate From
-              </button>
+              {formMode === "create" ? (
+                <button type="button" onClick={openGenerateFromSalesOrder} className="rounded-xl border border-sky-500/30 bg-sky-500/10 px-5 py-3 text-sm font-semibold text-sky-100 transition hover:bg-sky-500/20">
+                  Generate From
+                </button>
+              ) : null}
             </div>
 
             <div className="mt-6 flex flex-wrap gap-2 border-b border-white/10 pb-4">
@@ -1978,9 +1983,9 @@ export function AdminSalesInvoiceClient({
               ))}
             </div>
 
-            {hasGeneratedSalesOrderLines ? (
+            {isGeneratedBodyLocked ? (
               <div className="mt-5 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-                This Sales Invoice is generated from Sales Order. Product, qty, selling price, discount, batch/S/N, location, and footer pricing are locked. To change claim or delivery values, cancel this DO and generate again from the Sales Order.
+                This Sales Invoice is generated from a source document. Header and Body are locked. Use the Footer tab to record payment only.
               </div>
             ) : null}
             {generateFromError ? <div className="mt-5 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">{generateFromError}</div> : null}
@@ -1988,7 +1993,12 @@ export function AdminSalesInvoiceClient({
             {submitSuccess ? <div className="mt-5 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">{submitSuccess}</div> : null}
 
             {activeTab === "HEADER" ? (
-              <div className="mt-6 space-y-5">
+              <div className={`mt-6 space-y-5 ${isGeneratedEditMode ? "pointer-events-none rounded-[1.75rem] border border-white/10 bg-white/[0.04] p-4 opacity-70 grayscale" : ""}`}>
+                {isGeneratedEditMode ? (
+                  <div className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white/55">
+                    Read-only generated header section. This Sales Invoice was generated from a source document.
+                  </div>
+                ) : null}
                 <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
                   <div>
                     <label className="label-rk">Doc Date</label>
@@ -2033,14 +2043,14 @@ export function AdminSalesInvoiceClient({
             ) : null}
 
             {activeTab === "BODY" ? (
-              <div className={`mt-6 space-y-5 ${hasGeneratedSalesOrderLines ? "rounded-[1.75rem] border border-white/10 bg-white/[0.04] p-4 opacity-70 grayscale" : ""}`}>
-                {hasGeneratedSalesOrderLines ? (
+              <div className={`mt-6 space-y-5 ${isGeneratedBodyLocked ? "pointer-events-none rounded-[1.75rem] border border-white/10 bg-white/[0.04] p-4 opacity-70 grayscale" : ""}`}>
+                {isGeneratedBodyLocked ? (
                   <div className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white/55">
-                    Read-only generated body section. This Sales Invoice was generated from Sales Order, so product, qty, selling price, discount, and line pricing details are locked.
+                    Read-only generated body section. This Sales Invoice was generated from a source document, so product, qty, selling price, discount, batch/S/N, location, and line pricing details are locked.
                   </div>
                 ) : null}
                 {lines.map((line, index) => {
-                  const isGeneratedLine = isGeneratedLineFromSalesOrder(line);
+                  const isGeneratedLine = isGeneratedBodyLocked || isGeneratedLineFromSalesOrder(line);
                   const normalizedLine = normalizedLines[index];
                   const total = normalizedLine?.lineTotal || 0;
                   const taxAmount = normalizedLine?.taxAmount || 0;
@@ -2240,31 +2250,31 @@ export function AdminSalesInvoiceClient({
                     </div>
                   );
                 })}
-                {!hasGeneratedSalesOrderLines ? (
+                {!isGeneratedBodyLocked ? (
                   <button type="button" onClick={() => setLines((prev) => [...prev, emptyLine(isLineItemTaxMode ? taxConfig.defaultAdminTaxCodeId || "" : "", defaultLocationId, qtyDecimalPlaces, priceDecimalPlaces)])} className="rounded-xl border border-white/15 px-4 py-3 text-sm text-white/75 transition hover:bg-white/10 hover:text-white">+ Add Product</button>
                 ) : null}
               </div>
             ) : null}
 
             {activeTab === "FOOTER" ? (
-              <div className={`mt-6 grid gap-6 lg:grid-cols-[1fr_360px] ${hasGeneratedSalesOrderLines ? "pointer-events-none rounded-[1.75rem] border border-white/10 bg-white/[0.04] p-4 opacity-70 grayscale" : ""}`}>
-                {hasGeneratedSalesOrderLines ? (
+              <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_360px]">
+                {isGeneratedEditMode ? (
                   <div className="lg:col-span-2 rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white/55">
-                    Read-only generated footer section. This Sales Invoice was generated from Sales Order, so footer pricing details are locked.
+                    Payment update mode. Header, Body, tax, pricing, terms, bank account, and remarks are locked for generated Sales Invoice.
                   </div>
                 ) : null}
                 <div className="space-y-5">
                   <div>
                     <label className="label-rk">Terms & Conditions</label>
-                    <textarea className="input-rk min-h-[140px]" value={termsAndConditions} onChange={(e) => setTermsAndConditions(e.target.value)} placeholder="Enter terms manually. Template picker can be added in later phase." />
+                    <textarea className="input-rk min-h-[140px]" value={termsAndConditions} disabled={isGeneratedEditMode} onChange={(e) => setTermsAndConditions(e.target.value)} placeholder="Enter terms manually. Template picker can be added in later phase." />
                   </div>
                   <div>
                     <label className="label-rk">Bank Account</label>
-                    <textarea className="input-rk min-h-[100px]" value={bankAccount} onChange={(e) => setBankAccount(e.target.value)} placeholder="Enter bank details manually." />
+                    <textarea className="input-rk min-h-[100px]" value={bankAccount} disabled={isGeneratedEditMode} onChange={(e) => setBankAccount(e.target.value)} placeholder="Enter bank details manually." />
                   </div>
                   <div>
                     <label className="label-rk">Footer Remarks</label>
-                    <textarea className="input-rk min-h-[100px]" value={footerRemarks} onChange={(e) => setFooterRemarks(e.target.value)} />
+                    <textarea className="input-rk min-h-[100px]" value={footerRemarks} disabled={isGeneratedEditMode} onChange={(e) => setFooterRemarks(e.target.value)} />
                   </div>
                 </div>
                 <div className="h-fit rounded-[1.75rem] border border-white/10 bg-black/30 p-5 text-sm">
@@ -2274,7 +2284,7 @@ export function AdminSalesInvoiceClient({
                   {!isLineItemTaxMode && isTaxEnabled ? (
                     <div className="mt-4">
                       <label className="label-rk">Transaction Tax Code</label>
-                      <CompactSelect options={taxCodeOptions} value={selectedTaxCodeId} onChange={setSelectedTaxCodeId} />
+                      <CompactSelect options={taxCodeOptions} value={selectedTaxCodeId} onChange={setSelectedTaxCodeId} disabled={isGeneratedEditMode} />
                     </div>
                   ) : null}
                   <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-xs leading-6 text-white/60">
@@ -2335,7 +2345,7 @@ export function AdminSalesInvoiceClient({
             <div className="mt-8 flex flex-wrap justify-end gap-3 border-t border-white/10 pt-5">
               <button type="button" onClick={closeForm} className="rounded-xl border border-white/15 px-5 py-3 text-sm text-white/75 transition hover:bg-white/10">Close</button>
               <button type="button" disabled={!canSubmitDeliveryOrder} onClick={submitDeliveryOrder} className="rounded-xl bg-red-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-red-500 disabled:opacity-60">
-                {isSubmitting ? "Saving..." : formMode === "revise" ? "Save Revised Sales Invoice" : formMode === "edit" ? "Update Sales Invoice" : "Create Sales Invoice"}
+                {isSubmitting ? "Saving..." : formMode === "revise" ? "Save Revised Sales Invoice" : isGeneratedEditMode ? "Update Payment" : formMode === "edit" ? "Update Sales Invoice" : "Create Sales Invoice"}
               </button>
             </div>
           </div>
@@ -2351,9 +2361,9 @@ export function AdminSalesInvoiceClient({
               <p className="mt-3 text-sm text-white/60">Only source documents with remaining invoice qty are shown.</p>
             </div>
 
-            {hasGeneratedSalesOrderLines ? (
+            {isGeneratedBodyLocked ? (
               <div className="mt-5 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-                This Sales Invoice is generated from Sales Order. Product, qty, selling price, discount, batch/S/N, location, and footer pricing are locked. To change claim or delivery values, cancel this DO and generate again from the Sales Order.
+                This Sales Invoice is generated from a source document. Header and Body are locked. Use the Footer tab to record payment only.
               </div>
             ) : null}
             {generateFromError ? <div className="mt-5 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">{generateFromError}</div> : null}
