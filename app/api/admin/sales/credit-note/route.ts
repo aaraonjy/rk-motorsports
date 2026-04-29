@@ -380,7 +380,7 @@ async function buildCreditNoteData(body: any, tx: Prisma.TransactionClient) {
     departmentId: sourceInvoice.departmentId,
     termsAndConditions: sourceInvoice.termsAndConditions,
     bankAccount: sourceInvoice.bankAccount,
-    footerRemarks: sourceInvoice.footerRemarks,
+    footerRemarks: normalizeText(body.footerRemarks) || sourceInvoice.footerRemarks,
     subtotal,
     discountTotal,
     taxableSubtotal,

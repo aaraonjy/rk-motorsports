@@ -38,6 +38,15 @@ type SourceInvoice = {
   customerId: string;
   customerName: string;
   customerAccountNo?: string | null;
+  email?: string | null;
+  contactNo?: string | null;
+  billingAddressLine1?: string | null;
+  billingAddressLine2?: string | null;
+  billingAddressLine3?: string | null;
+  billingAddressLine4?: string | null;
+  billingCity?: string | null;
+  billingPostCode?: string | null;
+  billingCountryCode?: string | null;
   currency?: string | null;
   grandTotal: string | number;
   lines?: InvoiceLine[];
@@ -255,6 +264,7 @@ export function AdminCreditNoteClient({ initialTaxCodes }: Props) {
   const [isDocNoModalOpen, setIsDocNoModalOpen] = useState(false);
   const [docNoDraft, setDocNoDraft] = useState("");
   const [reason, setReason] = useState("");
+  const [footerRemarks, setFooterRemarks] = useState("");
   const [submitError, setSubmitError] = useState("");
   const [submitSuccess, setSubmitSuccess] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -279,6 +289,7 @@ export function AdminCreditNoteClient({ initialTaxCodes }: Props) {
   }, [sourceInvoices]);
 
   const selectedCustomer = useMemo(() => customerOptions.find((item) => item.id === selectedCustomerId) || null, [customerOptions, selectedCustomerId]);
+  const selectedCustomerInvoice = useMemo(() => sourceInvoices.find((item) => item.customerId === selectedCustomerId) || null, [sourceInvoices, selectedCustomerId]);
 
   const filteredInvoices = useMemo(() => {
     if (!selectedCustomerId) return [];
@@ -345,6 +356,7 @@ export function AdminCreditNoteClient({ initialTaxCodes }: Props) {
     setDocNo("");
     setDocNoPreview("Auto Generated");
     setReason("");
+    setFooterRemarks("");
     setSelectedCustomerId("");
     setSelectedInvoiceId("");
     setPickLines([]);
@@ -362,6 +374,7 @@ export function AdminCreditNoteClient({ initialTaxCodes }: Props) {
     setSelectedInvoiceId("");
     setPickLines([]);
     setReason("");
+    setFooterRemarks("");
     setSubmitError("");
   }
 
@@ -438,8 +451,23 @@ export function AdminCreditNoteClient({ initialTaxCodes }: Props) {
     );
   }
 
+  function sanitizeCreditInput(value: string, maxValue: number) {
+    const numeric = Number(value || 0);
+    if (!Number.isFinite(numeric) || numeric < 0) return "0";
+    return String(Math.min(numeric, maxValue));
+  }
+
   function updatePickLine(key: string, patch: Partial<PickLine>) {
     setPickLines((prev) => prev.map((line) => (line.key === key ? { ...line, ...patch } : line)));
+  }
+
+  function updateCreditValue(line: PickLine, value: string) {
+    if (line.itemType === "SERVICE_ITEM") {
+      updatePickLine(line.key, { creditAmount: sanitizeCreditInput(value, line.remainingCreditAmount) });
+      return;
+    }
+
+    updatePickLine(line.key, { creditQty: sanitizeCreditInput(value, line.remainingCreditQty) });
   }
 
   async function submitCreditNote() {
@@ -492,6 +520,7 @@ export function AdminCreditNoteClient({ initialTaxCodes }: Props) {
           sourceTransactionId: selectedInvoice.id,
           reason,
           remarks: reason,
+          footerRemarks,
           lines: selectedLines.map((line) => ({
             sourceLineId: line.sourceLineId,
             sourceTransactionId: line.sourceTransactionId,
@@ -586,7 +615,7 @@ export function AdminCreditNoteClient({ initialTaxCodes }: Props) {
         <div className="mt-8 rounded-2xl border border-white/10 bg-black/20 p-4">
           <div className="grid gap-4 md:grid-cols-3">
             <input className="input-rk" value={searchKeyword} onChange={(e) => setSearchKeyword(e.target.value)} placeholder="Search credit note no / customer" />
-            <select className="input-rk" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+            <select className="input-rk max-w-[366px] pr-12" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
               <option value="ALL">All Status</option>
               <option value="COMPLETED">Completed</option>
               <option value="CANCELLED">Cancelled</option>
@@ -702,15 +731,15 @@ export function AdminCreditNoteClient({ initialTaxCodes }: Props) {
                   />
                   <div>
                     <label className="label-rk">Customer Name</label>
-                    <input className="input-rk" value={selectedCustomer?.label?.split(" — ").slice(1).join(" — ") || ""} readOnly disabled />
+                    <input className="input-rk" value={selectedCustomerInvoice?.customerName || selectedCustomer?.label?.split(" — ").slice(1).join(" — ") || ""} readOnly disabled />
                   </div>
                   <div>
                     <label className="label-rk">Email</label>
-                    <input className="input-rk" value="" readOnly disabled />
+                    <input className="input-rk" value={selectedCustomerInvoice?.email || ""} readOnly disabled />
                   </div>
                   <div>
                     <label className="label-rk">Contact No</label>
-                    <input className="input-rk" value="" readOnly disabled />
+                    <input className="input-rk" value={selectedCustomerInvoice?.contactNo || ""} readOnly disabled />
                   </div>
                 </div>
 
@@ -729,6 +758,32 @@ export function AdminCreditNoteClient({ initialTaxCodes }: Props) {
                 <div className="rounded-[1.5rem] border border-white/10 bg-black/20 p-5">
                   <p className="text-sm font-semibold uppercase tracking-[0.24em] text-white/45">Billing Address</p>
                   <p className="mt-4 text-sm leading-6 text-white/60">Billing address will follow the selected source Sales Invoice.</p>
+                  <div className="mt-5 grid gap-5 md:grid-cols-2">
+                    <div>
+                      <label className="label-rk">Billing Address Line 1</label>
+                      <input className="input-rk" value={selectedInvoice?.billingAddressLine1 || selectedCustomerInvoice?.billingAddressLine1 || ""} readOnly disabled />
+                    </div>
+                    <div>
+                      <label className="label-rk">Billing Address Line 2</label>
+                      <input className="input-rk" value={selectedInvoice?.billingAddressLine2 || selectedCustomerInvoice?.billingAddressLine2 || ""} readOnly disabled />
+                    </div>
+                    <div>
+                      <label className="label-rk">Billing Address Line 3</label>
+                      <input className="input-rk" value={selectedInvoice?.billingAddressLine3 || selectedCustomerInvoice?.billingAddressLine3 || ""} readOnly disabled />
+                    </div>
+                    <div>
+                      <label className="label-rk">Billing Address Line 4</label>
+                      <input className="input-rk" value={selectedInvoice?.billingAddressLine4 || selectedCustomerInvoice?.billingAddressLine4 || ""} readOnly disabled />
+                    </div>
+                    <div>
+                      <label className="label-rk">City</label>
+                      <input className="input-rk" value={selectedInvoice?.billingCity || selectedCustomerInvoice?.billingCity || ""} readOnly disabled />
+                    </div>
+                    <div>
+                      <label className="label-rk">Post Code</label>
+                      <input className="input-rk" value={selectedInvoice?.billingPostCode || selectedCustomerInvoice?.billingPostCode || ""} readOnly disabled />
+                    </div>
+                  </div>
                 </div>
               </div>
             ) : null}
@@ -743,14 +798,11 @@ export function AdminCreditNoteClient({ initialTaxCodes }: Props) {
                 </div>
 
                 <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <SearchableSelect
-                      label="A/C No"
-                      placeholder="Search or select customer"
-                      options={customerOptions}
-                      value={selectedCustomerId}
-                      onChange={(option) => handleCustomerChange(option?.id || "")}
-                    />
+                  <div className="grid gap-4 md:grid-cols-[1fr_2fr]">
+                    <div>
+                      <label className="label-rk">A/C No</label>
+                      <input className="input-rk" value={selectedCustomer?.label || ""} readOnly disabled placeholder="Select customer in Header first" />
+                    </div>
                     <div>
                       <label className="label-rk">Search Sales Invoice</label>
                       <input
@@ -765,7 +817,7 @@ export function AdminCreditNoteClient({ initialTaxCodes }: Props) {
 
                   <div className="mt-4 rounded-2xl border border-white/10">
                     {!selectedCustomerId ? (
-                      <div className="px-4 py-6 text-sm text-white/45">Please select customer first.</div>
+                      <div className="px-4 py-6 text-sm text-white/45">Please select customer in Header first.</div>
                     ) : filteredInvoices.length === 0 ? (
                       <div className="px-4 py-6 text-sm text-white/45">No available sales invoice found for this customer.</div>
                     ) : (
@@ -823,11 +875,13 @@ export function AdminCreditNoteClient({ initialTaxCodes }: Props) {
                             </td>
                             <td className="px-4 py-4 text-right">
                               <input
+                                type="number"
+                                min="0"
+                                max={line.itemType === "SERVICE_ITEM" ? line.remainingCreditAmount : line.remainingCreditQty}
                                 className="input-rk text-right"
                                 value={line.itemType === "SERVICE_ITEM" ? line.creditAmount : line.creditQty}
-                                onChange={(e) =>
-                                  updatePickLine(line.key, line.itemType === "SERVICE_ITEM" ? { creditAmount: e.target.value } : { creditQty: e.target.value })
-                                }
+                                onChange={(e) => updateCreditValue(line, e.target.value)}
+                                onBlur={(e) => updateCreditValue(line, e.target.value)}
                               />
                             </td>
                           </tr>
@@ -841,8 +895,19 @@ export function AdminCreditNoteClient({ initialTaxCodes }: Props) {
 
             {activeTab === "FOOTER" ? (
               <div className="mt-8 grid gap-4 md:grid-cols-[1fr_360px]">
-                <div className="rounded-2xl border border-white/10 p-4 text-sm leading-6 text-white/55">
-                  Credit Note is posted immediately. Stock items will be stocked-in. Cancelling the CN will reverse the stock movement.
+                <div className="space-y-5">
+                  <div>
+                    <label className="label-rk">Footer Remarks</label>
+                    <textarea
+                      className="input-rk min-h-[150px] resize-none"
+                      value={footerRemarks}
+                      onChange={(e) => setFooterRemarks(e.target.value)}
+                      placeholder="Enter additional remarks manually."
+                    />
+                  </div>
+                  <div className="rounded-2xl border border-white/10 p-4 text-sm leading-6 text-white/55">
+                    Credit Note is posted immediately. Stock items will be stocked-in. Cancelling the CN will reverse the stock movement.
+                  </div>
                 </div>
                 <div className="rounded-2xl border border-white/10 p-5">
                   <div className="flex justify-between text-white/70"><span>Subtotal</span><span>{money(totals.subtotal)}</span></div>
