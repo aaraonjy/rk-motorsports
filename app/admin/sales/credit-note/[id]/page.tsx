@@ -32,12 +32,6 @@ function formatDateTime(value: Date | string | null | undefined) {
   }).replace(/am|pm/i, (value) => value.toLowerCase());
 }
 
-function getStatusClass(status: string) {
-  if (status === "CANCELLED") return "border-red-500/25 bg-red-500/10 text-red-200";
-  if (status === "COMPLETED") return "border-sky-500/25 bg-sky-500/10 text-sky-200";
-  return "border-amber-500/25 bg-amber-500/10 text-amber-200";
-}
-
 function ReadonlyField({ label, value, className = "" }: { label: string; value: string; className?: string }) {
   return (
     <div className={className}>
@@ -56,6 +50,15 @@ function ReadonlyTextArea({ label, value, className = "" }: { label: string; val
   );
 }
 
+function getSourceDocNos(line: {
+  targetLineLinks?: Array<{ sourceTransaction?: { docNo?: string | null } | null }>;
+}) {
+  const values = (line.targetLineLinks || [])
+    .map((link) => link.sourceTransaction?.docNo)
+    .filter(Boolean) as string[];
+  return values.length > 0 ? values.join(", ") : "-";
+}
+
 export default async function AdminCreditNoteDetailPage({ params }: Params) {
   const user = await getSessionUser();
   if (!user) redirect("/login");
@@ -67,6 +70,9 @@ export default async function AdminCreditNoteDetailPage({ params }: Params) {
     include: {
       createdByAdmin: { select: { id: true, name: true, email: true } },
       cancelledByAdmin: { select: { id: true, name: true, email: true } },
+      agent: { select: { id: true, code: true, name: true } },
+      project: { select: { id: true, code: true, name: true } },
+      department: { select: { id: true, code: true, name: true } },
       targetLinks: {
         include: {
           sourceTransaction: { select: { id: true, docType: true, docNo: true, status: true } },
@@ -78,7 +84,7 @@ export default async function AdminCreditNoteDetailPage({ params }: Params) {
           targetLineLinks: {
             include: {
               sourceTransaction: { select: { id: true, docType: true, docNo: true, status: true } },
-              sourceLine: { select: { id: true, lineNo: true, productCode: true, productDescription: true } },
+              sourceLine: { select: { id: true, lineNo: true, qty: true, productCode: true, productDescription: true } },
             },
           },
         },
@@ -96,86 +102,141 @@ export default async function AdminCreditNoteDetailPage({ params }: Params) {
     );
   }
 
-  const sourceInvoice = transaction.targetLinks?.[0]?.sourceTransaction || null;
+  const currency = transaction.currency || "MYR";
+  const sourceInvoices = transaction.targetLinks.map((link) => link.sourceTransaction).filter((source) => source && source.docType === "INV");
+  const primarySourceInvoice = sourceInvoices[0] || null;
 
   return (
     <section className="section-pad">
-      <div className="container-rk max-w-6xl">
-        <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      <div className="container-rk max-w-7xl space-y-6">
+        <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <Link href="/admin/sales/credit-note" className="text-sm text-white/55 transition hover:text-white">← Back to Credit Note</Link>
-            <h1 className="mt-4 text-4xl font-black tracking-tight text-white">Credit Note Preview</h1>
-            <p className="mt-3 text-sm text-white/70">Credit Note reduces sales amount and stocks returned items back into inventory.</p>
+            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-red-400/80">Credit Note</p>
+            <h1 className="mt-3 text-4xl font-bold">{transaction.docNo}</h1>
+            <p className="mt-4 max-w-3xl text-white/70">View credit note details in read-only mode.</p>
+            {sourceInvoices.length > 0 ? (
+              <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+                <span className="text-sky-200">Reflecting to:</span>
+                {sourceInvoices.map((source, index) => (
+                  <Link key={source?.id} href={`/admin/sales/sales-invoice/${source?.id}`} className="text-sky-200 underline-offset-4 hover:underline">
+                    {source?.docNo}{sourceInvoices.length > 1 && index < sourceInvoices.length - 1 ? "," : ""}
+                  </Link>
+                ))}
+              </div>
+            ) : null}
           </div>
-          <span className={`inline-flex w-fit rounded-full border px-4 py-2 text-xs font-bold ${getStatusClass(transaction.status)}`}>
-            {transaction.status}
-          </span>
+          <div className="flex flex-wrap gap-3">
+            <Link href="/admin/sales/credit-note" className="rounded-xl border border-white/15 bg-white/5 px-5 py-3 text-sm text-white/80 transition hover:bg-white/10">
+              Back
+            </Link>
+          </div>
         </div>
 
         {transaction.status === "CANCELLED" ? (
-          <div className="mb-8 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-4 text-sm text-red-100">
-            <div className="font-semibold">This Credit Note has been cancelled.</div>
-            <div className="mt-3 space-y-2 text-white/85">
-              <div>Cancelled At: {formatDateTime(transaction.cancelledAt)}</div>
-              <div>Cancelled By: {transaction.cancelledByAdmin?.name || "-"}</div>
-              <div>Reason: {transaction.cancelReason || "-"}</div>
-            </div>
+          <div className="rounded-2xl border border-red-500/25 bg-red-500/10 p-5 text-sm text-red-100">
+            <div className="font-semibold">This credit note has been cancelled.</div>
+            <div className="mt-2">Cancelled At: {formatDate(transaction.cancelledAt)}</div>
+            <div className="mt-1">Cancelled By: {transaction.cancelledByAdmin?.name || "-"}</div>
+            <div className="mt-1">Reason: {transaction.cancelReason || "-"}</div>
           </div>
         ) : null}
 
-        <div className="card-rk p-8">
-          <div className="grid gap-5 md:grid-cols-3">
-            <ReadonlyField label="Credit Note No" value={transaction.docNo} />
-            <ReadonlyField label="Doc Date" value={formatDate(transaction.docDate)} />
-            <ReadonlyField label="Source Invoice" value={sourceInvoice?.docNo || transaction.reference || "-"} />
-            <ReadonlyField label="Customer" value={transaction.customerName} />
-            <ReadonlyField label="Account No" value={transaction.customerAccountNo || "-"} />
-            <ReadonlyField label="Currency" value={transaction.currency || "MYR"} />
-            <ReadonlyTextArea label="Reason / Remarks" value={transaction.remarks || "-"} className="md:col-span-3" />
-          </div>
-
-          <div className="mt-10 overflow-x-auto rounded-2xl border border-white/10">
-            <table className="min-w-full text-left text-sm">
-              <thead className="border-b border-white/10 text-xs uppercase tracking-wide text-white/45">
-                <tr>
-                  <th className="px-4 py-4">No</th>
-                  <th className="px-4 py-4">Product</th>
-                  <th className="px-4 py-4 text-right">Qty</th>
-                  <th className="px-4 py-4 text-right">Unit Price</th>
-                  <th className="px-4 py-4 text-right">Line Total</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/10">
-                {transaction.lines.map((line) => (
-                  <tr key={line.id} className="text-white/85">
-                    <td className="px-4 py-4">{line.lineNo}</td>
-                    <td className="px-4 py-4">
-                      <div className="font-semibold text-white">{line.productCode}</div>
-                      <div className="mt-1 text-xs text-white/45">{line.productDescription}</div>
-                    </td>
-                    <td className="px-4 py-4 text-right">{money(line.qty)} {line.uom}</td>
-                    <td className="px-4 py-4 text-right">{money(line.unitPrice)}</td>
-                    <td className="px-4 py-4 text-right font-semibold">{money(line.lineTotal)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="mt-8 flex justify-end">
-            <div className="w-full max-w-sm rounded-2xl border border-white/10 p-5">
-              <div className="flex justify-between text-white/70"><span>Subtotal</span><span>{money(transaction.subtotal)}</span></div>
-              <div className="mt-3 flex justify-between text-white/70"><span>Discount</span><span>{money(transaction.discountTotal)}</span></div>
-              <div className="mt-3 flex justify-between text-white/70"><span>Tax</span><span>{money(transaction.taxTotal)}</span></div>
-              <div className="mt-5 border-t border-white/10 pt-5 flex justify-between text-xl font-bold text-white">
-                <span>Grand Total ({transaction.currency || "MYR"})</span>
-                <span>{money(transaction.grandTotal)}</span>
-              </div>
+        <div className="rounded-[2rem] border border-white/10 bg-black/45 p-5 backdrop-blur-md md:p-6">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.24em] text-white/40">Credit Note</p>
+              <h2 className="mt-4 text-4xl font-bold">View Credit Note</h2>
+              <p className="mt-4 max-w-3xl text-white/70">Credit Note reduces sales amount and stocks returned items back into inventory.</p>
+            </div>
+            <div className="grid min-w-[250px] grid-cols-[110px_1fr] gap-x-3 gap-y-2 text-xs text-white/55">
+              <div className="text-right">Created By:</div>
+              <div className="text-left font-semibold text-white/75">{transaction.createdByAdmin?.name || "-"}</div>
+              <div className="text-right">Created Date:</div>
+              <div className="text-left font-semibold text-white/75">{formatDateTime(transaction.createdAt)}</div>
             </div>
           </div>
 
-          <div className="mt-8 rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-sm text-white/55">
-            Credit Note has no Edit or Edit Revise action. If the CN is wrong, cancel it and create a new Credit Note.
+          <div className="mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+            <ReadonlyField label="Doc Date" value={formatDate(transaction.docDate)} />
+            <ReadonlyField label="System Doc No" value={transaction.docNo} className="xl:col-span-3" />
+            <ReadonlyField label="A/C No" value={transaction.customerAccountNo || ""} />
+            <ReadonlyField label="Customer Name" value={transaction.customerName || ""} />
+            <ReadonlyField label="Email" value={transaction.email || ""} />
+            <ReadonlyField label="Source INV" value={primarySourceInvoice?.docNo || transaction.reference || ""} />
+            <ReadonlyField label="Document Description" value={transaction.docDesc || ""} className="xl:col-span-2" />
+            <ReadonlyField label="Attention" value={transaction.attention || ""} />
+            <ReadonlyField label="Contact No" value={transaction.contactNo || ""} />
+            <ReadonlyField label="Agent" value={transaction.agent ? `${transaction.agent.code} — ${transaction.agent.name}` : ""} />
+            {transaction.project ? <ReadonlyField label="Project" value={`${transaction.project.code} — ${transaction.project.name}`} /> : null}
+            {transaction.department ? <ReadonlyField label="Department" value={`${transaction.department.code} — ${transaction.department.name}`} /> : null}
+          </div>
+
+          <div className="mt-6 grid gap-5 md:grid-cols-2">
+            <ReadonlyTextArea label="Reason / Remarks" value={transaction.remarks || ""} />
+            <ReadonlyTextArea label="Footer Remarks" value={transaction.footerRemarks || ""} />
+          </div>
+
+          <div className="mt-8 rounded-[1.5rem] border border-white/10 p-4">
+            <h3 className="text-lg font-bold">Products</h3>
+            <div className="mt-4 overflow-x-auto">
+              <table className="min-w-full divide-y divide-white/10 text-sm">
+                <thead className="text-left text-white/45">
+                  <tr>
+                    <th className="px-4 py-3">Product</th>
+                    <th className="px-4 py-3">Reflecting To</th>
+                    <th className="px-4 py-3">UOM</th>
+                    <th className="px-4 py-3 text-right">Qty</th>
+                    <th className="px-4 py-3 text-right">Unit Price</th>
+                    <th className="px-4 py-3">Location</th>
+                    <th className="px-4 py-3 text-right">Gross Amount</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/10 text-white/80">
+                  {transaction.lines.length === 0 ? (
+                    <tr><td colSpan={7} className="px-4 py-8 text-center text-white/50">No product line found.</td></tr>
+                  ) : (
+                    transaction.lines.map((line) => (
+                      <tr key={line.id}>
+                        <td className="px-4 py-4">
+                          <div className="font-semibold text-white">{line.productCode}</div>
+                          <div className="mt-1 text-xs text-white/50">{line.productDescription}</div>
+                          {line.batchNo ? <div className="mt-2 text-xs text-amber-100/80">Batch No: {line.batchNo}</div> : null}
+                          {Array.isArray(line.serialNos) && line.serialNos.length > 0 ? <div className="mt-1 text-xs text-sky-100/80">S/N No: {line.serialNos.join(", ")}</div> : null}
+                          {line.remarks ? <div className="mt-2 text-xs text-white/40">Remarks: {line.remarks}</div> : null}
+                        </td>
+                        <td className="px-4 py-4">{getSourceDocNos(line)}</td>
+                        <td className="px-4 py-4">{line.uom}</td>
+                        <td className="px-4 py-4 text-right">{money(line.qty)}</td>
+                        <td className="px-4 py-4 text-right">{money(line.unitPrice)}</td>
+                        <td className="px-4 py-4">{line.locationCode ? `${line.locationCode} — ${line.locationName || ""}` : "-"}</td>
+                        <td className="px-4 py-4 text-right">{money(line.lineTotal)}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_360px]">
+            <div className="space-y-5">
+              <ReadonlyTextArea label="Terms & Conditions" value={transaction.termsAndConditions || ""} />
+              <ReadonlyTextArea label="Bank Account" value={transaction.bankAccount || ""} />
+            </div>
+            <div className="rounded-[1.5rem] border border-white/10 p-5">
+              <h3 className="text-xl font-bold">Credit Note Summary</h3>
+              <div className="mt-5 space-y-4 text-sm">
+                <div className="flex justify-between gap-4"><span className="text-white/65">Subtotal</span><span>{money(transaction.subtotal)}</span></div>
+                <div className="flex justify-between gap-4"><span className="text-white/65">Discount</span><span>{money(transaction.discountTotal)}</span></div>
+                <div className="flex justify-between gap-4"><span className="text-white/65">Tax</span><span>{money(transaction.taxTotal)}</span></div>
+                <div className="border-t border-white/10 pt-4">
+                  <div className="flex justify-between gap-4 text-xl font-bold">
+                    <span>Grand Total ({currency})</span>
+                    <span>{money(transaction.grandTotal)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
