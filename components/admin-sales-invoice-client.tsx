@@ -2157,7 +2157,7 @@ export function AdminSalesInvoiceClient({
                                 setBalances({});
                               }}
                             />
-                            {line.inventoryProductId && line.locationId && !loadingBatches[index] && (availableBatches[index] || []).length === 0 ? (
+                            {line.inventoryProductId && line.locationId && !isGeneratedLine && !loadingBatches[index] && (availableBatches[index] || []).length === 0 ? (
                               <p className="mt-2 text-xs text-amber-200">No available batch balance found for this product/location.</p>
                             ) : null}
                             {line.batchNo && selectedProduct?.isAssemblyItem ? (
@@ -2206,7 +2206,7 @@ export function AdminSalesInvoiceClient({
                               }}
                               disabled={!line.inventoryProductId || !line.locationId || (selectedProduct.batchTracking && !line.batchNo) || Boolean(loadingSerials[index]) || isGeneratedLine}
                             />
-                            {line.inventoryProductId && line.locationId && (!selectedProduct.batchTracking || line.batchNo) && !loadingSerials[index] && (availableSerials[index] || []).length === 0 ? (
+                            {line.inventoryProductId && line.locationId && (!selectedProduct.batchTracking || line.batchNo) && !isGeneratedLine && !loadingSerials[index] && (availableSerials[index] || []).length === 0 ? (
                               <p className="mt-2 text-xs text-amber-200">No available S/N found for this product/location{selectedProduct.batchTracking ? " and batch" : ""}.</p>
                             ) : null}
                           </div>
