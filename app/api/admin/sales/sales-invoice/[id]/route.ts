@@ -800,13 +800,59 @@ export async function GET(_req: Request, context: Params) {
       include: { lines: { orderBy: { createdAt: "asc" }, include: { serialEntries: { orderBy: { serialNo: "asc" } } } } },
     });
 
+    const sourceDeliveryOrderIds = Array.from(new Set(
+      (transaction.targetLinks || [])
+        .map((link) => link.sourceTransaction)
+        .filter((source) => source?.docType === "DO" && source.status !== "CANCELLED")
+        .map((source) => source!.id)
+    ));
+
+    const sourceDeliveryLedgerRows = sourceDeliveryOrderIds.length
+      ? await db.stockLedger.findMany({
+          where: {
+            sourceType: "SALES_DELIVERY_ORDER",
+            sourceId: { in: sourceDeliveryOrderIds },
+            movementDirection: "OUT",
+          },
+          orderBy: [{ createdAt: "asc" }],
+          select: { sourceId: true, inventoryProductId: true, locationId: true, batchNo: true, remarks: true },
+        })
+      : [];
+
+    const sourceDeliveryStockMap = new Map<string, { batchNo: string | null; serialNos: string[] }>();
+    for (const row of sourceDeliveryLedgerRows) {
+      const sourceId = String(row.sourceId || "");
+      const productId = String(row.inventoryProductId || "");
+      const locationId = String(row.locationId || "");
+      if (!sourceId || !productId || !locationId) continue;
+
+      const key = `${sourceId}__${productId}__${locationId}`;
+      const existing = sourceDeliveryStockMap.get(key) || { batchNo: row.batchNo || null, serialNos: [] };
+      if (!existing.batchNo && row.batchNo) existing.batchNo = row.batchNo;
+      const serialMatch = String(row.remarks || "").match(/SERIAL_NO=([^|]+)/);
+      const serialNo = serialMatch?.[1]?.trim();
+      if (serialNo && !existing.serialNos.some((item) => item.toUpperCase() === serialNo.toUpperCase())) {
+        existing.serialNos.push(serialNo);
+      }
+      sourceDeliveryStockMap.set(key, existing);
+    }
+
     const transactionWithStockPicking = {
       ...withPaymentSummary(withCancellationDetails(transaction)),
-      lines: transaction.lines.map((line, index) => ({
-        ...line,
-        batchNo: stockIssue?.lines[index]?.batchNo || null,
-        serialNos: stockIssue?.lines[index]?.serialEntries.map((entry) => entry.serialNo) || [],
-      })),
+      lines: transaction.lines.map((line, index) => {
+        const sourceDeliveryLink = (line.sourceLineLinks || []).find((link) =>
+          link.sourceTransaction?.docType === "DO" && link.sourceTransaction?.status !== "CANCELLED"
+        );
+        const sourceDeliveryStock = sourceDeliveryLink
+          ? sourceDeliveryStockMap.get(`${sourceDeliveryLink.sourceTransactionId}__${line.inventoryProductId || ""}__${line.locationId || ""}`)
+          : null;
+
+        return {
+          ...line,
+          batchNo: stockIssue?.lines[index]?.batchNo || sourceDeliveryStock?.batchNo || null,
+          serialNos: stockIssue?.lines[index]?.serialEntries.map((entry) => entry.serialNo) || sourceDeliveryStock?.serialNos || [],
+        };
+      }),
     };
 
     return NextResponse.json({ ok: true, transaction: transactionWithStockPicking });
@@ -876,34 +922,7 @@ export async function PATCH(req: Request, context: Params) {
       }
 
       if (hasSalesOrderSource(current)) {
-        if (action === "revise") {
-          throw new Error("Sales Invoice generated from source document cannot be revised. Please cancel this Sales Invoice and generate a new Sales Invoice from the original source document.");
-        }
-
-        const paymentInput = getPaymentInput(body);
-        const existingTotalPaid = (current.payments || []).reduce((sum, payment) => sum + toNumber(payment.amount), 0);
-        validatePaymentAmount(paymentInput.amount, current.grandTotal, existingTotalPaid);
-        await createSalesTransactionPaymentIfNeeded(tx, current.id, admin.id, paymentInput);
-
-        const nextTotalPaid = Math.round((existingTotalPaid + paymentInput.amount + Number.EPSILON) * 100) / 100;
-        const updated = await tx.salesTransaction.update({
-          where: { id: current.id },
-          data: {
-            status: getSalesInvoiceStatusForPayment(current.grandTotal, nextTotalPaid),
-            cancelledAt: null,
-            cancelledByAdminId: null,
-            cancelReason: null,
-          },
-          include: {
-            lines: true,
-            payments: {
-              orderBy: [{ paymentDate: "asc" }, { createdAt: "asc" }],
-              include: { createdByAdmin: { select: { id: true, name: true, email: true } } },
-            },
-          },
-        });
-
-        return { transaction: updated, auditAction: "UPDATE" as const, description: `Updated payment for Sales Invoice ${updated.docNo}.` };
+        throw new Error("Sales Invoice generated from source document cannot be edited. Please cancel this Sales Invoice and generate a new Sales Invoice from the original source document.");
       }
 
       const data = await buildDirectSalesInvoiceData(body, tx);

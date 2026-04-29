@@ -193,6 +193,8 @@ type SalesInvoiceRecord = {
     discountRate?: string | number | null;
     discountType?: string | null;
     locationId?: string | null;
+    batchNo?: string | null;
+    serialNos?: string[] | null;
     taxCodeId?: string | null;
     remarks?: string | null;
   }>;
@@ -1490,7 +1492,7 @@ export function AdminSalesInvoiceClient({
       setActiveTab("FOOTER");
       setSubmitMessageType("success");
       setRecentCancelledTransaction(null);
-      setSubmitSuccess("Generated Sales Invoice opened for payment update only. Header and Body are locked.");
+      setSubmitSuccess("");
     }
   }
 
@@ -1931,7 +1933,7 @@ export function AdminSalesInvoiceClient({
                           {!isFullyPaidSalesInvoice(item) ? (
                             <>
                               <button type="button" onClick={(event) => { event.stopPropagation(); openEdit(item); }} className="rounded-xl border border-white/15 px-3 py-2 text-xs text-white/75 transition hover:bg-white/10 hover:text-white">
-                                Edit
+                                {isGeneratedFromSalesOrder(item) ? "Record Payment" : "Edit"}
                               </button>
                               {!isGeneratedFromSalesOrder(item) ? (
                                 <button type="button" onClick={(event) => { event.stopPropagation(); openRevise(item); }} className="rounded-xl border border-sky-500/30 px-3 py-2 text-xs text-sky-200 transition hover:bg-sky-500/10">

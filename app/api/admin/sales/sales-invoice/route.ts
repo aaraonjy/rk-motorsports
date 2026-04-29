@@ -757,7 +757,16 @@ export async function GET(req: Request) {
           },
         },
         payments: { orderBy: [{ paymentDate: "asc" }, { createdAt: "asc" }], include: { createdByAdmin: { select: { id: true, name: true, email: true } } } },
-        lines: { orderBy: { lineNo: "asc" } },
+        lines: {
+          orderBy: { lineNo: "asc" },
+          include: {
+            sourceLineLinks: {
+              include: {
+                sourceTransaction: { select: { id: true, docType: true, docNo: true, status: true } },
+              },
+            },
+          },
+        },
       },
     });
 
@@ -769,15 +778,63 @@ export async function GET(req: Request) {
       : [];
     const stockIssueByReference = new Map(stockIssues.map((item) => [item.reference || "", item]));
 
+    const sourceDeliveryOrderIds = Array.from(new Set(
+      rows.flatMap((row) =>
+        (row.targetLinks || [])
+          .map((link) => link.sourceTransaction)
+          .filter((source) => source?.docType === "DO" && source.status !== "CANCELLED")
+          .map((source) => source!.id)
+      )
+    ));
+
+    const sourceDeliveryLedgerRows = sourceDeliveryOrderIds.length
+      ? await db.stockLedger.findMany({
+          where: {
+            sourceType: "SALES_DELIVERY_ORDER",
+            sourceId: { in: sourceDeliveryOrderIds },
+            movementDirection: "OUT",
+          },
+          orderBy: [{ createdAt: "asc" }],
+          select: { sourceId: true, inventoryProductId: true, locationId: true, batchNo: true, remarks: true },
+        })
+      : [];
+
+    const sourceDeliveryStockMap = new Map<string, { batchNo: string | null; serialNos: string[] }>();
+    for (const row of sourceDeliveryLedgerRows) {
+      const sourceId = String(row.sourceId || "");
+      const productId = String(row.inventoryProductId || "");
+      const locationId = String(row.locationId || "");
+      if (!sourceId || !productId || !locationId) continue;
+
+      const key = `${sourceId}__${productId}__${locationId}`;
+      const existing = sourceDeliveryStockMap.get(key) || { batchNo: row.batchNo || null, serialNos: [] };
+      if (!existing.batchNo && row.batchNo) existing.batchNo = row.batchNo;
+      const serialMatch = String(row.remarks || "").match(/SERIAL_NO=([^|]+)/);
+      const serialNo = serialMatch?.[1]?.trim();
+      if (serialNo && !existing.serialNos.some((item) => item.toUpperCase() === serialNo.toUpperCase())) {
+        existing.serialNos.push(serialNo);
+      }
+      sourceDeliveryStockMap.set(key, existing);
+    }
+
     const transactions = rows.map((row) => {
       const stockIssue = stockIssueByReference.get(row.docNo);
       return {
         ...withPaymentSummary(withCancellationDetails(row)),
-        lines: row.lines.map((line, index) => ({
-          ...line,
-          batchNo: stockIssue?.lines[index]?.batchNo || null,
-          serialNos: stockIssue?.lines[index]?.serialEntries.map((entry) => entry.serialNo) || [],
-        })),
+        lines: row.lines.map((line, index) => {
+          const sourceDeliveryLink = (line.sourceLineLinks || []).find((link) =>
+            link.sourceTransaction?.docType === "DO" && link.sourceTransaction?.status !== "CANCELLED"
+          );
+          const sourceDeliveryStock = sourceDeliveryLink
+            ? sourceDeliveryStockMap.get(`${sourceDeliveryLink.sourceTransactionId}__${line.inventoryProductId || ""}__${line.locationId || ""}`)
+            : null;
+
+          return {
+            ...line,
+            batchNo: stockIssue?.lines[index]?.batchNo || sourceDeliveryStock?.batchNo || null,
+            serialNos: stockIssue?.lines[index]?.serialEntries.map((entry) => entry.serialNo) || sourceDeliveryStock?.serialNos || [],
+          };
+        }),
         sourceLinks: row.targetLinks.map((link) => ({
           sourceTransaction: link.sourceTransaction,
         })),
