@@ -200,15 +200,15 @@ export default async function AdminCreditNoteDetailPage({ params }: Params) {
                         <td className="px-4 py-4">
                           <div className="font-semibold text-white">{line.productCode}</div>
                           <div className="mt-1 text-xs text-white/50">{line.productDescription}</div>
-                          {line.batchNo ? <div className="mt-2 text-xs text-amber-100/80">Batch No: {line.batchNo}</div> : null}
-                          {Array.isArray(line.serialNos) && line.serialNos.length > 0 ? <div className="mt-1 text-xs text-sky-100/80">S/N No: {line.serialNos.join(", ")}</div> : null}
+                          {(line as any).batchNo ? <div className="mt-2 text-xs text-amber-100/80">Batch No: {(line as any).batchNo}</div> : null}
+                          {Array.isArray((line as any).serialNos) && (line as any).serialNos.length > 0 ? <div className="mt-1 text-xs text-sky-100/80">S/N No: {(line as any).serialNos.join(", ")}</div> : null}
                           {line.remarks ? <div className="mt-2 text-xs text-white/40">Remarks: {line.remarks}</div> : null}
                         </td>
                         <td className="px-4 py-4">{getSourceDocNos(line)}</td>
                         <td className="px-4 py-4">{line.uom}</td>
                         <td className="px-4 py-4 text-right">{money(line.qty)}</td>
                         <td className="px-4 py-4 text-right">{money(line.unitPrice)}</td>
-                        <td className="px-4 py-4">{line.locationCode ? `${line.locationCode} — ${line.locationName || ""}` : "-"}</td>
+                        <td className="px-4 py-4">{(line as any).locationCode ? `${(line as any).locationCode} — ${(line as any).locationName || ""}` : "-"}</td>
                         <td className="px-4 py-4 text-right">{money(line.lineTotal)}</td>
                       </tr>
                     ))
