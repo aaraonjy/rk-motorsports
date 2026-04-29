@@ -669,9 +669,12 @@ export async function POST(req: Request) {
 
       await createCreditNoteStockIn(tx, creditNote, createdLines);
 
-      await createAuditLogFromRequest(tx, req, {
+      await createAuditLogFromRequest({
+        req,
+        user: admin,
+        module: "SALES",
         action: "CREATE",
-        entityType: "SalesTransaction",
+        entityType: "CREDIT_NOTE",
         entityId: creditNote.id,
         description: `Created Credit Note ${creditNote.docNo} from ${data.sourceInvoice.docNo}`,
       });
