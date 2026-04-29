@@ -1,18 +1,15 @@
-import { NextResponse } from "next/server";
-import { Prisma, SalesTransactionStatus } from "@prisma/client";
+import {
+  NextResponse } from "next/server";
+import { Prisma,
+  SalesTransactionStatus } from "@prisma/client";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { createAuditLogFromRequest } from "@/lib/audit";
 import {
   acquireAdvisoryLock,
   acquireStockMutationLocks,
-  buildDocumentNumberLockKey,
   buildLedgerValues,
-  buildStockBalanceLockKey,
-  buildTransactionNumberLockKey,
   createStoredQtyDecimal,
-  generateStockDocumentNumber,
-  generateStockTransactionNumber,
   getStockBalance,
 } from "@/lib/stock";
 
@@ -505,8 +502,6 @@ async function createStockIssueForDeliveryOrder(
   const config = await tx.stockConfiguration.findUnique({ where: { id: "default" } });
   if (!config?.stockModuleEnabled) throw new Error("Stock module is disabled.");
 
-  await acquireAdvisoryLock(tx, buildTransactionNumberLockKey("SI", deliveryOrder.docDate));
-  await acquireAdvisoryLock(tx, buildDocumentNumberLockKey("SI", deliveryOrder.docDate));
   await acquireStockMutationLocks(
     tx,
     stockLines.map((line) => ({
@@ -541,94 +536,78 @@ async function createStockIssueForDeliveryOrder(
     }
   }
 
-  const transactionNo = await generateStockTransactionNumber(tx, "SI", deliveryOrder.docDate);
-  const stockDocNo = await generateStockDocumentNumber(tx, "SI", deliveryOrder.docDate);
+  for (const line of stockLines) {
+    const baseRemarks = line.remarks || normalizeText(body.stockRemarks) || deliveryOrder.remarks || `Sales stock out for ${deliveryOrder.docNo}`;
 
-  const stockTransaction = await tx.stockTransaction.create({
-    data: {
-      transactionNo,
-      docNo: stockDocNo,
-      docDate: deliveryOrder.docDate,
-      docDesc: `Auto stock issue for ${deliveryOrder.docNo}`,
-      transactionType: "SI",
-      transactionDate: deliveryOrder.docDate,
-      reference: deliveryOrder.docNo,
-      remarks: normalizeText(body.stockRemarks) || deliveryOrder.remarks || `Auto generated from Delivery Order ${deliveryOrder.docNo}`,
-      projectId: deliveryOrder.projectId,
-      departmentId: deliveryOrder.departmentId,
-      createdByAdminId: adminId,
-      lines: {
-        create: stockLines.map((line) => ({
-          inventoryProductId: line.inventoryProductId!,
-          qty: line.qty,
-          locationId: line.locationId,
-          batchNo: line.batchNo,
-          remarks: line.remarks || `Auto stock issue for ${deliveryOrder.docNo}`,
-          serialEntries: (line.serialNos || []).length
-            ? {
-                create: (line.serialNos || []).map((serialNo: string) => ({
-                  inventoryProductId: line.inventoryProductId!,
-                  serialNo,
-                })),
-              }
-            : undefined,
-        })),
-      },
-    },
-    include: { lines: { include: { serialEntries: true } } },
-  });
+    if (line.serialNumberTracking) {
+      for (const serialNo of line.serialNos || []) {
+        const serialRecord = await tx.inventorySerial.findUnique({
+          where: {
+            inventoryProductId_serialNo: {
+              inventoryProductId: line.inventoryProductId!,
+              serialNo,
+            },
+          },
+          include: { inventoryBatch: true },
+        });
 
-  for (const stockLine of stockTransaction.lines) {
-    const ledgerValues = buildLedgerValues(createStoredQtyDecimal(stockLine.qty), "OUT");
+        if (!serialRecord || serialRecord.status !== "IN_STOCK" || serialRecord.currentLocationId !== line.locationId) {
+          throw new Error(`Serial No ${serialNo} is not available at the selected location.`);
+        }
+        if (line.batchNo && serialRecord.inventoryBatch?.batchNo !== line.batchNo) {
+          throw new Error(`Serial No ${serialNo} does not belong to Batch No ${line.batchNo}.`);
+        }
+
+        const ledgerValues = buildLedgerValues(createStoredQtyDecimal(1), "OUT");
+        await tx.stockLedger.create({
+          data: {
+            movementDate: deliveryOrder.docDate,
+            movementType: "SI",
+            movementDirection: "OUT",
+            ...ledgerValues,
+            batchNo: line.batchNo || serialRecord.inventoryBatch?.batchNo || null,
+            inventoryProductId: line.inventoryProductId!,
+            locationId: line.locationId,
+            transactionId: null,
+            transactionLineId: null,
+            referenceNo: deliveryOrder.docNo,
+            referenceText: `Delivery Order ${deliveryOrder.docNo}`,
+            sourceType: "SALES_DELIVERY_ORDER",
+            sourceId: deliveryOrder.id,
+            remarks: `${baseRemarks} | SERIAL_NO=${serialNo}`,
+          },
+        });
+
+        await tx.inventorySerial.update({
+          where: { id: serialRecord.id },
+          data: { status: "OUT_OF_STOCK", currentLocationId: null },
+        });
+      }
+      continue;
+    }
+
+    const ledgerValues = buildLedgerValues(createStoredQtyDecimal(line.qty), "OUT");
     await tx.stockLedger.create({
       data: {
         movementDate: deliveryOrder.docDate,
         movementType: "SI",
         movementDirection: "OUT",
         ...ledgerValues,
-        batchNo: stockLine.batchNo,
-        inventoryProductId: stockLine.inventoryProductId,
-        locationId: stockLine.locationId!,
-        transactionId: stockTransaction.id,
-        transactionLineId: stockLine.id,
-        referenceNo: stockTransaction.transactionNo,
+        batchNo: line.batchNo,
+        inventoryProductId: line.inventoryProductId!,
+        locationId: line.locationId,
+        transactionId: null,
+        transactionLineId: null,
+        referenceNo: deliveryOrder.docNo,
         referenceText: `Delivery Order ${deliveryOrder.docNo}`,
         sourceType: "SALES_DELIVERY_ORDER",
         sourceId: deliveryOrder.id,
-        remarks: stockLine.remarks,
+        remarks: baseRemarks,
       },
     });
-
-    for (const serialEntry of stockLine.serialEntries || []) {
-      const serialRecord = await tx.inventorySerial.findUnique({
-        where: {
-          inventoryProductId_serialNo: {
-            inventoryProductId: stockLine.inventoryProductId,
-            serialNo: serialEntry.serialNo,
-          },
-        },
-        include: { inventoryBatch: true },
-      });
-
-      if (!serialRecord || serialRecord.status !== "IN_STOCK" || serialRecord.currentLocationId !== stockLine.locationId) {
-        throw new Error(`Serial No ${serialEntry.serialNo} is not available at the selected location.`);
-      }
-      if (stockLine.batchNo && serialRecord.inventoryBatch?.batchNo !== stockLine.batchNo) {
-        throw new Error(`Serial No ${serialEntry.serialNo} does not belong to Batch No ${stockLine.batchNo}.`);
-      }
-
-      await tx.inventorySerial.update({
-        where: { id: serialRecord.id },
-        data: { status: "OUT_OF_STOCK", currentLocationId: null },
-      });
-      await tx.stockTransactionLineSerial.update({
-        where: { id: serialEntry.id },
-        data: { inventorySerialId: serialRecord.id, inventoryBatchId: serialRecord.inventoryBatchId },
-      });
-    }
   }
 
-  return stockTransaction;
+  return null;
 }
 
 export async function GET(req: Request) {
