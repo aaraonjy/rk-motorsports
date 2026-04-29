@@ -154,6 +154,7 @@ export function AdminCreditNoteClient({ initialTaxCodes }: Props) {
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [isLoading, setIsLoading] = useState(true);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<"HEADER" | "BODY" | "FOOTER">("HEADER");
   const [sourceSearch, setSourceSearch] = useState("");
   const [selectedCustomerId, setSelectedCustomerId] = useState("");
   const [selectedInvoiceId, setSelectedInvoiceId] = useState("");
@@ -169,6 +170,7 @@ export function AdminCreditNoteClient({ initialTaxCodes }: Props) {
   const [cancelReason, setCancelReason] = useState("");
 
   const selectedInvoice = useMemo(() => sourceInvoices.find((item) => item.id === selectedInvoiceId) || null, [sourceInvoices, selectedInvoiceId]);
+  const selectedCustomer = useMemo(() => customerOptions.find((item) => item.id === selectedCustomerId) || null, [customerOptions, selectedCustomerId]);
 
   const customerOptions = useMemo(() => {
     const map = new Map<string, { id: string; label: string; searchText: string }>();
@@ -256,6 +258,7 @@ export function AdminCreditNoteClient({ initialTaxCodes }: Props) {
     setSourceSearch("");
     setSubmitError("");
     setSubmitSuccess("");
+    setActiveTab("HEADER");
     setIsCreateOpen(true);
     await Promise.all([loadSourceInvoices(), loadNextDocNo(todayInput())]);
   }
@@ -535,137 +538,217 @@ export function AdminCreditNoteClient({ initialTaxCodes }: Props) {
       {isCreateOpen ? (
         <div className="fixed inset-0 z-[120] overflow-y-auto bg-black/70 px-4 py-8 backdrop-blur-sm">
           <div className="mx-auto max-w-7xl rounded-[2rem] border border-white/10 bg-[#0b0b0f] p-5 shadow-2xl md:p-8">
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.24em] text-red-400/80">New Credit Note</p>
-              <h2 className="mt-3 text-3xl font-bold">Create Credit Note</h2>
-              <p className="mt-2 text-sm text-white/50">CN No: <span className="font-semibold text-white">{docNo || docNoPreview}</span></p>
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-[0.24em] text-red-400/80">Credit Note</p>
+                <h2 className="mt-4 text-3xl font-bold text-white">Create Credit Note</h2>
+              </div>
             </div>
+
+            <div className="mt-7 flex flex-wrap gap-2">
+              {(["HEADER", "BODY", "FOOTER"] as const).map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setActiveTab(tab)}
+                  className={`rounded-xl border px-5 py-3 text-sm font-bold transition ${
+                    activeTab === tab
+                      ? "border-red-500 bg-red-500 text-white"
+                      : "border-white/10 bg-black/20 text-white/55 hover:bg-white/10 hover:text-white"
+                  }`}
+                >
+                  {tab === "HEADER" ? "Header" : tab === "BODY" ? "Body" : "Footer"}
+                </button>
+              ))}
+            </div>
+
+            <div className="mt-6 border-t border-white/10" />
 
             {submitError ? <div className="mt-6 rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-red-100">{submitError}</div> : null}
 
-            <div className="mt-8 grid gap-4 md:grid-cols-3">
-              <div>
-                <label className="label-rk">Doc Date</label>
-                <input type="date" className="input-rk" value={docDate} onChange={(e) => setDocDate(e.target.value)} />
-              </div>
-              <div>
-                <label className="label-rk">Manual CN No (Optional)</label>
-                <input className="input-rk" value={docNo} onChange={(e) => setDocNo(normalizeDocNoInput(e.target.value))} placeholder={docNoPreview} />
-              </div>
-              <div>
-                <label className="label-rk">Reason <span className="text-rk-red">*</span></label>
-                <input className="input-rk" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Customer cancelled item / goods returned" />
-              </div>
-            </div>
-
-            <div className="mt-8 rounded-2xl border border-white/10 bg-black/20 p-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <label className="label-rk">Customer</label>
-                  <select className="input-rk" value={selectedCustomerId} onChange={(e) => handleCustomerChange(e.target.value)}>
-                    <option value="">Select customer first</option>
-                    {customerOptions.map((customer) => (
-                      <option key={customer.id} value={customer.id}>{customer.label}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="label-rk">Search Sales Invoice</label>
-                  <input
-                    className="input-rk"
-                    value={sourceSearch}
-                    onChange={(e) => setSourceSearch(e.target.value)}
-                    disabled={!selectedCustomerId}
-                    placeholder={selectedCustomerId ? "Search invoice no" : "Select customer first"}
-                  />
-                </div>
-              </div>
-
-              <div className="mt-4 rounded-2xl border border-white/10">
-                {!selectedCustomerId ? (
-                  <div className="px-4 py-6 text-sm text-white/45">Please select customer profile first before selecting Sales Invoice.</div>
-                ) : filteredInvoices.length === 0 ? (
-                  <div className="px-4 py-6 text-sm text-white/45">No available invoice found for this customer.</div>
-                ) : (
-                  <div className="max-h-64 overflow-y-auto">
-                    {filteredInvoices.map((invoice) => (
-                      <button
-                        key={invoice.id}
-                        type="button"
-                        onClick={() => preparePickLines(invoice.id)}
-                        className={`flex w-full items-center justify-between gap-4 border-b border-white/10 px-4 py-4 text-left text-sm transition last:border-0 ${
-                          selectedInvoiceId === invoice.id ? "bg-white/10 text-white" : "text-white/80 hover:bg-white/5"
-                        }`}
-                      >
-                        <div>
-                          <div className="font-semibold">{invoice.docNo}</div>
-                          <div className="mt-1 text-xs text-white/45">{invoice.customerName} • {formatDate(invoice.docDate)}</div>
-                        </div>
-                        <div className="text-right font-semibold">{invoice.currency || "MYR"} {money(invoice.grandTotal)}</div>
-                      </button>
-                    ))}
+            {activeTab === "HEADER" ? (
+              <div className="mt-8 space-y-6">
+                <div className="grid gap-5 md:grid-cols-[280px_1fr]">
+                  <div>
+                    <label className="label-rk">Doc Date</label>
+                    <input type="date" className="input-rk" value={docDate} onChange={(e) => setDocDate(e.target.value)} />
                   </div>
-                )}
-              </div>
-            </div>
+                  <div>
+                    <label className="label-rk">System Doc No</label>
+                    <input className="input-rk" value={docNo || docNoPreview} readOnly disabled />
+                  </div>
+                </div>
 
-            {selectedInvoice ? (
-              <div className="mt-8 overflow-x-auto rounded-2xl border border-white/10">
-                <table className="min-w-full text-left text-sm">
-                  <thead className="border-b border-white/10 text-xs uppercase tracking-wide text-white/45">
-                    <tr>
-                      <th className="px-4 py-4">INV</th>
-                      <th className="px-4 py-4">Product</th>
-                      <th className="px-4 py-4 text-right">Invoiced</th>
-                      <th className="px-4 py-4 text-right">Credited</th>
-                      <th className="px-4 py-4 text-right">Remaining</th>
-                      <th className="px-4 py-4 text-right">Credit Qty / Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/10">
-                    {pickLines.map((line) => (
-                      <tr key={line.key}>
-                        <td className="px-4 py-4 text-white/70">{line.sourceDocNo}</td>
-                        <td className="px-4 py-4">
-                          <div className="font-semibold text-white">{line.productCode}</div>
-                          <div className="mt-1 text-xs text-white/45">{line.productDescription}</div>
-                        </td>
-                        <td className="px-4 py-4 text-right text-white/75">
-                          {line.itemType === "SERVICE_ITEM" ? money(line.invoicedAmount) : `${money(line.invoicedQty)} ${line.uom}`}
-                        </td>
-                        <td className="px-4 py-4 text-right text-white/75">
-                          {line.itemType === "SERVICE_ITEM" ? money(line.creditedAmount) : `${money(line.creditedQty)} ${line.uom}`}
-                        </td>
-                        <td className="px-4 py-4 text-right text-white/75">
-                          {line.itemType === "SERVICE_ITEM" ? money(line.remainingCreditAmount) : `${money(line.remainingCreditQty)} ${line.uom}`}
-                        </td>
-                        <td className="px-4 py-4 text-right">
-                          <input
-                            className="input-rk text-right"
-                            value={line.itemType === "SERVICE_ITEM" ? line.creditAmount : line.creditQty}
-                            onChange={(e) =>
-                              updatePickLine(line.key, line.itemType === "SERVICE_ITEM" ? { creditAmount: e.target.value } : { creditQty: e.target.value })
-                            }
-                          />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <div className="grid gap-5 md:grid-cols-4">
+                  <div>
+                    <label className="label-rk">A/C No</label>
+                    <select className="input-rk" value={selectedCustomerId} onChange={(e) => handleCustomerChange(e.target.value)}>
+                      <option value="">Search or select customer</option>
+                      {customerOptions.map((customer) => (
+                        <option key={customer.id} value={customer.id}>{customer.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label-rk">Customer Name</label>
+                    <input className="input-rk" value={selectedCustomer?.label?.split(" — ").slice(1).join(" — ") || ""} readOnly disabled />
+                  </div>
+                  <div>
+                    <label className="label-rk">Email</label>
+                    <input className="input-rk" value="" readOnly disabled />
+                  </div>
+                  <div>
+                    <label className="label-rk">Contact No</label>
+                    <input className="input-rk" value="" readOnly disabled />
+                  </div>
+                </div>
+
+                <div className="grid gap-5 md:grid-cols-2">
+                  <div>
+                    <label className="label-rk">Document Description</label>
+                    <input className="input-rk" value={selectedInvoice ? `Credit Note for ${selectedInvoice.docNo}` : ""} readOnly disabled />
+                  </div>
+                  <div>
+                    <label className="label-rk">Reason <span className="text-rk-red">*</span></label>
+                    <input className="input-rk" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Customer cancelled item / goods returned" />
+                  </div>
+                </div>
+
+                <div className="grid gap-5 md:grid-cols-2">
+                  <div>
+                    <label className="label-rk">Manual CN No (Optional)</label>
+                    <input className="input-rk" value={docNo} onChange={(e) => setDocNo(normalizeDocNoInput(e.target.value))} placeholder={docNoPreview} />
+                  </div>
+                </div>
+
+                <div className="rounded-[1.5rem] border border-white/10 bg-black/20 p-5">
+                  <p className="text-sm font-semibold uppercase tracking-[0.24em] text-white/45">Billing Address</p>
+                  <p className="mt-4 text-sm leading-6 text-white/60">Billing address will follow the selected source Sales Invoice.</p>
+                </div>
               </div>
             ) : null}
 
-            <div className="mt-8 grid gap-4 md:grid-cols-[1fr_360px]">
-              <div className="rounded-2xl border border-white/10 p-4 text-sm leading-6 text-white/55">
-                Credit Note is posted immediately. Stock items will be stocked-in. Cancelling the CN will reverse the stock movement.
+            {activeTab === "BODY" ? (
+              <div className="mt-8 space-y-6">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-semibold uppercase tracking-[0.24em] text-white/45">Generate From</p>
+                    <h3 className="mt-3 text-xl font-bold text-white">Sales Invoice</h3>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div>
+                      <label className="label-rk">A/C No</label>
+                      <select className="input-rk" value={selectedCustomerId} onChange={(e) => handleCustomerChange(e.target.value)}>
+                        <option value="">Search or select customer</option>
+                        {customerOptions.map((customer) => (
+                          <option key={customer.id} value={customer.id}>{customer.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="label-rk">Search Sales Invoice</label>
+                      <input
+                        className="input-rk"
+                        value={sourceSearch}
+                        onChange={(e) => setSourceSearch(e.target.value)}
+                        disabled={!selectedCustomerId}
+                        placeholder="Search sales invoice no / customer"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-4 rounded-2xl border border-white/10">
+                    {!selectedCustomerId ? (
+                      <div className="px-4 py-6 text-sm text-white/45">Please select customer first.</div>
+                    ) : filteredInvoices.length === 0 ? (
+                      <div className="px-4 py-6 text-sm text-white/45">No available sales invoice found for this customer.</div>
+                    ) : (
+                      <div className="max-h-64 overflow-y-auto">
+                        {filteredInvoices.map((invoice) => (
+                          <button
+                            key={invoice.id}
+                            type="button"
+                            onClick={() => preparePickLines(invoice.id)}
+                            className={`flex w-full items-center justify-between gap-4 border-b border-white/10 px-4 py-4 text-left text-sm transition last:border-0 ${
+                              selectedInvoiceId === invoice.id ? "bg-white/10 text-white" : "text-white/80 hover:bg-white/5"
+                            }`}
+                          >
+                            <div>
+                              <div className="font-semibold">{invoice.docNo}</div>
+                              <div className="mt-1 text-xs text-white/45">{invoice.customerName} • {formatDate(invoice.docDate)}</div>
+                            </div>
+                            <div className="text-right font-semibold">{invoice.currency || "MYR"} {money(invoice.grandTotal)}</div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {selectedInvoice ? (
+                  <div className="overflow-x-auto rounded-2xl border border-white/10">
+                    <table className="min-w-full text-left text-sm">
+                      <thead className="border-b border-white/10 text-xs uppercase tracking-wide text-white/45">
+                        <tr>
+                          <th className="px-4 py-4">INV</th>
+                          <th className="px-4 py-4">Product</th>
+                          <th className="px-4 py-4 text-right">Invoiced</th>
+                          <th className="px-4 py-4 text-right">Credited</th>
+                          <th className="px-4 py-4 text-right">Remaining</th>
+                          <th className="px-4 py-4 text-right">Credit Qty / Amount</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/10">
+                        {pickLines.map((line) => (
+                          <tr key={line.key}>
+                            <td className="px-4 py-4 text-white/70">{line.sourceDocNo}</td>
+                            <td className="px-4 py-4">
+                              <div className="font-semibold text-white">{line.productCode}</div>
+                              <div className="mt-1 text-xs text-white/45">{line.productDescription}</div>
+                            </td>
+                            <td className="px-4 py-4 text-right text-white/75">
+                              {line.itemType === "SERVICE_ITEM" ? money(line.invoicedAmount) : `${money(line.invoicedQty)} ${line.uom}`}
+                            </td>
+                            <td className="px-4 py-4 text-right text-white/75">
+                              {line.itemType === "SERVICE_ITEM" ? money(line.creditedAmount) : `${money(line.creditedQty)} ${line.uom}`}
+                            </td>
+                            <td className="px-4 py-4 text-right text-white/75">
+                              {line.itemType === "SERVICE_ITEM" ? money(line.remainingCreditAmount) : `${money(line.remainingCreditQty)} ${line.uom}`}
+                            </td>
+                            <td className="px-4 py-4 text-right">
+                              <input
+                                className="input-rk text-right"
+                                value={line.itemType === "SERVICE_ITEM" ? line.creditAmount : line.creditQty}
+                                onChange={(e) =>
+                                  updatePickLine(line.key, line.itemType === "SERVICE_ITEM" ? { creditAmount: e.target.value } : { creditQty: e.target.value })
+                                }
+                              />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : null}
               </div>
-              <div className="rounded-2xl border border-white/10 p-5">
-                <div className="flex justify-between text-white/70"><span>Subtotal</span><span>{money(totals.subtotal)}</span></div>
-                <div className="mt-3 flex justify-between text-white/70"><span>Discount</span><span>{money(totals.discount)}</span></div>
-                <div className="mt-3 flex justify-between text-white/70"><span>Tax</span><span>{money(totals.tax)}</span></div>
-                <div className="mt-5 flex justify-between border-t border-white/10 pt-5 text-xl font-bold text-white"><span>Grand Total</span><span>{money(totals.grandTotal)}</span></div>
+            ) : null}
+
+            {activeTab === "FOOTER" ? (
+              <div className="mt-8 grid gap-4 md:grid-cols-[1fr_360px]">
+                <div className="rounded-2xl border border-white/10 p-4 text-sm leading-6 text-white/55">
+                  Credit Note is posted immediately. Stock items will be stocked-in. Cancelling the CN will reverse the stock movement.
+                </div>
+                <div className="rounded-2xl border border-white/10 p-5">
+                  <div className="flex justify-between text-white/70"><span>Subtotal</span><span>{money(totals.subtotal)}</span></div>
+                  <div className="mt-3 flex justify-between text-white/70"><span>Discount</span><span>{money(totals.discount)}</span></div>
+                  <div className="mt-3 flex justify-between text-white/70"><span>Tax</span><span>{money(totals.tax)}</span></div>
+                  <div className="mt-5 flex justify-between border-t border-white/10 pt-5 text-xl font-bold text-white"><span>Grand Total</span><span>{money(totals.grandTotal)}</span></div>
+                </div>
               </div>
-            </div>
+            ) : null}
 
             <div className="mt-8 flex justify-end gap-3">
               <button type="button" onClick={closeCreate} className="rounded-xl border border-white/15 px-6 py-3 text-sm text-white/75 hover:bg-white/10">Close</button>
