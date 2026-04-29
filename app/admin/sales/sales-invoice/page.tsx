@@ -8,6 +8,31 @@ function toNumber(value: unknown) {
   return Number.isFinite(numeric) ? numeric : 0;
 }
 
+function extractSerialNo(value: string | null | undefined) {
+  const match = String(value || "").match(/SERIAL_NO=([^|]+)/);
+  return match ? match[1].trim() : "";
+}
+
+function uniqueText(values: Array<string | null | undefined>) {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const value of values) {
+    const text = String(value || "").trim();
+    if (!text) continue;
+    const key = text.toUpperCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(text);
+  }
+  return result;
+}
+
+function buildBatchKey(productId?: string | null, batchNo?: string | null) {
+  const product = String(productId || "").trim();
+  const batch = String(batchNo || "").trim().toUpperCase();
+  return product && batch ? `${product}__${batch}` : "";
+}
+
 function sumLinkedQty(
   line: {
     sourceLineLinks?: Array<{ linkType?: string | null; qty?: unknown; claimAmount?: unknown; targetTransaction?: { status?: string | null } | null }>;
@@ -133,6 +158,71 @@ export default async function AdminSalesInvoicePage() {
     }),
   ]);
 
+  const deliveryOrderIds = salesOrders.filter((order) => order.docType === "DO").map((order) => order.id);
+  const deliveryOrderLedgerRows = deliveryOrderIds.length
+    ? await db.stockLedger.findMany({
+        where: {
+          sourceType: "SALES_DELIVERY_ORDER",
+          sourceId: { in: deliveryOrderIds },
+          movementDirection: "OUT",
+        },
+        orderBy: [{ createdAt: "asc" }],
+        select: {
+          sourceId: true,
+          inventoryProductId: true,
+          locationId: true,
+          batchNo: true,
+          remarks: true,
+          createdAt: true,
+        },
+      })
+    : [];
+
+  const batchLookupConditions = new Map<string, { inventoryProductId: string; batchNo: string }>();
+  for (const row of deliveryOrderLedgerRows) {
+    const key = buildBatchKey(row.inventoryProductId, row.batchNo);
+    if (key && !batchLookupConditions.has(key)) {
+      batchLookupConditions.set(key, { inventoryProductId: row.inventoryProductId, batchNo: String(row.batchNo) });
+    }
+  }
+
+  const batchRows = batchLookupConditions.size
+    ? await db.inventoryBatch.findMany({
+        where: { OR: Array.from(batchLookupConditions.values()) },
+        select: { inventoryProductId: true, batchNo: true, expiryDate: true },
+      })
+    : [];
+
+  const batchExpiryMap = new Map<string, Date | null>();
+  for (const batch of batchRows) {
+    batchExpiryMap.set(buildBatchKey(batch.inventoryProductId, batch.batchNo), batch.expiryDate ?? null);
+  }
+
+  const ledgerGroupMap = new Map<string, { sourceId: string; inventoryProductId: string; locationId: string; batchNo: string; expiryDate: Date | null; serialNos: string[] }>();
+  for (const row of deliveryOrderLedgerRows) {
+    const batchNo = row.batchNo || "";
+    const groupKey = `${row.sourceId || ""}__${row.inventoryProductId || ""}__${row.locationId || ""}__${batchNo.toUpperCase()}`;
+    const current = ledgerGroupMap.get(groupKey) || {
+      sourceId: row.sourceId || "",
+      inventoryProductId: row.inventoryProductId,
+      locationId: row.locationId,
+      batchNo,
+      expiryDate: batchExpiryMap.get(buildBatchKey(row.inventoryProductId, batchNo)) || null,
+      serialNos: [],
+    };
+    const serialNo = extractSerialNo(row.remarks);
+    if (serialNo) current.serialNos = uniqueText([...current.serialNos, serialNo]);
+    ledgerGroupMap.set(groupKey, current);
+  }
+
+  const stockMetaQueues = new Map<string, Array<{ batchNo: string; expiryDate: Date | null; serialNos: string[] }>>();
+  for (const group of ledgerGroupMap.values()) {
+    const key = `${group.sourceId}__${group.inventoryProductId}__${group.locationId}`;
+    const current = stockMetaQueues.get(key) || [];
+    current.push({ batchNo: group.batchNo, expiryDate: group.expiryDate, serialNos: group.serialNos });
+    stockMetaQueues.set(key, current);
+  }
+
   return (
     <section className="section-pad">
       <div className="container-rk max-w-7xl">
@@ -180,6 +270,9 @@ export default async function AdminSalesInvoicePage() {
               const orderedAmount = toNumber(line.lineTotal);
               const invoicedAmount = sumLinkedAmount(line, "INVOICED_TO");
               const remainingInvoiceAmount = Math.max(0, orderedAmount - invoicedAmount);
+              const sourceStockMetaKey = `${order.id}__${line.inventoryProductId || ""}__${line.locationId || ""}`;
+              const sourceStockMetaQueue = order.docType === "DO" ? stockMetaQueues.get(sourceStockMetaKey) || [] : [];
+              const sourceStockMeta = sourceStockMetaQueue.length > 0 ? sourceStockMetaQueue.shift() : null;
               return {
                 id: line.id,
                 inventoryProductId: line.inventoryProductId,
@@ -197,6 +290,9 @@ export default async function AdminSalesInvoicePage() {
                 discountRate: Number(line.discountRate ?? 0),
                 discountType: line.discountType,
                 locationId: line.locationId,
+                batchNo: sourceStockMeta?.batchNo || "",
+                serialNos: sourceStockMeta?.serialNos || [],
+                expiryDate: sourceStockMeta?.expiryDate ? sourceStockMeta.expiryDate.toISOString() : null,
                 taxCodeId: line.taxCodeId,
                 remarks: line.remarks,
               };

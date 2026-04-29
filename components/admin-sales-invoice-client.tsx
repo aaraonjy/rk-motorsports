@@ -126,6 +126,8 @@ type SourceSalesOrderRecord = {
     discountRate?: string | number | null;
     discountType?: string | null;
     locationId?: string | null;
+    batchNo?: string | null;
+    serialNos?: string[] | null;
     taxCodeId?: string | null;
     remarks?: string | null;
   }>;
@@ -271,6 +273,8 @@ type PickLine = {
   discountRate: number;
   discountType: "PERCENT" | "AMOUNT";
   locationId: string;
+  batchNo: string;
+  serialNos: string[];
   remarks: string;
   invoiceQty: string;
   invoiceAmount: string;
@@ -1607,6 +1611,8 @@ export function AdminSalesInvoiceClient({
             discountRate: Number(line.discountRate || 0),
             discountType: line.discountType === "AMOUNT" ? "AMOUNT" : "PERCENT",
             locationId: line.locationId || defaultLocationId,
+            batchNo: line.batchNo || "",
+            serialNos: uniqueSerialNos(Array.isArray(line.serialNos) ? line.serialNos : []),
             remarks: line.remarks || "",
             invoiceQty: String(Number(line.remainingInvoiceQty || 0)),
             invoiceAmount: formatDecimalInput(remainingInvoiceAmount, priceDecimalPlaces),
@@ -1685,8 +1691,8 @@ export function AdminSalesInvoiceClient({
           discountType: isServiceItem ? "AMOUNT" : line.discountType,
           locationId: isServiceItem ? "" : (line.locationId || defaultLocationId),
           taxCodeId: isLineItemTaxMode ? taxConfig.defaultAdminTaxCodeId || "" : "",
-          batchNo: "",
-          serialNos: [],
+          batchNo: isServiceItem ? "" : (line.batchNo || ""),
+          serialNos: isServiceItem ? [] : uniqueSerialNos(line.serialNos || []),
           serialSearch: "",
           remarks: line.remarks,
         };
@@ -2131,11 +2137,17 @@ export function AdminSalesInvoiceClient({
                             <SearchableSelect
                               label="Batch No"
                               placeholder={loadingBatches[index] ? "Loading batches..." : "Select Batch No"}
-                              options={(availableBatches[index] || []).map((batch) => ({
-                                id: batch.batchNo,
-                                label: batchOptionLabel(batch, qtyDecimalPlaces),
-                                searchText: `${batch.batchNo} ${batch.expiryDate || ""}`.toLowerCase(),
-                              }))}
+                              options={(() => {
+                                const batches = [...(availableBatches[index] || [])];
+                                if (line.batchNo && !batches.some((batch) => batch.batchNo.toUpperCase() === line.batchNo.toUpperCase())) {
+                                  batches.unshift({ id: line.batchNo, batchNo: line.batchNo });
+                                }
+                                return batches.map((batch) => ({
+                                  id: batch.batchNo,
+                                  label: batchOptionLabel(batch, qtyDecimalPlaces),
+                                  searchText: `${batch.batchNo} ${batch.expiryDate || ""}`.toLowerCase(),
+                                }));
+                              })()}
                               value={line.batchNo}
                               disabled={!line.inventoryProductId || !line.locationId || Boolean(loadingBatches[index]) || isGeneratedLine}
                               onChange={(option) => {
