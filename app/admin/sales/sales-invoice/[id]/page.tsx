@@ -209,6 +209,7 @@ export default async function AdminSalesInvoiceDetailPage({ params }: Params) {
           sourceLineLinks: {
             include: {
               sourceTransaction: { select: { id: true, docType: true, docNo: true, status: true } },
+              targetTransaction: { select: { id: true, docType: true, docNo: true, status: true } },
               sourceLine: { select: { id: true, lineNo: true, qty: true } },
             },
           },
@@ -230,8 +231,17 @@ export default async function AdminSalesInvoiceDetailPage({ params }: Params) {
   const payments = (transaction.payments || []) as PaymentHistoryItem[];
   const totalPaid = payments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
   const grandTotal = Number(transaction.grandTotal || 0);
-  const outstandingBalance = Math.max(0, Math.round((grandTotal - totalPaid + Number.EPSILON) * 100) / 100);
-  const paymentStatus = grandTotal <= 0 || totalPaid >= grandTotal ? "PAID" : totalPaid > 0 ? "PARTIALLY_PAID" : "UNPAID";
+  const totalCredited = transaction.lines.reduce((lineSum, line) => {
+    return lineSum + (line.sourceLineLinks || [])
+      .filter((link) => link.linkType === "CREDITED_TO")
+      .filter((link) => link.targetTransaction?.status !== "CANCELLED")
+      .reduce((sum, link) => sum + Number(link.claimAmount || 0), 0);
+  }, 0);
+  // DN is not implemented yet. Keep this visible as 0.00 so the before/after invoice formula is clear.
+  const totalDebited = 0;
+  const adjustedGrandTotal = Math.max(0, Math.round((grandTotal - totalCredited + totalDebited + Number.EPSILON) * 100) / 100);
+  const outstandingBalance = Math.max(0, Math.round((adjustedGrandTotal - totalPaid + Number.EPSILON) * 100) / 100);
+  const paymentStatus = outstandingBalance <= 0 ? "PAID" : totalPaid > 0 || totalCredited > 0 || totalDebited > 0 ? "PARTIALLY_PAID" : "UNPAID";
 
   const stockIssue = await db.stockTransaction.findFirst({
     where: {
@@ -620,7 +630,10 @@ export default async function AdminSalesInvoiceDetailPage({ params }: Params) {
                 </div>
 
                 <div className="border-t border-white/10 pt-4">
-                  <div className="flex justify-between gap-4"><span className="text-white/65">Total Paid</span><span>{currency} {money(totalPaid)}</span></div>
+                  <div className="flex justify-between gap-4"><span className="text-white/65">Credit Note (CN)</span><span>- {currency} {money(totalCredited)}</span></div>
+                  <div className="mt-3 flex justify-between gap-4"><span className="text-white/65">Debit Note (DN)</span><span>+ {currency} {money(totalDebited)}</span></div>
+                  <div className="mt-3 flex justify-between gap-4"><span className="text-white/65">Adjusted Total</span><span>{currency} {money(adjustedGrandTotal)}</span></div>
+                  <div className="mt-3 flex justify-between gap-4"><span className="text-white/65">Total Paid</span><span>{currency} {money(totalPaid)}</span></div>
                   <div className="mt-3 flex justify-between gap-4"><span className="text-white/65">Outstanding</span><span>{currency} {money(outstandingBalance)}</span></div>
                   <div className="mt-4">
                     <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getPaymentStatusClass(paymentStatus)}`}>{getPaymentStatusLabel(paymentStatus)}</span>

@@ -152,32 +152,61 @@ function getPaymentInput(body: any) {
   return { amount, paymentMode, paymentDate };
 }
 
-function calculateSalesPaymentSummary(payments: Array<{ amount?: Prisma.Decimal | number | string | null }>, grandTotal: Prisma.Decimal | number | string | null | undefined) {
-  const total = toNumber(grandTotal);
-  const totalPaid = payments.reduce((sum, payment) => sum + toNumber(payment.amount), 0);
-  const roundedTotalPaid = Math.round((totalPaid + Number.EPSILON) * 100) / 100;
-  const outstandingBalance = Math.max(0, Math.round((total - roundedTotalPaid + Number.EPSILON) * 100) / 100);
+function calculateSalesAdjustmentSummary(lines?: Array<{ sourceLineLinks?: Array<{ linkType?: string | null; claimAmount?: Prisma.Decimal | number | string | null; targetTransaction?: { status?: string | null; docType?: string | null } | null }> }>) {
+  const totalCredited = (lines || []).reduce((lineSum, line) => {
+    return lineSum + (line.sourceLineLinks || [])
+      .filter((link) => link.linkType === "CREDITED_TO")
+      .filter((link) => link.targetTransaction?.status !== "CANCELLED")
+      .reduce((sum, link) => sum + toNumber(link.claimAmount), 0);
+  }, 0);
+
+  // DN is not implemented yet. Keep this field ready so the invoice UI/accounting formula is already aligned:
+  // Outstanding = Grand Total - Paid - CN + DN
+  const totalDebited = 0;
+
   return {
-    totalPaid: roundedTotalPaid,
-    outstandingBalance,
-    paymentStatus: total <= 0 || roundedTotalPaid >= total ? "PAID" : roundedTotalPaid > 0 ? "PARTIALLY_PAID" : "UNPAID",
+    totalCredited: Math.round((totalCredited + Number.EPSILON) * 100) / 100,
+    totalDebited,
   };
 }
 
-function getSalesInvoiceStatusForPayment(grandTotal: Prisma.Decimal | number | string, totalPaid: number) {
+function calculateSalesPaymentSummary(
+  payments: Array<{ amount?: Prisma.Decimal | number | string | null }>,
+  grandTotal: Prisma.Decimal | number | string | null | undefined,
+  lines?: Array<{ sourceLineLinks?: Array<{ linkType?: string | null; claimAmount?: Prisma.Decimal | number | string | null; targetTransaction?: { status?: string | null; docType?: string | null } | null }> }>
+) {
   const total = toNumber(grandTotal);
-  if (total <= 0 || totalPaid >= total) return "COMPLETED" as SalesTransactionStatus;
+  const totalPaid = payments.reduce((sum, payment) => sum + toNumber(payment.amount), 0);
+  const roundedTotalPaid = Math.round((totalPaid + Number.EPSILON) * 100) / 100;
+  const adjustmentSummary = calculateSalesAdjustmentSummary(lines);
+  const adjustedGrandTotal = Math.max(0, Math.round((total - adjustmentSummary.totalCredited + adjustmentSummary.totalDebited + Number.EPSILON) * 100) / 100);
+  const outstandingBalance = Math.max(0, Math.round((adjustedGrandTotal - roundedTotalPaid + Number.EPSILON) * 100) / 100);
+  return {
+    totalPaid: roundedTotalPaid,
+    totalCredited: adjustmentSummary.totalCredited,
+    totalDebited: adjustmentSummary.totalDebited,
+    adjustedGrandTotal,
+    outstandingBalance,
+    paymentStatus: outstandingBalance <= 0 ? "PAID" : roundedTotalPaid > 0 || adjustmentSummary.totalCredited > 0 || adjustmentSummary.totalDebited > 0 ? "PARTIALLY_PAID" : "UNPAID",
+  };
+}
+
+function getSalesInvoiceStatusForPayment(grandTotal: Prisma.Decimal | number | string, totalPaid: number, totalCredited = 0, totalDebited = 0) {
+  const adjustedTotal = Math.max(0, Math.round((toNumber(grandTotal) - totalCredited + totalDebited + Number.EPSILON) * 100) / 100);
+  if (adjustedTotal <= 0 || totalPaid >= adjustedTotal) return "COMPLETED" as SalesTransactionStatus;
   return "OPEN" as SalesTransactionStatus;
 }
 
 function withPaymentSummary<T extends Record<string, any>>(transaction: T) {
   const payments = Array.isArray(transaction.payments) ? transaction.payments : [];
-  const summary = calculateSalesPaymentSummary(payments, transaction.grandTotal);
-  return { ...transaction, payments, totalPaid: summary.totalPaid, outstandingBalance: summary.outstandingBalance, paymentStatus: summary.paymentStatus };
+  const lines = Array.isArray(transaction.lines) ? transaction.lines : [];
+  const summary = calculateSalesPaymentSummary(payments, transaction.grandTotal, lines);
+  return { ...transaction, payments, totalPaid: summary.totalPaid, totalCredited: summary.totalCredited, totalDebited: summary.totalDebited, adjustedGrandTotal: summary.adjustedGrandTotal, outstandingBalance: summary.outstandingBalance, paymentStatus: summary.paymentStatus };
 }
 
-function validatePaymentAmount(paymentAmount: number, grandTotal: Prisma.Decimal | number | string, existingPaid = 0) {
-  const outstanding = Math.max(0, Math.round((toNumber(grandTotal) - existingPaid + Number.EPSILON) * 100) / 100);
+function validatePaymentAmount(paymentAmount: number, grandTotal: Prisma.Decimal | number | string, existingPaid = 0, totalCredited = 0, totalDebited = 0) {
+  const adjustedTotal = Math.max(0, Math.round((toNumber(grandTotal) - totalCredited + totalDebited + Number.EPSILON) * 100) / 100);
+  const outstanding = Math.max(0, Math.round((adjustedTotal - existingPaid + Number.EPSILON) * 100) / 100);
   if (paymentAmount > outstanding) throw new Error("Payment amount cannot exceed the outstanding balance.");
 }
 
@@ -763,6 +792,7 @@ export async function GET(req: Request) {
             sourceLineLinks: {
               include: {
                 sourceTransaction: { select: { id: true, docType: true, docNo: true, status: true } },
+                targetTransaction: { select: { id: true, docType: true, docNo: true, status: true } },
               },
             },
           },
