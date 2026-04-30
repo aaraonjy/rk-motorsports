@@ -672,6 +672,8 @@ export function AdminStockTransactionClient({
   const [departmentOptions, setDepartmentOptions] = useState<DepartmentOption[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
+  const [paginationTotal, setPaginationTotal] = useState(0);
+  const [paginationTotalPages, setPaginationTotalPages] = useState(1);
 
   const activeLocations = useMemo(() => initialLocations.filter((item) => item.isActive), [initialLocations]);
 
@@ -730,22 +732,12 @@ export function AdminStockTransactionClient({
     );
   }
 
-  const filteredTransactions = useMemo(() => {
-    return transactions.filter((item) => {
-      const hasRevisionChildren = Array.isArray(item.revisions) && item.revisions.length > 0;
-      return !hasRevisionChildren;
-    });
-  }, [transactions]);
+  const visibleTransactions = transactions;
+  const totalPages = Math.max(1, paginationTotalPages);
 
   useEffect(() => {
     setCurrentPage(1);
   }, [searchKeyword, dateFrom, dateTo, filterProjectId, filterDepartmentId, transactionType]);
-
-  const totalPages = Math.max(1, Math.ceil(filteredTransactions.length / pageSize));
-  const paginatedTransactions = useMemo(
-    () => filteredTransactions.slice((currentPage - 1) * pageSize, currentPage * pageSize),
-    [filteredTransactions, currentPage]
-  );
 
   useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(totalPages);
@@ -754,7 +746,7 @@ export function AdminStockTransactionClient({
   async function loadTransactions() {
     setIsLoadingTransactions(true);
     try {
-      const params = new URLSearchParams({ transactionType });
+      const params = new URLSearchParams({ transactionType, page: String(currentPage), pageSize: String(pageSize) });
       if (searchKeyword.trim()) params.set("q", searchKeyword.trim());
       if (dateFrom) params.set("dateFrom", dateFrom);
       if (dateTo) params.set("dateTo", dateTo);
@@ -767,11 +759,17 @@ export function AdminStockTransactionClient({
       const data = await response.json();
       if (!response.ok || !data.ok) {
         setTransactions([]);
+        setPaginationTotal(0);
+        setPaginationTotalPages(1);
         return;
       }
       setTransactions(Array.isArray(data.transactions) ? data.transactions : []);
+      setPaginationTotal(Number(data.pagination?.total || 0));
+      setPaginationTotalPages(Math.max(1, Number(data.pagination?.totalPages || 1)));
     } catch {
       setTransactions([]);
+      setPaginationTotal(0);
+      setPaginationTotalPages(1);
     } finally {
       setIsLoadingTransactions(false);
     }
@@ -779,7 +777,7 @@ export function AdminStockTransactionClient({
 
   useEffect(() => {
     void loadTransactions();
-  }, [transactionType, searchKeyword, dateFrom, dateTo, filterProjectId, filterDepartmentId]);
+  }, [transactionType, searchKeyword, dateFrom, dateTo, filterProjectId, filterDepartmentId, currentPage]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1553,10 +1551,10 @@ export function AdminStockTransactionClient({
             <tbody className="divide-y divide-white/10">
               {isLoadingTransactions ? (
                 <tr><td colSpan={6} className="px-3 py-8 text-center text-white/50">Loading transactions...</td></tr>
-              ) : filteredTransactions.length === 0 ? (
+              ) : visibleTransactions.length === 0 ? (
                 <tr><td colSpan={6} className="px-3 py-8 text-center text-white/50">No transactions found.</td></tr>
               ) : (
-                paginatedTransactions.map((item) => (
+                visibleTransactions.map((item) => (
                   <tr
                     key={item.id}
                     className={`cursor-pointer align-top text-white/80 transition hover:bg-white/5 ${item.status === "CANCELLED" ? "bg-red-500/5" : ""}`}
@@ -1628,10 +1626,10 @@ export function AdminStockTransactionClient({
           </table>
         </div>
 
-        {filteredTransactions.length > 0 ? (
+        {paginationTotal > 0 ? (
           <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4">
             <div className="text-sm text-white/55">
-              Showing {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, filteredTransactions.length)} of {filteredTransactions.length} records
+              Showing {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, paginationTotal)} of {paginationTotal} records
             </div>
             <div className="flex items-center gap-2">
               <button

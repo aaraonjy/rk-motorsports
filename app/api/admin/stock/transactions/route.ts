@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { StockAdjustmentDirection, StockTransactionType } from "@prisma/client";
+import { Prisma, StockAdjustmentDirection, StockTransactionType } from "@prisma/client";
 import { requireAdmin, verifyPassword } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { createAuditLogFromRequest } from "@/lib/audit";
@@ -174,69 +174,90 @@ export async function GET(req: Request) {
     const dateTo = searchParams.get("dateTo")?.trim() || undefined;
     const projectId = searchParams.get("projectId")?.trim() || undefined;
     const departmentId = searchParams.get("departmentId")?.trim() || undefined;
+    const rawPage = Number(searchParams.get("page") || "1");
+    const page = Number.isFinite(rawPage) && rawPage > 0 ? Math.floor(rawPage) : 1;
+    const pageSize = 10;
 
-    const rows = await db.stockTransaction.findMany({
-      where: {
-        ...(type ? { transactionType: type as StockTransactionType } : {}),
-        ...(projectId ? { projectId } : {}),
-        ...(departmentId ? { departmentId } : {}),
-        ...(dateFrom || dateTo
-          ? {
-              transactionDate: {
-                ...(dateFrom ? { gte: normalizeStockDate(dateFrom) } : {}),
-                ...(dateTo ? { lte: normalizeStockDate(dateTo) } : {}),
-              },
-            }
-          : {}),
-        ...(q
-          ? {
-              OR: [
-                                { docNo: { contains: q, mode: "insensitive" } },
-                { docDesc: { contains: q, mode: "insensitive" } },
-                { reference: { contains: q, mode: "insensitive" } },
-                { remarks: { contains: q, mode: "insensitive" } },
-                { project: { is: { code: { contains: q, mode: "insensitive" } } } },
-                { project: { is: { name: { contains: q, mode: "insensitive" } } } },
-                { department: { is: { code: { contains: q, mode: "insensitive" } } } },
-                { department: { is: { name: { contains: q, mode: "insensitive" } } } },
-                { lines: { some: { inventoryProduct: { code: { contains: q, mode: "insensitive" } } } } },
-                { lines: { some: { inventoryProduct: { description: { contains: q, mode: "insensitive" } } } } },
-                { lines: { some: { location: { is: { code: { contains: q, mode: "insensitive" } } } } } },
-                { lines: { some: { fromLocation: { is: { code: { contains: q, mode: "insensitive" } } } } } },
-                { lines: { some: { toLocation: { is: { code: { contains: q, mode: "insensitive" } } } } } },
-                { lines: { some: { batchNo: { contains: q, mode: "insensitive" } } } },
-                { lines: { some: { serialEntries: { some: { serialNo: { contains: q, mode: "insensitive" } } } } } },
-              ],
-            }
-          : {}),
-      },
-      orderBy: [{ docNo: { sort: "desc", nulls: "last" } }, { transactionNo: "desc" }],
-      take: 100,
-      include: {
-        createdByAdmin: { select: { id: true, name: true, email: true } },
-        project: { select: { id: true, code: true, name: true } },
-        department: { select: { id: true, code: true, name: true, projectId: true } },
-        revisedFrom: { select: { id: true, docNo: true } },
-        revisions: { select: { id: true } },
-        lines: {
-          include: {
-            inventoryProduct: { select: { id: true, code: true, description: true, baseUom: true } },
-            location: { select: { id: true, code: true, name: true } },
-            fromLocation: { select: { id: true, code: true, name: true } },
-            toLocation: { select: { id: true, code: true, name: true } },
-            serialEntries: {
-              orderBy: [{ serialNo: "asc" }],
-              select: {
-                id: true,
-                serialNo: true,
+    const where: Prisma.StockTransactionWhereInput = {
+      ...(type ? { transactionType: type as StockTransactionType } : {}),
+      ...(projectId ? { projectId } : {}),
+      ...(departmentId ? { departmentId } : {}),
+      revisions: { none: {} },
+      ...(dateFrom || dateTo
+        ? {
+            transactionDate: {
+              ...(dateFrom ? { gte: normalizeStockDate(dateFrom) } : {}),
+              ...(dateTo ? { lte: normalizeStockDate(dateTo) } : {}),
+            },
+          }
+        : {}),
+      ...(q
+        ? {
+            OR: [
+              { docNo: { contains: q, mode: "insensitive" } },
+              { docDesc: { contains: q, mode: "insensitive" } },
+              { reference: { contains: q, mode: "insensitive" } },
+              { remarks: { contains: q, mode: "insensitive" } },
+              { project: { is: { code: { contains: q, mode: "insensitive" } } } },
+              { project: { is: { name: { contains: q, mode: "insensitive" } } } },
+              { department: { is: { code: { contains: q, mode: "insensitive" } } } },
+              { department: { is: { name: { contains: q, mode: "insensitive" } } } },
+              { lines: { some: { inventoryProduct: { code: { contains: q, mode: "insensitive" } } } } },
+              { lines: { some: { inventoryProduct: { description: { contains: q, mode: "insensitive" } } } } },
+              { lines: { some: { location: { is: { code: { contains: q, mode: "insensitive" } } } } } },
+              { lines: { some: { fromLocation: { is: { code: { contains: q, mode: "insensitive" } } } } } },
+              { lines: { some: { toLocation: { is: { code: { contains: q, mode: "insensitive" } } } } } },
+              { lines: { some: { batchNo: { contains: q, mode: "insensitive" } } } },
+              { lines: { some: { serialEntries: { some: { serialNo: { contains: q, mode: "insensitive" } } } } } },
+            ],
+          }
+        : {}),
+    };
+
+    const [total, rows] = await Promise.all([
+      db.stockTransaction.count({ where }),
+      db.stockTransaction.findMany({
+        where,
+        orderBy: [{ docNo: { sort: "desc", nulls: "last" } }, { transactionNo: "desc" }],
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        include: {
+          createdByAdmin: { select: { id: true, name: true, email: true } },
+          project: { select: { id: true, code: true, name: true } },
+          department: { select: { id: true, code: true, name: true, projectId: true } },
+          revisedFrom: { select: { id: true, docNo: true } },
+          revisions: { select: { id: true } },
+          lines: {
+            include: {
+              inventoryProduct: { select: { id: true, code: true, description: true, baseUom: true } },
+              location: { select: { id: true, code: true, name: true } },
+              fromLocation: { select: { id: true, code: true, name: true } },
+              toLocation: { select: { id: true, code: true, name: true } },
+              serialEntries: {
+                orderBy: [{ serialNo: "asc" }],
+                select: {
+                  id: true,
+                  serialNo: true,
+                },
               },
             },
           },
         },
+      }),
+    ]);
+
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+    return NextResponse.json({
+      ok: true,
+      transactions: rows,
+      pagination: {
+        page,
+        pageSize,
+        total,
+        totalPages,
       },
     });
-
-    return NextResponse.json({ ok: true, transactions: rows });
   } catch (error) {
     return NextResponse.json(
       { ok: false, error: error instanceof Error ? error.message : "Unable to load stock transactions." },
