@@ -20,9 +20,9 @@ const sections: readonly MenuSection[] = [
     key: "master",
     items: [
       { label: "Product List", href: "/admin/stock/products" },
-      { label: "Product Group", href: "/admin/product-groups" },
-      { label: "Product Sub-Group", href: "/admin/product-sub-groups" },
-      { label: "Product Brand", href: "/admin/brands" },
+      { label: "Product Group", href: "/admin/stock/product-groups" },
+      { label: "Product Sub-Group", href: "/admin/stock/product-sub-groups" },
+      { label: "Product Brand", href: "/admin/stock/brands" },
       { label: "Stock Location", href: "/admin/stock/locations" },
     ],
   },
