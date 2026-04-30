@@ -236,7 +236,7 @@ function formatDate(value: string | Date | null | undefined) {
 
 function getStatusClass(status: string) {
   if (status === "CANCELLED") return "border-red-500/25 bg-red-500/10 text-red-200";
-  if (status === "COMPLETED") return "border-sky-500/25 bg-sky-500/10 text-sky-200";
+  if (status === "COMPLETED") return "border-emerald-500/25 bg-emerald-500/10 text-emerald-200";
   return "border-amber-500/25 bg-amber-500/10 text-amber-200";
 }
 
