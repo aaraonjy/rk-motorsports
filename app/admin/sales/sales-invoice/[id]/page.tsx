@@ -191,7 +191,7 @@ export default async function AdminSalesInvoiceDetailPage({ params }: Params) {
       revisions: { select: { id: true, docNo: true, status: true } },
       sourceLinks: {
         include: {
-          targetTransaction: { select: { id: true, docType: true, docNo: true, status: true } },
+          targetTransaction: { select: { id: true, docType: true, docNo: true, status: true, grandTotal: true } },
         },
       },
       payments: {
@@ -209,7 +209,7 @@ export default async function AdminSalesInvoiceDetailPage({ params }: Params) {
           sourceLineLinks: {
             include: {
               sourceTransaction: { select: { id: true, docType: true, docNo: true, status: true } },
-              targetTransaction: { select: { id: true, docType: true, docNo: true, status: true } },
+              targetTransaction: { select: { id: true, docType: true, docNo: true, status: true, grandTotal: true } },
               sourceLine: { select: { id: true, lineNo: true, qty: true } },
             },
           },
@@ -231,14 +231,22 @@ export default async function AdminSalesInvoiceDetailPage({ params }: Params) {
   const payments = (transaction.payments || []) as PaymentHistoryItem[];
   const totalPaid = payments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
   const grandTotal = Number(transaction.grandTotal || 0);
-  const totalCredited = transaction.lines.reduce((lineSum, line) => {
+  const lineCredited = transaction.lines.reduce((lineSum, line) => {
     return lineSum + (line.sourceLineLinks || [])
       .filter((link) => link.linkType === "CREDITED_TO")
       .filter((link) => link.targetTransaction?.status !== "CANCELLED")
       .reduce((sum, link) => sum + Number(link.claimAmount || 0), 0);
   }, 0);
-  // DN is not implemented yet. Keep this visible as 0.00 so the before/after invoice formula is clear.
-  const totalDebited = 0;
+  const linkedCreditNotes = transaction.sourceLinks
+    .map((link) => link.targetTransaction)
+    .filter((target) => target?.docType === "CN" && target.status !== "CANCELLED")
+    .reduce((sum, target) => sum + Number(target?.grandTotal || 0), 0);
+  const linkedDebitNotes = transaction.sourceLinks
+    .map((link) => link.targetTransaction)
+    .filter((target) => target?.docType === "DN" && target.status !== "CANCELLED")
+    .reduce((sum, target) => sum + Number(target?.grandTotal || 0), 0);
+  const totalCredited = linkedCreditNotes > 0 ? linkedCreditNotes : lineCredited;
+  const totalDebited = linkedDebitNotes;
   const adjustedGrandTotal = Math.max(0, Math.round((grandTotal - totalCredited + totalDebited + Number.EPSILON) * 100) / 100);
   const outstandingBalance = Math.max(0, Math.round((adjustedGrandTotal - totalPaid + Number.EPSILON) * 100) / 100);
   const paymentStatus = outstandingBalance <= 0 ? "PAID" : totalPaid > 0 || totalCredited > 0 || totalDebited > 0 ? "PARTIALLY_PAID" : "UNPAID";

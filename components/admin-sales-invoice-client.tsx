@@ -937,6 +937,7 @@ export function AdminSalesInvoiceClient({
   const [submitMessageType, setSubmitMessageType] = useState<"success" | "cancel">("success");
   const [recentCancelledTransaction, setRecentCancelledTransaction] = useState<SalesInvoiceRecord | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [deletingPaymentId, setDeletingPaymentId] = useState<string | null>(null);
   const [cancelTarget, setCancelTarget] = useState<SalesInvoiceRecord | null>(null);
   const [cancelReason, setCancelReason] = useState("");
   const [paymentDate, setPaymentDate] = useState(todayInput());
@@ -1881,6 +1882,31 @@ export function AdminSalesInvoiceClient({
     }
   }
 
+  async function deletePayment(paymentId: string) {
+    if (!editTarget?.id || !paymentId) return;
+    const confirmed = window.confirm("Delete this payment record? This will recalculate the invoice outstanding balance.");
+    if (!confirmed) return;
+    setDeletingPaymentId(paymentId);
+    setSubmitError("");
+    try {
+      const response = await fetch(`/api/admin/sales/sales-invoice/${editTarget.id}/payments/${paymentId}`, { method: "DELETE" });
+      const data = await response.json();
+      if (!response.ok || !data.ok) throw new Error(data.error || "Unable to delete payment.");
+      if (data.transaction) {
+        setEditTarget(data.transaction as SalesInvoiceRecord);
+      } else {
+        setEditTarget((prev) => prev ? { ...prev, payments: (prev.payments || []).filter((payment) => payment.id !== paymentId) } : prev);
+      }
+      setPaymentAmount("0");
+      await loadTransactions();
+      router.refresh();
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : "Unable to delete payment.");
+    } finally {
+      setDeletingPaymentId(null);
+    }
+  }
+
   const filteredTransactions = useMemo(() => {
     return transactions.filter((item) => {
       const hasRevisionChildren = Array.isArray(item.revisions) && item.revisions.length > 0;
@@ -2427,7 +2453,18 @@ export function AdminSalesInvoiceClient({
                             <div key={payment.id} className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-white/70">
                               <div className="flex items-center justify-between gap-3">
                                 <span>{formatDate(payment.paymentDate)} • {getPaymentModeLabel(payment.paymentMode)}</span>
-                                <span className="font-semibold text-white">{currency || "MYR"} {moneyWithPlaces(Number(payment.amount || 0), priceDecimalPlaces)}</span>
+                                <div className="flex items-center gap-3">
+                                  <span className="font-semibold text-white">{currency || "MYR"} {moneyWithPlaces(Number(payment.amount || 0), priceDecimalPlaces)}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => deletePayment(payment.id)}
+                                    disabled={deletingPaymentId === payment.id}
+                                    title="Delete payment record"
+                                    className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-red-500/25 bg-red-500/10 text-red-200 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                                  >
+                                    🗑
+                                  </button>
+                                </div>
                               </div>
                             </div>
                           ))}
