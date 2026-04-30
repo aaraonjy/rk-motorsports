@@ -1157,6 +1157,18 @@ export function AdminSalesInvoiceClient({
     return Boolean(line.sourceLineId || line.sourceTransactionId);
   }
 
+  function isGeneratedLineFromDeliveryOrder(line: LineForm) {
+    if (!line.sourceTransactionId) return false;
+    const source = availableSourceOrders.find((order) => order.id === line.sourceTransactionId);
+    return String(source?.docNo || "").toUpperCase().startsWith("DO-");
+  }
+
+  function shouldLockBatchSerialForLine(line: LineForm) {
+    if (!isGeneratedLineFromSalesOrder(line)) return false;
+    if (isGeneratedEditMode) return true;
+    return isGeneratedLineFromDeliveryOrder(line);
+  }
+
   function getGeneratedEditStockMeta(transaction: SalesInvoiceRecord, line: NonNullable<SalesInvoiceRecord["lines"]>[number], index: number) {
     const sourceIds = new Set(
       (transaction.targetLinks || [])
@@ -2119,7 +2131,7 @@ export function AdminSalesInvoiceClient({
 
             {isGeneratedBodyLocked ? (
               <div className="mt-5 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-                This Sales Invoice is generated from a source document. Header and Body are locked. Use the Footer tab to record payment only.
+                This Sales Invoice is generated from a source document. Header and Body are locked. If generated from Sales Order, Batch No and S/N remain selectable for tracked stock items before saving. Use the Footer tab to record payment only.
               </div>
             ) : null}
             {generateFromError ? <div className="mt-5 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">{generateFromError}</div> : null}
@@ -2177,14 +2189,15 @@ export function AdminSalesInvoiceClient({
             ) : null}
 
             {activeTab === "BODY" ? (
-              <div className={`mt-6 space-y-5 ${isGeneratedBodyLocked ? "pointer-events-none rounded-[1.75rem] border border-white/10 bg-white/[0.04] p-4 opacity-70 grayscale" : ""}`}>
+              <div className={`mt-6 space-y-5 ${isGeneratedBodyLocked ? "rounded-[1.75rem] border border-white/10 bg-white/[0.04] p-4 opacity-70 grayscale" : ""}`}>
                 {isGeneratedBodyLocked ? (
                   <div className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white/55">
-                    Read-only generated body section. This Sales Invoice was generated from a source document, so product, qty, selling price, discount, batch/S/N, location, and line pricing details are locked.
+                    Read-only generated body section. This Sales Invoice was generated from a source document, so product, qty, selling price, discount, location, and line pricing details are locked. Batch No and S/N remain selectable only when generated directly from Sales Order.
                   </div>
                 ) : null}
                 {lines.map((line, index) => {
                   const isGeneratedLine = isGeneratedBodyLocked || isGeneratedLineFromSalesOrder(line);
+                  const isBatchSerialLocked = shouldLockBatchSerialForLine(line);
                   const normalizedLine = normalizedLines[index];
                   const total = normalizedLine?.lineTotal || 0;
                   const taxAmount = normalizedLine?.taxAmount || 0;
@@ -2293,7 +2306,7 @@ export function AdminSalesInvoiceClient({
                                 }));
                               })()}
                               value={line.batchNo}
-                              disabled={!line.inventoryProductId || !line.locationId || Boolean(loadingBatches[index]) || isGeneratedLine}
+                              disabled={!line.inventoryProductId || !line.locationId || Boolean(loadingBatches[index]) || isBatchSerialLocked}
                               onChange={(option) => {
                                 updateLine(index, { batchNo: option?.id || "", serialNos: [], serialSearch: "" });
                                 setAvailableSerials((prev) => { const next = { ...prev }; delete next[index]; return next; });
@@ -2348,7 +2361,7 @@ export function AdminSalesInvoiceClient({
                                 const exists = line.serialNos.some((item) => item.toUpperCase() === serialNo.toUpperCase());
                                 updateLine(index, { serialNos: exists ? line.serialNos.filter((item) => item.toUpperCase() !== serialNo.toUpperCase()) : uniqueSerialNos([...line.serialNos, serialNo]) });
                               }}
-                              disabled={!line.inventoryProductId || !line.locationId || (selectedProduct.batchTracking && !line.batchNo) || Boolean(loadingSerials[index]) || isGeneratedLine}
+                              disabled={!line.inventoryProductId || !line.locationId || (selectedProduct.batchTracking && !line.batchNo) || Boolean(loadingSerials[index]) || isBatchSerialLocked}
                             />
                             {line.inventoryProductId && line.locationId && (!selectedProduct.batchTracking || line.batchNo) && !isGeneratedLine && !loadingSerials[index] && (availableSerials[index] || []).length === 0 ? (
                               <p className="mt-2 text-xs text-amber-200">No available S/N found for this product/location{selectedProduct.batchTracking ? " and batch" : ""}.</p>
@@ -2516,7 +2529,7 @@ export function AdminSalesInvoiceClient({
 
             {isGeneratedBodyLocked ? (
               <div className="mt-5 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-                This Sales Invoice is generated from a source document. Header and Body are locked. Use the Footer tab to record payment only.
+                This Sales Invoice is generated from a source document. Header and Body are locked. If generated from Sales Order, Batch No and S/N remain selectable for tracked stock items before saving. Use the Footer tab to record payment only.
               </div>
             ) : null}
             {generateFromError ? <div className="mt-5 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">{generateFromError}</div> : null}
