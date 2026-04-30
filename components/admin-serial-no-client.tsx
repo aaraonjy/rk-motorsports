@@ -176,19 +176,6 @@ export function AdminSerialNoClient({ initialRows, initialPagination, products, 
           </div>
         </div>
 
-        {pagination.total > 0 ? (
-          <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4">
-            <div className="text-sm text-white/55">
-              Showing {(pagination.page - 1) * pagination.pageSize + 1}–{Math.min(pagination.page * pagination.pageSize, pagination.total)} of {pagination.total} records
-            </div>
-            <div className="flex items-center gap-2">
-              <button type="button" onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))} disabled={pagination.page <= 1} className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/80 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50">Prev</button>
-              <div className="rounded-xl border border-white/10 bg-black/20 px-4 py-2 text-sm text-white/80">Page {pagination.page} / {pagination.totalPages}</div>
-              <button type="button" onClick={() => setCurrentPage((prev) => Math.min(pagination.totalPages, prev + 1))} disabled={pagination.page >= pagination.totalPages} className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/80 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50">Next</button>
-            </div>
-          </div>
-        ) : null}
-
         {error ? <div className="mt-5 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</div> : null}
 
         <div className="mt-6 overflow-x-auto">
@@ -221,6 +208,20 @@ export function AdminSerialNoClient({ initialRows, initialPagination, products, 
             </tbody>
           </table>
         </div>
+
+        {pagination.total > 0 ? (
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4">
+            <div className="text-sm text-white/55">
+              Showing {(pagination.page - 1) * pagination.pageSize + 1}–{Math.min(pagination.page * pagination.pageSize, pagination.total)} of {pagination.total} records
+            </div>
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))} disabled={pagination.page <= 1} className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/80 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50">Prev</button>
+              <div className="rounded-xl border border-white/10 bg-black/20 px-4 py-2 text-sm text-white/80">Page {pagination.page} / {pagination.totalPages}</div>
+              <button type="button" onClick={() => setCurrentPage((prev) => Math.min(pagination.totalPages, prev + 1))} disabled={pagination.page >= pagination.totalPages} className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/80 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50">Next</button>
+            </div>
+          </div>
+        ) : null}
+
       </div>
 
       {selectedDetail ? (
