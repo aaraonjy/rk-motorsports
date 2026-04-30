@@ -610,24 +610,149 @@ export function AdminDebitNoteClient({ initialProducts, initialLocations, defaul
 
             {activeTab === "HEADER" ? (
               <div className="mt-8 space-y-6">
-                <div className="grid gap-5 md:grid-cols-[280px_1fr]"><div><label className="label-rk">Doc Date</label><input type="date" className="input-rk" value={docDate} onChange={(e) => setDocDate(e.target.value)} /></div><div><label className="label-rk">System Doc No</label><button type="button" onClick={openDocNoModal} className="input-rk flex items-center justify-between gap-3 text-left"><span>{docNo || docNoPreview}</span><span className="text-xs text-white/45">Click to override</span></button></div></div>
+                <div className="grid gap-5 md:grid-cols-[280px_1fr]">
+                  <div>
+                    <label className="label-rk">Doc Date</label>
+                    <input type="date" className="input-rk" value={docDate} onChange={(e) => setDocDate(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="label-rk">System Doc No</label>
+                    <button type="button" onClick={openDocNoModal} className="input-rk flex items-center justify-between gap-3 text-left">
+                      <span>{docNo || docNoPreview}</span>
+                      <span className="text-xs text-white/45">Click to override</span>
+                    </button>
+                  </div>
+                </div>
+
                 <div className="grid gap-5 md:grid-cols-4">
                   <SearchableSelect label="A/C No" placeholder="Search or select customer" options={customerOptions} value={selectedCustomerId} onChange={(option) => handleCustomerChange(option?.id || "")} />
-                  <div><label className="label-rk">Customer Name</label><input className="input-rk" value={selectedCustomerInvoice?.customerName || selectedCustomer?.label?.split(" — ").slice(1).join(" — ") || ""} readOnly disabled /></div>
-                  <div><label className="label-rk">Email</label><input className="input-rk" value={selectedCustomerInvoice?.email || ""} readOnly disabled /></div>
-                  <div><label className="label-rk">Contact No</label><input className="input-rk" value={selectedCustomerInvoice?.contactNo || ""} readOnly disabled /></div>
+                  <div>
+                    <label className="label-rk">Customer Name</label>
+                    <input className="input-rk" value={selectedCustomerInvoice?.customerName || selectedCustomer?.label?.split(" — ").slice(1).join(" — ") || ""} readOnly disabled />
+                  </div>
+                  <div>
+                    <label className="label-rk">Email</label>
+                    <input className="input-rk" value={selectedCustomerInvoice?.email || ""} readOnly disabled />
+                  </div>
+                  <div>
+                    <label className="label-rk">Contact No</label>
+                    <input className="input-rk" value={selectedCustomerInvoice?.contactNo || ""} readOnly disabled />
+                  </div>
                 </div>
-                <div className="grid gap-5 md:grid-cols-2"><div><label className="label-rk">Document Description</label><input className="input-rk" value={selectedInvoice ? `Debit Note for ${selectedInvoice.docNo}` : ""} readOnly disabled /></div><div><label className="label-rk">Reason <span className="text-rk-red">*</span></label><input className="input-rk" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Additional charge / undercharged item" /></div></div>
-                <div className="grid gap-5 md:grid-cols-4"><div><label className="label-rk">Attention</label><input className="input-rk" value={selectedInvoice?.attention || selectedCustomerInvoice?.attention || ""} readOnly disabled /></div><SearchableSelect label="Agent" placeholder="Select agent" options={agentOptions} value={agentId} onChange={(option) => setAgentId(option?.id || "")} /><SearchableSelect label="Project" placeholder="Select project" options={projectOptions} value={projectId} onChange={(option) => { setProjectId(option?.id || ""); setDepartmentId(""); }} /><SearchableSelect label="Department" placeholder="Select department" options={departmentOptions} value={departmentId} onChange={(option) => setDepartmentId(option?.id || "")} /></div>
-                <div className="rounded-2xl border border-white/10 p-5"><label className="label-rk">Source Sales Invoice <span className="text-rk-red">*</span></label><button type="button" disabled={!selectedCustomerId} onClick={() => setIsInvoicePickerOpen((prev) => !prev)} className={`input-rk mt-2 flex items-center justify-between gap-3 text-left ${!selectedCustomerId ? "opacity-60" : ""}`}><span className={selectedInvoice ? "truncate text-white" : "truncate text-white/45"}>{selectedInvoice ? `${selectedInvoice.docNo} — ${selectedInvoice.customerName}` : "Search or select sales invoice"}</span><span className="text-white/55">▾</span></button>{isInvoicePickerOpen ? <div className="mt-3 overflow-hidden rounded-2xl border border-white/10 bg-black/35"><div className="border-b border-white/10 p-3"><input className="input-rk h-10" value={sourceSearch} onChange={(e) => setSourceSearch(e.target.value)} placeholder="Search Sales Invoice" /></div><div className="max-h-64 overflow-y-auto p-2">{filteredInvoices.length === 0 ? <div className="rounded-xl px-3 py-3 text-sm text-white/45">No available sales invoice found for this customer.</div> : filteredInvoices.map((invoice) => <button key={invoice.id} type="button" onClick={() => selectInvoice(invoice.id)} className={`flex w-full items-center justify-between gap-4 rounded-xl px-3 py-3 text-left text-sm transition ${selectedInvoiceId === invoice.id ? "bg-white/10 text-white" : "text-white/85 hover:bg-white/10 hover:text-white"}`}><div><div className="font-semibold">{invoice.docNo}</div><div className="mt-1 text-xs text-white/45">{invoice.customerName} • {formatDate(invoice.docDate)}</div></div><div className="text-right font-semibold">{invoice.currency || "MYR"} {money(invoice.grandTotal)}</div></button>)}</div></div> : null}{!selectedCustomerId ? <div className="mt-4 rounded-2xl border border-white/10 px-4 py-6 text-sm text-white/45">Please select customer first.</div> : null}</div>
+
+                <div className="grid gap-5 md:grid-cols-4">
+                  <div className="md:col-span-2">
+                    <label className="label-rk">Document Description</label>
+                    <input className="input-rk" value={selectedInvoice ? `Debit Note for ${selectedInvoice.docNo}` : ""} readOnly disabled />
+                  </div>
+                  <div>
+                    <label className="label-rk">Attention</label>
+                    <input className="input-rk" value={selectedInvoice?.attention || selectedCustomerInvoice?.attention || ""} readOnly disabled />
+                  </div>
+                  <SearchableSelect label="Agent" placeholder="Select agent" options={agentOptions} value={agentId} onChange={(option) => setAgentId(option?.id || "")} />
+                </div>
+
+                <div className="grid gap-5 md:grid-cols-4">
+                  <SearchableSelect label="Project" placeholder="Select project" options={projectOptions} value={projectId} onChange={(option) => { setProjectId(option?.id || ""); setDepartmentId(""); }} />
+                  <SearchableSelect label="Department" placeholder="Select department" options={departmentOptions} value={departmentId} onChange={(option) => setDepartmentId(option?.id || "")} />
+                  <div className="md:col-span-2">
+                    <label className="label-rk">Reason <span className="text-rk-red">*</span></label>
+                    <input className="input-rk" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Additional charge / undercharged item" />
+                  </div>
+                </div>
+
+                <div className="grid gap-5 md:grid-cols-[1fr_1fr]">
+                  <div className="rounded-[1.5rem] border border-white/10 p-5">
+                    <p className="text-xs font-bold uppercase tracking-[0.24em] text-white/40">Source Sales Invoice</p>
+                    <div className="mt-5">
+                      <label className="label-rk">Source Sales Invoice <span className="text-rk-red">*</span></label>
+                      <button
+                        type="button"
+                        disabled={!selectedCustomerId}
+                        onClick={() => setIsInvoicePickerOpen((prev) => !prev)}
+                        className={`input-rk flex items-center justify-between gap-3 text-left ${!selectedCustomerId ? "opacity-60" : ""}`}
+                      >
+                        <span className={selectedInvoice ? "truncate text-white" : "truncate text-white/45"}>
+                          {selectedInvoice ? `${selectedInvoice.docNo} — ${selectedInvoice.customerName}` : "Search or select sales invoice"}
+                        </span>
+                        <span className="text-white/55">▾</span>
+                      </button>
+
+                      {isInvoicePickerOpen ? (
+                        <div className="mt-3 overflow-hidden rounded-2xl border border-white/10 bg-black/35">
+                          <div className="border-b border-white/10 p-3">
+                            <input className="input-rk h-10" value={sourceSearch} onChange={(e) => setSourceSearch(e.target.value)} placeholder="Search Sales Invoice" />
+                          </div>
+                          <div className="max-h-64 overflow-y-auto p-2">
+                            {filteredInvoices.length === 0 ? (
+                              <div className="rounded-xl px-3 py-3 text-sm text-white/45">No available sales invoice found for this customer.</div>
+                            ) : (
+                              filteredInvoices.map((invoice) => (
+                                <button
+                                  key={invoice.id}
+                                  type="button"
+                                  onClick={() => selectInvoice(invoice.id)}
+                                  className={`flex w-full items-center justify-between gap-4 rounded-xl px-3 py-3 text-left text-sm transition ${selectedInvoiceId === invoice.id ? "bg-white/10 text-white" : "text-white/85 hover:bg-white/10 hover:text-white"}`}
+                                >
+                                  <div>
+                                    <div className="font-semibold">{invoice.docNo}</div>
+                                    <div className="mt-1 text-xs text-white/45">{invoice.customerName} • {formatDate(invoice.docDate)}</div>
+                                  </div>
+                                  <div className="text-right font-semibold">{invoice.currency || "MYR"} {money(invoice.grandTotal)}</div>
+                                </button>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {!selectedCustomerId ? <div className="mt-4 rounded-2xl border border-white/10 px-4 py-6 text-sm text-white/45">Please select customer first.</div> : null}
+                    </div>
+                  </div>
+
+                  <div className="rounded-[1.5rem] border border-white/10 p-5">
+                    <p className="text-xs font-bold uppercase tracking-[0.24em] text-white/40">Billing Address</p>
+                    <p className="mt-3 text-sm text-white/55">Billing address used for this Debit Note.</p>
+                    <div className="mt-5 grid gap-4 md:grid-cols-2">
+                      <div>
+                        <label className="label-rk">Billing Address Line 1</label>
+                        <input className="input-rk" value={selectedInvoice?.billingAddressLine1 || ""} readOnly disabled />
+                      </div>
+                      <div>
+                        <label className="label-rk">Billing Address Line 2</label>
+                        <input className="input-rk" value={selectedInvoice?.billingAddressLine2 || ""} readOnly disabled />
+                      </div>
+                      <div>
+                        <label className="label-rk">Billing Address Line 3</label>
+                        <input className="input-rk" value={selectedInvoice?.billingAddressLine3 || ""} readOnly disabled />
+                      </div>
+                      <div>
+                        <label className="label-rk">Billing Address Line 4</label>
+                        <input className="input-rk" value={selectedInvoice?.billingAddressLine4 || ""} readOnly disabled />
+                      </div>
+                      <div>
+                        <label className="label-rk">City</label>
+                        <input className="input-rk" value={selectedInvoice?.billingCity || ""} readOnly disabled />
+                      </div>
+                      <div>
+                        <label className="label-rk">Post Code</label>
+                        <input className="input-rk" value={selectedInvoice?.billingPostCode || ""} readOnly disabled />
+                      </div>
+                      <div>
+                        <label className="label-rk">Country Code</label>
+                        <input className="input-rk" value={selectedInvoice?.billingCountryCode || ""} readOnly disabled />
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             ) : null}
 
             {activeTab === "BODY" ? (
-              <div className="mt-8 space-y-5">
+              <div className="mt-8 space-y-6">
                 {!selectedInvoice ? <div className="rounded-2xl border border-white/10 px-4 py-6 text-sm text-white/45">Please select customer and source Sales Invoice in Header first.</div> : null}
-                <div className="flex justify-end"><button type="button" onClick={addLine} className="rounded-xl border border-white/15 px-4 py-2 text-sm text-white/75 hover:bg-white/10">+ Add Line</button></div>
-                <div className="space-y-4">
+
+                <div className="space-y-5">
                   {lines.map((line, index) => {
                     const product = initialProducts.find((item) => item.id === line.inventoryProductId);
                     const uomOptions = [product?.baseUom, ...(product?.uomConversions || []).map((item) => item.uomCode)].filter(Boolean) as string[];
@@ -635,26 +760,110 @@ export function AdminDebitNoteClient({ initialProducts, initialLocations, defaul
                     const availableBatches = batchOptions[batchKey(line)] || [];
                     const availableSerials = serialOptions[serialKey(line)] || [];
                     return (
-                      <div key={line.key} className="rounded-[1.5rem] border border-white/10 p-4">
-                        <div className="mb-4 flex items-center justify-between"><h3 className="font-bold text-white">Line {index + 1}</h3>{lines.length > 1 ? <button type="button" onClick={() => removeLine(line.key)} className="rounded-xl border border-red-500/30 px-3 py-2 text-xs text-red-100 hover:bg-red-500/10">Remove</button> : null}</div>
-                        <div className="grid gap-4 md:grid-cols-4">
-                          <SearchableSelect label="Product" placeholder="Select product" options={productOptions} value={line.inventoryProductId} onChange={(option) => selectProduct(line.key, option?.id || "")} />
-                          <div><label className="label-rk">UOM</label><select className="input-rk" value={line.uom} onChange={(e) => patchLine(line.key, { uom: e.target.value })}>{uomOptions.length === 0 ? <option value="">-</option> : uomOptions.map((uom) => <option key={uom} value={uom}>{uom}</option>)}</select></div>
-                          <div><label className="label-rk">Qty</label><input type="number" min="0" className="input-rk text-right" value={line.qty} onChange={(e) => patchLine(line.key, { qty: e.target.value })} /></div>
-                          <div><label className="label-rk">Selling Price</label><input type="number" min="0" className="input-rk text-right" value={line.unitPrice} onChange={(e) => patchLine(line.key, { unitPrice: e.target.value })} /></div>
+                      <div key={line.key} className="rounded-[1.5rem] border border-white/10 p-5">
+                        <div className="mb-6 flex items-center justify-between">
+                          <h3 className="text-xl font-bold text-white">Product {index + 1}</h3>
+                          {lines.length > 1 ? <button type="button" onClick={() => removeLine(line.key)} className="rounded-xl border border-red-500/30 px-4 py-2 text-xs text-red-100 hover:bg-red-500/10">Remove</button> : null}
                         </div>
-                        <div className="mt-4 grid gap-4 md:grid-cols-4">
-                          <div><label className="label-rk">Discount Type</label><select className="input-rk" value={line.discountType} onChange={(e) => patchLine(line.key, { discountType: e.target.value === "AMOUNT" ? "AMOUNT" : "PERCENT" })}><option value="PERCENT">Percent (%)</option><option value="AMOUNT">Amount</option></select></div>
-                          <div><label className="label-rk">Discount</label><input type="number" min="0" className="input-rk text-right" value={line.discountRate} onChange={(e) => patchLine(line.key, { discountRate: e.target.value })} /></div>
-                          <div><label className="label-rk">Tax Code</label><select className="input-rk" value={line.taxCodeId} onChange={(e) => patchLine(line.key, { taxCodeId: e.target.value })}><option value="">No Tax</option>{initialTaxCodes.map((taxCode) => <option key={taxCode.id} value={taxCode.id}>{taxCode.code} — {Number(taxCode.rate || 0)}%</option>)}</select></div>
-                          <SearchableSelect label="Location" placeholder="Select location" options={locationOptions} value={line.locationId} onChange={(option) => patchLine(line.key, { locationId: option?.id || "", batchNo: "", serialNos: [] })} />
+
+                        <div className="grid gap-5 md:grid-cols-4">
+                          <div className="md:col-span-2">
+                            <SearchableSelect label="Product" placeholder="Search or select product" options={productOptions} value={line.inventoryProductId} onChange={(option) => selectProduct(line.key, option?.id || "")} />
+                          </div>
+                          <div>
+                            <label className="label-rk">UOM</label>
+                            <select className="input-rk" value={line.uom} onChange={(e) => patchLine(line.key, { uom: e.target.value })}>
+                              {uomOptions.length === 0 ? <option value="">Select UOM</option> : uomOptions.map((uom) => <option key={uom} value={uom}>{uom}</option>)}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="label-rk">Qty</label>
+                            <input type="number" min="0" className="input-rk text-right" value={line.qty} onChange={(e) => patchLine(line.key, { qty: e.target.value })} />
+                          </div>
                         </div>
-                        {line.itemType === "STOCK_ITEM" && line.trackInventory ? <div className="mt-4 grid gap-4 md:grid-cols-2"><div><label className="label-rk">Batch No {line.batchTracking ? <span className="text-rk-red">*</span> : null}</label><div className="flex gap-2"><input className="input-rk" value={line.batchNo} onChange={(e) => patchLine(line.key, { batchNo: e.target.value, serialNos: [] })} placeholder="Enter or select batch" /><button type="button" onClick={() => loadBatches(line)} className="rounded-xl border border-white/15 px-4 text-sm text-white/75 hover:bg-white/10">Load</button></div>{availableBatches.length > 0 ? <div className="mt-2 flex flex-wrap gap-2">{availableBatches.map((batch) => <button key={batch.id} type="button" onClick={() => patchLine(line.key, { batchNo: batch.batchNo, serialNos: [] })} className="rounded-lg border border-white/10 px-3 py-1 text-xs text-white/70 hover:bg-white/10">{batch.batchNo}{batch.balance != null ? ` (${batch.balance})` : ""}</button>)}</div> : null}</div>{line.serialNumberTracking ? <div><label className="label-rk">Serial No <span className="text-rk-red">*</span></label><div className="flex gap-2"><input className="input-rk" value={line.serialSearch} onChange={(e) => patchLine(line.key, { serialSearch: e.target.value })} placeholder="Search serial" /><button type="button" onClick={() => loadSerials(line)} className="rounded-xl border border-white/15 px-4 text-sm text-white/75 hover:bg-white/10">Load</button></div><div className="mt-2 text-xs text-white/45">Selected: {line.serialNos.length ? line.serialNos.join(", ") : "-"}</div>{availableSerials.length > 0 ? <div className="mt-2 max-h-32 overflow-y-auto rounded-xl border border-white/10 p-2">{availableSerials.map((serial) => <button key={serial.id} type="button" onClick={() => toggleSerial(line, serial.serialNo)} className={`mb-1 mr-1 rounded-lg border px-3 py-1 text-xs ${line.serialNos.includes(serial.serialNo) ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200" : "border-white/10 text-white/70 hover:bg-white/10"}`}>{serial.serialNo}</button>)}</div> : null}</div> : null}</div> : null}
-                        <div className="mt-4 grid gap-4 md:grid-cols-[1fr_280px]"><div><label className="label-rk">Remarks</label><input className="input-rk" value={line.remarks} onChange={(e) => patchLine(line.key, { remarks: e.target.value })} /></div><div className="rounded-2xl border border-white/10 p-4 text-right"><div className="text-xs text-white/45">Gross Amount</div><div className="mt-2 text-xl font-bold text-white">{money(calculated.lineTotal)}</div></div></div>
+
+                        <div className="mt-5 grid gap-5 md:grid-cols-[1fr_150px_120px_2fr]">
+                          <div>
+                            <label className="label-rk">Selling Price</label>
+                            <input type="number" min="0" className="input-rk text-right" value={line.unitPrice} onChange={(e) => patchLine(line.key, { unitPrice: e.target.value })} />
+                          </div>
+                          <div>
+                            <label className="label-rk">Discount</label>
+                            <input type="number" min="0" className="input-rk text-right" value={line.discountRate} onChange={(e) => patchLine(line.key, { discountRate: e.target.value })} />
+                          </div>
+                          <div>
+                            <label className="label-rk">&nbsp;</label>
+                            <select className="input-rk" value={line.discountType === "AMOUNT" ? "AMOUNT" : "PERCENT"} onChange={(e) => patchLine(line.key, { discountType: e.target.value === "AMOUNT" ? "AMOUNT" : "PERCENT" })}>
+                              <option value="PERCENT">%</option>
+                              <option value="AMOUNT">Amount</option>
+                            </select>
+                          </div>
+                          <div>
+                            <SearchableSelect label="Location" placeholder="Select location" options={locationOptions} value={line.locationId} onChange={(option) => patchLine(line.key, { locationId: option?.id || "", batchNo: "", serialNos: [] })} />
+                            <p className="mt-2 text-xs text-white/45">Select product and location before loading batch / serial no.</p>
+                          </div>
+                        </div>
+
+                        {line.itemType === "STOCK_ITEM" && line.trackInventory ? (
+                          <div className="mt-5 grid gap-5 md:grid-cols-2">
+                            <div>
+                              <label className="label-rk">Batch No {line.batchTracking ? <span className="text-rk-red">*</span> : null}</label>
+                              <div className="flex gap-2">
+                                <input className="input-rk" value={line.batchNo} onChange={(e) => patchLine(line.key, { batchNo: e.target.value, serialNos: [] })} placeholder="Enter or select batch" />
+                                <button type="button" onClick={() => loadBatches(line)} className="rounded-xl border border-white/15 px-4 text-sm text-white/75 hover:bg-white/10">Load</button>
+                              </div>
+                              {availableBatches.length > 0 ? (
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                  {availableBatches.map((batch) => <button key={batch.id} type="button" onClick={() => patchLine(line.key, { batchNo: batch.batchNo, serialNos: [] })} className="rounded-lg border border-white/10 px-3 py-1 text-xs text-white/70 hover:bg-white/10">{batch.batchNo}{batch.balance != null ? ` (${batch.balance})` : ""}</button>)}
+                                </div>
+                              ) : null}
+                            </div>
+                            {line.serialNumberTracking ? (
+                              <div>
+                                <label className="label-rk">Serial No <span className="text-rk-red">*</span></label>
+                                <div className="flex gap-2">
+                                  <input className="input-rk" value={line.serialSearch} onChange={(e) => patchLine(line.key, { serialSearch: e.target.value })} placeholder="Search serial" />
+                                  <button type="button" onClick={() => loadSerials(line)} className="rounded-xl border border-white/15 px-4 text-sm text-white/75 hover:bg-white/10">Load</button>
+                                </div>
+                                <div className="mt-2 text-xs text-white/45">Selected: {line.serialNos.length ? line.serialNos.join(", ") : "-"}</div>
+                                {availableSerials.length > 0 ? (
+                                  <div className="mt-2 max-h-32 overflow-y-auto rounded-xl border border-white/10 p-2">
+                                    {availableSerials.map((serial) => <button key={serial.id} type="button" onClick={() => toggleSerial(line, serial.serialNo)} className={`mb-1 mr-1 rounded-lg border px-3 py-1 text-xs ${line.serialNos.includes(serial.serialNo) ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200" : "border-white/10 text-white/70 hover:bg-white/10"}`}>{serial.serialNo}</button>)}
+                                  </div>
+                                ) : null}
+                              </div>
+                            ) : null}
+                          </div>
+                        ) : null}
+
+                        <div className="mt-5 grid gap-5 md:grid-cols-4">
+                          <div>
+                            <label className="label-rk">Tax Code</label>
+                            <select className="input-rk" value={line.taxCodeId} onChange={(e) => patchLine(line.key, { taxCodeId: e.target.value })}>
+                              <option value="">No Tax</option>
+                              {initialTaxCodes.map((taxCode) => <option key={taxCode.id} value={taxCode.id}>{taxCode.code} — {Number(taxCode.rate || 0)}%</option>)}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="label-rk">Tax Amount</label>
+                            <input className="input-rk text-right" value={money(calculated.taxAmount)} readOnly disabled />
+                          </div>
+                          <div>
+                            <label className="label-rk">Gross Amount</label>
+                            <input className="input-rk text-right" value={money(calculated.lineTotal)} readOnly disabled />
+                          </div>
+                        </div>
+
+                        <div className="mt-5">
+                          <label className="label-rk">Product Remarks</label>
+                          <textarea className="input-rk min-h-[90px] resize-y" value={line.remarks} onChange={(e) => patchLine(line.key, { remarks: e.target.value })} />
+                        </div>
                       </div>
                     );
                   })}
                 </div>
+
+                <button type="button" onClick={addLine} className="rounded-xl border border-white/15 px-5 py-3 text-sm text-white/75 hover:bg-white/10">+ Add Product</button>
               </div>
             ) : null}
 
