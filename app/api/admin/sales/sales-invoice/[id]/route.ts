@@ -339,6 +339,7 @@ type DirectSalesInvoiceLinePayload = {
   locationId?: string | null;
   batchNo?: string | null;
   serialNos?: string[] | null;
+  taxCodeId?: string | null;
   remarks?: string | null;
 };
 
