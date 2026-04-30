@@ -3,6 +3,8 @@ import { getSessionUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { AdminMasterListClient } from "@/components/admin-master-list-client";
 
+const PAGE_SIZE = 10;
+
 export default async function AdminDepartmentsPage() {
   const user = await getSessionUser();
   if (!user) redirect("/login");
@@ -41,6 +43,12 @@ export default async function AdminDepartmentsPage() {
               groupId: item.projectId,
               groupLabel: `${item.project.code} — ${item.project.name}`,
             }))}
+            initialPagination={{
+              page: 1,
+              pageSize: PAGE_SIZE,
+              total: items.length,
+              totalPages: Math.max(1, Math.ceil(items.length / PAGE_SIZE)),
+            }}
           />
         </div>
       </div>
