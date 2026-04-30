@@ -3,14 +3,18 @@ import { getSessionUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { AdminMasterListClient } from "@/components/admin-master-list-client";
 
+const PAGE_SIZE = 10;
+
 export default async function AdminProductSubGroupsPage() {
   const user = await getSessionUser();
   if (!user) redirect("/login");
   if (user.role !== "ADMIN") redirect("/dashboard");
 
-  const [items, groups] = await Promise.all([
+  const [total, items, groups] = await Promise.all([
+    db.productSubGroup.count(),
     db.productSubGroup.findMany({
       orderBy: [{ isActive: "desc" }, { code: "asc" }],
+      take: PAGE_SIZE,
       include: {
         group: {
           select: {
@@ -55,6 +59,12 @@ export default async function AdminProductSubGroupsPage() {
               groupId: item.groupId,
               groupLabel: `${item.group.code} — ${item.group.name}`,
             }))}
+            initialPagination={{
+              page: 1,
+              pageSize: PAGE_SIZE,
+              total,
+              totalPages: Math.max(1, Math.ceil(total / PAGE_SIZE)),
+            }}
           />
         </div>
       </div>

@@ -4,12 +4,14 @@ import { useEffect, useMemo, useState } from "react";
 
 type Item = { id: string; code: string; name: string; isActive: boolean; groupId?: string; groupLabel?: string | null };
 type GroupOption = { id: string; code: string; name: string; isActive: boolean };
+type PaginationInfo = { page: number; pageSize: number; total: number; totalPages: number };
 
 type Props = {
   title: string;
   subtitle: string;
   apiBase: string;
   initialItems: Item[];
+  initialPagination: PaginationInfo;
   requireGroup?: boolean;
   groups?: GroupOption[];
   groupLabelTitle?: string;
@@ -20,17 +22,21 @@ function sortItemsByCode(items: Item[]) {
   return [...items].sort((a, b) => a.code.localeCompare(b.code));
 }
 
+const EMPTY_PAGINATION: PaginationInfo = { page: 1, pageSize: 10, total: 0, totalPages: 1 };
+
 export function AdminMasterListClient({
   title,
   subtitle,
   apiBase,
   initialItems,
+  initialPagination,
   requireGroup = false,
   groups = [],
   groupLabelTitle = "Group",
   groupPlaceholder = "Select group",
 }: Props) {
   const [items, setItems] = useState(sortItemsByCode(initialItems));
+  const [pagination, setPagination] = useState<PaginationInfo>(initialPagination || EMPTY_PAGINATION);
   const [keyword, setKeyword] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
@@ -41,33 +47,90 @@ export function AdminMasterListClient({
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [isSaving, setIsSaving] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 10;
+  const [isLoadingItems, setIsLoadingItems] = useState(false);
+  const [currentPage, setCurrentPage] = useState(initialPagination?.page || 1);
 
-  const filteredItems = useMemo(() => {
-    const q = keyword.trim().toLowerCase();
-    return items.filter((item) => !q || item.code.toLowerCase().includes(q) || item.name.toLowerCase().includes(q) || (item.groupLabel || "").toLowerCase().includes(q));
-  }, [items, keyword]);
+  const totalPages = Math.max(1, pagination.totalPages || 1);
 
-  const totalPages = Math.max(1, Math.ceil(filteredItems.length / pageSize));
-  const paginatedItems = useMemo(() => filteredItems.slice((currentPage - 1) * pageSize, currentPage * pageSize), [filteredItems, currentPage]);
+  async function loadItems(page = currentPage) {
+    setIsLoadingItems(true);
+    try {
+      const params = new URLSearchParams({ page: String(page) });
+      if (keyword.trim()) params.set("q", keyword.trim());
 
-  useEffect(() => { setCurrentPage(1); }, [keyword]);
-  useEffect(() => { if (currentPage > totalPages) setCurrentPage(totalPages); }, [currentPage, totalPages]);
+      const response = await fetch(`${apiBase}?${params.toString()}`, { cache: "no-store" });
+      const data = await response.json();
+
+      if (!response.ok || !data.ok) {
+        setItems([]);
+        setPagination({ page, pageSize: 10, total: 0, totalPages: 1 });
+        return;
+      }
+
+      const nextItems = Array.isArray(data.items) ? sortItemsByCode(data.items) : [];
+      const nextPagination = data.pagination || { page, pageSize: 10, total: nextItems.length, totalPages: 1 };
+      setItems(nextItems);
+      setPagination(nextPagination);
+
+      if (page > nextPagination.totalPages) {
+        setCurrentPage(Math.max(1, nextPagination.totalPages));
+      }
+    } catch {
+      setItems([]);
+      setPagination({ page, pageSize: 10, total: 0, totalPages: 1 });
+    } finally {
+      setIsLoadingItems(false);
+    }
+  }
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [keyword]);
+
+  useEffect(() => {
+    void loadItems(currentPage);
+  }, [currentPage, keyword]);
+
+  const activeGroups = useMemo(() => groups.filter((item) => item.isActive), [groups]);
 
   function openCreate() {
-    setEditingId(null); setCode(""); setName(""); setGroupId(""); setIsActive(true); setError(""); setSuccess(""); setIsOpen(true);
+    setEditingId(null);
+    setCode("");
+    setName("");
+    setGroupId("");
+    setIsActive(true);
+    setError("");
+    setSuccess("");
+    setIsOpen(true);
   }
+
   function openEdit(item: Item) {
-    setEditingId(item.id); setCode(item.code); setName(item.name); setGroupId(item.groupId || ""); setIsActive(item.isActive); setError(""); setSuccess(""); setIsOpen(true);
+    setEditingId(item.id);
+    setCode(item.code);
+    setName(item.name);
+    setGroupId(item.groupId || "");
+    setIsActive(item.isActive);
+    setError("");
+    setSuccess("");
+    setIsOpen(true);
   }
+
   function closeModal() {
-    setIsOpen(false); setEditingId(null); setCode(""); setName(""); setGroupId(""); setIsActive(true); setError("");
+    setIsOpen(false);
+    setEditingId(null);
+    setCode("");
+    setName("");
+    setGroupId("");
+    setIsActive(true);
+    setError("");
   }
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
-    setIsSaving(true); setError(""); setSuccess("");
+    setIsSaving(true);
+    setError("");
+    setSuccess("");
+
     try {
       const response = await fetch(editingId ? `${apiBase}/${editingId}` : apiBase, {
         method: editingId ? "PATCH" : "POST",
@@ -79,10 +142,15 @@ export function AdminMasterListClient({
         setError(data.error || "Unable to save record.");
         return;
       }
-      const saved = data.item as Item;
-      setItems((prev) => sortItemsByCode(editingId ? prev.map((item) => item.id === saved.id ? saved : item) : [...prev, saved]));
+
       closeModal();
       setSuccess(editingId ? "Updated successfully." : "Created successfully.");
+      if (!editingId) {
+        setCurrentPage(1);
+        await loadItems(1);
+      } else {
+        await loadItems(currentPage);
+      }
     } catch {
       setError("Unable to save record right now.");
     } finally {
@@ -92,7 +160,9 @@ export function AdminMasterListClient({
 
   async function handleDelete(item: Item) {
     if (!window.confirm(`Delete ${item.code}?`)) return;
-    setError(""); setSuccess("");
+    setError("");
+    setSuccess("");
+
     try {
       const response = await fetch(`${apiBase}/${item.id}`, { method: "DELETE" });
       const data = await response.json();
@@ -100,8 +170,8 @@ export function AdminMasterListClient({
         setError(data.error || "Unable to delete record.");
         return;
       }
-      setItems((prev) => sortItemsByCode(prev.filter((row) => row.id !== item.id)));
       setSuccess("Deleted successfully.");
+      await loadItems(currentPage);
     } catch {
       setError("Unable to delete record right now.");
     }
@@ -140,9 +210,11 @@ export function AdminMasterListClient({
               </tr>
             </thead>
             <tbody className="divide-y divide-white/10">
-              {filteredItems.length === 0 ? (
+              {isLoadingItems ? (
+                <tr><td colSpan={requireGroup ? 5 : 4} className="px-3 py-8 text-center text-white/50">Loading records...</td></tr>
+              ) : items.length === 0 ? (
                 <tr><td colSpan={requireGroup ? 5 : 4} className="px-3 py-8 text-center text-white/50">No records found.</td></tr>
-              ) : paginatedItems.map((item) => (
+              ) : items.map((item) => (
                 <tr key={item.id}>
                   <td className="px-3 py-4 font-semibold text-white">{item.code}</td>
                   <td className="px-3 py-4 text-white/80">{item.name}</td>
@@ -157,6 +229,35 @@ export function AdminMasterListClient({
             </tbody>
           </table>
         </div>
+
+        {pagination.total > 0 ? (
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4">
+            <div className="text-sm text-white/55">
+              Showing {(pagination.page - 1) * pagination.pageSize + 1}–{Math.min(pagination.page * pagination.pageSize, pagination.total)} of {pagination.total} records
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/80 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Prev
+              </button>
+              <div className="rounded-xl border border-white/10 bg-black/20 px-4 py-2 text-sm text-white/80">
+                Page {currentPage} / {totalPages}
+              </div>
+              <button
+                type="button"
+                onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                disabled={currentPage >= totalPages}
+                className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/80 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {isOpen ? (
@@ -177,7 +278,7 @@ export function AdminMasterListClient({
                   <div className="relative">
                     <select className="input-rk appearance-none pr-12" value={groupId} onChange={(e) => setGroupId(e.target.value)} required>
                       <option value="">{groupPlaceholder}</option>
-                      {groups.filter((item) => item.isActive).map((group) => (
+                      {activeGroups.map((group) => (
                         <option key={group.id} value={group.id}>{group.code} — {group.name}</option>
                       ))}
                     </select>

@@ -3,14 +3,20 @@ import { getSessionUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { AdminMasterListClient } from "@/components/admin-master-list-client";
 
+const PAGE_SIZE = 10;
+
 export default async function AdminBrandsPage() {
   const user = await getSessionUser();
   if (!user) redirect("/login");
   if (user.role !== "ADMIN") redirect("/dashboard");
 
-  const items = await db.productBrand.findMany({
-    orderBy: [{ isActive: "desc" }, { code: "asc" }],
-  });
+  const [total, items] = await Promise.all([
+    db.productBrand.count(),
+    db.productBrand.findMany({
+      orderBy: [{ isActive: "desc" }, { code: "asc" }],
+      take: PAGE_SIZE,
+    }),
+  ]);
 
   return (
     <section className="section-pad">
@@ -31,6 +37,12 @@ export default async function AdminBrandsPage() {
               name: item.name,
               isActive: item.isActive,
             }))}
+            initialPagination={{
+              page: 1,
+              pageSize: PAGE_SIZE,
+              total,
+              totalPages: Math.max(1, Math.ceil(total / PAGE_SIZE)),
+            }}
           />
         </div>
       </div>
