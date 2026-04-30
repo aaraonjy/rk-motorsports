@@ -113,6 +113,7 @@ type Props = {
   initialLocations: StockLocationOption[];
   defaultLocationId: string;
   initialTaxCodes: TaxCodeOption[];
+  defaultAdminTaxCodeId?: string | null;
   initialAgents: AgentOption[];
   initialProjects: ProjectOption[];
   initialDepartments: DepartmentOption[];
@@ -233,7 +234,7 @@ function SearchableSelect({ label, placeholder, options, value, disabled = false
   );
 }
 
-export function AdminDebitNoteClient({ initialProducts, initialLocations, defaultLocationId, initialTaxCodes, initialAgents, initialProjects, initialDepartments }: Props) {
+export function AdminDebitNoteClient({ initialProducts, initialLocations, defaultLocationId, initialTaxCodes, defaultAdminTaxCodeId, initialAgents, initialProjects, initialDepartments }: Props) {
   const router = useRouter();
   const [transactions, setTransactions] = useState<DebitNoteRecord[]>([]);
   const [sourceInvoices, setSourceInvoices] = useState<SourceInvoice[]>([]);
@@ -265,7 +266,7 @@ export function AdminDebitNoteClient({ initialProducts, initialLocations, defaul
   const [batchOptions, setBatchOptions] = useState<Record<string, AvailableBatch[]>>({});
   const [serialOptions, setSerialOptions] = useState<Record<string, AvailableSerial[]>>({});
 
-  const defaultTaxCodeId = initialTaxCodes[0]?.id || "";
+  const defaultTaxCodeId = defaultAdminTaxCodeId || "";
   const selectedInvoice = useMemo(() => sourceInvoices.find((item) => item.id === selectedInvoiceId) || null, [sourceInvoices, selectedInvoiceId]);
 
   const customerOptions = useMemo(() => {
@@ -767,10 +768,13 @@ export function AdminDebitNoteClient({ initialProducts, initialLocations, defaul
                           <label className="label-rk">Discount</label>
                           <div className="grid grid-cols-[minmax(0,1fr)_120px] gap-3">
                             <input className="input-rk" type="number" min="0" value={line.discountRate} onChange={(e) => patchLine(line.key, { discountRate: e.target.value })} />
-                            <select className="input-rk" value={line.discountType === "AMOUNT" ? "AMOUNT" : "PERCENT"} onChange={(e) => patchLine(line.key, { discountType: e.target.value === "AMOUNT" ? "AMOUNT" : "PERCENT" })}>
-                              <option value="PERCENT">%</option>
-                              <option value="AMOUNT">RM</option>
-                            </select>
+                            <div className="relative">
+                              <select className="input-rk w-full appearance-none pr-12" value={line.discountType === "AMOUNT" ? "AMOUNT" : "PERCENT"} onChange={(e) => patchLine(line.key, { discountType: e.target.value === "AMOUNT" ? "AMOUNT" : "PERCENT" })}>
+                                <option value="PERCENT">%</option>
+                                <option value="AMOUNT">RM</option>
+                              </select>
+                              <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-xs text-white/60">▾</span>
+                            </div>
                           </div>
                         </div>
 
@@ -812,10 +816,13 @@ export function AdminDebitNoteClient({ initialProducts, initialLocations, defaul
 
                         <div>
                           <label className="label-rk">Tax Code</label>
-                          <select className="input-rk" value={line.taxCodeId} onChange={(e) => patchLine(line.key, { taxCodeId: e.target.value })}>
-                            <option value="">No Tax</option>
-                            {initialTaxCodes.map((taxCode) => <option key={taxCode.id} value={taxCode.id}>{taxCode.code} — {Number(taxCode.rate || 0)}%</option>)}
-                          </select>
+                          <div className="relative">
+                            <select className="input-rk w-full appearance-none pr-12" value={line.taxCodeId} onChange={(e) => patchLine(line.key, { taxCodeId: e.target.value })}>
+                              <option value="">No Tax</option>
+                              {initialTaxCodes.map((taxCode) => <option key={taxCode.id} value={taxCode.id}>{taxCode.code} — {Number(taxCode.rate || 0)}%</option>)}
+                            </select>
+                            <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-xs text-white/60">▾</span>
+                          </div>
                         </div>
 
                         <div>

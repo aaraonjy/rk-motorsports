@@ -9,7 +9,7 @@ export default async function AdminDebitNotePage() {
   if (!user) redirect("/login");
   if (user.role !== "ADMIN") redirect("/dashboard");
 
-  const [products, locations, stockConfig, taxCodes, agents, projects, departments] = await Promise.all([
+  const [products, locations, stockConfig, taxConfig, taxCodes, agents, projects, departments] = await Promise.all([
     db.inventoryProduct.findMany({
       where: {
         isActive: true,
@@ -43,6 +43,7 @@ export default async function AdminDebitNotePage() {
       select: { id: true, code: true, name: true, isActive: true },
     }),
     db.stockConfiguration.findUnique({ where: { id: "default" } }),
+    db.taxConfiguration.findUnique({ where: { id: "default" } }),
     db.taxCode.findMany({
       where: { isActive: true },
       orderBy: [{ sortOrder: "asc" }, { code: "asc" }],
@@ -83,6 +84,7 @@ export default async function AdminDebitNotePage() {
             rate: Number(taxCode.rate ?? 0),
             calculationMethod: taxCode.calculationMethod,
           }))}
+          defaultAdminTaxCodeId={taxConfig?.defaultAdminTaxCodeId || ""}
           initialAgents={agents}
           initialProjects={projects}
           initialDepartments={departments}
