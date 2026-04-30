@@ -158,7 +158,7 @@ function calculateSalesPaymentSummary(
 
 function getSalesInvoiceStatusForPayment(grandTotal: Prisma.Decimal | number | string, totalPaid: number, totalCredited = 0, totalDebited = 0) { const adjustedTotal = Math.max(0, Math.round((toNumber(grandTotal) - totalCredited + totalDebited + Number.EPSILON) * 100) / 100); if (adjustedTotal <= 0 || totalPaid >= adjustedTotal) return "COMPLETED" as SalesTransactionStatus; return "OPEN" as SalesTransactionStatus; }
 function withPaymentSummary<T extends Record<string, any>>(transaction: T) { const payments = Array.isArray(transaction.payments) ? transaction.payments : []; const lines = Array.isArray(transaction.lines) ? transaction.lines : []; const sourceLinks = Array.isArray(transaction.sourceLinks) ? transaction.sourceLinks : []; const summary = calculateSalesPaymentSummary(payments, transaction.grandTotal, lines, sourceLinks); return { ...transaction, payments, totalPaid: summary.totalPaid, totalCredited: summary.totalCredited, totalDebited: summary.totalDebited, adjustedGrandTotal: summary.adjustedGrandTotal, outstandingBalance: summary.outstandingBalance, paymentStatus: summary.paymentStatus }; }
-function validatePaymentAmount(paymentAmount: number, grandTotal: Prisma.Decimal | number | string, existingPaid = 0, totalCredited = 0, totalDebited = 0) { const adjustedTotal = Math.max(0, Math.round((toNumber(grandTotal) - totalCredited + totalDebited + Number.EPSILON) * 100) / 100); const outstanding = Math.max(0, Math.round((adjustedTotal - existingPaid + Number.EPSILON) * 100) / 100); if (paymentAmount > outstanding) throw new Error("Payment amount cannot exceed the outstanding balance."); }
+function validatePaymentAmount(paymentAmount: number, grandTotal: Prisma.Decimal | number | string, existingPaid = 0, totalCredited = 0, totalDebited = 0) { const adjustedTotal = Math.max(0, Math.round((toNumber(grandTotal) - totalCredited + totalDebited + Number.EPSILON) * 100) / 100); const outstanding = Math.max(0, Math.round((adjustedTotal - existingPaid + Number.EPSILON) * 100) / 100); if (paymentAmount - outstanding > 0.005) throw new Error("Payment amount cannot exceed the outstanding balance."); }
 async function createSalesTransactionPaymentIfNeeded(tx: Prisma.TransactionClient, transactionId: string, adminId: string, paymentInput: { amount: number; paymentMode: string; paymentDate: Date }) { if (paymentInput.amount <= 0) return null; return tx.salesTransactionPayment.create({ data: { salesTransactionId: transactionId, paymentDate: paymentInput.paymentDate, paymentMode: paymentInput.paymentMode, amount: new Prisma.Decimal(paymentInput.amount.toFixed(2)), createdByAdminId: adminId } }); }
 
 
@@ -1153,6 +1153,8 @@ export async function PATCH(req: Request, context: Params) {
       }
 
       const paymentInput = getPaymentInput(body);
+      const existingTotalPaid = (current.payments || []).reduce((sum, payment) => sum + toNumber(payment.amount), 0);
+      const adjustmentSummary = calculateSalesAdjustmentSummary(current.lines || [], current.sourceLinks || []);
       const isGeneratedFromSource = hasSalesOrderSource(current);
 
       if (isGeneratedFromSource) {
@@ -1160,8 +1162,6 @@ export async function PATCH(req: Request, context: Params) {
           throw new Error("Sales Invoice generated from source document cannot be revised. Please cancel this Sales Invoice and generate a new Sales Invoice from the original source document.");
         }
 
-        const existingTotalPaid = (current.payments || []).reduce((sum, payment) => sum + toNumber(payment.amount), 0);
-        const adjustmentSummary = calculateSalesAdjustmentSummary(current.lines || [], current.sourceLinks || []);
         validatePaymentAmount(paymentInput.amount, current.grandTotal, existingTotalPaid, adjustmentSummary.totalCredited, adjustmentSummary.totalDebited);
         await createSalesTransactionPaymentIfNeeded(tx, current.id, admin.id, paymentInput);
 
@@ -1182,16 +1182,19 @@ export async function PATCH(req: Request, context: Params) {
       }
 
       const data = await buildDirectSalesInvoiceData(body, tx);
-      await reverseStockIssueForSalesInvoice(tx, current, admin.id, action === "revise" ? "Revised Sales Invoice" : "Edited Sales Invoice");
 
       if (action === "edit") {
+        const nextTotalPaid = Math.round((existingTotalPaid + paymentInput.amount + Number.EPSILON) * 100) / 100;
+        validatePaymentAmount(paymentInput.amount, data.grandTotal, existingTotalPaid, adjustmentSummary.totalCredited, adjustmentSummary.totalDebited);
+
+        await reverseStockIssueForSalesInvoice(tx, current, admin.id, "Edited Sales Invoice");
         await tx.salesTransactionLine.deleteMany({ where: { transactionId: current.id } });
         const updated = await tx.salesTransaction.update({
           where: { id: current.id },
           data: {
             ...buildSalesUpdateData(data, body, admin.id),
             docNo: current.docNo,
-            status: getSalesInvoiceStatusForPayment(data.grandTotal, Math.round(((current.payments || []).reduce((sum, payment) => sum + toNumber(payment.amount), 0) + paymentInput.amount + Number.EPSILON) * 100) / 100),
+            status: getSalesInvoiceStatusForPayment(data.grandTotal, nextTotalPaid, adjustmentSummary.totalCredited, adjustmentSummary.totalDebited),
             cancelledAt: null,
             cancelledByAdminId: null,
             cancelReason: null,
@@ -1200,13 +1203,13 @@ export async function PATCH(req: Request, context: Params) {
           include: { lines: true, payments: { orderBy: [{ paymentDate: "asc" }, { createdAt: "asc" }], include: { createdByAdmin: { select: { id: true, name: true, email: true } } } } },
         });
 
-        const existingTotalPaid = (current.payments || []).reduce((sum, payment) => sum + toNumber(payment.amount), 0);
-        validatePaymentAmount(paymentInput.amount, data.grandTotal, existingTotalPaid);
         await createStockIssueForDirectSalesInvoice(tx, admin.id, updated, data.lines, body);
         await createSalesTransactionPaymentIfNeeded(tx, updated.id, admin.id, paymentInput);
         const withPayments = await tx.salesTransaction.findUnique({ where: { id: updated.id }, include: { lines: true, payments: { orderBy: [{ paymentDate: "asc" }, { createdAt: "asc" }], include: { createdByAdmin: { select: { id: true, name: true, email: true } } } } } });
         return { transaction: withPayments || updated, auditAction: "UPDATE" as const, description: `Updated Sales Invoice ${updated.docNo}.` };
       }
+
+      await reverseStockIssueForSalesInvoice(tx, current, admin.id, "Revised Sales Invoice");
 
       const nextDocNo = await generateSalesInvoiceRevisionNo(tx, current);
       const revised = await tx.salesTransaction.create({
