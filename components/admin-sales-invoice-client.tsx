@@ -133,6 +133,8 @@ type SourceSalesOrderRecord = {
   }>;
 };
 
+type SourceDocumentType = "SO" | "DO";
+
 type SalesInvoiceRecord = {
   id: string;
   docNo: string;
@@ -964,6 +966,7 @@ export function AdminSalesInvoiceClient({
   const [paymentMode, setPaymentMode] = useState("CASH");
   const [paymentAmount, setPaymentAmount] = useState("0");
   const [isGenerateFromOpen, setIsGenerateFromOpen] = useState(false);
+  const [selectedSourceType, setSelectedSourceType] = useState<SourceDocumentType | null>(null);
   const [generateFromError, setGenerateFromError] = useState("");
   const [sourceSearch, setSourceSearch] = useState("");
   const [selectedSourceOrderIds, setSelectedSourceOrderIds] = useState<string[]>([]);
@@ -1121,17 +1124,20 @@ export function AdminSalesInvoiceClient({
   );
 
 
+  const selectedSourceTypeLabel = selectedSourceType === "DO" ? "Delivery Order" : selectedSourceType === "SO" ? "Sales Order" : "Document Source";
+
   const availableSourceOrders = useMemo(() => {
     return initialSalesOrders.filter((order) => {
       if (!customerId) return false;
       if (order.customerId !== customerId) return false;
       if (order.status === "CANCELLED" || order.status === "COMPLETED") return false;
+      if (selectedSourceType && !String(order.docNo || "").toUpperCase().startsWith(`${selectedSourceType}-`)) return false;
       return (order.lines || []).some((line) => {
         const itemType = line.itemType === "SERVICE_ITEM" || line.itemType === "NON_STOCK_ITEM" ? line.itemType : "STOCK_ITEM";
         return itemType === "SERVICE_ITEM" ? Number(line.remainingInvoiceAmount || 0) > 0 : Number(line.remainingInvoiceQty || 0) > 0;
       });
     });
-  }, [customerId, initialSalesOrders]);
+  }, [customerId, initialSalesOrders, selectedSourceType]);
 
   const filteredSourceOrders = useMemo(() => {
     const keyword = sourceSearch.trim().toLowerCase();
@@ -1464,6 +1470,7 @@ export function AdminSalesInvoiceClient({
     setSubmitSuccess("");
     setGenerateFromError("");
     setSelectedSourceOrderIds([]);
+    setSelectedSourceType(null);
     setPickLines([]);
     setBalances({});
     setLoadingBalances({});
@@ -1580,6 +1587,7 @@ export function AdminSalesInvoiceClient({
     setSubmitSuccess("");
     setGenerateFromError("");
     setSelectedSourceOrderIds([]);
+    setSelectedSourceType(null);
     setPickLines([]);
     setIsCreateOpen(true);
   }
@@ -1613,6 +1621,7 @@ export function AdminSalesInvoiceClient({
   function handleCustomerChange(nextCustomerId: string) {
     setCustomerId(nextCustomerId);
     setSelectedSourceOrderIds([]);
+    setSelectedSourceType(null);
     setPickLines([]);
     setGenerateFromError("");
     const customer = initialCustomers.find((item) => item.id === nextCustomerId);
@@ -1667,9 +1676,18 @@ export function AdminSalesInvoiceClient({
       return;
     }
     setSelectedSourceOrderIds([]);
+    setSelectedSourceType(null);
     setPickLines([]);
     setSourceSearch("");
     setIsGenerateFromOpen(true);
+  }
+
+  function chooseSourceType(nextSourceType: SourceDocumentType) {
+    setSelectedSourceType(nextSourceType);
+    setSelectedSourceOrderIds([]);
+    setPickLines([]);
+    setSourceSearch("");
+    setGenerateFromError("");
   }
 
   function toggleSourceOrder(orderId: string) {
@@ -1678,7 +1696,7 @@ export function AdminSalesInvoiceClient({
 
   function preparePickLines() {
     if (selectedSourceOrders.length === 0) {
-      setGenerateFromError("Please select at least one Sales Order.");
+      setGenerateFromError(`Please select at least one ${selectedSourceTypeLabel}.`);
       return;
     }
 
@@ -1801,10 +1819,11 @@ export function AdminSalesInvoiceClient({
     );
 
     setIsGenerateFromOpen(false);
+    setSelectedSourceType(null);
     setActiveTab("BODY");
     setSubmitMessageType("success");
     setRecentCancelledTransaction(null);
-    setSubmitSuccess(`Imported ${validLines.length} Sales Order line(s). Please review and save the Sales Invoice.`);
+    setSubmitSuccess(`Imported ${validLines.length} source document line(s). Please review and save the Sales Invoice.`);
   }
 
   function validateDeliveryOrderForm() {
@@ -2523,8 +2542,8 @@ export function AdminSalesInvoiceClient({
           <div className="mx-auto max-w-6xl rounded-[2rem] border border-white/10 bg-[#08080c] p-6 shadow-2xl">
             <div>
               <p className="text-sm font-semibold uppercase tracking-[0.24em] text-sky-300/80">Generate From</p>
-              <h2 className="mt-3 text-3xl font-bold">Pick From Sales Order</h2>
-              <p className="mt-3 text-sm text-white/60">Only source documents with remaining invoice qty are shown.</p>
+              <h2 className="mt-3 text-3xl font-bold">{selectedSourceType ? `Pick From ${selectedSourceTypeLabel}` : "Pick Document Source"}</h2>
+              <p className="mt-3 text-sm text-white/60">{selectedSourceType ? `Only ${selectedSourceTypeLabel} documents with remaining invoice qty are shown.` : "Choose whether this Sales Invoice should be generated from a Sales Order or Delivery Order."}</p>
             </div>
 
             {isGeneratedBodyLocked ? (
@@ -2534,32 +2553,52 @@ export function AdminSalesInvoiceClient({
             ) : null}
             {generateFromError ? <div className="mt-5 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">{generateFromError}</div> : null}
 
-            <div className="mt-6">
-              <input className="input-rk" value={sourceSearch} onChange={(e) => setSourceSearch(e.target.value)} placeholder="Search Sales Order" />
-            </div>
+            {!selectedSourceType ? (
+              <div className="mt-6 grid gap-4 md:grid-cols-2">
+                <button type="button" onClick={() => chooseSourceType("SO")} className="rounded-2xl border border-white/10 bg-black/30 p-5 text-left transition hover:border-sky-400/40 hover:bg-sky-500/10">
+                  <div className="text-lg font-bold text-white">Sales Order</div>
+                  <div className="mt-2 text-sm leading-6 text-white/55">Generate Sales Invoice from Sales Order balance. Batch No and S/N can still be selected for tracked stock items.</div>
+                </button>
+                <button type="button" onClick={() => chooseSourceType("DO")} className="rounded-2xl border border-white/10 bg-black/30 p-5 text-left transition hover:border-sky-400/40 hover:bg-sky-500/10">
+                  <div className="text-lg font-bold text-white">Delivery Order</div>
+                  <div className="mt-2 text-sm leading-6 text-white/55">Generate Sales Invoice from delivered stock. Batch No and S/N will follow the Delivery Order stock movement.</div>
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="mt-6 flex flex-wrap items-center gap-3">
+                  <button type="button" onClick={() => chooseSourceType("SO")} className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${selectedSourceType === "SO" ? "bg-sky-500/20 text-sky-100 border border-sky-500/30" : "border border-white/10 text-white/60 hover:bg-white/10 hover:text-white"}`}>Sales Order</button>
+                  <button type="button" onClick={() => chooseSourceType("DO")} className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${selectedSourceType === "DO" ? "bg-sky-500/20 text-sky-100 border border-sky-500/30" : "border border-white/10 text-white/60 hover:bg-white/10 hover:text-white"}`}>Delivery Order</button>
+                </div>
 
-            <div className="mt-5 max-h-64 overflow-y-auto rounded-2xl border border-white/10">
-              {filteredSourceOrders.length === 0 ? (
-                <div className="px-4 py-8 text-center text-white/45">No available Sales Order found for this customer.</div>
-              ) : (
-                filteredSourceOrders.map((order) => (
-                  <label key={order.id} className="flex cursor-pointer items-start gap-3 border-b border-white/10 px-4 py-4 text-sm transition hover:bg-white/[0.04]">
-                    <input type="checkbox" checked={selectedSourceOrderIds.includes(order.id)} onChange={() => toggleSourceOrder(order.id)} className="mt-1" />
-                    <div>
-                      <div className="font-semibold text-white">{order.docNo}</div>
-                      <div className="mt-1 text-white/50">{formatDate(order.docDate)} • {order.customerName}</div>
-                    </div>
-                  </label>
-                ))
-              )}
-            </div>
+                <div className="mt-6">
+                  <input className="input-rk" value={sourceSearch} onChange={(e) => setSourceSearch(e.target.value)} placeholder={`Search ${selectedSourceTypeLabel}`} />
+                </div>
+
+                <div className="mt-5 max-h-64 overflow-y-auto rounded-2xl border border-white/10">
+                  {filteredSourceOrders.length === 0 ? (
+                    <div className="px-4 py-8 text-center text-white/45">No available {selectedSourceTypeLabel} found for this customer.</div>
+                  ) : (
+                    filteredSourceOrders.map((order) => (
+                      <label key={order.id} className="flex cursor-pointer items-start gap-3 border-b border-white/10 px-4 py-4 text-sm transition hover:bg-white/[0.04]">
+                        <input type="checkbox" checked={selectedSourceOrderIds.includes(order.id)} onChange={() => toggleSourceOrder(order.id)} className="mt-1" />
+                        <div>
+                          <div className="font-semibold text-white">{order.docNo}</div>
+                          <div className="mt-1 text-white/50">{formatDate(order.docDate)} • {order.customerName}</div>
+                        </div>
+                      </label>
+                    ))
+                  )}
+                </div>
+              </>
+            )}
 
             {pickLines.length > 0 ? (
               <div className="mt-6 overflow-x-auto rounded-2xl border border-white/10">
                 <table className="min-w-full divide-y divide-white/10 text-sm">
                   <thead className="text-left text-white/45">
                     <tr>
-                      <th className="px-4 py-3">SO</th>
+                      <th className="px-4 py-3">Source Document</th>
                       <th className="px-4 py-3">Product</th>
                       <th className="px-4 py-3 text-right">Ordered</th>
                       <th className="px-4 py-3 text-right">Delivered</th>
@@ -2596,16 +2635,18 @@ export function AdminSalesInvoiceClient({
             ) : null}
 
             <div className="mt-6 flex justify-end gap-3">
-              <button type="button" onClick={() => setIsGenerateFromOpen(false)} className="rounded-xl border border-white/15 px-5 py-3 text-sm text-white/75 transition hover:bg-white/10">Close</button>
-              {pickLines.length > 0 ? (
-                <button type="button" onClick={importPickLines} className="rounded-xl bg-red-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-red-500">
-                  Import
-                </button>
-              ) : (
-                <button type="button" onClick={preparePickLines} className="rounded-xl border border-sky-500/30 bg-sky-500/10 px-5 py-3 text-sm font-semibold text-sky-100 transition hover:bg-sky-500/20">
-                  Load Product
-                </button>
-              )}
+              <button type="button" onClick={() => { setIsGenerateFromOpen(false); setSelectedSourceType(null); }} className="rounded-xl border border-white/15 px-5 py-3 text-sm text-white/75 transition hover:bg-white/10">Close</button>
+              {selectedSourceType ? (
+                pickLines.length > 0 ? (
+                  <button type="button" onClick={importPickLines} className="rounded-xl bg-red-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-red-500">
+                    Import
+                  </button>
+                ) : (
+                  <button type="button" onClick={preparePickLines} className="rounded-xl border border-sky-500/30 bg-sky-500/10 px-5 py-3 text-sm font-semibold text-sky-100 transition hover:bg-sky-500/20">
+                    Load Product
+                  </button>
+                )
+              ) : null}
             </div>
           </div>
         </div>
