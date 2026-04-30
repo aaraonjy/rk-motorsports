@@ -331,7 +331,7 @@ function calculateSalesPaymentSummary(
       if (roundedTotalPaid <= 0 && adjustmentSummary.totalCredited > 0) return "CREDITED";
       return "PAID";
     }
-    return roundedTotalPaid > 0 || adjustmentSummary.totalCredited > 0 || adjustmentSummary.totalDebited > 0 ? "PARTIALLY_PAID" : "UNPAID";
+    return roundedTotalPaid > 0 ? "PARTIALLY_PAID" : "UNPAID";
   })();
 
   return {

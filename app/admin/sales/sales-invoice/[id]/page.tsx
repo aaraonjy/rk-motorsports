@@ -61,6 +61,8 @@ function getPaymentModeLabel(value: string | null | undefined) {
 function getPaymentStatusLabel(value: string | null | undefined) {
   switch (value) {
     case "PAID": return "PAID";
+    case "CREDITED": return "CREDITED";
+    case "SETTLED": return "SETTLED";
     case "PARTIALLY_PAID": return "PARTIAL";
     case "UNPAID": return "UNPAID";
     default: return value || "UNPAID";
@@ -68,7 +70,8 @@ function getPaymentStatusLabel(value: string | null | undefined) {
 }
 
 function getPaymentStatusClass(value: string | null | undefined) {
-  if (value === "PAID") return "border-emerald-500/25 bg-emerald-500/10 text-emerald-200";
+  if (value === "PAID" || value === "SETTLED") return "border-emerald-500/25 bg-emerald-500/10 text-emerald-200";
+  if (value === "CREDITED") return "border-sky-500/25 bg-sky-500/10 text-sky-200";
   if (value === "PARTIALLY_PAID") return "border-amber-500/25 bg-amber-500/10 text-amber-200";
   return "border-white/15 bg-white/5 text-white/55";
 }
@@ -249,7 +252,7 @@ export default async function AdminSalesInvoiceDetailPage({ params }: Params) {
   const totalDebited = linkedDebitNotes;
   const adjustedGrandTotal = Math.max(0, Math.round((grandTotal - totalCredited + totalDebited + Number.EPSILON) * 100) / 100);
   const outstandingBalance = Math.max(0, Math.round((adjustedGrandTotal - totalPaid + Number.EPSILON) * 100) / 100);
-  const paymentStatus = outstandingBalance <= 0 ? "PAID" : totalPaid > 0 || totalCredited > 0 || totalDebited > 0 ? "PARTIALLY_PAID" : "UNPAID";
+  const paymentStatus = outstandingBalance <= 0 ? (totalPaid <= 0 && totalCredited > 0 ? "CREDITED" : "PAID") : totalPaid > 0 ? "PARTIALLY_PAID" : "UNPAID";
 
   const stockIssue = await db.stockTransaction.findFirst({
     where: {

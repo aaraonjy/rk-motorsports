@@ -511,7 +511,7 @@ function getPaymentSummary(record: {
       if (totalPaid <= 0 && totalCredited > 0) return "CREDITED";
       return "PAID";
     }
-    return totalPaid > 0 || totalCredited > 0 || totalDebited > 0 ? "PARTIALLY_PAID" : "UNPAID";
+    return totalPaid > 0 ? "PARTIALLY_PAID" : "UNPAID";
   })();
   const paymentStatus = record.paymentStatus || calculatedPaymentStatus;
   return { grandTotal, totalPaid, totalCredited, totalDebited, adjustedGrandTotal, outstandingBalance, paymentStatus };
@@ -1293,7 +1293,7 @@ export function AdminSalesInvoiceClient({
   const projectedTotalPaid = Math.round((existingTotalPaid + normalizedPaymentAmount + Number.EPSILON) * 100) / 100;
   const paymentBaseTotal = invoiceAdjustmentSummary.adjustedGrandTotal;
   const projectedOutstandingBalance = Math.max(0, Math.round((paymentBaseTotal - projectedTotalPaid + Number.EPSILON) * 100) / 100);
-  const projectedPaymentStatus = paymentBaseTotal <= 0 || projectedTotalPaid >= paymentBaseTotal ? "PAID" : projectedTotalPaid > 0 || invoiceAdjustmentSummary.hasAdjustment ? "PARTIALLY_PAID" : "UNPAID";
+  const projectedPaymentStatus = paymentBaseTotal <= 0 || projectedTotalPaid >= paymentBaseTotal ? "PAID" : projectedTotalPaid > 0 ? "PARTIALLY_PAID" : "UNPAID";
 
   async function loadTransactions() {
     setIsLoading(true);

@@ -749,9 +749,12 @@ export function AdminDebitNoteClient({ initialProducts, initialLocations, defaul
 
                         <div>
                           <label className="label-rk">UOM</label>
-                          <select className="input-rk" value={line.uom} onChange={(e) => patchLine(line.key, { uom: e.target.value })}>
-                            {uomOptions.length === 0 ? <option value="">Select UOM</option> : uomOptions.map((uom) => <option key={uom} value={uom}>{uom}</option>)}
-                          </select>
+                          <div className="relative">
+                            <select className="input-rk w-full appearance-none pr-12" value={line.uom} onChange={(e) => patchLine(line.key, { uom: e.target.value })}>
+                              {uomOptions.length === 0 ? <option value="">Select UOM</option> : uomOptions.map((uom) => <option key={uom} value={uom}>{uom}</option>)}
+                            </select>
+                            <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-white/60">▾</span>
+                          </div>
                         </div>
 
                         <div>
