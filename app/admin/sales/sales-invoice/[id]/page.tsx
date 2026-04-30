@@ -455,7 +455,9 @@ export default async function AdminSalesInvoiceDetailPage({ params }: Params) {
                 {generatedTo.map((target, index) => {
                   const href = target?.docType === "CN"
                     ? `/admin/sales/credit-note/${target.id}`
-                    : target?.docType === "INV"
+                    : target?.docType === "DN"
+                      ? `/admin/sales/debit-note/${target.id}`
+                      : target?.docType === "INV"
                       ? `/admin/sales/sales-invoice/${target.id}`
                       : target?.docType === "CS"
                         ? `/admin/sales/cash-sales/${target.id}`
