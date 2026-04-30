@@ -609,79 +609,65 @@ export function AdminDebitNoteClient({ initialProducts, initialLocations, defaul
             {submitError ? <div className="mt-6 rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-red-100">{submitError}</div> : null}
 
             {activeTab === "HEADER" ? (
-              <div className="mt-8 space-y-6">
-                <div className="grid gap-5 md:grid-cols-[280px_1fr]">
+              <div className="mt-6 space-y-5">
+                <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
                   <div>
                     <label className="label-rk">Doc Date</label>
-                    <input type="date" className="input-rk" value={docDate} onChange={(e) => setDocDate(e.target.value)} />
+                    <input className="input-rk" type="date" value={docDate} onChange={(e) => setDocDate(e.target.value)} />
                   </div>
-                  <div>
+                  <div className="xl:col-span-3">
                     <label className="label-rk">System Doc No</label>
-                    <button type="button" onClick={openDocNoModal} className="input-rk flex items-center justify-between gap-3 text-left">
-                      <span>{docNo || docNoPreview}</span>
-                      <span className="text-xs text-white/45">Click to override</span>
+                    <button type="button" onClick={openDocNoModal} className="input-rk flex w-full items-center justify-between gap-3 pr-6 text-left">
+                      <span className="truncate text-white">{docNo || docNoPreview}</span>
+                      <span className="shrink-0 text-xs text-white/50">Click to override</span>
                     </button>
                   </div>
-                </div>
 
-                <div className="grid gap-5 md:grid-cols-4">
                   <SearchableSelect label="A/C No" placeholder="Search or select customer" options={customerOptions} value={selectedCustomerId} onChange={(option) => handleCustomerChange(option?.id || "")} />
                   <div>
                     <label className="label-rk">Customer Name</label>
-                    <input className="input-rk" value={selectedCustomerInvoice?.customerName || selectedCustomer?.label?.split(" — ").slice(1).join(" — ") || ""} readOnly disabled />
+                    <input className="input-rk" value={selectedCustomerInvoice?.customerName || selectedCustomer?.label?.split(" — ").slice(1).join(" — ") || ""} readOnly />
                   </div>
                   <div>
                     <label className="label-rk">Email</label>
-                    <input className="input-rk" value={selectedCustomerInvoice?.email || ""} readOnly disabled />
+                    <input className="input-rk" value={selectedCustomerInvoice?.email || ""} readOnly />
                   </div>
                   <div>
                     <label className="label-rk">Contact No</label>
-                    <input className="input-rk" value={selectedCustomerInvoice?.contactNo || ""} readOnly disabled />
+                    <input className="input-rk" value={selectedCustomerInvoice?.contactNo || ""} readOnly />
                   </div>
-                </div>
 
-                <div className="grid gap-5 md:grid-cols-4">
                   <div className="md:col-span-2">
                     <label className="label-rk">Document Description</label>
-                    <input className="input-rk" value={selectedInvoice ? `Debit Note for ${selectedInvoice.docNo}` : ""} readOnly disabled />
+                    <input className="input-rk" value={selectedInvoice ? `Debit Note for ${selectedInvoice.docNo}` : ""} readOnly />
                   </div>
                   <div>
                     <label className="label-rk">Attention</label>
-                    <input className="input-rk" value={selectedInvoice?.attention || selectedCustomerInvoice?.attention || ""} readOnly disabled />
+                    <input className="input-rk" value={selectedInvoice?.attention || selectedCustomerInvoice?.attention || ""} readOnly />
                   </div>
-                  <SearchableSelect label="Agent" placeholder="Select agent" options={agentOptions} value={agentId} onChange={(option) => setAgentId(option?.id || "")} />
-                </div>
+                  <SearchableSelect label="Agent" placeholder="No Agent" options={agentOptions} value={agentId} onChange={(option) => setAgentId(option?.id || "")} />
 
-                <div className="grid gap-5 md:grid-cols-4">
-                  <SearchableSelect label="Project" placeholder="Select project" options={projectOptions} value={projectId} onChange={(option) => { setProjectId(option?.id || ""); setDepartmentId(""); }} />
-                  <SearchableSelect label="Department" placeholder="Select department" options={departmentOptions} value={departmentId} onChange={(option) => setDepartmentId(option?.id || "")} />
+                  <SearchableSelect label="Project" placeholder="No Project" options={projectOptions} value={projectId} onChange={(option) => { setProjectId(option?.id || ""); setDepartmentId(""); }} />
+                  <SearchableSelect label="Department" placeholder="No Department" options={departmentOptions} value={departmentId} onChange={(option) => setDepartmentId(option?.id || "")} />
                   <div className="md:col-span-2">
-                    <label className="label-rk">Reason <span className="text-rk-red">*</span></label>
-                    <input className="input-rk" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Additional charge / undercharged item" />
-                  </div>
-                </div>
-
-                <div className="grid gap-5 md:grid-cols-[1fr_1fr]">
-                  <div className="rounded-[1.5rem] border border-white/10 p-5">
-                    <p className="text-xs font-bold uppercase tracking-[0.24em] text-white/40">Source Sales Invoice</p>
-                    <div className="mt-5">
-                      <label className="label-rk">Source Sales Invoice <span className="text-rk-red">*</span></label>
+                    <label className="label-rk">Source Sales Invoice <span className="text-rk-red">*</span></label>
+                    <div className="relative">
                       <button
                         type="button"
                         disabled={!selectedCustomerId}
                         onClick={() => setIsInvoicePickerOpen((prev) => !prev)}
-                        className={`input-rk flex items-center justify-between gap-3 text-left ${!selectedCustomerId ? "opacity-60" : ""}`}
+                        className={`input-rk flex w-full items-center justify-between gap-3 pr-6 text-left ${!selectedCustomerId ? "cursor-not-allowed opacity-60" : ""}`}
                       >
                         <span className={selectedInvoice ? "truncate text-white" : "truncate text-white/45"}>
-                          {selectedInvoice ? `${selectedInvoice.docNo} — ${selectedInvoice.customerName}` : "Search or select sales invoice"}
+                          {selectedInvoice ? `${selectedInvoice.docNo} — ${selectedInvoice.customerName}` : selectedCustomerId ? "Search or select sales invoice" : "Please select customer first"}
                         </span>
-                        <span className="text-white/55">▾</span>
+                        <span className="shrink-0 text-white/55">▾</span>
                       </button>
 
                       {isInvoicePickerOpen ? (
-                        <div className="mt-3 overflow-hidden rounded-2xl border border-white/10 bg-black/35">
+                        <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-[150] overflow-hidden rounded-2xl border border-white/10 bg-[#0b0b0f] shadow-2xl">
                           <div className="border-b border-white/10 p-3">
-                            <input className="input-rk h-10" value={sourceSearch} onChange={(e) => setSourceSearch(e.target.value)} placeholder="Search Sales Invoice" />
+                            <input className="input-rk h-10" value={sourceSearch} onChange={(e) => setSourceSearch(e.target.value)} placeholder="Search Sales Invoice" autoFocus />
                           </div>
                           <div className="max-h-64 overflow-y-auto p-2">
                             {filteredInvoices.length === 0 ? (
@@ -705,165 +691,153 @@ export function AdminDebitNoteClient({ initialProducts, initialLocations, defaul
                           </div>
                         </div>
                       ) : null}
-
-                      {!selectedCustomerId ? <div className="mt-4 rounded-2xl border border-white/10 px-4 py-6 text-sm text-white/45">Please select customer first.</div> : null}
                     </div>
                   </div>
 
-                  <div className="rounded-[1.5rem] border border-white/10 p-5">
-                    <p className="text-xs font-bold uppercase tracking-[0.24em] text-white/40">Billing Address</p>
-                    <p className="mt-3 text-sm text-white/55">Billing address used for this Debit Note.</p>
-                    <div className="mt-5 grid gap-4 md:grid-cols-2">
-                      <div>
-                        <label className="label-rk">Billing Address Line 1</label>
-                        <input className="input-rk" value={selectedInvoice?.billingAddressLine1 || ""} readOnly disabled />
-                      </div>
-                      <div>
-                        <label className="label-rk">Billing Address Line 2</label>
-                        <input className="input-rk" value={selectedInvoice?.billingAddressLine2 || ""} readOnly disabled />
-                      </div>
-                      <div>
-                        <label className="label-rk">Billing Address Line 3</label>
-                        <input className="input-rk" value={selectedInvoice?.billingAddressLine3 || ""} readOnly disabled />
-                      </div>
-                      <div>
-                        <label className="label-rk">Billing Address Line 4</label>
-                        <input className="input-rk" value={selectedInvoice?.billingAddressLine4 || ""} readOnly disabled />
-                      </div>
-                      <div>
-                        <label className="label-rk">City</label>
-                        <input className="input-rk" value={selectedInvoice?.billingCity || ""} readOnly disabled />
-                      </div>
-                      <div>
-                        <label className="label-rk">Post Code</label>
-                        <input className="input-rk" value={selectedInvoice?.billingPostCode || ""} readOnly disabled />
-                      </div>
-                      <div>
-                        <label className="label-rk">Country Code</label>
-                        <input className="input-rk" value={selectedInvoice?.billingCountryCode || ""} readOnly disabled />
-                      </div>
-                    </div>
+                  <div className="md:col-span-2">
+                    <label className="label-rk">Reason <span className="text-rk-red">*</span></label>
+                    <input className="input-rk" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Additional charge / undercharged item" />
+                  </div>
+                </div>
+
+                <div className="rounded-[1.75rem] border border-white/10 p-5">
+                  <div className="mb-5">
+                    <p className="text-sm font-semibold uppercase tracking-[0.24em] text-white/40">Billing Address</p>
+                    <p className="mt-2 text-sm text-white/55">Billing address used for this Debit Note.</p>
+                  </div>
+
+                  <div className="mt-5 grid gap-5 md:grid-cols-2">
+                    <div><label className="label-rk">Billing Address Line 1</label><input className="input-rk" value={selectedInvoice?.billingAddressLine1 || ""} readOnly /></div>
+                    <div><label className="label-rk">Billing Address Line 2</label><input className="input-rk" value={selectedInvoice?.billingAddressLine2 || ""} readOnly /></div>
+                    <div><label className="label-rk">Billing Address Line 3</label><input className="input-rk" value={selectedInvoice?.billingAddressLine3 || ""} readOnly /></div>
+                    <div><label className="label-rk">Billing Address Line 4</label><input className="input-rk" value={selectedInvoice?.billingAddressLine4 || ""} readOnly /></div>
+                    <div><label className="label-rk">City</label><input className="input-rk" value={selectedInvoice?.billingCity || ""} readOnly /></div>
+                    <div><label className="label-rk">Post Code</label><input className="input-rk" value={selectedInvoice?.billingPostCode || ""} readOnly /></div>
+                    <div><label className="label-rk">Country Code</label><input className="input-rk" value={selectedInvoice?.billingCountryCode || "MY"} readOnly /></div>
                   </div>
                 </div>
               </div>
             ) : null}
 
             {activeTab === "BODY" ? (
-              <div className="mt-8 space-y-6">
+              <div className="mt-6 space-y-5">
                 {!selectedInvoice ? <div className="rounded-2xl border border-white/10 px-4 py-6 text-sm text-white/45">Please select customer and source Sales Invoice in Header first.</div> : null}
 
-                <div className="space-y-5">
-                  {lines.map((line, index) => {
-                    const product = initialProducts.find((item) => item.id === line.inventoryProductId);
-                    const uomOptions = [product?.baseUom, ...(product?.uomConversions || []).map((item) => item.uomCode)].filter(Boolean) as string[];
-                    const calculated = calculateLine(line, initialTaxCodes);
-                    const availableBatches = batchOptions[batchKey(line)] || [];
-                    const availableSerials = serialOptions[serialKey(line)] || [];
-                    return (
-                      <div key={line.key} className="rounded-[1.5rem] border border-white/10 p-5">
-                        <div className="mb-6 flex items-center justify-between">
-                          <h3 className="text-xl font-bold text-white">Product {index + 1}</h3>
-                          {lines.length > 1 ? <button type="button" onClick={() => removeLine(line.key)} className="rounded-xl border border-red-500/30 px-4 py-2 text-xs text-red-100 hover:bg-red-500/10">Remove</button> : null}
+                {lines.map((line, index) => {
+                  const product = initialProducts.find((item) => item.id === line.inventoryProductId) || null;
+                  const uomOptions = [product?.baseUom, ...(product?.uomConversions || []).map((item) => item.uomCode)].filter(Boolean) as string[];
+                  const calculated = calculateLine(line, initialTaxCodes);
+                  const availableBatches = batchOptions[batchKey(line)] || [];
+                  const availableSerials = serialOptions[serialKey(line)] || [];
+                  const trackingInfo = product
+                    ? [product.batchTracking ? "Batch Tracked" : "", product.serialNumberTracking ? "Serial Tracked" : ""].filter(Boolean).join(" • ")
+                    : "";
+
+                  return (
+                    <div key={line.key} className="rounded-[1.75rem] border border-white/10 p-5">
+                      <div className="mb-5 flex items-center justify-between gap-3">
+                        <h3 className="text-lg font-semibold text-white">Product {index + 1}</h3>
+                        {lines.length > 1 ? <button type="button" onClick={() => removeLine(line.key)} className="rounded-xl border border-red-500/30 px-3 py-2 text-sm text-red-200 hover:bg-red-500/10">Remove</button> : null}
+                      </div>
+
+                      <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+                        <div className="md:col-span-2">
+                          <SearchableSelect label="Product" placeholder="Search or select product" options={productOptions} value={line.inventoryProductId} onChange={(option) => selectProduct(line.key, option?.id || "")} />
+                          {trackingInfo || line.productDescription ? <p className="mt-2 text-xs text-white/45">{trackingInfo || line.productDescription}</p> : null}
                         </div>
 
-                        <div className="grid gap-5 md:grid-cols-4">
-                          <div className="md:col-span-2">
-                            <SearchableSelect label="Product" placeholder="Search or select product" options={productOptions} value={line.inventoryProductId} onChange={(option) => selectProduct(line.key, option?.id || "")} />
-                          </div>
-                          <div>
-                            <label className="label-rk">UOM</label>
-                            <select className="input-rk" value={line.uom} onChange={(e) => patchLine(line.key, { uom: e.target.value })}>
-                              {uomOptions.length === 0 ? <option value="">Select UOM</option> : uomOptions.map((uom) => <option key={uom} value={uom}>{uom}</option>)}
-                            </select>
-                          </div>
-                          <div>
-                            <label className="label-rk">Qty</label>
-                            <input type="number" min="0" className="input-rk text-right" value={line.qty} onChange={(e) => patchLine(line.key, { qty: e.target.value })} />
-                          </div>
+                        <div>
+                          <label className="label-rk">UOM</label>
+                          <select className="input-rk" value={line.uom} onChange={(e) => patchLine(line.key, { uom: e.target.value })}>
+                            {uomOptions.length === 0 ? <option value="">Select UOM</option> : uomOptions.map((uom) => <option key={uom} value={uom}>{uom}</option>)}
+                          </select>
                         </div>
 
-                        <div className="mt-5 grid gap-5 md:grid-cols-[1fr_150px_120px_2fr]">
-                          <div>
-                            <label className="label-rk">Selling Price</label>
-                            <input type="number" min="0" className="input-rk text-right" value={line.unitPrice} onChange={(e) => patchLine(line.key, { unitPrice: e.target.value })} />
-                          </div>
-                          <div>
-                            <label className="label-rk">Discount</label>
-                            <input type="number" min="0" className="input-rk text-right" value={line.discountRate} onChange={(e) => patchLine(line.key, { discountRate: e.target.value })} />
-                          </div>
-                          <div>
-                            <label className="label-rk">&nbsp;</label>
+                        <div>
+                          <label className="label-rk">Qty</label>
+                          <input className="input-rk" type="number" min="0" value={line.qty} onChange={(e) => patchLine(line.key, { qty: e.target.value })} />
+                        </div>
+
+                        <div>
+                          <label className="label-rk">Selling Price</label>
+                          <input className="input-rk" type="number" min="0" value={line.unitPrice} onChange={(e) => patchLine(line.key, { unitPrice: e.target.value })} />
+                        </div>
+
+                        <div>
+                          <label className="label-rk">Discount</label>
+                          <div className="grid grid-cols-[minmax(0,1fr)_120px] gap-3">
+                            <input className="input-rk" type="number" min="0" value={line.discountRate} onChange={(e) => patchLine(line.key, { discountRate: e.target.value })} />
                             <select className="input-rk" value={line.discountType === "AMOUNT" ? "AMOUNT" : "PERCENT"} onChange={(e) => patchLine(line.key, { discountType: e.target.value === "AMOUNT" ? "AMOUNT" : "PERCENT" })}>
                               <option value="PERCENT">%</option>
-                              <option value="AMOUNT">Amount</option>
+                              <option value="AMOUNT">RM</option>
                             </select>
-                          </div>
-                          <div>
-                            <SearchableSelect label="Location" placeholder="Select location" options={locationOptions} value={line.locationId} onChange={(option) => patchLine(line.key, { locationId: option?.id || "", batchNo: "", serialNos: [] })} />
-                            <p className="mt-2 text-xs text-white/45">Select product and location before loading batch / serial no.</p>
                           </div>
                         </div>
 
-                        {line.itemType === "STOCK_ITEM" && line.trackInventory ? (
-                          <div className="mt-5 grid gap-5 md:grid-cols-2">
-                            <div>
-                              <label className="label-rk">Batch No {line.batchTracking ? <span className="text-rk-red">*</span> : null}</label>
-                              <div className="flex gap-2">
-                                <input className="input-rk" value={line.batchNo} onChange={(e) => patchLine(line.key, { batchNo: e.target.value, serialNos: [] })} placeholder="Enter or select batch" />
-                                <button type="button" onClick={() => loadBatches(line)} className="rounded-xl border border-white/15 px-4 text-sm text-white/75 hover:bg-white/10">Load</button>
-                              </div>
-                              {availableBatches.length > 0 ? (
-                                <div className="mt-2 flex flex-wrap gap-2">
-                                  {availableBatches.map((batch) => <button key={batch.id} type="button" onClick={() => patchLine(line.key, { batchNo: batch.batchNo, serialNos: [] })} className="rounded-lg border border-white/10 px-3 py-1 text-xs text-white/70 hover:bg-white/10">{batch.batchNo}{batch.balance != null ? ` (${batch.balance})` : ""}</button>)}
-                                </div>
-                              ) : null}
+                        <div className="md:col-span-2">
+                          <SearchableSelect label="Location" placeholder="Search or select location" options={locationOptions} value={line.locationId} onChange={(option) => patchLine(line.key, { locationId: option?.id || "", batchNo: "", serialNos: [] })} />
+                          <p className="mt-2 text-xs text-white/45">Select product and location before loading batch / serial no.</p>
+                        </div>
+
+                        {line.itemType === "STOCK_ITEM" && line.trackInventory && line.batchTracking ? (
+                          <div className="md:col-span-2">
+                            <label className="label-rk">Batch No <span className="text-rk-red">*</span></label>
+                            <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3">
+                              <input className="input-rk" value={line.batchNo} onChange={(e) => patchLine(line.key, { batchNo: e.target.value, serialNos: [] })} placeholder="Enter or select batch" />
+                              <button type="button" onClick={() => loadBatches(line)} className="rounded-xl border border-white/15 px-4 text-sm text-white/75 hover:bg-white/10">Load</button>
                             </div>
-                            {line.serialNumberTracking ? (
-                              <div>
-                                <label className="label-rk">Serial No <span className="text-rk-red">*</span></label>
-                                <div className="flex gap-2">
-                                  <input className="input-rk" value={line.serialSearch} onChange={(e) => patchLine(line.key, { serialSearch: e.target.value })} placeholder="Search serial" />
-                                  <button type="button" onClick={() => loadSerials(line)} className="rounded-xl border border-white/15 px-4 text-sm text-white/75 hover:bg-white/10">Load</button>
-                                </div>
-                                <div className="mt-2 text-xs text-white/45">Selected: {line.serialNos.length ? line.serialNos.join(", ") : "-"}</div>
-                                {availableSerials.length > 0 ? (
-                                  <div className="mt-2 max-h-32 overflow-y-auto rounded-xl border border-white/10 p-2">
-                                    {availableSerials.map((serial) => <button key={serial.id} type="button" onClick={() => toggleSerial(line, serial.serialNo)} className={`mb-1 mr-1 rounded-lg border px-3 py-1 text-xs ${line.serialNos.includes(serial.serialNo) ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200" : "border-white/10 text-white/70 hover:bg-white/10"}`}>{serial.serialNo}</button>)}
-                                  </div>
-                                ) : null}
+                            {availableBatches.length > 0 ? (
+                              <div className="mt-2 flex flex-wrap gap-2">
+                                {availableBatches.map((batch) => <button key={batch.id} type="button" onClick={() => patchLine(line.key, { batchNo: batch.batchNo, serialNos: [] })} className="rounded-lg border border-white/10 px-3 py-1 text-xs text-white/70 hover:bg-white/10">{batch.batchNo}{batch.balance != null ? ` (${batch.balance})` : ""}</button>)}
                               </div>
                             ) : null}
                           </div>
                         ) : null}
 
-                        <div className="mt-5 grid gap-5 md:grid-cols-4">
-                          <div>
-                            <label className="label-rk">Tax Code</label>
-                            <select className="input-rk" value={line.taxCodeId} onChange={(e) => patchLine(line.key, { taxCodeId: e.target.value })}>
-                              <option value="">No Tax</option>
-                              {initialTaxCodes.map((taxCode) => <option key={taxCode.id} value={taxCode.id}>{taxCode.code} — {Number(taxCode.rate || 0)}%</option>)}
-                            </select>
+                        {line.itemType === "STOCK_ITEM" && line.trackInventory && line.serialNumberTracking ? (
+                          <div className="md:col-span-2">
+                            <label className="label-rk">S/N No <span className="text-rk-red">*</span></label>
+                            <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3">
+                              <input className="input-rk" value={line.serialSearch} onChange={(e) => patchLine(line.key, { serialSearch: e.target.value })} placeholder="Search serial no" />
+                              <button type="button" onClick={() => loadSerials(line)} className="rounded-xl border border-white/15 px-4 text-sm text-white/75 hover:bg-white/10">Load</button>
+                            </div>
+                            <div className="mt-2 text-xs text-white/45">Selected: {line.serialNos.length ? line.serialNos.join(", ") : "-"}</div>
+                            {availableSerials.length > 0 ? (
+                              <div className="mt-2 max-h-32 overflow-y-auto rounded-xl border border-white/10 p-2">
+                                {availableSerials.map((serial) => <button key={serial.id} type="button" onClick={() => toggleSerial(line, serial.serialNo)} className={`mb-1 mr-1 rounded-lg border px-3 py-1 text-xs ${line.serialNos.includes(serial.serialNo) ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200" : "border-white/10 text-white/70 hover:bg-white/10"}`}>{serial.serialNo}</button>)}
+                              </div>
+                            ) : null}
                           </div>
-                          <div>
-                            <label className="label-rk">Tax Amount</label>
-                            <input className="input-rk text-right" value={money(calculated.taxAmount)} readOnly disabled />
-                          </div>
-                          <div>
-                            <label className="label-rk">Gross Amount</label>
-                            <input className="input-rk text-right" value={money(calculated.lineTotal)} readOnly disabled />
-                          </div>
+                        ) : null}
+
+                        <div>
+                          <label className="label-rk">Tax Code</label>
+                          <select className="input-rk" value={line.taxCodeId} onChange={(e) => patchLine(line.key, { taxCodeId: e.target.value })}>
+                            <option value="">No Tax</option>
+                            {initialTaxCodes.map((taxCode) => <option key={taxCode.id} value={taxCode.id}>{taxCode.code} — {Number(taxCode.rate || 0)}%</option>)}
+                          </select>
                         </div>
 
-                        <div className="mt-5">
+                        <div>
+                          <label className="label-rk">Tax Amount</label>
+                          <input className="input-rk" value={money(calculated.taxAmount)} readOnly />
+                        </div>
+
+                        <div>
+                          <label className="label-rk">Gross Amount</label>
+                          <input className="input-rk" value={money(calculated.lineTotal)} readOnly />
+                        </div>
+
+                        <div className="md:col-span-4">
                           <label className="label-rk">Product Remarks</label>
-                          <textarea className="input-rk min-h-[90px] resize-y" value={line.remarks} onChange={(e) => patchLine(line.key, { remarks: e.target.value })} />
+                          <textarea className="input-rk min-h-[90px]" value={line.remarks} onChange={(e) => patchLine(line.key, { remarks: e.target.value })} />
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
+                    </div>
+                  );
+                })}
 
-                <button type="button" onClick={addLine} className="rounded-xl border border-white/15 px-5 py-3 text-sm text-white/75 hover:bg-white/10">+ Add Product</button>
+                <button type="button" onClick={addLine} className="rounded-xl border border-white/15 px-4 py-3 text-sm text-white/75 transition hover:bg-white/10 hover:text-white">+ Add Product</button>
               </div>
             ) : null}
 
