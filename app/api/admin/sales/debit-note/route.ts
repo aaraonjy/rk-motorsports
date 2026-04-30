@@ -168,9 +168,21 @@ function calculateSalesAdjustmentSummary(
   };
 }
 
-function calculateInvoiceOutstanding(invoice: any) {
-  const payments = Array.isArray(invoice.payments) ? invoice.payments : [];
-  const totalPaid = payments.reduce((sum, payment) => sum + toNumber(payment.amount), 0);
+type InvoiceOutstandingInput = {
+  grandTotal?: Prisma.Decimal | number | string | null;
+  payments?: Array<{ amount?: Prisma.Decimal | number | string | null }> | null;
+  sourceLinks?: Array<{
+    targetTransaction?: {
+      status?: string | null;
+      docType?: string | null;
+      grandTotal?: Prisma.Decimal | number | string | null;
+    } | null;
+  }> | null;
+};
+
+function calculateInvoiceOutstanding(invoice: InvoiceOutstandingInput) {
+  const payments: Array<{ amount?: Prisma.Decimal | number | string | null }> = Array.isArray(invoice.payments) ? invoice.payments : [];
+  const totalPaid = payments.reduce((sum: number, payment: { amount?: Prisma.Decimal | number | string | null }) => sum + toNumber(payment.amount), 0);
   const summary = calculateSalesAdjustmentSummary(invoice.sourceLinks || []);
   const adjustedTotal = Math.max(0, Math.round((toNumber(invoice.grandTotal) - summary.totalCredited + summary.totalDebited + Number.EPSILON) * 100) / 100);
   const outstanding = Math.max(0, Math.round((adjustedTotal - totalPaid + Number.EPSILON) * 100) / 100);
