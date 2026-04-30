@@ -346,31 +346,6 @@ function batchOptionLabel(batch: AvailableBatch, qtyDecimalPlaces: number) {
   return parts.join(" • ");
 }
 
-
-
-function getCurrentBatchOptions(availableBatches: AvailableBatch[], batchNo: string, qtyDecimalPlaces: number) {
-  const batches = [...(availableBatches || [])];
-  const currentBatchNo = String(batchNo || "").trim();
-  if (currentBatchNo && !batches.some((batch) => String(batch.batchNo || "").toUpperCase() === currentBatchNo.toUpperCase())) {
-    batches.unshift({ id: currentBatchNo, batchNo: currentBatchNo, expiryDate: null, balance: null });
-  }
-  return batches.map((batch) => ({
-    id: batch.batchNo,
-    label: batchOptionLabel(batch, qtyDecimalPlaces),
-    searchText: `${batch.batchNo} ${batch.expiryDate || ""}`.toLowerCase(),
-  }));
-}
-
-function getCurrentSerialOptions(availableSerials: AvailableSerial[], selectedSerials: string[], batchNo: string) {
-  const serials = [...(availableSerials || [])];
-  for (const serialNo of uniqueSerialNos(selectedSerials || [])) {
-    if (!serials.some((item) => String(item.serialNo || "").toUpperCase() === serialNo.toUpperCase())) {
-      serials.unshift({ id: `selected-${serialNo}`, serialNo, batchNo: batchNo || null, expiryDate: null });
-    }
-  }
-  return serials;
-}
-
 function formatTraceDate(value: string | null | undefined) {
   if (!value) return "";
   const date = new Date(value);
@@ -2241,7 +2216,17 @@ export function AdminCashSalesClient({
                             <SearchableSelect
                               label="Batch No"
                               placeholder={loadingBatches[index] ? "Loading batches..." : "Select Batch No"}
-                              options={getCurrentBatchOptions(availableBatches[index] || [], line.batchNo, qtyDecimalPlaces)}
+                              options={(() => {
+                                const options = (availableBatches[index] || []).map((batch) => ({
+                                  id: batch.batchNo,
+                                  label: batchOptionLabel(batch, qtyDecimalPlaces),
+                                  searchText: `${batch.batchNo} ${batch.expiryDate || ""}`.toLowerCase(),
+                                }));
+                                if (line.batchNo && !options.some((option) => option.id.toUpperCase() === line.batchNo.toUpperCase())) {
+                                  options.unshift({ id: line.batchNo, label: `${line.batchNo} (Selected)`, searchText: line.batchNo.toLowerCase() });
+                                }
+                                return options;
+                              })()}
                               value={line.batchNo}
                               disabled={!line.inventoryProductId || !line.locationId || Boolean(loadingBatches[index]) || isGeneratedLine}
                               onChange={(option) => {
@@ -2251,7 +2236,7 @@ export function AdminCashSalesClient({
                                 setBalances({});
                               }}
                             />
-                            {line.inventoryProductId && line.locationId && !loadingBatches[index] && (availableBatches[index] || []).length === 0 && !line.batchNo ? (
+                            {line.inventoryProductId && line.locationId && !line.batchNo && !loadingBatches[index] && (availableBatches[index] || []).length === 0 ? (
                               <p className="mt-2 text-xs text-amber-200">No available batch balance found for this product/location.</p>
                             ) : null}
                             {line.batchNo && selectedProduct?.isAssemblyItem ? (
@@ -2290,7 +2275,7 @@ export function AdminCashSalesClient({
                           <div className="md:col-span-2">
                             <OutboundSerialPicker
                               label="S/N No"
-                              availableSerials={getCurrentSerialOptions(availableSerials[index] || [], line.serialNos, line.batchNo)}
+                              availableSerials={availableSerials[index] || []}
                               selectedSerials={line.serialNos}
                               searchValue={line.serialSearch}
                               onSearchValueChange={(value) => updateLine(index, { serialSearch: value })}
@@ -2300,7 +2285,7 @@ export function AdminCashSalesClient({
                               }}
                               disabled={!line.inventoryProductId || !line.locationId || (selectedProduct.batchTracking && !line.batchNo) || Boolean(loadingSerials[index]) || isGeneratedLine}
                             />
-                            {line.inventoryProductId && line.locationId && (!selectedProduct.batchTracking || line.batchNo) && !loadingSerials[index] && (availableSerials[index] || []).length === 0 && line.serialNos.length === 0 ? (
+                            {line.inventoryProductId && line.locationId && line.serialNos.length === 0 && (!selectedProduct.batchTracking || line.batchNo) && !loadingSerials[index] && (availableSerials[index] || []).length === 0 ? (
                               <p className="mt-2 text-xs text-amber-200">No available S/N found for this product/location{selectedProduct.batchTracking ? " and batch" : ""}.</p>
                             ) : null}
                           </div>

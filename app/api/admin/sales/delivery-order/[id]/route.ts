@@ -34,6 +34,51 @@ function withCancellationDetails<T extends Record<string, any>>(transaction: T) 
 }
 
 
+type StockPickingRow = {
+  sourceId?: string | null;
+  inventoryProductId?: string | null;
+  locationId?: string | null;
+  batchNo?: string | null;
+  remarks?: string | null;
+};
+
+function extractSerialNoFromRemarks(value: string | null | undefined) {
+  const match = String(value || "").match(/SERIAL_NO=([^|]+)/);
+  return match ? match[1].trim() : "";
+}
+
+function uniqueStringList(values: Array<string | null | undefined>) {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const value of values) {
+    const text = String(value || "").trim();
+    if (!text) continue;
+    const key = text.toUpperCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(text);
+  }
+  return result;
+}
+
+function getSavedStockPickingFromLedger(
+  rows: StockPickingRow[],
+  sourceId: string,
+  line: { inventoryProductId?: string | null; locationId?: string | null }
+) {
+  const matchingRows = rows.filter((row) => {
+    if (row.sourceId !== sourceId) return false;
+    if (line.inventoryProductId && row.inventoryProductId !== line.inventoryProductId) return false;
+    if (line.locationId && row.locationId && row.locationId !== line.locationId) return false;
+    return true;
+  });
+
+  const batchNo = uniqueStringList(matchingRows.map((row) => row.batchNo))[0] || null;
+  const serialNos = uniqueStringList(matchingRows.map((row) => extractSerialNoFromRemarks(row.remarks)));
+  return { batchNo, serialNos };
+}
+
+
 
 function roundQty(value: unknown) {
   return roundToDecimalPlaces(Number(value ?? 0), STOCK_STORAGE_DECIMAL_PLACES.qty);
@@ -776,12 +821,18 @@ export async function GET(_req: Request, context: Params) {
       include: { lines: { orderBy: { createdAt: "asc" }, include: { serialEntries: { orderBy: { serialNo: "asc" } } } } },
     });
 
+    const stockLedgerRowsForSavedPicking = await db.stockLedger.findMany({
+      where: { sourceType: "SALES_DELIVERY_ORDER", sourceId: transaction.id, movementDirection: "OUT" },
+      orderBy: [{ createdAt: "asc" }],
+      select: { sourceId: true, inventoryProductId: true, locationId: true, batchNo: true, remarks: true },
+    });
+
     const transactionWithStockPicking = {
       ...withCancellationDetails(transaction),
       lines: transaction.lines.map((line, index) => ({
         ...line,
-        batchNo: stockIssue?.lines[index]?.batchNo || null,
-        serialNos: stockIssue?.lines[index]?.serialEntries.map((entry) => entry.serialNo) || [],
+        batchNo: stockIssue?.lines[index]?.batchNo || getSavedStockPickingFromLedger(stockLedgerRowsForSavedPicking, transaction.id, line).batchNo || null,
+        serialNos: uniqueStringList([...(stockIssue?.lines[index]?.serialEntries.map((entry) => entry.serialNo) || []), ...getSavedStockPickingFromLedger(stockLedgerRowsForSavedPicking, transaction.id, line).serialNos]),
       })),
     };
 
