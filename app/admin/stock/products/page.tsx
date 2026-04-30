@@ -1,4 +1,3 @@
-
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -9,9 +8,12 @@ export default async function AdminProductsPage() {
   if (!user) redirect("/login");
   if (user.role !== "ADMIN") redirect("/dashboard");
 
-  const [products, locations, groups, subGroups, brands] = await Promise.all([
+  const pageSize = 10;
+
+  const [products, productTotal, locations, groups, subGroups, brands] = await Promise.all([
     db.inventoryProduct.findMany({
       orderBy: [{ isActive: "desc" }, { code: "asc" }],
+      take: pageSize,
       include: {
         defaultLocation: { select: { id: true, code: true, name: true } },
         productGroup: { select: { id: true, code: true, name: true, isActive: true } },
@@ -19,6 +21,7 @@ export default async function AdminProductsPage() {
         productBrand: { select: { id: true, code: true, name: true, isActive: true } },
       },
     }),
+    db.inventoryProduct.count(),
     db.stockLocation.findMany({
       orderBy: [{ isActive: "desc" }, { code: "asc" }],
       select: { id: true, code: true, name: true, isActive: true },
@@ -66,13 +69,15 @@ export default async function AdminProductsPage() {
               trackInventory: product.trackInventory,
               serialNumberTracking: product.serialNumberTracking,
               batchTracking: product.batchTracking,
-              isAssemblyItem: (product as any).isAssemblyItem ?? false,
+              isAssemblyItem: product.isAssemblyItem ?? false,
               isActive: product.isActive,
               defaultLocationId: product.defaultLocationId,
               defaultLocationLabel: product.defaultLocation ? `${product.defaultLocation.code} — ${product.defaultLocation.name}` : null,
+              uomConversions: [],
               createdAt: product.createdAt.toISOString(),
               updatedAt: product.updatedAt.toISOString(),
             }))}
+            initialPagination={{ page: 1, pageSize, total: productTotal, totalPages: Math.max(1, Math.ceil(productTotal / pageSize)) }}
             locations={locations}
             productGroups={groups}
             productSubGroups={subGroups}
