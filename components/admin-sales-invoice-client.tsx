@@ -938,6 +938,7 @@ export function AdminSalesInvoiceClient({
   const [recentCancelledTransaction, setRecentCancelledTransaction] = useState<SalesInvoiceRecord | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deletingPaymentId, setDeletingPaymentId] = useState<string | null>(null);
+  const [paymentDeleteTarget, setPaymentDeleteTarget] = useState<PaymentHistoryItem | null>(null);
   const [cancelTarget, setCancelTarget] = useState<SalesInvoiceRecord | null>(null);
   const [cancelReason, setCancelReason] = useState("");
   const [paymentDate, setPaymentDate] = useState(todayInput());
@@ -1884,8 +1885,6 @@ export function AdminSalesInvoiceClient({
 
   async function deletePayment(paymentId: string) {
     if (!editTarget?.id || !paymentId) return;
-    const confirmed = window.confirm("Delete this payment record? This will recalculate the invoice outstanding balance.");
-    if (!confirmed) return;
     setDeletingPaymentId(paymentId);
     setSubmitError("");
     try {
@@ -1898,6 +1897,7 @@ export function AdminSalesInvoiceClient({
         setEditTarget((prev) => prev ? { ...prev, payments: (prev.payments || []).filter((payment) => payment.id !== paymentId) } : prev);
       }
       setPaymentAmount("0");
+      setPaymentDeleteTarget(null);
       await loadTransactions();
       router.refresh();
     } catch (error) {
@@ -2457,7 +2457,7 @@ export function AdminSalesInvoiceClient({
                                   <span className="font-semibold text-white">{currency || "MYR"} {moneyWithPlaces(Number(payment.amount || 0), priceDecimalPlaces)}</span>
                                   <button
                                     type="button"
-                                    onClick={() => deletePayment(payment.id)}
+                                    onClick={() => setPaymentDeleteTarget(payment)}
                                     disabled={deletingPaymentId === payment.id}
                                     title="Delete payment record"
                                     className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-red-500/25 bg-red-500/10 text-red-200 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50"
@@ -2588,6 +2588,28 @@ export function AdminSalesInvoiceClient({
             <div className="mt-6 flex justify-end gap-3">
               <button type="button" onClick={() => setIsDocNoModalOpen(false)} className="rounded-xl border border-white/15 px-4 py-2 text-sm text-white/75">Cancel</button>
               <button type="button" onClick={() => { setDocNo(normalizeDocNoInput(docNoDraft)); setIsDocNoModalOpen(false); }} className="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white">Save</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+
+      {paymentDeleteTarget ? (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-[2rem] border border-white/10 bg-[#08080c] p-6 shadow-2xl">
+            <h3 className="text-2xl font-bold">Delete Sales Invoice Payment</h3>
+            <p className="mt-3 text-sm text-white/60">This will delete the selected payment record and recalculate the outstanding balance.</p>
+            <div className="mt-5 rounded-2xl border border-white/10 bg-black/30 px-4 py-4 text-sm text-white/75">
+              <div className="flex items-center justify-between gap-4">
+                <span>{formatDate(paymentDeleteTarget.paymentDate)} • {getPaymentModeLabel(paymentDeleteTarget.paymentMode)}</span>
+                <span className="font-semibold text-white">{currency || "MYR"} {moneyWithPlaces(Number(paymentDeleteTarget.amount || 0), priceDecimalPlaces)}</span>
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end gap-3">
+              <button type="button" onClick={() => setPaymentDeleteTarget(null)} className="rounded-xl border border-white/15 px-5 py-3 text-sm text-white/75">Close</button>
+              <button type="button" disabled={deletingPaymentId === paymentDeleteTarget.id} onClick={() => deletePayment(paymentDeleteTarget.id)} className="rounded-xl bg-red-600 px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60">
+                {deletingPaymentId === paymentDeleteTarget.id ? "Deleting..." : "Confirm Delete"}
+              </button>
             </div>
           </div>
         </div>

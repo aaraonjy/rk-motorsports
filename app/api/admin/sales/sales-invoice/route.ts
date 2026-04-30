@@ -152,6 +152,90 @@ function getPaymentInput(body: any) {
   return { amount, paymentMode, paymentDate };
 }
 
+
+async function loadTaxSettings(tx: Prisma.TransactionClient) {
+  const config = await tx.taxConfiguration.findUnique({ where: { id: "default" } });
+  const taxCodes = await tx.taxCode.findMany({ where: { isActive: true } });
+
+  return {
+    enabled: Boolean(config?.taxModuleEnabled),
+    mode: config?.taxCalculationMode === "LINE_ITEM" ? "LINE_ITEM" : "TRANSACTION",
+    taxCodes: new Map(taxCodes.map((taxCode) => [taxCode.id, taxCode])),
+  };
+}
+
+function calculateTaxAmount(taxableAmount: Prisma.Decimal, taxRate: Prisma.Decimal | number | string | null | undefined, method: string | null | undefined) {
+  const rate = new Prisma.Decimal(Number(taxRate ?? 0));
+  if (rate.lte(0) || taxableAmount.lte(0)) return new Prisma.Decimal(0);
+
+  if (method === "INCLUSIVE") {
+    return taxableAmount.mul(rate).div(new Prisma.Decimal(100).plus(rate)).toDecimalPlaces(2);
+  }
+
+  return taxableAmount.mul(rate).div(100).toDecimalPlaces(2);
+}
+
+function applyLineTax(line: any, taxSettings: Awaited<ReturnType<typeof loadTaxSettings>>) {
+  const requestedTaxCodeId = normalizeText(line.taxCodeId);
+  const taxCode = taxSettings.enabled && taxSettings.mode === "LINE_ITEM" && requestedTaxCodeId ? taxSettings.taxCodes.get(requestedTaxCodeId) : null;
+  const taxableAmount = line.lineSubtotal.minus(line.discountAmount).toDecimalPlaces(2);
+  const taxAmount = taxCode ? calculateTaxAmount(taxableAmount, taxCode.rate, taxCode.calculationMethod) : new Prisma.Decimal(0);
+  const lineTotal = taxCode?.calculationMethod === "INCLUSIVE" ? taxableAmount : taxableAmount.plus(taxAmount).toDecimalPlaces(2);
+
+  return {
+    ...line,
+    taxCodeId: taxCode?.id || null,
+    taxCode: taxCode?.code || null,
+    taxDescription: taxCode?.description || null,
+    taxDisplayLabel: taxCode?.displayLabel || taxCode?.code || null,
+    taxRate: taxCode?.rate || new Prisma.Decimal(0),
+    taxCalculationMethod: taxCode?.calculationMethod || null,
+    taxAmount,
+    lineTotal,
+  };
+}
+
+function calculateTransactionTotals(
+  lines: any[],
+  taxSettings: Awaited<ReturnType<typeof loadTaxSettings>>,
+  transactionTaxCodeId: string | null
+): {
+  subtotal: Prisma.Decimal;
+  discountTotal: Prisma.Decimal;
+  taxableSubtotal: Prisma.Decimal;
+  taxTotal: Prisma.Decimal;
+  grandTotal: Prisma.Decimal;
+  transactionTaxCode: any | null;
+} {
+  const subtotal = lines.reduce((sum, line) => sum.plus(line.lineSubtotal), new Prisma.Decimal(0)).toDecimalPlaces(2);
+  const discountTotal = lines.reduce((sum, line) => sum.plus(line.discountAmount), new Prisma.Decimal(0)).toDecimalPlaces(2);
+  const taxableSubtotal = subtotal.minus(discountTotal).toDecimalPlaces(2);
+
+  if (taxSettings.enabled && taxSettings.mode === "LINE_ITEM") {
+    return {
+      subtotal,
+      discountTotal,
+      taxableSubtotal,
+      taxTotal: lines.reduce((sum, line) => sum.plus(line.taxAmount), new Prisma.Decimal(0)).toDecimalPlaces(2),
+      grandTotal: lines.reduce((sum, line) => sum.plus(line.lineTotal), new Prisma.Decimal(0)).toDecimalPlaces(2),
+      transactionTaxCode: null,
+    };
+  }
+
+  const transactionTaxCode = taxSettings.enabled && transactionTaxCodeId ? taxSettings.taxCodes.get(transactionTaxCodeId) || null : null;
+  const taxTotal = transactionTaxCode ? calculateTaxAmount(taxableSubtotal, transactionTaxCode.rate, transactionTaxCode.calculationMethod) : new Prisma.Decimal(0);
+  const grandTotal = transactionTaxCode?.calculationMethod === "INCLUSIVE" ? taxableSubtotal : taxableSubtotal.plus(taxTotal).toDecimalPlaces(2);
+
+  return {
+    subtotal,
+    discountTotal,
+    taxableSubtotal,
+    taxTotal,
+    grandTotal,
+    transactionTaxCode,
+  };
+}
+
 function calculateSalesAdjustmentSummary(
   lines?: Array<{ sourceLineLinks?: Array<{ linkType?: string | null; claimAmount?: Prisma.Decimal | number | string | null; targetTransaction?: { status?: string | null; docType?: string | null } | null }> }>,
   sourceLinks?: Array<{ targetTransaction?: { status?: string | null; docType?: string | null; grandTotal?: Prisma.Decimal | number | string | null } | null }>
@@ -522,7 +606,7 @@ function buildInvoiceLine(
     serialNumberTracking: !isServiceItem && Boolean(product?.serialNumberTracking),
     locationCode: location?.code || null,
     locationName: location?.name || null,
-    taxCodeId: null,
+    taxCodeId: normalizeText(line.taxCodeId) || sourceLine?.taxCodeId || null,
     taxCode: null,
     taxDescription: null,
     taxDisplayLabel: null,
@@ -584,7 +668,10 @@ async function buildSalesInvoiceData(body: any, tx: Prisma.TransactionClient) {
   const productMap = new Map<string, any>(products.map((item: any) => [item.id, item]));
   const locationMap = new Map<string, any>(locations.map((item: any) => [item.id, item]));
 
-  const lines = rawLines.map((line, index) => buildInvoiceLine(line, index + 1, productMap, locationMap, sourceLineMap, numberFormat));
+  const taxSettings = await loadTaxSettings(tx);
+  const lines = rawLines
+    .map((line, index) => buildInvoiceLine(line, index + 1, productMap, locationMap, sourceLineMap, numberFormat))
+    .map((line) => applyLineTax(line, taxSettings));
 
   for (const line of lines) {
     const product = line.inventoryProductId ? productMap.get(line.inventoryProductId) : null;
@@ -594,11 +681,8 @@ async function buildSalesInvoiceData(body: any, tx: Prisma.TransactionClient) {
     }
   }
 
-  const subtotal = lines.reduce((sum, line) => sum.plus(line.lineSubtotal), new Prisma.Decimal(0)).toDecimalPlaces(2);
-  const discountTotal = lines.reduce((sum, line) => sum.plus(line.discountAmount), new Prisma.Decimal(0)).toDecimalPlaces(2);
-  const taxableSubtotal = subtotal.minus(discountTotal).toDecimalPlaces(2);
-  const taxTotal = new Prisma.Decimal(0);
-  const grandTotal = lines.reduce((sum, line) => sum.plus(line.lineTotal), new Prisma.Decimal(0)).toDecimalPlaces(2);
+  const totals = calculateTransactionTotals(lines, taxSettings, normalizeText(body.transactionTaxCodeId));
+  const { subtotal, discountTotal, taxableSubtotal, taxTotal, grandTotal, transactionTaxCode } = totals;
 
   const sourceLines = Array.from(sourceLineMap.values()) as any[];
   const generatedFromDocNos = Array.from(new Set(sourceLines.map((line: any) => line.transaction?.docNo).filter(Boolean)));
@@ -622,6 +706,7 @@ async function buildSalesInvoiceData(body: any, tx: Prisma.TransactionClient) {
     taxableSubtotal,
     taxTotal,
     grandTotal,
+    transactionTaxCode,
     lines,
     sourceTransactionIds: Array.from(new Set(lines.map((line) => line.sourceTransactionId).filter(Boolean))) as string[],
     sourceDocTypes,
@@ -952,6 +1037,12 @@ export async function POST(req: Request) {
           subtotal: data.subtotal,
           discountTotal: data.discountTotal,
           taxableSubtotal: data.taxableSubtotal,
+          taxCodeId: data.transactionTaxCode?.id || null,
+          taxCode: data.transactionTaxCode?.code || null,
+          taxDescription: data.transactionTaxCode?.description || null,
+          taxDisplayLabel: data.transactionTaxCode?.displayLabel || data.transactionTaxCode?.code || null,
+          taxRate: data.transactionTaxCode?.rate || null,
+          taxCalculationMethod: data.transactionTaxCode?.calculationMethod || null,
           taxTotal: data.taxTotal,
           grandTotal: data.grandTotal,
           termsAndConditions: data.termsAndConditions,
