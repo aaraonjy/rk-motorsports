@@ -11,7 +11,7 @@ function toNumber(value: Prisma.Decimal | number | string | null | undefined) {
 }
 
 function calculatePaymentSummary(transaction: any) {
-  const payments = Array.isArray(transaction.payments) ? transaction.payments : [];
+  const payments: Array<{ amount?: Prisma.Decimal | number | string | null }> = Array.isArray(transaction.payments) ? transaction.payments : [];
   const grandTotal = toNumber(transaction.grandTotal);
   const totalPaid = Math.round((payments.reduce((sum, payment) => sum + toNumber(payment.amount), 0) + Number.EPSILON) * 100) / 100;
   const outstandingBalance = Math.max(0, Math.round((grandTotal - totalPaid + Number.EPSILON) * 100) / 100);

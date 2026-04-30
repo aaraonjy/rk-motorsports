@@ -38,7 +38,7 @@ function calculateSalesAdjustmentSummary(
 }
 
 function calculatePaymentSummary(transaction: any) {
-  const payments = Array.isArray(transaction.payments) ? transaction.payments : [];
+  const payments: Array<{ amount?: Prisma.Decimal | number | string | null }> = Array.isArray(transaction.payments) ? transaction.payments : [];
   const totalPaid = Math.round((payments.reduce((sum, payment) => sum + toNumber(payment.amount), 0) + Number.EPSILON) * 100) / 100;
   const adjustment = calculateSalesAdjustmentSummary(transaction.lines || [], transaction.sourceLinks || []);
   const grandTotal = toNumber(transaction.grandTotal);
