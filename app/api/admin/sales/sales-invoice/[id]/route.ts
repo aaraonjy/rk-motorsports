@@ -254,7 +254,7 @@ function sumLinkedQty(
   line: {
     sourceLineLinks?: Array<{ linkType?: string | null; qty?: Prisma.Decimal | number | string | null; claimAmount?: Prisma.Decimal | number | string | null; targetTransaction?: { status?: string | null } | null }>;
   },
-  linkType: "INVOICED_TO"
+  linkType: "INVOICED_TO" | "RETURNED_TO"
 ) {
   return (line.sourceLineLinks || [])
     .filter((link) => link.linkType === linkType)
@@ -267,7 +267,7 @@ function sumLinkedAmount(
   line: {
     sourceLineLinks?: Array<{ linkType?: string | null; claimAmount?: Prisma.Decimal | number | string | null; targetTransaction?: { status?: string | null } | null }>;
   },
-  linkType: "INVOICED_TO"
+  linkType: "INVOICED_TO" | "RETURNED_TO"
 ) {
   return (line.sourceLineLinks || [])
     .filter((link) => link.linkType === linkType)
@@ -279,33 +279,37 @@ function withSalesLineProgress(line: any) {
   const itemType = line.inventoryProduct?.itemType || line.itemType || "STOCK_ITEM";
   const orderedQty = toNumber(line.qty);
   const invoicedQty = sumLinkedQty(line, "INVOICED_TO");
+  const returnedQty = line.transaction?.docType === "DO" ? sumLinkedQty(line, "RETURNED_TO") : 0;
   const orderedAmount = toNumber(line.lineTotal);
   const invoicedAmount = sumLinkedAmount(line, "INVOICED_TO");
+  const returnedAmount = line.transaction?.docType === "DO" ? sumLinkedAmount(line, "RETURNED_TO") : 0;
 
   return {
     ...line,
     itemType,
     orderedQty,
     invoicedQty,
+    returnedQty,
     orderedAmount,
     invoicedAmount,
-    remainingInvoiceQty: Math.max(0, orderedQty - invoicedQty),
-    remainingInvoiceAmount: Math.max(0, orderedAmount - invoicedAmount),
+    returnedAmount,
+    remainingInvoiceQty: Math.max(0, orderedQty - returnedQty - invoicedQty),
+    remainingInvoiceAmount: Math.max(0, orderedAmount - returnedAmount - invoicedAmount),
   };
 }
 
-function calculateSalesOrderStatus(lines: Array<{ itemType?: string; orderedQty: number; invoicedQty: number; orderedAmount?: number; invoicedAmount?: number }>) {
+function calculateSalesOrderStatus(lines: Array<{ itemType?: string; orderedQty: number; invoicedQty: number; returnedQty?: number; orderedAmount?: number; invoicedAmount?: number; returnedAmount?: number }>) {
   if (lines.length === 0) return "OPEN" as SalesTransactionStatus;
 
   const hasAnyProgress = lines.some((line) =>
     line.itemType === "SERVICE_ITEM"
-      ? Number(line.invoicedAmount || 0) > 0
-      : line.invoicedQty > 0
+      ? Number(line.invoicedAmount || 0) > 0 || Number(line.returnedAmount || 0) > 0
+      : line.invoicedQty > 0 || Number(line.returnedQty || 0) > 0
   );
   const isFullyInvoiced = lines.every((line) =>
     line.itemType === "SERVICE_ITEM"
-      ? Number(line.invoicedAmount || 0) >= Number(line.orderedAmount || 0)
-      : line.invoicedQty >= line.orderedQty
+      ? Number(line.invoicedAmount || 0) + Number(line.returnedAmount || 0) >= Number(line.orderedAmount || 0)
+      : line.invoicedQty + Number(line.returnedQty || 0) >= line.orderedQty
   );
 
   if (isFullyInvoiced) return "COMPLETED" as SalesTransactionStatus;
@@ -338,7 +342,7 @@ async function refreshSalesOrderStatuses(tx: Prisma.TransactionClient, sourceTra
 
     if (!source || source.docType !== "SO" || source.status === "CANCELLED") continue;
 
-    const lines = source.lines.map((line) => withSalesLineProgress(line));
+    const lines = source.lines.map((line) => withSalesLineProgress({ ...line, transaction: { docType: source.docType } }));
     const nextStatus = calculateSalesOrderStatus(lines);
     if (source.status !== nextStatus) {
       await tx.salesTransaction.update({ where: { id: source.id }, data: { status: nextStatus } });
@@ -371,7 +375,7 @@ async function refreshDeliveryOrderStatuses(tx: Prisma.TransactionClient, source
 
     if (!source || source.docType !== "DO" || source.status === "CANCELLED") continue;
 
-    const lines = source.lines.map((line) => withSalesLineProgress(line));
+    const lines = source.lines.map((line) => withSalesLineProgress({ ...line, transaction: { docType: source.docType } }));
     const nextStatus = calculateSalesOrderStatus(lines);
     if (source.status !== nextStatus) {
       await tx.salesTransaction.update({ where: { id: source.id }, data: { status: nextStatus } });

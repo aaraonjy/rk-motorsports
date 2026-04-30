@@ -37,7 +37,7 @@ function sumLinkedQty(
   line: {
     sourceLineLinks?: Array<{ linkType?: string | null; qty?: unknown; claimAmount?: unknown; targetTransaction?: { status?: string | null } | null }>;
   },
-  linkType: "INVOICED_TO" | "INVOICED_TO"
+  linkType: "INVOICED_TO" | "RETURNED_TO"
 ) {
   return (line.sourceLineLinks || [])
     .filter((link) => link.linkType === linkType)
@@ -50,7 +50,7 @@ function sumLinkedAmount(
   line: {
     sourceLineLinks?: Array<{ linkType?: string | null; claimAmount?: unknown; targetTransaction?: { status?: string | null } | null }>;
   },
-  linkType: "INVOICED_TO" | "INVOICED_TO"
+  linkType: "INVOICED_TO" | "RETURNED_TO"
 ) {
   return (line.sourceLineLinks || [])
     .filter((link) => link.linkType === linkType)
@@ -266,10 +266,12 @@ export default async function AdminSalesInvoicePage() {
             lines: order.lines.map((line) => {
               const itemType = line.inventoryProduct?.itemType || "STOCK_ITEM";
               const invoicedQty = sumLinkedQty(line, "INVOICED_TO");
-              const remainingInvoiceQty = Math.max(0, toNumber(line.qty) - invoicedQty);
+              const returnedQty = order.docType === "DO" ? sumLinkedQty(line, "RETURNED_TO") : 0;
+              const remainingInvoiceQty = Math.max(0, toNumber(line.qty) - returnedQty - invoicedQty);
               const orderedAmount = toNumber(line.lineTotal);
               const invoicedAmount = sumLinkedAmount(line, "INVOICED_TO");
-              const remainingInvoiceAmount = Math.max(0, orderedAmount - invoicedAmount);
+              const returnedAmount = order.docType === "DO" ? sumLinkedAmount(line, "RETURNED_TO") : 0;
+              const remainingInvoiceAmount = Math.max(0, orderedAmount - returnedAmount - invoicedAmount);
               const sourceStockMetaKey = `${order.id}__${line.inventoryProductId || ""}__${line.locationId || ""}`;
               const sourceStockMetaQueue = order.docType === "DO" ? stockMetaQueues.get(sourceStockMetaKey) || [] : [];
               const sourceStockMeta = sourceStockMetaQueue.length > 0 ? sourceStockMetaQueue.shift() : null;
@@ -282,9 +284,11 @@ export default async function AdminSalesInvoicePage() {
                 uom: line.uom,
                 qty: Number(line.qty ?? 0),
                 invoicedQty,
+                returnedQty,
                 remainingInvoiceQty,
                 orderedAmount,
                 invoicedAmount,
+                returnedAmount,
                 remainingInvoiceAmount,
                 unitPrice: Number(line.unitPrice ?? 0),
                 discountRate: Number(line.discountRate ?? 0),
