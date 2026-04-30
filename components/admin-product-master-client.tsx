@@ -315,6 +315,8 @@ export function AdminProductMasterClient({
   productBrands,
 }: Props) {
   const [products, setProducts] = useState(initialProducts);
+  const [pagination, setPagination] = useState(initialPagination);
+  const [isLoadingProducts, setIsLoadingProducts] = useState(false);
   const [keyword, setKeyword] = useState("");
   const [itemTypeFilter, setItemTypeFilter] = useState<"ALL" | InventoryItemTypeValue>("ALL");
   const [statusFilter, setStatusFilter] = useState<"ALL" | "ACTIVE" | "INACTIVE">("ALL");
