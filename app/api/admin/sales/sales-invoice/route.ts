@@ -280,13 +280,22 @@ function calculateSalesPaymentSummary(
   const adjustmentSummary = calculateSalesAdjustmentSummary(lines, sourceLinks);
   const adjustedGrandTotal = Math.max(0, Math.round((total - adjustmentSummary.totalCredited + adjustmentSummary.totalDebited + Number.EPSILON) * 100) / 100);
   const outstandingBalance = Math.max(0, Math.round((adjustedGrandTotal - roundedTotalPaid + Number.EPSILON) * 100) / 100);
+  const paymentStatus = (() => {
+    if (outstandingBalance <= 0) {
+      if (roundedTotalPaid > 0 && (adjustmentSummary.totalCredited > 0 || adjustmentSummary.totalDebited > 0)) return "SETTLED";
+      if (roundedTotalPaid <= 0 && adjustmentSummary.totalCredited > 0) return "CREDITED";
+      return "PAID";
+    }
+    return roundedTotalPaid > 0 || adjustmentSummary.totalCredited > 0 || adjustmentSummary.totalDebited > 0 ? "PARTIALLY_PAID" : "UNPAID";
+  })();
+
   return {
     totalPaid: roundedTotalPaid,
     totalCredited: adjustmentSummary.totalCredited,
     totalDebited: adjustmentSummary.totalDebited,
     adjustedGrandTotal,
     outstandingBalance,
-    paymentStatus: outstandingBalance <= 0 ? "PAID" : roundedTotalPaid > 0 || adjustmentSummary.totalCredited > 0 || adjustmentSummary.totalDebited > 0 ? "PARTIALLY_PAID" : "UNPAID",
+    paymentStatus,
   };
 }
 

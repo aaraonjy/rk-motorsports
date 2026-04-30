@@ -175,7 +175,7 @@ type SalesInvoiceRecord = {
   totalDebited?: string | number | null;
   adjustedGrandTotal?: string | number | null;
   outstandingBalance?: string | number | null;
-  paymentStatus?: "UNPAID" | "PARTIALLY_PAID" | "PAID" | string | null;
+  paymentStatus?: "UNPAID" | "PARTIALLY_PAID" | "PAID" | "CREDITED" | "SETTLED" | string | null;
   cancelReason?: string | null;
   cancelledAt?: string | Date | null;
   cancelledBy?: string | null;
@@ -471,6 +471,8 @@ function getPaymentModeLabel(value: string) {
 function getPaymentStatusLabel(value: string | null | undefined) {
   switch (value) {
     case "PAID": return "PAID";
+    case "CREDITED": return "CREDITED";
+    case "SETTLED": return "SETTLED";
     case "PARTIALLY_PAID": return "PARTIAL";
     case "UNPAID": return "UNPAID";
     default: return value || "UNPAID";
@@ -479,6 +481,8 @@ function getPaymentStatusLabel(value: string | null | undefined) {
 
 function getPaymentStatusClass(value: string | null | undefined) {
   if (value === "PAID") return "border-emerald-500/25 bg-emerald-500/10 text-emerald-200";
+  if (value === "SETTLED") return "border-emerald-500/25 bg-emerald-500/10 text-emerald-200";
+  if (value === "CREDITED") return "border-sky-500/25 bg-sky-500/10 text-sky-200";
   if (value === "PARTIALLY_PAID") return "border-amber-500/25 bg-amber-500/10 text-amber-200";
   return "border-white/15 bg-white/5 text-white/55";
 }
@@ -501,13 +505,28 @@ function getPaymentSummary(record: {
     record.adjustedGrandTotal ?? Math.max(0, Math.round((grandTotal - totalCredited + totalDebited + Number.EPSILON) * 100) / 100)
   );
   const outstandingBalance = Number(record.outstandingBalance ?? Math.max(0, Math.round((adjustedGrandTotal - totalPaid + Number.EPSILON) * 100) / 100));
-  const paymentStatus = record.paymentStatus || (outstandingBalance <= 0 ? "PAID" : totalPaid > 0 || totalCredited > 0 || totalDebited > 0 ? "PARTIALLY_PAID" : "UNPAID");
+  const calculatedPaymentStatus = (() => {
+    if (outstandingBalance <= 0) {
+      if (totalPaid > 0 && (totalCredited > 0 || totalDebited > 0)) return "SETTLED";
+      if (totalPaid <= 0 && totalCredited > 0) return "CREDITED";
+      return "PAID";
+    }
+    return totalPaid > 0 || totalCredited > 0 || totalDebited > 0 ? "PARTIALLY_PAID" : "UNPAID";
+  })();
+  const paymentStatus = record.paymentStatus || calculatedPaymentStatus;
   return { grandTotal, totalPaid, totalCredited, totalDebited, adjustedGrandTotal, outstandingBalance, paymentStatus };
 }
 
-function isFullyPaidSalesInvoice(record: { status?: string | null; grandTotal?: string | number | null; totalPaid?: string | number | null; outstandingBalance?: string | number | null; paymentStatus?: string | null; payments?: PaymentHistoryItem[] }) {
+function getDisplaySalesInvoiceStatus(record: { status?: string | null; grandTotal?: string | number | null; totalPaid?: string | number | null; totalCredited?: string | number | null; totalDebited?: string | number | null; adjustedGrandTotal?: string | number | null; outstandingBalance?: string | number | null; paymentStatus?: string | null; payments?: PaymentHistoryItem[] }) {
+  if (record.status === "CANCELLED") return "CANCELLED";
   const summary = getPaymentSummary(record);
-  return record.status === "COMPLETED" || summary.paymentStatus === "PAID" || summary.outstandingBalance <= 0;
+  if (summary.outstandingBalance <= 0) return "COMPLETED";
+  return record.status || "OPEN";
+}
+
+function isFullyPaidSalesInvoice(record: { status?: string | null; grandTotal?: string | number | null; totalPaid?: string | number | null; totalCredited?: string | number | null; totalDebited?: string | number | null; adjustedGrandTotal?: string | number | null; outstandingBalance?: string | number | null; paymentStatus?: string | null; payments?: PaymentHistoryItem[] }) {
+  const summary = getPaymentSummary(record);
+  return record.status === "COMPLETED" || summary.outstandingBalance <= 0;
 }
 
 function formatDate(value: string | Date | null | undefined) {
@@ -2031,7 +2050,7 @@ export function AdminSalesInvoiceClient({
                       <div className="text-xs text-white/45">{item.customerAccountNo || "-"}</div>
                     </td>
                     <td className="px-4 py-4 text-white/65">{(item.targetLinks || []).map((link) => link.sourceTransaction?.docNo).filter(Boolean).join(", ") || "-"}</td>
-                    <td className="px-4 py-4"><span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getStatusClass(item.status)}`}>{item.status}</span></td>
+                    <td className="px-4 py-4"><span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getStatusClass(getDisplaySalesInvoiceStatus(item))}`}>{getDisplaySalesInvoiceStatus(item)}</span></td>
                     <td className="px-4 py-4">
                       <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getPaymentStatusClass(getPaymentSummary(item).paymentStatus)}`}>
                         {getPaymentStatusLabel(getPaymentSummary(item).paymentStatus)}
@@ -2042,23 +2061,23 @@ export function AdminSalesInvoiceClient({
                     <td className="px-4 py-4 text-right">{`${item.currency || "MYR"} ${moneyWithPlaces(getPaymentSummary(item).outstandingBalance, priceDecimalPlaces)}`}</td>
                     <td className="px-4 py-4 text-right">
                       {item.status !== "CANCELLED" ? (
-                        <div className="flex flex-wrap justify-end gap-2">
-                          {!isFullyPaidSalesInvoice(item) ? (
-                            <>
-                              <button type="button" onClick={(event) => { event.stopPropagation(); openEdit(item); }} className="rounded-xl border border-white/15 px-3 py-2 text-xs text-white/75 transition hover:bg-white/10 hover:text-white">
-                                {isGeneratedFromSalesOrder(item) ? "Record Payment" : "Edit"}
+                        isFullyPaidSalesInvoice(item) ? (
+                          <span className="inline-flex rounded-xl border border-white/10 px-3 py-2 text-xs text-white/35">Locked</span>
+                        ) : (
+                          <div className="flex flex-wrap justify-end gap-2">
+                            <button type="button" onClick={(event) => { event.stopPropagation(); openEdit(item); }} className="rounded-xl border border-white/15 px-3 py-2 text-xs text-white/75 transition hover:bg-white/10 hover:text-white">
+                              {isGeneratedFromSalesOrder(item) ? "Record Payment" : "Edit"}
+                            </button>
+                            {!isGeneratedFromSalesOrder(item) ? (
+                              <button type="button" onClick={(event) => { event.stopPropagation(); openRevise(item); }} className="rounded-xl border border-sky-500/30 px-3 py-2 text-xs text-sky-200 transition hover:bg-sky-500/10">
+                                Edit Revise
                               </button>
-                              {!isGeneratedFromSalesOrder(item) ? (
-                                <button type="button" onClick={(event) => { event.stopPropagation(); openRevise(item); }} className="rounded-xl border border-sky-500/30 px-3 py-2 text-xs text-sky-200 transition hover:bg-sky-500/10">
-                                  Edit Revise
-                                </button>
-                              ) : null}
-                            </>
-                          ) : null}
-                          <button type="button" onClick={(event) => { event.stopPropagation(); setCancelTarget(item); }} className="rounded-xl border border-red-500/30 px-3 py-2 text-xs text-red-200 transition hover:bg-red-500/10">
-                            Cancel
-                          </button>
-                        </div>
+                            ) : null}
+                            <button type="button" onClick={(event) => { event.stopPropagation(); setCancelTarget(item); }} className="rounded-xl border border-red-500/30 px-3 py-2 text-xs text-red-200 transition hover:bg-red-500/10">
+                              Cancel
+                            </button>
+                          </div>
+                        )
                       ) : (
                         <span className="text-xs text-white/35">Cancelled</span>
                       )}
