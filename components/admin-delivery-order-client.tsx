@@ -158,7 +158,9 @@ type DeliveryOrderRecord = {
   termsAndConditions?: string | null;
   bankAccount?: string | null;
   footerRemarks?: string | null;
-  status: "OPEN" | "PARTIAL" | "COMPLETED" | "CANCELLED";
+  status: "OPEN" | "PARTIAL" | "COMPLETED" | "CANCELLED" | "RETURNED" | "PARTIAL_RETURN";
+  displayStatus?: string | null;
+  returnStatus?: string | null;
   grandTotal: string | number;
   cancelReason?: string | null;
   cancelledAt?: string | Date | null;
@@ -551,9 +553,15 @@ function getSalesDocumentLabel(_transaction: DeliveryOrderRecord) {
 
 function getStatusClass(status: string) {
   if (status === "CANCELLED") return "border-red-500/25 bg-red-500/10 text-red-200";
+  if (status === "RETURNED") return "border-white/15 bg-white/5 text-white/55";
+  if (status === "PARTIAL_RETURN") return "border-amber-500/25 bg-amber-500/10 text-amber-200";
   if (status === "CONFIRMED" || status === "COMPLETED") return "border-emerald-500/25 bg-emerald-500/10 text-emerald-200";
   if (status === "PARTIAL") return "border-indigo-500/25 bg-indigo-500/10 text-indigo-200";
   return "border-amber-500/25 bg-amber-500/10 text-amber-200";
+}
+
+function getDisplayStatus(transaction: { status?: string | null; displayStatus?: string | null; returnStatus?: string | null }) {
+  return transaction.displayStatus || transaction.returnStatus || transaction.status || "OPEN";
 }
 
 function emptyLine(defaultTaxCodeId = "", defaultLocationId = "", qtyDecimalPlaces = 2, priceDecimalPlaces = 2): LineForm {
@@ -828,6 +836,17 @@ function hasActiveInvoiceTransaction(transaction: DeliveryOrderRecord) {
     const target = link.targetTransaction;
     return target && ["INV", "CS"].includes(String(target.docType || "")) && target.status !== "CANCELLED";
   });
+}
+
+function hasActiveDeliveryReturnTransaction(transaction: DeliveryOrderRecord) {
+  return (transaction.downstreamLinks || []).some((link) => {
+    const target = link.targetTransaction;
+    return target && target.docType === "DR" && target.status !== "CANCELLED";
+  });
+}
+
+function isDeliveryOrderLockedByReturn(transaction: DeliveryOrderRecord) {
+  return hasActiveDeliveryReturnTransaction(transaction) || getDisplayStatus(transaction) === "RETURNED" || getDisplayStatus(transaction) === "PARTIAL_RETURN";
 }
 
 export function AdminDeliveryOrderClient({
@@ -1872,12 +1891,12 @@ export function AdminDeliveryOrderClient({
                       <div className="text-xs text-white/45">{item.customerAccountNo || "-"}</div>
                     </td>
                     <td className="px-4 py-4 text-white/65">{(item.targetLinks || []).map((link) => link.sourceTransaction?.docNo).filter(Boolean).join(", ") || "-"}</td>
-                    <td className="px-4 py-4"><span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getStatusClass(item.status)}`}>{item.status}</span></td>
+                    <td className="px-4 py-4"><span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getStatusClass(getDisplayStatus(item))}`}>{getDisplayStatus(item).replace("PARTIAL_RETURN", "PARTIAL RETURN")}</span></td>
                     <td className="px-4 py-4 text-right">{`${item.currency || "MYR"} ${moneyWithPlaces(Number(item.grandTotal || 0), priceDecimalPlaces)}`}</td>
                     <td className="px-4 py-4 text-right">
                       {item.status !== "CANCELLED" ? (
                         <div className="flex flex-wrap justify-end gap-2">
-                          {item.status !== "COMPLETED" && !hasActiveInvoiceTransaction(item) && !isGeneratedFromSalesOrder(item) ? (
+                          {item.status !== "COMPLETED" && !hasActiveInvoiceTransaction(item) && !isGeneratedFromSalesOrder(item) && !isDeliveryOrderLockedByReturn(item) ? (
                             <>
                               <button type="button" onClick={(event) => { event.stopPropagation(); openEdit(item); }} className="rounded-xl border border-white/15 px-3 py-2 text-xs text-white/75 transition hover:bg-white/10 hover:text-white">
                                 Edit
@@ -1887,7 +1906,7 @@ export function AdminDeliveryOrderClient({
                               </button>
                             </>
                           ) : null}
-                          {item.status !== "COMPLETED" && !hasActiveInvoiceTransaction(item) ? (
+                          {item.status !== "COMPLETED" && !hasActiveInvoiceTransaction(item) && !isDeliveryOrderLockedByReturn(item) ? (
                             <button type="button" onClick={(event) => { event.stopPropagation(); setCancelTarget(item); }} className="rounded-xl border border-red-500/30 px-3 py-2 text-xs text-red-200 transition hover:bg-red-500/10">
                               Cancel
                             </button>

@@ -43,7 +43,7 @@ function sumLinkedQty(
   line: {
     sourceLineLinks?: Array<{ linkType?: string | null; qty?: Prisma.Decimal | number | string | null; claimAmount?: Prisma.Decimal | number | string | null; targetTransaction?: { status?: string | null } | null }>;
   },
-  linkType: "DELIVERED_TO" | "INVOICED_TO"
+  linkType: "DELIVERED_TO" | "INVOICED_TO" | "RETURNED_TO"
 ) {
   return (line.sourceLineLinks || [])
     .filter((link) => link.linkType === linkType)
@@ -56,7 +56,7 @@ function sumLinkedAmount(
   line: {
     sourceLineLinks?: Array<{ linkType?: string | null; claimAmount?: Prisma.Decimal | number | string | null; targetTransaction?: { status?: string | null } | null }>;
   },
-  linkType: "DELIVERED_TO" | "INVOICED_TO"
+  linkType: "DELIVERED_TO" | "INVOICED_TO" | "RETURNED_TO"
 ) {
   return (line.sourceLineLinks || [])
     .filter((link) => link.linkType === linkType)
@@ -69,18 +69,24 @@ function withSalesLineProgress(line: any) {
   const orderedQty = toNumber(line.qty);
   const deliveredQty = sumLinkedQty(line, "DELIVERED_TO");
   const invoicedQty = sumLinkedQty(line, "INVOICED_TO");
+  const returnedQty = sumLinkedQty(line, "RETURNED_TO");
   const orderedAmount = toNumber(line.lineTotal);
   const deliveredAmount = sumLinkedAmount(line, "DELIVERED_TO");
   const invoicedAmount = sumLinkedAmount(line, "INVOICED_TO");
+  const returnedAmount = sumLinkedAmount(line, "RETURNED_TO");
   return {
     ...line,
     itemType,
     orderedQty,
     deliveredQty,
     invoicedQty,
+    returnedQty,
     orderedAmount,
     deliveredAmount,
     invoicedAmount,
+    returnedAmount,
+    remainingReturnQty: Math.max(0, orderedQty - returnedQty),
+    netInvoiceQty: Math.max(0, orderedQty - returnedQty - invoicedQty),
     remainingDeliveryQty: Math.max(0, orderedQty - deliveredQty),
     remainingInvoiceQty: Math.max(0, orderedQty - invoicedQty),
     remainingDeliveryAmount: Math.max(0, orderedAmount - deliveredAmount),

@@ -178,7 +178,7 @@ function sumLinkedQty(
   line: {
     sourceLineLinks?: Array<{ linkType?: string | null; qty?: Prisma.Decimal | number | string | null; claimAmount?: Prisma.Decimal | number | string | null; targetTransaction?: { status?: string | null } | null }>;
   },
-  linkType: "DELIVERED_TO" | "INVOICED_TO"
+  linkType: "DELIVERED_TO" | "INVOICED_TO" | "RETURNED_TO"
 ) {
   return (line.sourceLineLinks || [])
     .filter((link) => link.linkType === linkType)
@@ -191,7 +191,7 @@ function sumLinkedAmount(
   line: {
     sourceLineLinks?: Array<{ linkType?: string | null; claimAmount?: Prisma.Decimal | number | string | null; targetTransaction?: { status?: string | null } | null }>;
   },
-  linkType: "DELIVERED_TO" | "INVOICED_TO"
+  linkType: "DELIVERED_TO" | "INVOICED_TO" | "RETURNED_TO"
 ) {
   return (line.sourceLineLinks || [])
     .filter((link) => link.linkType === linkType)
@@ -204,9 +204,11 @@ function withSalesLineProgress(line: any) {
   const orderedQty = toNumber(line.qty);
   const deliveredQty = sumLinkedQty(line, "DELIVERED_TO");
   const invoicedQty = sumLinkedQty(line, "INVOICED_TO");
+  const returnedQty = sumLinkedQty(line, "RETURNED_TO");
   const orderedAmount = toNumber(line.lineTotal);
   const deliveredAmount = sumLinkedAmount(line, "DELIVERED_TO");
   const invoicedAmount = sumLinkedAmount(line, "INVOICED_TO");
+  const returnedAmount = sumLinkedAmount(line, "RETURNED_TO");
 
   return {
     ...line,
@@ -214,9 +216,13 @@ function withSalesLineProgress(line: any) {
     orderedQty,
     deliveredQty,
     invoicedQty,
+    returnedQty,
     orderedAmount,
     deliveredAmount,
     invoicedAmount,
+    returnedAmount,
+    remainingReturnQty: Math.max(0, orderedQty - returnedQty),
+    netInvoiceQty: Math.max(0, orderedQty - returnedQty - invoicedQty),
     remainingDeliveryQty: Math.max(0, orderedQty - deliveredQty),
     remainingInvoiceQty: Math.max(0, orderedQty - invoicedQty),
     remainingDeliveryAmount: Math.max(0, orderedAmount - deliveredAmount),
@@ -246,6 +252,16 @@ function calculateSalesOrderStatus(lines: Array<{ itemType?: string; orderedQty:
   if (isFullyDelivered || isFullyInvoiced) return "COMPLETED" as SalesTransactionStatus;
   if (hasAnyProgress) return "PARTIAL" as SalesTransactionStatus;
   return "OPEN" as SalesTransactionStatus;
+}
+
+
+function calculateDeliveryReturnDisplayStatus(lines: Array<{ orderedQty: number; returnedQty?: number }>, fallbackStatus: SalesTransactionStatus | string) {
+  if (fallbackStatus === "CANCELLED") return "CANCELLED";
+  const totalQty = lines.reduce((sum, line) => sum + Number(line.orderedQty || 0), 0);
+  const returnedQty = lines.reduce((sum, line) => sum + Number(line.returnedQty || 0), 0);
+  if (totalQty > 0 && returnedQty >= totalQty) return "RETURNED";
+  if (returnedQty > 0) return "PARTIAL_RETURN";
+  return fallbackStatus;
 }
 
 async function refreshSalesOrderStatuses(tx: Prisma.TransactionClient, sourceTransactionIds: string[]) {
@@ -687,10 +703,13 @@ export async function GET(req: Request) {
       const stockIssue = stockIssueByReference.get(row.docNo);
       const progressLines = row.lines.map((line) => withSalesLineProgress(line));
       const progressStatus = row.status === "CANCELLED" ? row.status : calculateSalesOrderStatus(progressLines);
+      const displayStatus = calculateDeliveryReturnDisplayStatus(progressLines, progressStatus);
       return {
         ...withCancellationDetails(row),
         status: progressStatus,
         progressStatus,
+        displayStatus,
+        returnStatus: displayStatus,
         lines: progressLines.map((line, index) => ({
           ...line,
           batchNo: stockIssue?.lines[index]?.batchNo || null,

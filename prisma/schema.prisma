@@ -112,6 +112,7 @@ enum SalesLineLinkType {
   DELIVERED_TO
   INVOICED_TO
   CREDITED_TO
+  RETURNED_TO
 }
 
 enum TaxCalculationMethod {
