@@ -646,6 +646,10 @@ export function AdminSalesQuotationClient({
   const priceInputStep = decimalStep(priceDecimalPlaces);
 
   const [transactions, setTransactions] = useState<QuotationRecord[]>([]);
+  const pageSize = 10;
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalRecords, setTotalRecords] = useState(0);
+  const totalPages = Math.max(1, Math.ceil(totalRecords / pageSize));
   const [isLoading, setIsLoading] = useState(true);
   const [products, setProducts] = useState<ProductOption[]>(initialProducts);
   const [searchKeyword, setSearchKeyword] = useState("");
@@ -889,17 +893,26 @@ export function AdminSalesQuotationClient({
     };
   }, [isLineItemTaxMode, isTaxEnabled, normalizedLines, selectedTaxCode]);
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchKeyword, statusFilter]);
+
   async function loadTransactions() {
     setIsLoading(true);
     try {
       const params = new URLSearchParams();
       if (searchKeyword.trim()) params.set("q", searchKeyword.trim());
       if (statusFilter !== "ALL") params.set("status", statusFilter);
+      params.set("page", String(currentPage));
+      params.set("pageSize", String(pageSize));
       const response = await fetch(`/api/admin/sales/quotation?${params.toString()}`, { cache: "no-store" });
       const data = await response.json();
-      setTransactions(response.ok && data.ok && Array.isArray(data.transactions) ? data.transactions : []);
+      const nextTransactions = response.ok && data.ok && Array.isArray(data.transactions) ? data.transactions : [];
+      setTransactions(nextTransactions);
+      setTotalRecords(response.ok && data.ok && data.pagination ? Number(data.pagination.total || 0) : nextTransactions.length);
     } catch {
       setTransactions([]);
+      setTotalRecords(0);
     } finally {
       setIsLoading(false);
     }
@@ -924,7 +937,7 @@ export function AdminSalesQuotationClient({
 
   useEffect(() => {
     void loadTransactions();
-  }, [searchKeyword, statusFilter]);
+  }, [searchKeyword, statusFilter, currentPage]);
 
   useEffect(() => {
     const editId = searchParams.get("edit");
@@ -1405,6 +1418,35 @@ export function AdminSalesQuotationClient({
               )}
             </tbody>
           </table>
+          {totalRecords > 0 ? (
+            <div className="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-white/10 pt-4 text-sm text-white/55">
+              <div>
+                Showing {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, totalRecords)} of {totalRecords} records
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={currentPage <= 1 || isLoading}
+                  onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                  className="rounded-xl border border-white/10 px-4 py-2 text-white/70 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Prev
+                </button>
+                <span className="rounded-xl border border-white/10 px-4 py-2 font-semibold text-white/80">
+                  Page {currentPage} / {totalPages}
+                </span>
+                <button
+                  type="button"
+                  disabled={currentPage >= totalPages || isLoading}
+                  onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                  className="rounded-xl border border-white/10 px-4 py-2 text-white/70 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          ) : null}
+
         </div>
       </div>
 

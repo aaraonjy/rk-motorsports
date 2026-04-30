@@ -333,9 +333,11 @@ export async function GET(req: Request) {
 
     const q = searchParams.get("q")?.trim() || undefined;
     const status = searchParams.get("status")?.trim() || "ALL";
+    const pageSize = 10;
+    const requestedPage = Number(searchParams.get("page") || "1");
+    const page = Number.isFinite(requestedPage) && requestedPage > 0 ? Math.floor(requestedPage) : 1;
 
-    const rows = await db.salesTransaction.findMany({
-      where: {
+    const where: Prisma.SalesTransactionWhereInput = {
         docType: "SO",
         ...(status !== "ALL" ? { status: status as SalesTransactionStatus } : {}),
         ...(q
@@ -349,9 +351,15 @@ export async function GET(req: Request) {
               ],
             }
           : {}),
-      },
+      };
+
+    const total = await db.salesTransaction.count({ where });
+
+    const rows = await db.salesTransaction.findMany({
+      where,
       orderBy: [{ docNo: "desc" }],
-      take: 100,
+      skip: (page - 1) * pageSize,
+      take: pageSize,
       include: {
         customer: { select: { id: true, name: true, email: true, customerAccountNo: true } },
         createdByAdmin: { select: { id: true, name: true, email: true } },
@@ -389,7 +397,14 @@ export async function GET(req: Request) {
       };
     });
 
-    return NextResponse.json({ ok: true, transactions });
+    const pagination = {
+      page,
+      pageSize,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / pageSize)),
+    };
+
+    return NextResponse.json({ ok: true, transactions, pagination });
   } catch (error) {
     return NextResponse.json(
       { ok: false, error: error instanceof Error ? error.message : "Unable to load sales orders." },

@@ -313,10 +313,35 @@ export async function GET(req: Request) {
       return NextResponse.json({ ok: true, docNo });
     }
 
+    const q = searchParams.get("q")?.trim() || undefined;
+    const status = searchParams.get("status")?.trim() || "ALL";
+    const pageSize = 10;
+    const requestedPage = Number(searchParams.get("page") || "1");
+    const page = Number.isFinite(requestedPage) && requestedPage > 0 ? Math.floor(requestedPage) : 1;
+
+    const where: Prisma.SalesTransactionWhereInput = {
+      docType: "DR",
+      ...(status !== "ALL" ? { status: status as any } : {}),
+      ...(q
+        ? {
+            OR: [
+              { docNo: { contains: q, mode: "insensitive" } },
+              { customerName: { contains: q, mode: "insensitive" } },
+              { customerAccountNo: { contains: q, mode: "insensitive" } },
+              { reference: { contains: q, mode: "insensitive" } },
+              { docDesc: { contains: q, mode: "insensitive" } },
+            ],
+          }
+        : {}),
+    };
+
+    const total = await db.salesTransaction.count({ where });
+
     const rows = await db.salesTransaction.findMany({
-      where: { docType: "DR" },
+      where,
       orderBy: [{ docDate: "desc" }, { docNo: "desc" }],
-      take: 100,
+      skip: (page - 1) * pageSize,
+      take: pageSize,
       include: {
         cancelledByAdmin: { select: { id: true, name: true, email: true } },
         targetLinks: {
@@ -327,7 +352,14 @@ export async function GET(req: Request) {
     });
 
     const sourceDeliveryOrders = await db.$transaction(async (tx) => getSourceDeliveryOrders(tx));
-    return NextResponse.json({ ok: true, transactions: rows.map(withCancellationDetails), sourceDeliveryOrders });
+    const pagination = {
+      page,
+      pageSize,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / pageSize)),
+    };
+
+    return NextResponse.json({ ok: true, transactions: rows.map(withCancellationDetails), sourceDeliveryOrders, pagination });
   } catch (error) {
     return NextResponse.json(
       { ok: false, error: error instanceof Error ? error.message : "Unable to load delivery returns." },

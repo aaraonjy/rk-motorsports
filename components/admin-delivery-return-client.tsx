@@ -235,6 +235,10 @@ function SearchableSelect({
 export function AdminDeliveryReturnClient({ initialAgents, initialProjects, initialDepartments }: Props) {
   const router = useRouter();
   const [transactions, setTransactions] = useState<DeliveryReturnRecord[]>([]);
+  const pageSize = 10;
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalRecords, setTotalRecords] = useState(0);
+  const totalPages = Math.max(1, Math.ceil(totalRecords / pageSize));
   const [sourceDeliveryOrders, setSourceDeliveryOrders] = useState<SourceDeliveryOrder[]>([]);
   const [searchKeyword, setSearchKeyword] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
@@ -263,13 +267,24 @@ export function AdminDeliveryReturnClient({ initialAgents, initialProjects, init
   const [cancelTarget, setCancelTarget] = useState<DeliveryReturnRecord | null>(null);
   const [cancelReason, setCancelReason] = useState("");
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchKeyword, statusFilter]);
+
   async function loadTransactions() {
     setIsLoading(true);
     try {
-      const response = await fetch("/api/admin/sales/delivery-return", { cache: "no-store" });
+      const params = new URLSearchParams();
+      if (searchKeyword.trim()) params.set("q", searchKeyword.trim());
+      if (statusFilter !== "ALL") params.set("status", statusFilter);
+      params.set("page", String(currentPage));
+      params.set("pageSize", String(pageSize));
+      const response = await fetch(`/api/admin/sales/delivery-return?${params.toString()}`, { cache: "no-store" });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok || !payload.ok) throw new Error(payload.error || "Unable to load delivery returns.");
-      setTransactions(payload.transactions || []);
+      const nextTransactions = Array.isArray(payload.transactions) ? payload.transactions : [];
+      setTransactions(nextTransactions);
+      setTotalRecords(payload.pagination ? Number(payload.pagination.total || 0) : nextTransactions.length);
       setSourceDeliveryOrders(payload.sourceDeliveryOrders || []);
     } catch (error) {
       setSubmitError(error instanceof Error ? error.message : "Unable to load delivery returns.");
@@ -288,7 +303,7 @@ export function AdminDeliveryReturnClient({ initialAgents, initialProjects, init
 
   useEffect(() => {
     loadTransactions();
-  }, []);
+  }, [searchKeyword, statusFilter, currentPage]);
 
   const customerOptions = useMemo<SearchableSelectOption[]>(() => {
     const map = new Map<string, SearchableSelectOption>();
@@ -642,6 +657,35 @@ export function AdminDeliveryReturnClient({ initialAgents, initialProjects, init
               )}
             </tbody>
           </table>
+          {totalRecords > 0 ? (
+            <div className="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-white/10 pt-4 text-sm text-white/55">
+              <div>
+                Showing {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, totalRecords)} of {totalRecords} records
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={currentPage <= 1 || isLoading}
+                  onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                  className="rounded-xl border border-white/10 px-4 py-2 text-white/70 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Prev
+                </button>
+                <span className="rounded-xl border border-white/10 px-4 py-2 font-semibold text-white/80">
+                  Page {currentPage} / {totalPages}
+                </span>
+                <button
+                  type="button"
+                  disabled={currentPage >= totalPages || isLoading}
+                  onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                  className="rounded-xl border border-white/10 px-4 py-2 text-white/70 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          ) : null}
+
         </div>
       </div>
 
