@@ -171,6 +171,9 @@ type SalesInvoiceRecord = {
   grandTotal: string | number;
   payments?: PaymentHistoryItem[];
   totalPaid?: string | number | null;
+  totalCredited?: string | number | null;
+  totalDebited?: string | number | null;
+  adjustedGrandTotal?: string | number | null;
   outstandingBalance?: string | number | null;
   paymentStatus?: "UNPAID" | "PARTIALLY_PAID" | "PAID" | string | null;
   cancelReason?: string | null;
@@ -480,12 +483,26 @@ function getPaymentStatusClass(value: string | null | undefined) {
   return "border-white/15 bg-white/5 text-white/55";
 }
 
-function getPaymentSummary(record: { grandTotal?: string | number | null; totalPaid?: string | number | null; outstandingBalance?: string | number | null; paymentStatus?: string | null; payments?: PaymentHistoryItem[] }) {
+function getPaymentSummary(record: {
+  grandTotal?: string | number | null;
+  totalPaid?: string | number | null;
+  totalCredited?: string | number | null;
+  totalDebited?: string | number | null;
+  adjustedGrandTotal?: string | number | null;
+  outstandingBalance?: string | number | null;
+  paymentStatus?: string | null;
+  payments?: PaymentHistoryItem[];
+}) {
   const grandTotal = Number(record.grandTotal || 0);
   const totalPaid = Number(record.totalPaid ?? (record.payments || []).reduce((sum, payment) => sum + Number(payment.amount || 0), 0));
-  const outstandingBalance = Number(record.outstandingBalance ?? Math.max(0, grandTotal - totalPaid));
-  const paymentStatus = record.paymentStatus || (grandTotal <= 0 || totalPaid >= grandTotal ? "PAID" : totalPaid > 0 ? "PARTIALLY_PAID" : "UNPAID");
-  return { grandTotal, totalPaid, outstandingBalance, paymentStatus };
+  const totalCredited = Number(record.totalCredited || 0);
+  const totalDebited = Number(record.totalDebited || 0);
+  const adjustedGrandTotal = Number(
+    record.adjustedGrandTotal ?? Math.max(0, Math.round((grandTotal - totalCredited + totalDebited + Number.EPSILON) * 100) / 100)
+  );
+  const outstandingBalance = Number(record.outstandingBalance ?? Math.max(0, Math.round((adjustedGrandTotal - totalPaid + Number.EPSILON) * 100) / 100));
+  const paymentStatus = record.paymentStatus || (outstandingBalance <= 0 ? "PAID" : totalPaid > 0 || totalCredited > 0 || totalDebited > 0 ? "PARTIALLY_PAID" : "UNPAID");
+  return { grandTotal, totalPaid, totalCredited, totalDebited, adjustedGrandTotal, outstandingBalance, paymentStatus };
 }
 
 function isFullyPaidSalesInvoice(record: { status?: string | null; grandTotal?: string | number | null; totalPaid?: string | number | null; outstandingBalance?: string | number | null; paymentStatus?: string | null; payments?: PaymentHistoryItem[] }) {
@@ -1216,6 +1233,24 @@ export function AdminSalesInvoiceClient({
     return 0;
   }, [editTarget, formMode]);
 
+  const invoiceAdjustmentSummary = useMemo(() => {
+    if (formMode !== "edit" || !editTarget) {
+      return { totalCredited: 0, totalDebited: 0, adjustedGrandTotal: totals.grandTotal, hasAdjustment: false };
+    }
+
+    const paymentSummary = getPaymentSummary(editTarget);
+    const totalCredited = paymentSummary.totalCredited;
+    const totalDebited = paymentSummary.totalDebited;
+    const adjustedGrandTotal = Math.max(0, Math.round((totals.grandTotal - totalCredited + totalDebited + Number.EPSILON) * 100) / 100);
+
+    return {
+      totalCredited,
+      totalDebited,
+      adjustedGrandTotal,
+      hasAdjustment: totalCredited > 0 || totalDebited > 0,
+    };
+  }, [editTarget, formMode, totals.grandTotal]);
+
   const normalizedPaymentAmount = useMemo(() => {
     const numeric = Number(paymentAmount || 0);
     if (!Number.isFinite(numeric) || numeric < 0) return 0;
@@ -1223,8 +1258,9 @@ export function AdminSalesInvoiceClient({
   }, [paymentAmount]);
 
   const projectedTotalPaid = Math.round((existingTotalPaid + normalizedPaymentAmount + Number.EPSILON) * 100) / 100;
-  const projectedOutstandingBalance = Math.max(0, Math.round((totals.grandTotal - projectedTotalPaid + Number.EPSILON) * 100) / 100);
-  const projectedPaymentStatus = totals.grandTotal <= 0 || projectedTotalPaid >= totals.grandTotal ? "PAID" : projectedTotalPaid > 0 ? "PARTIALLY_PAID" : "UNPAID";
+  const paymentBaseTotal = invoiceAdjustmentSummary.adjustedGrandTotal;
+  const projectedOutstandingBalance = Math.max(0, Math.round((paymentBaseTotal - projectedTotalPaid + Number.EPSILON) * 100) / 100);
+  const projectedPaymentStatus = paymentBaseTotal <= 0 || projectedTotalPaid >= paymentBaseTotal ? "PAID" : projectedTotalPaid > 0 || invoiceAdjustmentSummary.hasAdjustment ? "PARTIALLY_PAID" : "UNPAID";
 
   async function loadTransactions() {
     setIsLoading(true);
@@ -2347,6 +2383,13 @@ export function AdminSalesInvoiceClient({
                   <div className="mt-4 border-t border-white/10 pt-4">
                     <SummaryRow label={`Grand Total (${currency || "MYR"})`} value={moneyWithPlaces(totals.grandTotal, priceDecimalPlaces)} strong />
                   </div>
+                  {formMode === "edit" ? (
+                    <div className="mt-4 border-t border-white/10 pt-4">
+                      <SummaryRow label="Credit Note (CN)" value={`- ${currency || "MYR"} ${moneyWithPlaces(invoiceAdjustmentSummary.totalCredited, priceDecimalPlaces)}`} />
+                      <SummaryRow label="Debit Note (DN)" value={`+ ${currency || "MYR"} ${moneyWithPlaces(invoiceAdjustmentSummary.totalDebited, priceDecimalPlaces)}`} />
+                      <SummaryRow label="Adjusted Total" value={`${currency || "MYR"} ${moneyWithPlaces(invoiceAdjustmentSummary.adjustedGrandTotal, priceDecimalPlaces)}`} />
+                    </div>
+                  ) : null}
 
                   <div className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-4">
                     <h4 className="text-sm font-semibold uppercase tracking-[0.2em] text-white/55">Payment</h4>
@@ -2364,6 +2407,7 @@ export function AdminSalesInvoiceClient({
                     </div>
 
                     <div className="mt-5 border-t border-white/10 pt-4">
+                      {formMode === "edit" ? <SummaryRow label="Adjusted Total" value={moneyWithPlaces(paymentBaseTotal, priceDecimalPlaces)} /> : null}
                       <SummaryRow label="Existing Paid" value={moneyWithPlaces(existingTotalPaid, priceDecimalPlaces)} />
                       <SummaryRow label="New Payment" value={moneyWithPlaces(normalizedPaymentAmount, priceDecimalPlaces)} />
                       <SummaryRow label="Total Paid" value={moneyWithPlaces(projectedTotalPaid, priceDecimalPlaces)} />
