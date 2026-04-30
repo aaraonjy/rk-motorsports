@@ -40,6 +40,14 @@ type BatchRow = {
   updatedAt: string | null;
 };
 
+
+type PaginationInfo = {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+};
+
 type BatchDetail = {
   batch: BatchRow;
   locations: Array<{ locationId: string; locationLabel: string; balance: number }>;
@@ -58,6 +66,7 @@ type BatchDetail = {
 
 type Props = {
   initialRows: BatchRow[];
+  initialPagination: PaginationInfo;
   products: ProductOption[];
   locations: LocationOption[];
 };
@@ -84,8 +93,11 @@ function statusBadge(status: BatchRow["status"]) {
   }
 }
 
-export function AdminBatchNoClient({ initialRows, products, locations }: Props) {
+export function AdminBatchNoClient({ initialRows, initialPagination, products, locations }: Props) {
   const [rows, setRows] = useState(initialRows);
+  const [pagination, setPagination] = useState<PaginationInfo>(initialPagination);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [isLoadingRows, setIsLoadingRows] = useState(false);
   const [qtyDecimalPlaces, setQtyDecimalPlaces] = useState(DEFAULT_STOCK_NUMBER_FORMAT_CONFIG.qtyDecimalPlaces);
   const [productFilter, setProductFilter] = useState("ALL");
   const [batchKeyword, setBatchKeyword] = useState("");
@@ -114,17 +126,42 @@ export function AdminBatchNoClient({ initialRows, products, locations }: Props) 
     };
   }, []);
 
-  const filteredRows = useMemo(() => {
-    const keyword = batchKeyword.trim().toLowerCase();
-    return rows.filter((item) => {
-      const matchesProduct = productFilter === "ALL" || item.inventoryProductId === productFilter;
-      const matchesKeyword = !keyword || item.batchNo.toLowerCase().includes(keyword) || item.productCode.toLowerCase().includes(keyword) || item.productDescription.toLowerCase().includes(keyword);
-      const matchesLocation = locationFilter === "ALL" || item.locationSummary.toLowerCase().includes(locationFilter.toLowerCase());
-      const matchesStatus = statusFilter === "ALL" || item.status === statusFilter;
-      const matchesZero = !zeroBalanceOnly || item.balance <= 0;
-      return matchesProduct && matchesKeyword && matchesLocation && matchesStatus && matchesZero;
-    });
-  }, [rows, productFilter, batchKeyword, locationFilter, statusFilter, zeroBalanceOnly]);
+  const filteredRows = rows;
+
+  async function loadRows(page = currentPage) {
+    setIsLoadingRows(true);
+    try {
+      const params = new URLSearchParams({ mode: "list", page: String(page) });
+      if (productFilter !== "ALL") params.set("productId", productFilter);
+      if (batchKeyword.trim()) params.set("q", batchKeyword.trim());
+      if (locationFilter !== "ALL") params.set("locationId", locationFilter);
+      if (statusFilter !== "ALL") params.set("status", statusFilter);
+      if (zeroBalanceOnly) params.set("zeroBalanceOnly", "1");
+
+      const response = await fetch(`/api/admin/stock/batches?${params.toString()}`, { cache: "no-store" });
+      const data = await response.json();
+      if (!response.ok || !data.ok) {
+        setRows([]);
+        setPagination({ page, pageSize: 10, total: 0, totalPages: 1 });
+        return;
+      }
+      setRows(Array.isArray(data.rows) ? data.rows : []);
+      setPagination(data.pagination || { page, pageSize: 10, total: 0, totalPages: 1 });
+    } catch {
+      setRows([]);
+      setPagination({ page, pageSize: 10, total: 0, totalPages: 1 });
+    } finally {
+      setIsLoadingRows(false);
+    }
+  }
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [productFilter, batchKeyword, locationFilter, statusFilter, zeroBalanceOnly]);
+
+  useEffect(() => {
+    void loadRows(currentPage);
+  }, [currentPage, productFilter, batchKeyword, locationFilter, statusFilter, zeroBalanceOnly]);
 
   async function openDetail(id: string) {
     setSubmitError("");
@@ -266,6 +303,19 @@ export function AdminBatchNoClient({ initialRows, products, locations }: Props) 
             </tbody>
           </table>
         </div>
+
+        {pagination.total > 0 ? (
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4">
+            <div className="text-sm text-white/55">
+              Showing {(pagination.page - 1) * pagination.pageSize + 1}–{Math.min(pagination.page * pagination.pageSize, pagination.total)} of {pagination.total} records
+            </div>
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))} disabled={pagination.page <= 1} className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/80 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50">Prev</button>
+              <div className="rounded-xl border border-white/10 bg-black/20 px-4 py-2 text-sm text-white/80">Page {pagination.page} / {pagination.totalPages}</div>
+              <button type="button" onClick={() => setCurrentPage((prev) => Math.min(pagination.totalPages, prev + 1))} disabled={pagination.page >= pagination.totalPages} className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/80 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50">Next</button>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {selectedDetail ? (

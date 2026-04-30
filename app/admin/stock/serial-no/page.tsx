@@ -18,7 +18,7 @@ export default async function AdminSerialNoPage() {
   });
   if (!stockConfig?.stockModuleEnabled) redirect("/admin");
 
-  const [products, locations, serials] = await Promise.all([
+  const [products, locations, serials, serialTotal] = await Promise.all([
     db.inventoryProduct.findMany({
       where: { trackInventory: true },
       orderBy: [{ isActive: "desc" }, { code: "asc" }],
@@ -30,7 +30,7 @@ export default async function AdminSerialNoPage() {
     }),
     db.inventorySerial.findMany({
       orderBy: [{ updatedAt: "desc" }, { serialNo: "asc" }],
-      take: 300,
+      take: 10,
       include: {
         inventoryProduct: { select: { id: true, code: true, description: true } },
         inventoryBatch: { select: { id: true, batchNo: true } },
@@ -48,6 +48,7 @@ export default async function AdminSerialNoPage() {
         },
       },
     }),
+    db.inventorySerial.count(),
   ]);
 
   const initialRows = serials.map((item) => {
@@ -81,7 +82,7 @@ export default async function AdminSerialNoPage() {
         </div>
 
         <div className="mt-10">
-          <AdminSerialNoClient initialRows={initialRows} products={products} locations={locations} />
+          <AdminSerialNoClient initialRows={initialRows} initialPagination={{ page: 1, pageSize: 10, total: serialTotal, totalPages: Math.max(1, Math.ceil(serialTotal / 10)) }} products={products} locations={locations} />
         </div>
       </div>
     </section>

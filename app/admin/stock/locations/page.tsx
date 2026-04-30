@@ -8,8 +8,10 @@ export default async function AdminStockLocationsPage() {
   if (!user) redirect("/login");
   if (user.role !== "ADMIN") redirect("/dashboard");
 
-  const locations = await db.stockLocation.findMany({
+  const [locations, locationTotal] = await Promise.all([
+    db.stockLocation.findMany({
     orderBy: [{ isActive: "desc" }, { code: "asc" }],
+      take: 10,
     select: {
       id: true,
       code: true,
@@ -18,7 +20,9 @@ export default async function AdminStockLocationsPage() {
       createdAt: true,
       updatedAt: true,
     },
-  });
+  }),
+    db.stockLocation.count(),
+  ]);
 
   return (
     <section className="section-pad">
@@ -35,6 +39,7 @@ export default async function AdminStockLocationsPage() {
 
         <div className="mt-10">
           <AdminStockLocationClient
+            initialPagination={{ page: 1, pageSize: 10, total: locationTotal, totalPages: Math.max(1, Math.ceil(locationTotal / 10)) }}
             initialItems={locations.map((item) => ({
               ...item,
               createdAt: item.createdAt.toISOString(),

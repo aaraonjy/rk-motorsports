@@ -78,8 +78,17 @@ type StockSettingsResponse = {
   config?: Partial<StockSettingsConfig>;
 };
 
+type PaginationInfo = {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+};
+
+
 type Props = {
   initialProducts: InventoryProductRecord[];
+  initialPagination: PaginationInfo;
   locations: StockLocationOption[];
   productGroups: MasterOption[];
   productSubGroups: SubGroupOption[];
@@ -299,6 +308,7 @@ function SearchableSelect({
 
 export function AdminProductMasterClient({
   initialProducts,
+  initialPagination,
   locations,
   productGroups,
   productSubGroups,
@@ -352,36 +362,42 @@ export function AdminProductMasterClient({
     };
   }, []);
 
-  const filteredProducts = useMemo(() => {
-    const normalizedKeyword = keyword.trim().toLowerCase();
-    return products.filter((product) => {
-      const matchesKeyword =
-        !normalizedKeyword ||
-        product.code.toLowerCase().includes(normalizedKeyword) ||
-        product.description.toLowerCase().includes(normalizedKeyword) ||
-        (product.brand || "").toLowerCase().includes(normalizedKeyword) ||
-        (product.group || "").toLowerCase().includes(normalizedKeyword) ||
-        (product.subGroup || "").toLowerCase().includes(normalizedKeyword);
+  const filteredProducts = products;
+  const paginatedProducts = products;
+  const totalPages = pagination.totalPages;
 
-      const matchesType = itemTypeFilter === "ALL" || product.itemType === itemTypeFilter;
-      const matchesStatus = statusFilter === "ALL" || (statusFilter === "ACTIVE" ? product.isActive : !product.isActive);
-      return matchesKeyword && matchesType && matchesStatus;
-    });
-  }, [products, keyword, itemTypeFilter, statusFilter]);
+  async function loadProducts(page = currentPage) {
+    setIsLoadingProducts(true);
+    try {
+      const params = new URLSearchParams({ page: String(page) });
+      if (keyword.trim()) params.set("q", keyword.trim());
+      if (itemTypeFilter !== "ALL") params.set("itemType", itemTypeFilter);
+      if (statusFilter !== "ALL") params.set("status", statusFilter);
+
+      const response = await fetch(`/api/admin/products?${params.toString()}`, { cache: "no-store" });
+      const data = await response.json();
+      if (!response.ok || !data.ok) {
+        setProducts([]);
+        setPagination({ page, pageSize, total: 0, totalPages: 1 });
+        return;
+      }
+      setProducts(Array.isArray(data.products) ? sortProductsByCode(data.products) : []);
+      setPagination(data.pagination || { page, pageSize, total: 0, totalPages: 1 });
+    } catch {
+      setProducts([]);
+      setPagination({ page, pageSize, total: 0, totalPages: 1 });
+    } finally {
+      setIsLoadingProducts(false);
+    }
+  }
 
   useEffect(() => {
     setCurrentPage(1);
   }, [keyword, itemTypeFilter, statusFilter]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredProducts.length / pageSize));
-  const paginatedProducts = useMemo(
-    () => filteredProducts.slice((currentPage - 1) * pageSize, currentPage * pageSize),
-    [filteredProducts, currentPage]
-  );
-
   useEffect(() => {
-    if (currentPage > totalPages) setCurrentPage(totalPages);
-  }, [currentPage, totalPages]);
+    void loadProducts(currentPage);
+  }, [currentPage, keyword, itemTypeFilter, statusFilter]);
 
   function closeModal() {
     setIsModalOpen(false);
@@ -607,11 +623,10 @@ export function AdminProductMasterClient({
       }
 
       const saved = data.product as InventoryProductRecord;
-      setProducts((prev) =>
-        sortProductsByCode(editingId ? prev.map((item) => (item.id === saved.id ? saved : item)) : [...prev, saved])
-      );
       setSubmitSuccess(editingId ? "Product updated successfully." : "Product created successfully.");
       closeModal();
+      await loadProducts(editingId ? currentPage : 1);
+      if (!editingId) setCurrentPage(1);
     } catch {
       setSubmitError("Unable to save product right now.");
     } finally {
@@ -632,8 +647,8 @@ export function AdminProductMasterClient({
         setSubmitError(data.error || "Unable to delete product.");
         return;
       }
-      setProducts((prev) => sortProductsByCode(prev.filter((item) => item.id !== product.id)));
       setSubmitSuccess("Product deleted successfully.");
+      await loadProducts(currentPage);
     } catch {
       setSubmitError("Unable to delete product right now.");
     }
@@ -696,7 +711,9 @@ export function AdminProductMasterClient({
               </tr>
             </thead>
             <tbody className="divide-y divide-white/10">
-              {filteredProducts.length === 0 ? (
+              {isLoadingProducts ? (
+                <tr><td colSpan={8} className="px-3 py-8 text-center text-white/50">Loading products...</td></tr>
+              ) : filteredProducts.length === 0 ? (
                 <tr><td colSpan={8} className="px-3 py-8 text-center text-white/50">No products found.</td></tr>
               ) : paginatedProducts.map((product) => (
                 <tr key={product.id} className="align-top text-white/80">
@@ -737,7 +754,7 @@ export function AdminProductMasterClient({
         {filteredProducts.length > 0 ? (
           <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4">
             <div className="text-sm text-white/55">
-              Showing {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, filteredProducts.length)} of {filteredProducts.length} products
+              Showing {(pagination.page - 1) * pagination.pageSize + 1}–{Math.min(pagination.page * pagination.pageSize, pagination.total)} of {pagination.total} products
             </div>
             <div className="flex items-center gap-2">
               <button

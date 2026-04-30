@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 type StockLocationRecord = {
   id: string;
@@ -19,7 +19,16 @@ type FormState = {
 
 type Props = {
   initialItems: StockLocationRecord[];
+  initialPagination: PaginationInfo;
 };
+
+type PaginationInfo = {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+};
+
 
 function emptyForm(): FormState {
   return {
@@ -29,8 +38,11 @@ function emptyForm(): FormState {
   };
 }
 
-export function AdminStockLocationClient({ initialItems }: Props) {
+export function AdminStockLocationClient({ initialItems, initialPagination }: Props) {
   const [items, setItems] = useState(initialItems);
+  const [pagination, setPagination] = useState<PaginationInfo>(initialPagination);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [isLoadingItems, setIsLoadingItems] = useState(false);
   const [keyword, setKeyword] = useState("");
   const [statusFilter, setStatusFilter] = useState<"ALL" | "ACTIVE" | "INACTIVE">("ALL");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -40,20 +52,39 @@ export function AdminStockLocationClient({ initialItems }: Props) {
   const [submitError, setSubmitError] = useState("");
   const [submitSuccess, setSubmitSuccess] = useState("");
 
-  const filteredItems = useMemo(() => {
-    const normalizedKeyword = keyword.trim().toLowerCase();
-    return items.filter((item) => {
-      const matchesKeyword =
-        !normalizedKeyword ||
-        item.code.toLowerCase().includes(normalizedKeyword) ||
-        item.name.toLowerCase().includes(normalizedKeyword);
+  const filteredItems = items;
 
-      const matchesStatus =
-        statusFilter === "ALL" || (statusFilter === "ACTIVE" ? item.isActive : !item.isActive);
+  async function loadItems(page = currentPage) {
+    setIsLoadingItems(true);
+    try {
+      const params = new URLSearchParams({ page: String(page) });
+      if (keyword.trim()) params.set("q", keyword.trim());
+      if (statusFilter !== "ALL") params.set("status", statusFilter);
 
-      return matchesKeyword && matchesStatus;
-    });
-  }, [items, keyword, statusFilter]);
+      const response = await fetch(`/api/admin/stock/locations?${params.toString()}`, { cache: "no-store" });
+      const data = await response.json();
+      if (!response.ok || !data.ok) {
+        setItems([]);
+        setPagination({ page, pageSize: 10, total: 0, totalPages: 1 });
+        return;
+      }
+      setItems(Array.isArray(data.items) ? data.items : []);
+      setPagination(data.pagination || { page, pageSize: 10, total: 0, totalPages: 1 });
+    } catch {
+      setItems([]);
+      setPagination({ page, pageSize: 10, total: 0, totalPages: 1 });
+    } finally {
+      setIsLoadingItems(false);
+    }
+  }
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [keyword, statusFilter]);
+
+  useEffect(() => {
+    void loadItems(currentPage);
+  }, [currentPage, keyword, statusFilter]);
 
   function closeModal() {
     setIsModalOpen(false);
@@ -205,6 +236,19 @@ export function AdminStockLocationClient({ initialItems }: Props) {
             </tbody>
           </table>
         </div>
+
+        {pagination.total > 0 ? (
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4">
+            <div className="text-sm text-white/55">
+              Showing {(pagination.page - 1) * pagination.pageSize + 1}–{Math.min(pagination.page * pagination.pageSize, pagination.total)} of {pagination.total} records
+            </div>
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))} disabled={pagination.page <= 1} className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/80 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50">Prev</button>
+              <div className="rounded-xl border border-white/10 bg-black/20 px-4 py-2 text-sm text-white/80">Page {pagination.page} / {pagination.totalPages}</div>
+              <button type="button" onClick={() => setCurrentPage((prev) => Math.min(pagination.totalPages, prev + 1))} disabled={pagination.page >= pagination.totalPages} className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/80 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50">Next</button>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {isModalOpen ? (

@@ -70,21 +70,53 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const activeOnly = searchParams.get("activeOnly") === "1" || searchParams.get("activeOnly") === "true";
     const trackInventoryOnly = searchParams.get("trackInventory") === "1" || searchParams.get("trackInventory") === "true";
+    const q = searchParams.get("q")?.trim() || undefined;
+    const itemType = searchParams.get("itemType")?.trim() || "ALL";
+    const status = searchParams.get("status")?.trim() || "ALL";
+    const rawPage = Number(searchParams.get("page") || "1");
+    const page = Number.isFinite(rawPage) && rawPage > 0 ? Math.floor(rawPage) : 1;
+    const pageSize = 10;
 
-    const products = await db.inventoryProduct.findMany({
-      where: {
-        ...(activeOnly ? { isActive: true } : {}),
-        ...(trackInventoryOnly ? { OR: [{ trackInventory: true }, { itemType: "SERVICE_ITEM" }] } : {}),
-      },
-      orderBy: [{ code: "asc" }],
-      include: {
-        uomConversions: {
-          orderBy: [{ uomCode: "asc" }],
+    const where: Prisma.InventoryProductWhereInput = {
+      ...(activeOnly ? { isActive: true } : {}),
+      ...(trackInventoryOnly ? { OR: [{ trackInventory: true }, { itemType: "SERVICE_ITEM" }] } : {}),
+      ...(itemType !== "ALL" ? { itemType: itemType as any } : {}),
+      ...(status !== "ALL" ? { isActive: status === "ACTIVE" } : {}),
+      ...(q
+        ? {
+            OR: [
+              { code: { contains: q, mode: "insensitive" } },
+              { description: { contains: q, mode: "insensitive" } },
+              { brand: { contains: q, mode: "insensitive" } },
+              { group: { contains: q, mode: "insensitive" } },
+              { subGroup: { contains: q, mode: "insensitive" } },
+            ],
+          }
+        : {}),
+    };
+
+    const [total, products] = await Promise.all([
+      db.inventoryProduct.count({ where }),
+      db.inventoryProduct.findMany({
+        where,
+        orderBy: [{ isActive: "desc" }, { code: "asc" }],
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        include: {
+          uomConversions: {
+            orderBy: [{ uomCode: "asc" }],
+          },
         },
-      },
-    });
+      }),
+    ]);
 
-    return NextResponse.json({ ok: true, products: products.map((product) => mapProduct(product)) });
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+    return NextResponse.json({
+      ok: true,
+      products: products.map((product) => mapProduct(product)),
+      pagination: { page, pageSize, total, totalPages },
+    });
   } catch (error) {
     return NextResponse.json(
       { ok: false, error: error instanceof Error ? error.message : "Unable to load products." },

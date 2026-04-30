@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 type ProductOption = {
   id: string;
@@ -34,6 +34,14 @@ type SerialRow = {
   updatedAt: string | null;
 };
 
+
+type PaginationInfo = {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+};
+
 type SerialDetail = {
   serial: SerialRow;
   history: Array<{
@@ -51,6 +59,7 @@ type SerialDetail = {
 
 type Props = {
   initialRows: SerialRow[];
+  initialPagination: PaginationInfo;
   products: ProductOption[];
   locations: LocationOption[];
 };
@@ -62,8 +71,11 @@ function formatDate(value: string | null) {
   return date.toLocaleDateString();
 }
 
-export function AdminSerialNoClient({ initialRows, products, locations }: Props) {
-  const [rows] = useState(initialRows);
+export function AdminSerialNoClient({ initialRows, initialPagination, products, locations }: Props) {
+  const [rows, setRows] = useState(initialRows);
+  const [pagination, setPagination] = useState<PaginationInfo>(initialPagination);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [isLoadingRows, setIsLoadingRows] = useState(false);
   const [serialKeyword, setSerialKeyword] = useState("");
   const [productFilter, setProductFilter] = useState("ALL");
   const [batchFilter, setBatchFilter] = useState("");
@@ -73,18 +85,42 @@ export function AdminSerialNoClient({ initialRows, products, locations }: Props)
   const [loadingDetailId, setLoadingDetailId] = useState<string | null>(null);
   const [error, setError] = useState("");
 
-  const filteredRows = useMemo(() => {
-    const serialQ = serialKeyword.trim().toLowerCase();
-    const batchQ = batchFilter.trim().toLowerCase();
-    return rows.filter((item) => {
-      const matchesSerial = !serialQ || item.serialNo.toLowerCase().includes(serialQ) || item.productCode.toLowerCase().includes(serialQ) || item.productDescription.toLowerCase().includes(serialQ);
-      const matchesProduct = productFilter === "ALL" || item.inventoryProductId === productFilter;
-      const matchesBatch = !batchQ || (item.batchNo || "").toLowerCase().includes(batchQ);
-      const matchesLocation = locationFilter === "ALL" || item.currentLocationId === locationFilter;
-      const matchesStatus = statusFilter === "ALL" || item.status === statusFilter;
-      return matchesSerial && matchesProduct && matchesBatch && matchesLocation && matchesStatus;
-    });
-  }, [rows, serialKeyword, productFilter, batchFilter, locationFilter, statusFilter]);
+  const filteredRows = rows;
+
+  async function loadRows(page = currentPage) {
+    setIsLoadingRows(true);
+    try {
+      const params = new URLSearchParams({ mode: "list", page: String(page) });
+      if (serialKeyword.trim()) params.set("q", serialKeyword.trim());
+      if (productFilter !== "ALL") params.set("productId", productFilter);
+      if (batchFilter.trim()) params.set("batchNo", batchFilter.trim());
+      if (locationFilter !== "ALL") params.set("locationId", locationFilter);
+      if (statusFilter !== "ALL") params.set("status", statusFilter);
+
+      const response = await fetch(`/api/admin/stock/serials?${params.toString()}`, { cache: "no-store" });
+      const data = await response.json();
+      if (!response.ok || !data.ok) {
+        setRows([]);
+        setPagination({ page, pageSize: 10, total: 0, totalPages: 1 });
+        return;
+      }
+      setRows(Array.isArray(data.rows) ? data.rows : []);
+      setPagination(data.pagination || { page, pageSize: 10, total: 0, totalPages: 1 });
+    } catch {
+      setRows([]);
+      setPagination({ page, pageSize: 10, total: 0, totalPages: 1 });
+    } finally {
+      setIsLoadingRows(false);
+    }
+  }
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [serialKeyword, productFilter, batchFilter, locationFilter, statusFilter]);
+
+  useEffect(() => {
+    void loadRows(currentPage);
+  }, [currentPage, serialKeyword, productFilter, batchFilter, locationFilter, statusFilter]);
 
   async function openDetail(id: string) {
     setError("");
@@ -140,6 +176,19 @@ export function AdminSerialNoClient({ initialRows, products, locations }: Props)
           </div>
         </div>
 
+        {pagination.total > 0 ? (
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4">
+            <div className="text-sm text-white/55">
+              Showing {(pagination.page - 1) * pagination.pageSize + 1}–{Math.min(pagination.page * pagination.pageSize, pagination.total)} of {pagination.total} records
+            </div>
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))} disabled={pagination.page <= 1} className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/80 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50">Prev</button>
+              <div className="rounded-xl border border-white/10 bg-black/20 px-4 py-2 text-sm text-white/80">Page {pagination.page} / {pagination.totalPages}</div>
+              <button type="button" onClick={() => setCurrentPage((prev) => Math.min(pagination.totalPages, prev + 1))} disabled={pagination.page >= pagination.totalPages} className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/80 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50">Next</button>
+            </div>
+          </div>
+        ) : null}
+
         {error ? <div className="mt-5 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</div> : null}
 
         <div className="mt-6 overflow-x-auto">
@@ -157,7 +206,7 @@ export function AdminSerialNoClient({ initialRows, products, locations }: Props)
               </tr>
             </thead>
             <tbody className="divide-y divide-white/10">
-              {filteredRows.length === 0 ? <tr><td colSpan={8} className="px-3 py-8 text-center text-white/50">No serial records found.</td></tr> : filteredRows.map((item) => (
+              {isLoadingRows ? <tr><td colSpan={8} className="px-3 py-8 text-center text-white/50">Loading serial records...</td></tr> : filteredRows.length === 0 ? <tr><td colSpan={8} className="px-3 py-8 text-center text-white/50">No serial records found.</td></tr> : filteredRows.map((item) => (
                 <tr key={item.id} className="align-top text-white/80">
                   <td className="px-3 py-4 font-semibold text-white">{item.serialNo}</td>
                   <td className="px-3 py-4"><div className="font-medium text-white">{item.productCode}</div><div className="text-white/60">{item.productDescription}</div></td>

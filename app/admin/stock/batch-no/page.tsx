@@ -36,7 +36,7 @@ export default async function AdminBatchNoPage() {
   });
   if (!stockConfig?.stockModuleEnabled) redirect("/admin");
 
-  const [products, locations, batches] = await Promise.all([
+  const [products, locations, batches, batchTotal] = await Promise.all([
     db.inventoryProduct.findMany({
       where: { trackInventory: true },
       orderBy: [{ isActive: "desc" }, { code: "asc" }],
@@ -48,11 +48,12 @@ export default async function AdminBatchNoPage() {
     }),
     db.inventoryBatch.findMany({
       orderBy: [{ createdAt: "desc" }],
-      take: 200,
+      take: 10,
       include: {
         inventoryProduct: { select: { id: true, code: true, description: true } },
       },
     }),
+    db.inventoryBatch.count(),
   ]);
 
   const batchIds = batches.map((item) => item.id);
@@ -151,7 +152,7 @@ export default async function AdminBatchNoPage() {
         </div>
 
         <div className="mt-10">
-          <AdminBatchNoClient initialRows={initialRows} products={products} locations={locations} />
+          <AdminBatchNoClient initialRows={initialRows} initialPagination={{ page: 1, pageSize: 10, total: batchTotal, totalPages: Math.max(1, Math.ceil(batchTotal / 10)) }} products={products} locations={locations} />
         </div>
       </div>
     </section>

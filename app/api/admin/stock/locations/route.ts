@@ -21,15 +21,39 @@ function mapItem(item: any) {
   };
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     await requireAdmin();
+    const { searchParams } = new URL(req.url);
+    const q = searchParams.get("q")?.trim() || undefined;
+    const status = searchParams.get("status")?.trim() || "ALL";
+    const rawPage = Number(searchParams.get("page") || "1");
+    const page = Number.isFinite(rawPage) && rawPage > 0 ? Math.floor(rawPage) : 1;
+    const pageSize = 10;
 
-    const items = await db.stockLocation.findMany({
-      orderBy: [{ isActive: "desc" }, { code: "asc" }],
-    });
+    const where: any = {
+      ...(status !== "ALL" ? { isActive: status === "ACTIVE" } : {}),
+      ...(q
+        ? {
+            OR: [
+              { code: { contains: q, mode: "insensitive" } },
+              { name: { contains: q, mode: "insensitive" } },
+            ],
+          }
+        : {}),
+    };
 
-    return NextResponse.json({ ok: true, items: items.map(mapItem) });
+    const [total, items] = await Promise.all([
+      db.stockLocation.count({ where }),
+      db.stockLocation.findMany({
+        where,
+        orderBy: [{ isActive: "desc" }, { code: "asc" }],
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+    ]);
+
+    return NextResponse.json({ ok: true, items: items.map(mapItem), pagination: { page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)) } });
   } catch (error) {
     return NextResponse.json(
       { ok: false, error: error instanceof Error ? error.message : "Unable to load stock locations." },
