@@ -14,5 +14,11 @@ export default async function AdminDeliveryReturnPage() {
     db.department.findMany({ where: { isActive: true }, orderBy: [{ code: "asc" }], select: { id: true, code: true, name: true, projectId: true, isActive: true } }),
   ]);
 
-  return <AdminDeliveryReturnClient initialAgents={agents} initialProjects={projects} initialDepartments={departments} />;
+  return (
+    <section className="section-pad">
+      <div className="container-rk max-w-7xl">
+        <AdminDeliveryReturnClient initialAgents={agents} initialProjects={projects} initialDepartments={departments} />
+      </div>
+    </section>
+  );
 }
