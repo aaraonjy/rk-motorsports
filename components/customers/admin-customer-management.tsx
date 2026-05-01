@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { CustomerAccountNoFormat } from "@prisma/client";
@@ -296,29 +296,112 @@ function TextInput({
   );
 }
 
-function SelectInput({
+type SearchableSelectOption = {
+  id: string;
+  label: string;
+  searchText: string;
+};
+
+function SearchableSelect({
+  label,
+  placeholder,
+  options,
   value,
+  disabled = false,
   onChange,
-  children,
 }: {
+  label: string;
+  placeholder: string;
+  options: SearchableSelectOption[];
   value: string;
-  onChange: (value: string) => void;
-  children: ReactNode;
+  disabled?: boolean;
+  onChange: (option: SearchableSelectOption | null) => void;
 }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  const selectedOption = useMemo(() => options.find((item) => item.id === value) || null, [options, value]);
+
+  useEffect(() => {
+    setSearch(selectedOption?.label || "");
+  }, [selectedOption?.label]);
+
+  useEffect(() => {
+    function handleOutsideClick(event: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, []);
+
+  const filteredOptions = useMemo(() => {
+    const keyword = search.trim().toLowerCase();
+    if (!keyword) return options;
+    return options.filter((item) => item.searchText.includes(keyword));
+  }, [options, search]);
+
   return (
-    <div className="relative">
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full appearance-none rounded-xl border border-white/10 bg-black/40 px-4 py-3 pr-14 text-sm text-white outline-none transition hover:border-white/20 focus:border-white/25"
+    <div ref={containerRef} className="relative">
+      <label className="label-rk">{label}</label>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => {
+          if (disabled) return;
+          setIsOpen((prev) => !prev);
+          setSearch("");
+        }}
+        className={`input-rk flex items-center justify-between gap-3 pr-20 text-left ${disabled ? "cursor-not-allowed opacity-60" : ""}`}
       >
-        {children}
-      </select>
-      <div className="pointer-events-none absolute inset-y-0 right-5 flex items-center text-white/55">
-        <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-          <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.17l3.71-3.94a.75.75 0 1 1 1.08 1.04l-4.25 4.51a.75.75 0 0 1-1.08 0l-4.25-4.51a.75.75 0 0 1 .02-1.06Z" clipRule="evenodd" />
-        </svg>
-      </div>
+        <span className={selectedOption ? "truncate text-white" : "truncate text-white/45"}>
+          {selectedOption ? selectedOption.label : placeholder}
+        </span>
+        <span className="shrink-0 pr-5 text-white/60">▾</span>
+      </button>
+
+      {isOpen ? (
+        <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-[140] overflow-hidden rounded-2xl border border-white/10 bg-[#0b0b0f] shadow-2xl">
+          <div className="border-b border-white/10 p-3">
+            <input
+              autoFocus
+              className="input-rk"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={`Search ${label.toLowerCase()}`}
+            />
+          </div>
+
+          <div className="max-h-56 overflow-y-auto p-2">
+            {filteredOptions.length === 0 ? (
+              <div className="rounded-xl px-3 py-3 text-sm text-white/45">No matching {label.toLowerCase()} found.</div>
+            ) : (
+              filteredOptions.map((option) => {
+                const isSelected = selectedOption?.id === option.id;
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => {
+                      onChange(option);
+                      setSearch(option.label);
+                      setIsOpen(false);
+                    }}
+                    className={`flex w-full items-center rounded-xl px-3 py-3 text-left text-sm transition ${
+                      isSelected ? "bg-white/10 text-white" : "text-white/85 hover:bg-white/10 hover:text-white"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -404,33 +487,76 @@ function CustomerModal({
   const accountSuffix = customerInitial && rawAccountSuffix ? rawAccountSuffix.toUpperCase().slice(0, accountSuffixLength) : "";
   const previewAccountNo = customerInitial && accountSuffix ? `${accountPrefix}/${accountSuffix}` : "";
 
+  const countryList = useMemo(
+    () => (countries.length > 0 ? countries : [{ id: "fallback-MY", code: "MY", name: "Malaysia" }]),
+    [countries]
+  );
+
+  const currencyList = useMemo(
+    () => (currencies.length > 0 ? currencies : [{ id: "fallback-MYR", code: "MYR", name: "Malaysian Ringgit", symbol: "RM" }]),
+    [currencies]
+  );
+
+  const countryOptions = useMemo<SearchableSelectOption[]>(() => {
+    const options = countryList.map((country) => ({
+      id: country.code,
+      label: `${country.code} — ${country.name}`,
+      searchText: `${country.code} ${country.name}`.toLowerCase(),
+    }));
+
+    const currentValues = [form.billingCountryCode, form.deliveryCountryCode, deliveryAddressDraft.countryCode]
+      .map((value) => String(value || "").trim().toUpperCase())
+      .filter(Boolean);
+
+    for (const currentValue of currentValues) {
+      if (!options.some((option) => option.id === currentValue)) {
+        options.unshift({ id: currentValue, label: currentValue, searchText: currentValue.toLowerCase() });
+      }
+    }
+
+    return options;
+  }, [countryList, deliveryAddressDraft.countryCode, form.billingCountryCode, form.deliveryCountryCode]);
+
+  const currencyOptions = useMemo<SearchableSelectOption[]>(() => {
+    const options = currencyList.map((currency) => ({
+      id: currency.code,
+      label: `${currency.code} — ${currency.name}${currency.symbol ? ` (${currency.symbol})` : ""}`,
+      searchText: `${currency.code} ${currency.name} ${currency.symbol || ""}`.toLowerCase(),
+    }));
+
+    const currentValue = String(form.currency || "").trim().toUpperCase();
+    if (currentValue && !options.some((option) => option.id === currentValue)) {
+      options.unshift({ id: currentValue, label: currentValue, searchText: currentValue.toLowerCase() });
+    }
+
+    return options;
+  }, [currencyList, form.currency]);
+
+  const agentOptions = useMemo<SearchableSelectOption[]>(
+    () => [
+      { id: "", label: "No Agent", searchText: "no agent" },
+      ...agents.map((agent) => ({
+        id: agent.id,
+        label: `${agent.code} — ${agent.name}`,
+        searchText: `${agent.code} ${agent.name}`.toLowerCase(),
+      })),
+    ],
+    [agents]
+  );
+
+  const registrationTypeOptions = useMemo<SearchableSelectOption[]>(
+    () =>
+      CUSTOMER_REGISTRATION_ID_TYPES.map((item) => ({
+        id: item.value,
+        label: item.label,
+        searchText: `${item.value} ${item.label}`.toLowerCase(),
+      })),
+    []
+  );
+
   if (!isOpen) return null;
 
   const isPortalCustomer = customer?.accountSource === "PORTAL";
-  const countryOptions = countries.length > 0 ? countries : [{ id: "fallback-MY", code: "MY", name: "Malaysia" }];
-  const currencyOptions = currencies.length > 0 ? currencies : [{ id: "fallback-MYR", code: "MYR", name: "Malaysian Ringgit", symbol: "RM" }];
-
-  function renderCountryOptions(currentValue: string) {
-    const normalized = (currentValue || "MY").toUpperCase();
-    const hasCurrent = countryOptions.some((country) => country.code === normalized);
-    return (
-      <>
-        {!hasCurrent ? <option value={normalized}>{normalized}</option> : null}
-        {countryOptions.map((country) => <option key={country.id || country.code} value={country.code}>{country.code} - {country.name}</option>)}
-      </>
-    );
-  }
-
-  function renderCurrencyOptions(currentValue: string) {
-    const normalized = (currentValue || "MYR").toUpperCase();
-    const hasCurrent = currencyOptions.some((currency) => currency.code === normalized);
-    return (
-      <>
-        {!hasCurrent ? <option value={normalized}>{normalized}</option> : null}
-        {currencyOptions.map((currency) => <option key={currency.id || currency.code} value={currency.code}>{currency.code} - {currency.name}{currency.symbol ? ` (${currency.symbol})` : ""}</option>)}
-      </>
-    );
-  }
 
   function updateField<K extends keyof CustomerFormState>(key: K, value: CustomerFormState[K]) {
     setForm((prev) => ({
@@ -626,9 +752,13 @@ function CustomerModal({
                   <TextInput value={form.billingCity} onChange={(value) => updateField("billingCity", value)} placeholder="City" />
                   <TextInput value={form.billingPostCode} onChange={(value) => updateField("billingPostCode", value)} placeholder="Post Code" />
                 </div>
-                <SelectInput value={form.billingCountryCode} onChange={(value) => updateField("billingCountryCode", value)}>
-                  {renderCountryOptions(form.billingCountryCode)}
-                </SelectInput>
+                <SearchableSelect
+                  label="Country"
+                  placeholder="Search or select country"
+                  options={countryOptions}
+                  value={form.billingCountryCode}
+                  onChange={(option) => updateField("billingCountryCode", option?.id || "MY")}
+                />
               </div>
             </div>
 
@@ -646,9 +776,13 @@ function CustomerModal({
                   <TextInput value={form.deliveryCity} onChange={(value) => updateField("deliveryCity", value)} placeholder="City" />
                   <TextInput value={form.deliveryPostCode} onChange={(value) => updateField("deliveryPostCode", value)} placeholder="Post Code" />
                 </div>
-                <SelectInput value={form.deliveryCountryCode} onChange={(value) => updateField("deliveryCountryCode", value)}>
-                  {renderCountryOptions(form.deliveryCountryCode)}
-                </SelectInput>
+                <SearchableSelect
+                  label="Country"
+                  placeholder="Search or select country"
+                  options={countryOptions}
+                  value={form.deliveryCountryCode}
+                  onChange={(option) => updateField("deliveryCountryCode", option?.id || "MY")}
+                />
               </div>
             </div>
           </div>
@@ -682,26 +816,34 @@ function CustomerModal({
             <div className="mt-4 grid gap-4 md:grid-cols-2">
               <div><FieldLabel>Area</FieldLabel><TextInput value={form.area} onChange={(value) => updateField("area", value)} placeholder="Enter area" /></div>
               <div>
-                <FieldLabel>Currency</FieldLabel>
-                <SelectInput value={form.currency} onChange={(value) => updateField("currency", value)}>
-                  {renderCurrencyOptions(form.currency)}
-                </SelectInput>
+                <SearchableSelect
+                  label="Currency"
+                  placeholder="Search or select currency"
+                  options={currencyOptions}
+                  value={form.currency}
+                  onChange={(option) => updateField("currency", option?.id || "MYR")}
+                />
               </div>
               <div>
-                <FieldLabel>Agent</FieldLabel>
-                <SelectInput value={form.agentId} onChange={(value) => updateField("agentId", value)}>
-                  <option value="">No Agent</option>
-                  {agents.map((agent) => <option key={agent.id} value={agent.id}>{agent.code} - {agent.name}</option>)}
-                </SelectInput>
+                <SearchableSelect
+                  label="Agent"
+                  placeholder="Search or select agent"
+                  options={agentOptions}
+                  value={form.agentId}
+                  onChange={(option) => updateField("agentId", option?.id || "")}
+                />
               </div>
               <div><FieldLabel>Nature of Business</FieldLabel><TextInput value={form.natureOfBusiness} onChange={(value) => updateField("natureOfBusiness", value)} placeholder="Enter nature of business" /></div>
               <div><FieldLabel>Attention</FieldLabel><TextInput value={form.attention} onChange={(value) => updateField("attention", value)} placeholder="Enter attention" /></div>
               <div><FieldLabel>Contact</FieldLabel><TextInput value={form.contactPerson} onChange={(value) => updateField("contactPerson", value)} placeholder="Enter contact person" /></div>
               <div>
-                <FieldLabel>Registration Type</FieldLabel>
-                <SelectInput value={form.registrationIdType} onChange={(value) => updateField("registrationIdType", value)}>
-                  {CUSTOMER_REGISTRATION_ID_TYPES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
-                </SelectInput>
+                <SearchableSelect
+                  label="Registration Type"
+                  placeholder="Search or select registration type"
+                  options={registrationTypeOptions}
+                  value={form.registrationIdType}
+                  onChange={(option) => updateField("registrationIdType", option?.id || "BRN")}
+                />
               </div>
               <div><FieldLabel>Business Registration No.</FieldLabel><TextInput value={form.registrationNo} onChange={(value) => updateField("registrationNo", value)} placeholder="Enter registration no." /></div>
               <div><FieldLabel>Tax Identification No.</FieldLabel><TextInput value={form.taxIdentificationNo} onChange={(value) => updateField("taxIdentificationNo", value)} placeholder="Enter TIN no." /></div>
@@ -778,9 +920,13 @@ function CustomerModal({
                 <TextInput value={deliveryAddressDraft.addressLine4} onChange={(value) => updateDeliveryAddressDraft("addressLine4", value)} placeholder="Address line 4" />
                 <TextInput value={deliveryAddressDraft.city} onChange={(value) => updateDeliveryAddressDraft("city", value)} placeholder="City" />
                 <TextInput value={deliveryAddressDraft.postCode} onChange={(value) => updateDeliveryAddressDraft("postCode", value)} placeholder="Post Code" />
-                <SelectInput value={deliveryAddressDraft.countryCode} onChange={(value) => updateDeliveryAddressDraft("countryCode", value)}>
-                  {renderCountryOptions(deliveryAddressDraft.countryCode)}
-                </SelectInput>
+                <SearchableSelect
+                  label="Country"
+                  placeholder="Search or select country"
+                  options={countryOptions}
+                  value={deliveryAddressDraft.countryCode}
+                  onChange={(option) => updateDeliveryAddressDraft("countryCode", option?.id || "MY")}
+                />
               </div>
               <div className="mt-6 flex items-center justify-end gap-3">
                 <button type="button" onClick={() => setIsDeliveryAddressModalOpen(false)} className="rounded-xl border border-white/15 px-4 py-2.5 text-sm text-white/75 transition hover:bg-white/10 hover:text-white">
