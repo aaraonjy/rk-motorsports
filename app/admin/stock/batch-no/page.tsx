@@ -47,13 +47,14 @@ export default async function AdminBatchNoPage() {
       select: { id: true, code: true, name: true, isActive: true },
     }),
     db.inventoryBatch.findMany({
+      where: { isArchived: false },
       orderBy: [{ createdAt: "desc" }],
-      take: 10,
+      take: 400,
       include: {
         inventoryProduct: { select: { id: true, code: true, description: true } },
       },
     }),
-    db.inventoryBatch.count(),
+    db.inventoryBatch.count({ where: { isArchived: false } }),
   ]);
 
   const batchIds = batches.map((item) => item.id);
@@ -105,7 +106,7 @@ export default async function AdminBatchNoPage() {
   const usageCountMap = new Map(usageCounts.map((row) => [row.inventoryBatchId || "", row._count._all]));
   const locationMap = new Map(locations.map((item) => [item.id, `${item.code} — ${item.name}`]));
 
-  const initialRows: BatchRow[] = batches.map((item) => {
+  const allRows: BatchRow[] = batches.map((item) => {
     const balanceInfo = balanceMap.get(`${item.inventoryProductId}__${item.batchNo}`);
     const totalBalance = balanceInfo?.total ?? 0;
     const linkedSerialCount = serialCountMap.get(item.id) ?? 0;
@@ -140,19 +141,23 @@ export default async function AdminBatchNoPage() {
     };
   });
 
+
+  const visibleRows = allRows.filter((item) => item.balance > 0);
+  const initialRows: BatchRow[] = visibleRows.slice(0, 10);
+  const visibleTotal = visibleRows.length;
+
   return (
     <section className="section-pad">
       <div className="container-rk max-w-7xl">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.24em] text-red-400/80">Batch B</p>
-          <h1 className="mt-3 text-4xl font-bold">Batch Number Management</h1>
+          <h1 className="text-4xl font-bold">Batch Number Management</h1>
           <p className="mt-4 max-w-3xl text-white/70">
             Review current batch balances, location distribution, linked serial usage, and archive-safe cleanup from one traceability page.
           </p>
         </div>
 
         <div className="mt-10">
-          <AdminBatchNoClient initialRows={initialRows} initialPagination={{ page: 1, pageSize: 10, total: batchTotal, totalPages: Math.max(1, Math.ceil(batchTotal / 10)) }} products={products} locations={locations} />
+          <AdminBatchNoClient initialRows={initialRows} initialPagination={{ page: 1, pageSize: 10, total: visibleTotal, totalPages: Math.max(1, Math.ceil(visibleTotal / 10)) }} products={products} locations={locations} />
         </div>
       </div>
     </section>

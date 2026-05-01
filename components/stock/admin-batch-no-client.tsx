@@ -103,7 +103,7 @@ export function AdminBatchNoClient({ initialRows, initialPagination, products, l
   const [batchKeyword, setBatchKeyword] = useState("");
   const [locationFilter, setLocationFilter] = useState("ALL");
   const [statusFilter, setStatusFilter] = useState<"ALL" | BatchRow["status"]>("ALL");
-  const [zeroBalanceOnly, setZeroBalanceOnly] = useState(false);
+  const [includeZeroBalance, setIncludeZeroBalance] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [submitSuccess, setSubmitSuccess] = useState("");
   const [selectedDetail, setSelectedDetail] = useState<BatchDetail | null>(null);
@@ -136,7 +136,7 @@ export function AdminBatchNoClient({ initialRows, initialPagination, products, l
       if (batchKeyword.trim()) params.set("q", batchKeyword.trim());
       if (locationFilter !== "ALL") params.set("locationId", locationFilter);
       if (statusFilter !== "ALL") params.set("status", statusFilter);
-      if (zeroBalanceOnly) params.set("zeroBalanceOnly", "1");
+      if (includeZeroBalance) params.set("includeZeroBalance", "1");
 
       const response = await fetch(`/api/admin/stock/batches?${params.toString()}`, { cache: "no-store" });
       const data = await response.json();
@@ -157,11 +157,11 @@ export function AdminBatchNoClient({ initialRows, initialPagination, products, l
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [productFilter, batchKeyword, locationFilter, statusFilter, zeroBalanceOnly]);
+  }, [productFilter, batchKeyword, locationFilter, statusFilter, includeZeroBalance]);
 
   useEffect(() => {
     void loadRows(currentPage);
-  }, [currentPage, productFilter, batchKeyword, locationFilter, statusFilter, zeroBalanceOnly]);
+  }, [currentPage, productFilter, batchKeyword, locationFilter, statusFilter, includeZeroBalance]);
 
   async function openDetail(id: string) {
     setSubmitError("");
@@ -243,8 +243,8 @@ export function AdminBatchNoClient({ initialRows, initialPagination, products, l
               <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/60">▾</div>
             </div>
             <label className="flex items-center gap-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/80">
-              <input type="checkbox" checked={zeroBalanceOnly} onChange={(e) => setZeroBalanceOnly(e.target.checked)} />
-              <span>Zero Balance only</span>
+              <input type="checkbox" checked={includeZeroBalance} onChange={(e) => setIncludeZeroBalance(e.target.checked)} />
+              <span>Include zero balance</span>
             </label>
           </div>
         </div>
@@ -268,13 +268,12 @@ export function AdminBatchNoClient({ initialRows, initialPagination, products, l
                 <th className="px-3 py-3 font-medium">Location</th>
                 <th className="px-3 py-3 font-medium text-right">Linked Serial</th>
                 <th className="px-3 py-3 font-medium text-right">Usage Count</th>
-                <th className="px-3 py-3 font-medium">Status</th>
                 <th className="px-3 py-3 font-medium text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/10">
               {filteredRows.length === 0 ? (
-                <tr><td colSpan={10} className="px-3 py-8 text-center text-white/50">No batch records found.</td></tr>
+                <tr><td colSpan={9} className="px-3 py-8 text-center text-white/50">No batch records found.</td></tr>
               ) : filteredRows.map((item) => (
                 <tr key={item.id} className="align-top text-white/80">
                   <td className="px-3 py-4 font-semibold text-white">{item.productCode}</td>
@@ -285,7 +284,6 @@ export function AdminBatchNoClient({ initialRows, initialPagination, products, l
                   <td className="px-3 py-4 text-white/70">{item.locationSummary || "—"}</td>
                   <td className="px-3 py-4 text-right">{item.linkedSerialCount}</td>
                   <td className="px-3 py-4 text-right">{item.usageCount}</td>
-                  <td className="px-3 py-4"><span className={statusBadge(item.status)}>{item.status === "ZERO_BALANCE" ? "Zero Balance" : item.status === "ARCHIVED" ? "Archived" : "Active"}</span></td>
                   <td className="px-3 py-4">
                     <div className="flex justify-end gap-2">
                       <button type="button" onClick={() => openDetail(item.id)} className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-semibold text-white transition hover:bg-white/10">
