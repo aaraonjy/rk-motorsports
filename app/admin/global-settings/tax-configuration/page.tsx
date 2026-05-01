@@ -1,7 +1,7 @@
 import { getSessionUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { redirect } from "next/navigation";
-import { AdminTaxConfigurationClient } from "@/components/admin-tax-configuration-client";
+import { AdminTaxConfigurationClient } from "@/components/global-settings/admin-tax-configuration-client";
 
 export default async function TaxConfigurationPage() {
   const user = await getSessionUser();

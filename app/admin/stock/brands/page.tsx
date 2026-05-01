@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { AdminMasterListClient } from "@/components/admin-master-list-client";
+import { AdminMasterListClient } from "@/components/shared/admin-master-list-client";
 
 const PAGE_SIZE = 10;
 

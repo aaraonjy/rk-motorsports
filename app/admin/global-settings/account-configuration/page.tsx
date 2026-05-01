@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { AccountConfigurationForm } from "@/components/account-configuration-form";
+import { AccountConfigurationForm } from "@/components/global-settings/account-configuration-form";
 import {
   DEFAULT_ACCOUNT_CONFIGURATION_ID,
   DEFAULT_CUSTOMER_ACCOUNT_FORMAT,

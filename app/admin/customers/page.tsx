@@ -2,7 +2,7 @@ import { getSessionUser } from "@/lib/auth";
 import { getCustomers } from "@/lib/queries";
 import { redirect } from "next/navigation";
 import { PaginationControls } from "@/components/pagination-controls";
-import { AdminCustomerManagement } from "@/components/admin-customer-management";
+import { AdminCustomerManagement } from "@/components/customers/admin-customer-management";
 import { db } from "@/lib/db";
 import { DEFAULT_ACCOUNT_CONFIGURATION_ID, DEFAULT_CUSTOMER_ACCOUNT_FORMAT, DEFAULT_CUSTOMER_ACCOUNT_PREFIX } from "@/lib/customer-account";
 import type { CustomerAccountNoFormat } from "@prisma/client";
