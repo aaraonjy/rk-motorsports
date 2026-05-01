@@ -1256,11 +1256,11 @@ export function AdminStockAssemblyClient({
         return;
       }
 
-      setSubmitSuccess("Stock assembly created successfully.");
       setIsNegativeStockAuthOpen(false);
       setNegativeStockPendingPayload(null);
       setIsCreateOpen(false);
       resetCreateForm();
+      setSubmitSuccess("Stock Assembly created successfully.");
       setCurrentPage(1);
       await loadTransactions(1);
     } catch {
@@ -1292,11 +1292,11 @@ export function AdminStockAssemblyClient({
         return;
       }
 
-      setSubmitSuccess("Stock assembly created successfully.");
       setIsNegativeStockAuthOpen(false);
       setNegativeStockPendingPayload(null);
       setIsCreateOpen(false);
       resetCreateForm();
+      setSubmitSuccess("Stock Assembly created successfully.");
       setCurrentPage(1);
       await loadTransactions(1);
     } catch {
