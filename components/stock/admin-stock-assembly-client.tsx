@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   DEFAULT_STOCK_NUMBER_FORMAT_CONFIG,
@@ -106,6 +107,7 @@ type TransactionSummary = {
   transactionDate: string;
   status: "POSTED" | "CANCELLED";
   reference?: string | null;
+  remarks?: string | null;
   revisedFrom?: { id: string; docNo?: string | null } | null;
   revisions?: Array<{ id: string }>;
   lines: Array<{
@@ -665,6 +667,7 @@ export function AdminStockAssemblyClient({
   allProducts: InventoryProductOption[];
   locations: StockLocationOption[];
 }) {
+  const router = useRouter();
   const [finishedGoodId, setFinishedGoodId] = useState("");
   const [locationId, setLocationId] = useState("");
   const [assemblyQty, setAssemblyQty] = useState(formatNumberByDecimalPlaces(1, DEFAULT_STOCK_NUMBER_FORMAT_CONFIG.qtyDecimalPlaces));
@@ -707,6 +710,11 @@ export function AdminStockAssemblyClient({
   const [cancelTarget, setCancelTarget] = useState<CancelTarget | null>(null);
   const [cancelReason, setCancelReason] = useState("");
   const [isCancelling, setIsCancelling] = useState(false);
+  const [searchKeyword, setSearchKeyword] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [filterProjectId, setFilterProjectId] = useState("");
+  const [filterDepartmentId, setFilterDepartmentId] = useState("");
   const [projectOptions, setProjectOptions] = useState<ProjectOption[]>([]);
   const [departmentOptions, setDepartmentOptions] = useState<DepartmentOption[]>([]);
   const [isStockSettingsLoaded, setIsStockSettingsLoaded] = useState(false);
@@ -773,6 +781,10 @@ export function AdminStockAssemblyClient({
     () => (projectId ? departmentOptions.filter((item) => item.groupId === projectId && item.isActive) : []),
     [departmentOptions, projectId]
   );
+  const filteredListDepartmentOptions = useMemo(
+    () => (filterProjectId ? departmentOptions.filter((item) => item.groupId === filterProjectId && item.isActive) : []),
+    [departmentOptions, filterProjectId]
+  );
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -794,7 +806,14 @@ export function AdminStockAssemblyClient({
       const params = new URLSearchParams({
         transactionType: "AS",
         page: String(page),
+        pageSize: String(pagination.pageSize || 10),
       });
+      if (searchKeyword.trim()) params.set("q", searchKeyword.trim());
+      if (dateFrom) params.set("dateFrom", dateFrom);
+      if (dateTo) params.set("dateTo", dateTo);
+      if (projectFeatureEnabled && filterProjectId) params.set("projectId", filterProjectId);
+      if (departmentFeatureEnabled && filterDepartmentId) params.set("departmentId", filterDepartmentId);
+
       const response = await fetch(`/api/admin/stock/transactions?${params.toString()}`, { cache: "no-store" });
       const data = await response.json();
       if (!response.ok || !data.ok) {
@@ -825,8 +844,70 @@ export function AdminStockAssemblyClient({
   }
 
   useEffect(() => {
+    setCurrentPage(1);
+  }, [searchKeyword, dateFrom, dateTo, filterProjectId, filterDepartmentId]);
+
+  useEffect(() => {
+    if (currentPage > pagination.totalPages) setCurrentPage(pagination.totalPages);
+  }, [currentPage, pagination.totalPages]);
+
+  useEffect(() => {
     void loadTransactions(currentPage);
-  }, [currentPage]);
+  }, [currentPage, searchKeyword, dateFrom, dateTo, filterProjectId, filterDepartmentId, projectFeatureEnabled, departmentFeatureEnabled]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadProjectDepartmentOptions() {
+      try {
+        const [projectRes, departmentRes] = await Promise.all([
+          fetch("/api/admin/misc-projects", { cache: "no-store" }),
+          fetch("/api/admin/misc-departments", { cache: "no-store" }),
+        ]);
+        const projectData = await projectRes.json();
+        const departmentData = await departmentRes.json();
+        if (cancelled) return;
+        setProjectOptions(Array.isArray(projectData.items) ? projectData.items : []);
+        setDepartmentOptions(Array.isArray(departmentData.items) ? departmentData.items : []);
+      } catch {
+        if (!cancelled) {
+          setProjectOptions([]);
+          setDepartmentOptions([]);
+        }
+      }
+    }
+
+    void loadProjectDepartmentOptions();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (departmentId && !filteredDepartmentOptions.some((item) => item.id === departmentId)) {
+      setDepartmentId("");
+    }
+  }, [departmentId, filteredDepartmentOptions]);
+
+  useEffect(() => {
+    if (filterDepartmentId && !filteredListDepartmentOptions.some((item) => item.id === filterDepartmentId)) {
+      setFilterDepartmentId("");
+    }
+  }, [filterDepartmentId, filteredListDepartmentOptions]);
+
+  useEffect(() => {
+    if (projectFeatureEnabled) return;
+    if (projectId) setProjectId("");
+    if (departmentId) setDepartmentId("");
+    if (filterProjectId) setFilterProjectId("");
+    if (filterDepartmentId) setFilterDepartmentId("");
+  }, [projectFeatureEnabled, projectId, departmentId, filterProjectId, filterDepartmentId]);
+
+  useEffect(() => {
+    if (departmentFeatureEnabled) return;
+    if (departmentId) setDepartmentId("");
+    if (filterDepartmentId) setFilterDepartmentId("");
+  }, [departmentFeatureEnabled, departmentId, filterDepartmentId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1362,6 +1443,62 @@ export function AdminStockAssemblyClient({
           </button>
         </div>
 
+        <div className="mt-8 rounded-2xl border border-white/10 bg-black/20 p-4">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+            <div className="xl:col-span-2">
+              <label className="label-rk">Search</label>
+              <input
+                className="input-rk"
+                value={searchKeyword}
+                onChange={(e) => setSearchKeyword(e.target.value)}
+                placeholder={`Search doc no / desc${projectFeatureEnabled ? " / project" : ""}${departmentFeatureEnabled ? " / department" : ""} / reference / product / location / batch / serial`}
+              />
+            </div>
+            <div>
+              <label className="label-rk">Date From</label>
+              <input type="date" className="input-rk" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+            </div>
+            <div>
+              <label className="label-rk">Date To</label>
+              <input type="date" className="input-rk" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+            </div>
+            {projectFeatureEnabled ? (
+              <div>
+                <SearchableSelect
+                  label="Project"
+                  placeholder="All projects"
+                  options={projectOptions.filter((item) => item.isActive).map((item) => ({
+                    id: item.id,
+                    label: `${item.code} — ${item.name}`,
+                    searchText: `${item.code} ${item.name}`.toLowerCase(),
+                  }))}
+                  value={filterProjectId}
+                  onChange={(option) => {
+                    setFilterProjectId(option?.id || "");
+                    setFilterDepartmentId("");
+                  }}
+                />
+              </div>
+            ) : null}
+            {departmentFeatureEnabled ? (
+              <div>
+                <SearchableSelect
+                  label="Department"
+                  placeholder={filterProjectId ? "All departments" : "Select project first"}
+                  options={filteredListDepartmentOptions.map((item) => ({
+                    id: item.id,
+                    label: `${item.code} — ${item.name}`,
+                    searchText: `${item.code} ${item.name}`.toLowerCase(),
+                  }))}
+                  value={filterDepartmentId}
+                  disabled={!filterProjectId}
+                  onChange={(option) => setFilterDepartmentId(option?.id || "")}
+                />
+              </div>
+            ) : null}
+          </div>
+        </div>
+
         <div className="mt-6 overflow-x-auto">
           <table className="min-w-full divide-y divide-white/10 text-sm">
             <thead>
@@ -1369,20 +1506,24 @@ export function AdminStockAssemblyClient({
                 <th className="px-3 py-3 font-medium">Doc No</th>
                 <th className="px-3 py-3 font-medium">Date</th>
                 <th className="px-3 py-3 font-medium">Reference</th>
-                                                                <th className="px-3 py-3 font-medium">Status</th>
+                <th className="px-3 py-3 font-medium">Remarks</th>
+                <th className="px-3 py-3 font-medium">Status</th>
                 <th className="px-3 py-3 font-medium text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/10">
               {isLoadingTransactions ? (
-                <tr><td colSpan={5} className="px-3 py-8 text-center text-white/50">Loading transactions...</td></tr>
+                <tr><td colSpan={6} className="px-3 py-8 text-center text-white/50">Loading transactions...</td></tr>
               ) : visibleTransactions.length === 0 ? (
-                <tr><td colSpan={5} className="px-3 py-8 text-center text-white/50">No stock assembly transactions found.</td></tr>
+                <tr><td colSpan={6} className="px-3 py-8 text-center text-white/50">No stock assembly transactions found.</td></tr>
               ) : (
                 visibleTransactions.map((transaction) => {
-                  const fgLine = transaction.lines.find((line) => line.adjustmentDirection === "IN") || transaction.lines[0];
                   return (
-                    <tr key={transaction.id} className={`align-top text-white/80 ${transaction.status === "CANCELLED" ? "bg-red-500/5" : ""}`}>
+                    <tr
+                      key={transaction.id}
+                      className={`cursor-pointer align-top text-white/80 transition hover:bg-white/5 ${transaction.status === "CANCELLED" ? "bg-red-500/5" : ""}`}
+                      onClick={() => router.push(`/admin/stock/transactions/${transaction.id}`)}
+                    >
                       <td className="px-3 py-4 font-semibold text-white">
                         <div className="flex flex-col gap-1">
                           <span>{transaction.docNo || transaction.transactionNo}</span>
@@ -1399,24 +1540,46 @@ export function AdminStockAssemblyClient({
                       </td>
                       <td className="px-3 py-4">{formatDateInput(transaction.transactionDate)}</td>
                       <td className="px-3 py-4">{transaction.reference || "-"}</td>
-                                                                                        <td className="px-3 py-4">
+                      <td className="px-3 py-4">{transaction.remarks || "-"}</td>
+                      <td className="px-3 py-4">
                         <span className={transaction.status === "CANCELLED" ? "inline-flex rounded-full border border-red-500/25 bg-red-500/10 px-3 py-1 text-xs font-semibold text-red-200" : "inline-flex rounded-full border border-emerald-500/25 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-200"}>
                           {transaction.status === "CANCELLED" ? "Cancelled" : "Posted"}
                         </span>
                       </td>
                       <td className="px-3 py-4">
                         <div className="flex justify-end gap-2">
-                          <Link href={`/admin/stock/transactions/${transaction.id}`} className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-semibold text-white transition hover:bg-white/10">
-                            View
-                          </Link>
-                          <Link href={`/admin/stock/transactions/${transaction.id}/edit`} className={`rounded-lg px-3 py-2 text-xs font-semibold text-white transition ${transaction.status === "CANCELLED" ? "cursor-not-allowed border border-white/10 bg-white/5 opacity-50 pointer-events-none" : "border border-white/15 bg-white/5 hover:bg-white/10"}`}>
-                            Edit
-                          </Link>
                           <button
                             type="button"
+                            title={transaction.status === "CANCELLED" ? "Cannot edit cancelled transaction" : "Edit transaction"}
                             disabled={transaction.status === "CANCELLED"}
-                            onClick={() => setCancelTarget({ id: transaction.id, transactionNo: transaction.transactionNo })}
-                            className="rounded-lg border border-red-500/25 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-200 transition hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-50"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              if (transaction.status === "CANCELLED") return;
+                              router.push(`/admin/stock/transactions/${transaction.id}/edit`);
+                            }}
+                            className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${
+                              transaction.status === "CANCELLED"
+                                ? "cursor-not-allowed border-white/10 bg-white/5 text-white/35 opacity-50"
+                                : "border-white/15 bg-white/5 text-white hover:bg-white/10"
+                            }`}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            title={transaction.status === "CANCELLED" ? "Cannot cancel a cancelled transaction" : "Cancel transaction"}
+                            disabled={transaction.status === "CANCELLED"}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              if (transaction.status === "CANCELLED") return;
+                              setCancelTarget({ id: transaction.id, transactionNo: transaction.transactionNo });
+                              setCancelReason("");
+                            }}
+                            className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${
+                              transaction.status === "CANCELLED"
+                                ? "cursor-not-allowed border-red-500/10 bg-red-500/5 text-red-200/40 opacity-50"
+                                : "border-red-500/25 bg-red-500/10 text-red-200 hover:bg-red-500/15"
+                            }`}
                           >
                             Cancel
                           </button>
