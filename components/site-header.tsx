@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { getSessionUser } from "@/lib/auth";
-import { AdminNotificationBell } from "@/components/admin-notification-bell";
+import { AdminNotificationBell } from "@/components/shared/admin-notification-bell";
 import { SiteHeaderClient } from "@/components/site-header-client";
 import { AdminGlobalSettingsMenu } from "@/components/global-settings/admin-global-settings-menu";
 import { AdminStockMenu } from "@/components/stock/admin-stock-menu";
