@@ -774,6 +774,20 @@ export function AdminStockAssemblyClient({
     [departmentOptions, projectId]
   );
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const successMessage = params.get("success");
+
+    if (!successMessage) return;
+
+    setSubmitSuccess(successMessage);
+    params.delete("success");
+
+    const nextQuery = params.toString();
+    const nextUrl = nextQuery ? `${window.location.pathname}?${nextQuery}` : window.location.pathname;
+    window.history.replaceState(null, "", nextUrl);
+  }, []);
+
   async function loadTransactions(page = currentPage) {
     setIsLoadingTransactions(true);
     try {
@@ -1320,6 +1334,13 @@ export function AdminStockAssemblyClient({
 
   return (
     <>
+      {!isCreateOpen && (submitError || submitSuccess) ? (
+        <div className="mb-6 space-y-3">
+          {submitError ? <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{submitError}</div> : null}
+          {submitSuccess ? <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">{submitSuccess}</div> : null}
+        </div>
+      ) : null}
+
       <div className="rounded-[2rem] border border-white/10 bg-black/45 p-6 backdrop-blur-md md:p-8">
         <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
           <div>
@@ -1340,13 +1361,6 @@ export function AdminStockAssemblyClient({
             Create Stock Assembly
           </button>
         </div>
-
-        {(submitError || submitSuccess) ? (
-          <div className="mt-5 space-y-3">
-            {submitError ? <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{submitError}</div> : null}
-            {submitSuccess ? <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">{submitSuccess}</div> : null}
-          </div>
-        ) : null}
 
         <div className="mt-6 overflow-x-auto">
           <table className="min-w-full divide-y divide-white/10 text-sm">

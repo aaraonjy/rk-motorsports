@@ -1046,7 +1046,7 @@ export function AdminStockTransactionEditClient({
 
     setIsNegativeStockAuthOpen(false);
     setNegativeStockPendingPayload(null);
-    router.push(`/admin/stock/transactions/${data.transaction.id}?success=${encodeURIComponent(`${title} updated successfully.`)}`);
+    router.push(`${getBackHref(transactionType)}?success=${encodeURIComponent(`${title} updated successfully.`)}`);
     return { ok: true };
   }
 
