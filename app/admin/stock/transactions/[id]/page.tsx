@@ -302,7 +302,7 @@ export default async function AdminStockTransactionDetailPage({ params, searchPa
 
                   <div className="mt-5 grid gap-5 md:grid-cols-2">
                     <ReadonlyField label="Location" value={locationLabel} />
-                    <ReadonlyField label="Batch" value={line.batchNo || ""} />
+                    <ReadonlyField label="Batch No" value={line.batchNo || ""} />
                   </div>
 
                   <div className="mt-5 grid gap-5 md:grid-cols-2">
@@ -324,7 +324,7 @@ export default async function AdminStockTransactionDetailPage({ params, searchPa
                     <th className="px-3 py-3 font-medium">Direction</th>
                     <th className="px-3 py-3 font-medium text-right">Qty</th>
                     <th className="px-3 py-3 font-medium">Location</th>
-                    <th className="px-3 py-3 font-medium">Batch</th>
+                    <th className="px-3 py-3 font-medium">Batch No</th>
                     <th className="px-3 py-3 font-medium">Remarks</th>
                   </tr>
                 </thead>
