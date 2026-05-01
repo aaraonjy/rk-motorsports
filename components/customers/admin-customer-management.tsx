@@ -1007,15 +1007,6 @@ export function AdminCustomerManagement({ customers, agents, countries, currenci
   const [portalAccessTarget, setPortalAccessTarget] = useState<CustomerRecord | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState("");
 
-  useEffect(() => {
-    if (!submitSuccess) return;
-
-    const timer = window.setTimeout(() => {
-      setSubmitSuccess("");
-    }, 5000);
-
-    return () => window.clearTimeout(timer);
-  }, [submitSuccess]);
 
   async function togglePortalAccess(userId: string) {
     try {
