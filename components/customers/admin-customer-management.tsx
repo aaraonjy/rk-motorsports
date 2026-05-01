@@ -427,7 +427,7 @@ function CustomerModal({
   accountConfiguration: Props["accountConfiguration"];
   existingCustomerAccountNos: string[];
   onClose: () => void;
-  onSaved: () => void;
+  onSaved: (message: string) => void;
 }) {
   const [form, setForm] = useState<CustomerFormState>(() => getInitialForm(customer));
   const [error, setError] = useState<string | null>(null);
@@ -662,7 +662,7 @@ function CustomerModal({
         return;
       }
 
-      onSaved();
+      onSaved(mode === "create" ? "Customer created successfully." : "Customer updated successfully.");
       onClose();
     } catch {
       setError("Unable to save customer right now.");
@@ -1005,6 +1005,17 @@ export function AdminCustomerManagement({ customers, agents, countries, currenci
   const [isTogglingId, setIsTogglingId] = useState<string | null>(null);
   const [tempPassword, setTempPassword] = useState<string | null>(null);
   const [portalAccessTarget, setPortalAccessTarget] = useState<CustomerRecord | null>(null);
+  const [submitSuccess, setSubmitSuccess] = useState("");
+
+  useEffect(() => {
+    if (!submitSuccess) return;
+
+    const timer = window.setTimeout(() => {
+      setSubmitSuccess("");
+    }, 5000);
+
+    return () => window.clearTimeout(timer);
+  }, [submitSuccess]);
 
   async function togglePortalAccess(userId: string) {
     try {
@@ -1031,7 +1042,8 @@ export function AdminCustomerManagement({ customers, agents, countries, currenci
     await togglePortalAccess(userId);
   }
 
-  function handleSaved() {
+  function handleSaved(message: string) {
+    setSubmitSuccess(message);
     router.refresh();
   }
 
@@ -1041,6 +1053,12 @@ export function AdminCustomerManagement({ customers, agents, countries, currenci
 
   return (
     <>
+      {submitSuccess ? (
+        <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+          {submitSuccess}
+        </div>
+      ) : null}
+
       <div className="flex justify-end">
         <button type="button" onClick={() => setIsCreateOpen(true)} className="rounded-xl border border-white/15 bg-black/30 px-4 py-3 text-white transition hover:bg-white/10">Add Customer</button>
       </div>
