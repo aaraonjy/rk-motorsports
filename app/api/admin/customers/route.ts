@@ -1,11 +1,7 @@
 import { requireAdmin, hashPassword } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { resolveCustomerAccountNo } from "@/lib/customer-account";
-import {
-  CUSTOMER_CURRENCIES,
-  CUSTOMER_REGISTRATION_ID_TYPES,
-  SEA_COUNTRIES,
-} from "@/lib/customer-profile-options";
+import { CUSTOMER_REGISTRATION_ID_TYPES } from "@/lib/customer-profile-options";
 
 function generateTempPassword() {
   return Math.random().toString(36).slice(-10);
@@ -21,14 +17,22 @@ function getNullableText(body: Record<string, unknown>, key: string) {
   return value || null;
 }
 
-function normalizeCountryCode(value: string) {
-  const countryCode = value.trim().toUpperCase();
-  return SEA_COUNTRIES.some((country) => country.code === countryCode) ? countryCode : "MY";
+async function resolveCountryCode(value: string) {
+  const countryCode = value.trim().toUpperCase() || "MY";
+  const country = await db.country.findFirst({ where: { code: countryCode, isActive: true }, select: { code: true } });
+  if (!country) {
+    throw new Error(`Selected country code ${countryCode} is not available. Please create or activate it in Country Maintenance.`);
+  }
+  return country.code;
 }
 
-function normalizeCurrency(value: string) {
-  const currency = value.trim().toUpperCase();
-  return CUSTOMER_CURRENCIES.some((item) => item.code === currency) ? currency : "MYR";
+async function resolveCurrency(value: string) {
+  const currencyCode = value.trim().toUpperCase() || "MYR";
+  const currency = await db.currency.findFirst({ where: { code: currencyCode, isActive: true }, select: { code: true } });
+  if (!currency) {
+    throw new Error(`Selected currency code ${currencyCode} is not available. Please create or activate it in Currency Maintenance.`);
+  }
+  return currency.code;
 }
 
 function normalizeRegistrationIdType(value: string) {
@@ -44,11 +48,10 @@ function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
-function getDeliveryAddresses(body: Record<string, unknown>) {
+async function getDeliveryAddresses(body: Record<string, unknown>) {
   const raw = Array.isArray(body.deliveryAddresses) ? body.deliveryAddresses : [];
-
-  return raw
-    .map((item) => {
+  const mapped = await Promise.all(
+    raw.map(async (item) => {
       if (!item || typeof item !== "object") return null;
       const record = item as Record<string, unknown>;
       const addressLine1 = getText(record, "addressLine1");
@@ -62,10 +65,12 @@ function getDeliveryAddresses(body: Record<string, unknown>) {
         addressLine4: getNullableText(record, "addressLine4"),
         city: getNullableText(record, "city"),
         postCode: getNullableText(record, "postCode"),
-        countryCode: normalizeCountryCode(getText(record, "countryCode")),
+        countryCode: await resolveCountryCode(getText(record, "countryCode")),
       };
     })
-    .filter((item): item is NonNullable<typeof item> => Boolean(item));
+  );
+
+  return mapped.filter((item): item is NonNullable<typeof item> => Boolean(item));
 }
 
 async function resolveAgentId(agentId: string | null) {
@@ -114,7 +119,19 @@ export async function POST(req: Request) {
   }
 
   const passwordHash = await hashPassword(generateTempPassword());
-  const deliveryAddresses = getDeliveryAddresses(body);
+  let billingCountryCode = "MY";
+  let deliveryCountryCode = "MY";
+  let currency = "MYR";
+  let deliveryAddresses: Awaited<ReturnType<typeof getDeliveryAddresses>> = [];
+
+  try {
+    billingCountryCode = await resolveCountryCode(getText(body, "billingCountryCode"));
+    deliveryCountryCode = await resolveCountryCode(getText(body, "deliveryCountryCode"));
+    currency = await resolveCurrency(getText(body, "currency"));
+    deliveryAddresses = await getDeliveryAddresses(body);
+  } catch (error) {
+    return Response.json({ ok: false, error: error instanceof Error ? error.message : "Invalid country or currency selection." }, { status: 400 });
+  }
 
   await db.user.create({
     data: {
@@ -134,19 +151,19 @@ export async function POST(req: Request) {
       billingAddressLine4: getNullableText(body, "billingAddressLine4"),
       billingCity: getNullableText(body, "billingCity"),
       billingPostCode: getNullableText(body, "billingPostCode"),
-      billingCountryCode: normalizeCountryCode(getText(body, "billingCountryCode")),
+      billingCountryCode,
       deliveryAddressLine1: getNullableText(body, "deliveryAddressLine1"),
       deliveryAddressLine2: getNullableText(body, "deliveryAddressLine2"),
       deliveryAddressLine3: getNullableText(body, "deliveryAddressLine3"),
       deliveryAddressLine4: getNullableText(body, "deliveryAddressLine4"),
       deliveryCity: getNullableText(body, "deliveryCity"),
       deliveryPostCode: getNullableText(body, "deliveryPostCode"),
-      deliveryCountryCode: normalizeCountryCode(getText(body, "deliveryCountryCode")),
+      deliveryCountryCode,
       area: getNullableText(body, "area"),
       attention: getNullableText(body, "attention"),
       contactPerson: getNullableText(body, "contactPerson"),
       emailCc: getNullableText(body, "emailCc"),
-      currency: normalizeCurrency(getText(body, "currency")),
+      currency,
       agentId,
       natureOfBusiness: getNullableText(body, "natureOfBusiness"),
       registrationIdType: normalizeRegistrationIdType(getText(body, "registrationIdType")) as any,

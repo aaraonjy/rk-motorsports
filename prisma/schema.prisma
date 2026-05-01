@@ -555,6 +555,31 @@ model Agent {
   @@index([name])
 }
 
+model Country {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, code])
+  @@index([name])
+}
+
+model Currency {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  symbol    String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, code])
+  @@index([name])
+}
+
 model CustomerDeliveryAddress {
   id           String   @id @default(cuid())
   customerId   String

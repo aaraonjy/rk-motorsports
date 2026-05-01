@@ -22,6 +22,19 @@ type CustomerAgent = {
   name: string;
 };
 
+type CountryOption = {
+  id: string;
+  code: string;
+  name: string;
+};
+
+type CurrencyOption = {
+  id: string;
+  code: string;
+  name: string;
+  symbol: string;
+};
+
 type CustomerDeliveryAddress = {
   id: string;
   label: string | null;
@@ -89,7 +102,7 @@ export default async function AdminCustomersPage({
   const portalAccess = params.portalAccess || "ALL";
   const page = Math.max(1, Number(params.page || "1") || 1);
 
-  const [result, agents, accountConfig, existingAccountNos] = await Promise.all([
+  const [result, agents, countries, currencies, accountConfig, existingAccountNos] = await Promise.all([
     getCustomers({
       search,
       source,
@@ -108,6 +121,16 @@ export default async function AdminCustomersPage({
       orderBy: [{ code: "asc" }],
       select: { id: true, code: true, name: true },
     }),
+    db.country.findMany({
+      where: { isActive: true },
+      orderBy: [{ code: "asc" }],
+      select: { id: true, code: true, name: true },
+    }) as Promise<CountryOption[]>,
+    db.currency.findMany({
+      where: { isActive: true },
+      orderBy: [{ code: "asc" }],
+      select: { id: true, code: true, name: true, symbol: true },
+    }) as Promise<CurrencyOption[]>,
     db.accountConfiguration.findUnique({
       where: { id: DEFAULT_ACCOUNT_CONFIGURATION_ID },
       select: { customerAccountPrefix: true, customerAccountNoFormat: true },
@@ -237,6 +260,8 @@ export default async function AdminCustomersPage({
               createdAt: customer.createdAt.toISOString(),
             }))}
             agents={agents}
+            countries={countries}
+            currencies={currencies}
             accountConfiguration={{
               customerAccountPrefix: accountConfig?.customerAccountPrefix || DEFAULT_CUSTOMER_ACCOUNT_PREFIX,
               customerAccountNoFormat: (accountConfig?.customerAccountNoFormat || DEFAULT_CUSTOMER_ACCOUNT_FORMAT) as CustomerAccountNoFormat,

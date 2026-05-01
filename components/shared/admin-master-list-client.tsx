@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-type Item = { id: string; code: string; name: string; isActive: boolean; groupId?: string; groupLabel?: string | null };
+type Item = { id: string; code: string; name: string; isActive: boolean; groupId?: string; groupLabel?: string | null; [key: string]: unknown };
 type GroupOption = { id: string; code: string; name: string; isActive: boolean };
+type ExtraField = { key: string; label: string; placeholder?: string; required?: boolean; maxLength?: number };
 type PaginationInfo = { page: number; pageSize: number; total: number; totalPages: number };
 
 type Props = {
@@ -16,6 +17,7 @@ type Props = {
   groups?: GroupOption[];
   groupLabelTitle?: string;
   groupPlaceholder?: string;
+  extraFields?: ExtraField[];
 };
 
 function sortItemsByCode(items: Item[]) {
@@ -34,6 +36,7 @@ export function AdminMasterListClient({
   groups = [],
   groupLabelTitle = "Group",
   groupPlaceholder = "Select group",
+  extraFields = [],
 }: Props) {
   const [items, setItems] = useState(sortItemsByCode(initialItems));
   const [pagination, setPagination] = useState<PaginationInfo>(initialPagination || EMPTY_PAGINATION);
@@ -42,6 +45,7 @@ export function AdminMasterListClient({
   const [isOpen, setIsOpen] = useState(false);
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
+  const [extraValues, setExtraValues] = useState<Record<string, string>>({});
   const [groupId, setGroupId] = useState("");
   const [isActive, setIsActive] = useState(true);
   const [error, setError] = useState("");
@@ -51,6 +55,13 @@ export function AdminMasterListClient({
   const [currentPage, setCurrentPage] = useState(initialPagination?.page || 1);
 
   const totalPages = Math.max(1, pagination.totalPages || 1);
+
+  function buildEmptyExtraValues() {
+    return extraFields.reduce<Record<string, string>>((next, field) => {
+      next[field.key] = "";
+      return next;
+    }, {});
+  }
 
   async function loadItems(page = currentPage) {
     setIsLoadingItems(true);
@@ -97,6 +108,7 @@ export function AdminMasterListClient({
     setEditingId(null);
     setCode("");
     setName("");
+    setExtraValues(buildEmptyExtraValues());
     setGroupId("");
     setIsActive(true);
     setError("");
@@ -108,6 +120,11 @@ export function AdminMasterListClient({
     setEditingId(item.id);
     setCode(item.code);
     setName(item.name);
+    setExtraValues(extraFields.reduce<Record<string, string>>((next, field) => {
+      const value = item[field.key];
+      next[field.key] = typeof value === "string" ? value : value == null ? "" : String(value);
+      return next;
+    }, {}));
     setGroupId(item.groupId || "");
     setIsActive(item.isActive);
     setError("");
@@ -120,6 +137,7 @@ export function AdminMasterListClient({
     setEditingId(null);
     setCode("");
     setName("");
+    setExtraValues(buildEmptyExtraValues());
     setGroupId("");
     setIsActive(true);
     setError("");
@@ -135,7 +153,7 @@ export function AdminMasterListClient({
       const response = await fetch(editingId ? `${apiBase}/${editingId}` : apiBase, {
         method: editingId ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code, name, groupId: requireGroup ? (groupId || null) : null, isActive }),
+        body: JSON.stringify({ code, name, ...extraValues, groupId: requireGroup ? (groupId || null) : null, isActive }),
       });
       const data = await response.json();
       if (!response.ok || !data.ok) {
@@ -204,6 +222,7 @@ export function AdminMasterListClient({
               <tr className="text-left text-white/45">
                 <th className="px-3 py-3 font-medium">Code</th>
                 <th className="px-3 py-3 font-medium">Name</th>
+                {extraFields.map((field) => <th key={field.key} className="px-3 py-3 font-medium">{field.label}</th>)}
                 {requireGroup ? <th className="px-3 py-3 font-medium">{groupLabelTitle}</th> : null}
                 <th className="px-3 py-3 font-medium">Status</th>
                 <th className="px-3 py-3 font-medium text-right">Action</th>
@@ -211,13 +230,14 @@ export function AdminMasterListClient({
             </thead>
             <tbody className="divide-y divide-white/10">
               {isLoadingItems ? (
-                <tr><td colSpan={requireGroup ? 5 : 4} className="px-3 py-8 text-center text-white/50">Loading records...</td></tr>
+                <tr><td colSpan={(requireGroup ? 5 : 4) + extraFields.length} className="px-3 py-8 text-center text-white/50">Loading records...</td></tr>
               ) : items.length === 0 ? (
-                <tr><td colSpan={requireGroup ? 5 : 4} className="px-3 py-8 text-center text-white/50">No records found.</td></tr>
+                <tr><td colSpan={(requireGroup ? 5 : 4) + extraFields.length} className="px-3 py-8 text-center text-white/50">No records found.</td></tr>
               ) : items.map((item) => (
                 <tr key={item.id}>
                   <td className="px-3 py-4 font-semibold text-white">{item.code}</td>
                   <td className="px-3 py-4 text-white/80">{item.name}</td>
+                  {extraFields.map((field) => <td key={field.key} className="px-3 py-4 text-white/80">{item[field.key] == null || item[field.key] === "" ? "-" : String(item[field.key])}</td>)}
                   {requireGroup ? <td className="px-3 py-4 text-white/70">{item.groupLabel || "-"}</td> : null}
                   <td className="px-3 py-4"><span className={item.isActive ? "inline-flex rounded-full border border-emerald-500/30 bg-emerald-500/15 px-3 py-1 text-xs font-semibold text-emerald-300" : "inline-flex rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold text-white/65"}>{item.isActive ? "Active" : "Inactive"}</span></td>
                   <td className="px-3 py-4"><div className="flex justify-end gap-2">
@@ -271,6 +291,19 @@ export function AdminMasterListClient({
               <div className="grid gap-4 md:grid-cols-2">
                 <div><label className="label-rk">Code</label><input className="input-rk" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} required /></div>
                 <div><label className="label-rk">Name</label><input className="input-rk" value={name} onChange={(e) => setName(e.target.value)} required /></div>
+                {extraFields.map((field) => (
+                  <div key={field.key}>
+                    <label className="label-rk">{field.label}{field.required ? " *" : ""}</label>
+                    <input
+                      className="input-rk"
+                      value={extraValues[field.key] || ""}
+                      onChange={(e) => setExtraValues((prev) => ({ ...prev, [field.key]: field.maxLength ? e.target.value.slice(0, field.maxLength) : e.target.value }))}
+                      placeholder={field.placeholder || `Enter ${field.label.toLowerCase()}`}
+                      maxLength={field.maxLength}
+                      required={field.required}
+                    />
+                  </div>
+                ))}
               </div>
               {requireGroup ? (
                 <div>

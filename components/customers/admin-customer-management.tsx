@@ -4,16 +4,25 @@ import { useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { CustomerAccountNoFormat } from "@prisma/client";
-import {
-  CUSTOMER_CURRENCIES,
-  CUSTOMER_REGISTRATION_ID_TYPES,
-  SEA_COUNTRIES,
-} from "@/lib/customer-profile-options";
+import { CUSTOMER_REGISTRATION_ID_TYPES } from "@/lib/customer-profile-options";
 
 type CustomerAgent = {
   id: string;
   code: string;
   name: string;
+};
+
+type CountryOption = {
+  id: string;
+  code: string;
+  name: string;
+};
+
+type CurrencyOption = {
+  id: string;
+  code: string;
+  name: string;
+  symbol: string;
 };
 
 type CustomerDeliveryAddress = {
@@ -73,6 +82,8 @@ type CustomerRecord = {
 type Props = {
   customers: CustomerRecord[];
   agents: CustomerAgent[];
+  countries: CountryOption[];
+  currencies: CurrencyOption[];
   accountConfiguration: {
     customerAccountPrefix: string;
     customerAccountNoFormat: CustomerAccountNoFormat;
@@ -317,6 +328,8 @@ function CustomerModal({
   mode,
   customer,
   agents,
+  countries,
+  currencies,
   accountConfiguration,
   existingCustomerAccountNos,
   onClose,
@@ -326,6 +339,8 @@ function CustomerModal({
   mode: "create" | "edit";
   customer: CustomerRecord | null;
   agents: CustomerAgent[];
+  countries: CountryOption[];
+  currencies: CurrencyOption[];
   accountConfiguration: Props["accountConfiguration"];
   existingCustomerAccountNos: string[];
   onClose: () => void;
@@ -392,6 +407,30 @@ function CustomerModal({
   if (!isOpen) return null;
 
   const isPortalCustomer = customer?.accountSource === "PORTAL";
+  const countryOptions = countries.length > 0 ? countries : [{ id: "fallback-MY", code: "MY", name: "Malaysia" }];
+  const currencyOptions = currencies.length > 0 ? currencies : [{ id: "fallback-MYR", code: "MYR", name: "Malaysian Ringgit", symbol: "RM" }];
+
+  function renderCountryOptions(currentValue: string) {
+    const normalized = (currentValue || "MY").toUpperCase();
+    const hasCurrent = countryOptions.some((country) => country.code === normalized);
+    return (
+      <>
+        {!hasCurrent ? <option value={normalized}>{normalized}</option> : null}
+        {countryOptions.map((country) => <option key={country.id || country.code} value={country.code}>{country.code} - {country.name}</option>)}
+      </>
+    );
+  }
+
+  function renderCurrencyOptions(currentValue: string) {
+    const normalized = (currentValue || "MYR").toUpperCase();
+    const hasCurrent = currencyOptions.some((currency) => currency.code === normalized);
+    return (
+      <>
+        {!hasCurrent ? <option value={normalized}>{normalized}</option> : null}
+        {currencyOptions.map((currency) => <option key={currency.id || currency.code} value={currency.code}>{currency.code} - {currency.name}{currency.symbol ? ` (${currency.symbol})` : ""}</option>)}
+      </>
+    );
+  }
 
   function updateField<K extends keyof CustomerFormState>(key: K, value: CustomerFormState[K]) {
     setForm((prev) => ({
@@ -588,7 +627,7 @@ function CustomerModal({
                   <TextInput value={form.billingPostCode} onChange={(value) => updateField("billingPostCode", value)} placeholder="Post Code" />
                 </div>
                 <SelectInput value={form.billingCountryCode} onChange={(value) => updateField("billingCountryCode", value)}>
-                  {SEA_COUNTRIES.map((country) => <option key={country.code} value={country.code}>{country.code} - {country.name}</option>)}
+                  {renderCountryOptions(form.billingCountryCode)}
                 </SelectInput>
               </div>
             </div>
@@ -608,7 +647,7 @@ function CustomerModal({
                   <TextInput value={form.deliveryPostCode} onChange={(value) => updateField("deliveryPostCode", value)} placeholder="Post Code" />
                 </div>
                 <SelectInput value={form.deliveryCountryCode} onChange={(value) => updateField("deliveryCountryCode", value)}>
-                  {SEA_COUNTRIES.map((country) => <option key={country.code} value={country.code}>{country.code} - {country.name}</option>)}
+                  {renderCountryOptions(form.deliveryCountryCode)}
                 </SelectInput>
               </div>
             </div>
@@ -645,7 +684,7 @@ function CustomerModal({
               <div>
                 <FieldLabel>Currency</FieldLabel>
                 <SelectInput value={form.currency} onChange={(value) => updateField("currency", value)}>
-                  {CUSTOMER_CURRENCIES.map((currency) => <option key={currency.code} value={currency.code}>{currency.code} - {currency.name}</option>)}
+                  {renderCurrencyOptions(form.currency)}
                 </SelectInput>
               </div>
               <div>
@@ -740,7 +779,7 @@ function CustomerModal({
                 <TextInput value={deliveryAddressDraft.city} onChange={(value) => updateDeliveryAddressDraft("city", value)} placeholder="City" />
                 <TextInput value={deliveryAddressDraft.postCode} onChange={(value) => updateDeliveryAddressDraft("postCode", value)} placeholder="Post Code" />
                 <SelectInput value={deliveryAddressDraft.countryCode} onChange={(value) => updateDeliveryAddressDraft("countryCode", value)}>
-                  {SEA_COUNTRIES.map((country) => <option key={country.code} value={country.code}>{country.code} - {country.name}</option>)}
+                  {renderCountryOptions(deliveryAddressDraft.countryCode)}
                 </SelectInput>
               </div>
               <div className="mt-6 flex items-center justify-end gap-3">
@@ -813,7 +852,7 @@ function PortalAccessConfirmModal({ customer, isSubmitting, onClose, onConfirm }
   );
 }
 
-export function AdminCustomerManagement({ customers, agents, accountConfiguration, existingCustomerAccountNos, currentPage, pageSize }: Props) {
+export function AdminCustomerManagement({ customers, agents, countries, currencies, accountConfiguration, existingCustomerAccountNos, currentPage, pageSize }: Props) {
   const router = useRouter();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<CustomerRecord | null>(null);
@@ -906,8 +945,8 @@ export function AdminCustomerManagement({ customers, agents, accountConfiguratio
         </table>
       </div>
 
-      <CustomerModal isOpen={isCreateOpen} mode="create" customer={null} agents={agents} accountConfiguration={accountConfiguration} existingCustomerAccountNos={existingCustomerAccountNos} onClose={() => setIsCreateOpen(false)} onSaved={handleSaved} />
-      <CustomerModal isOpen={editingCustomer !== null} mode="edit" customer={editingCustomer} agents={agents} accountConfiguration={accountConfiguration} existingCustomerAccountNos={existingCustomerAccountNos} onClose={() => setEditingCustomer(null)} onSaved={handleSaved} />
+      <CustomerModal isOpen={isCreateOpen} mode="create" customer={null} agents={agents} countries={countries} currencies={currencies} accountConfiguration={accountConfiguration} existingCustomerAccountNos={existingCustomerAccountNos} onClose={() => setIsCreateOpen(false)} onSaved={handleSaved} />
+      <CustomerModal isOpen={editingCustomer !== null} mode="edit" customer={editingCustomer} agents={agents} countries={countries} currencies={currencies} accountConfiguration={accountConfiguration} existingCustomerAccountNos={existingCustomerAccountNos} onClose={() => setEditingCustomer(null)} onSaved={handleSaved} />
       <PortalAccessConfirmModal customer={portalAccessTarget} isSubmitting={!!(portalAccessTarget && isTogglingId === portalAccessTarget.id)} onClose={() => setPortalAccessTarget(null)} onConfirm={handleConfirmPortalAccess} />
       <TempPasswordModal password={tempPassword} onClose={() => setTempPassword(null)} />
     </>
