@@ -702,6 +702,7 @@ export function AdminStockAssemblyClient({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [submitSuccess, setSubmitSuccess] = useState("");
+  const [cancelError, setCancelError] = useState("");
   const [isNegativeStockAuthOpen, setIsNegativeStockAuthOpen] = useState(false);
   const [negativeStockPendingPayload, setNegativeStockPendingPayload] = useState<any | null>(null);
   const [overrideAdminEmail, setOverrideAdminEmail] = useState("");
@@ -1391,7 +1392,7 @@ export function AdminStockAssemblyClient({
 
     if (!cancelTarget) return;
     setIsCancelling(true);
-    setSubmitError("");
+    setCancelError("");
     try {
       const response = await fetch(`/api/admin/stock/transactions/${cancelTarget.id}/cancel`, {
         method: "POST",
@@ -1400,14 +1401,14 @@ export function AdminStockAssemblyClient({
       });
       const data = await response.json();
       if (!response.ok || !data.ok) {
-        setSubmitError(data.error || "Unable to cancel stock assembly.");
+        setCancelError(data.error || "Unable to cancel stock assembly.");
         return;
       }
       setCancelTarget(null);
       setCancelReason("");
       await loadTransactions(currentPage);
     } catch {
-      setSubmitError("Unable to cancel stock assembly right now.");
+      setCancelError("Unable to cancel stock assembly right now.");
     } finally {
       setIsCancelling(false);
     }
@@ -2009,7 +2010,12 @@ export function AdminStockAssemblyClient({
                 )}
               </div>
 
-              <div className="mt-5 flex flex-wrap items-center gap-3">
+              {cancelError ? (
+              <div className="mt-4 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+                {cancelError}
+              </div>
+            ) : null}
+            <div className="mt-5 flex flex-wrap items-center gap-3">
                 <button
                   type="button"
                   disabled={isSubmitting || !selectedFinishedGood || templateLines.length === 0}
@@ -2107,6 +2113,7 @@ export function AdminStockAssemblyClient({
                 onClick={() => {
                   setCancelTarget(null);
                   setCancelReason("");
+                  setCancelError("");
                 }}
                 className="rounded-xl border border-white/15 bg-white/5 px-5 py-3 text-sm text-white/80 transition hover:bg-white/10"
               >

@@ -655,6 +655,7 @@ export function AdminStockTransactionClient({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [submitSuccess, setSubmitSuccess] = useState("");
+  const [cancelError, setCancelError] = useState("");
   const [isNegativeStockAuthOpen, setIsNegativeStockAuthOpen] = useState(false);
   const [negativeStockPendingPayload, setNegativeStockPendingPayload] = useState<any | null>(null);
   const [overrideAdminEmail, setOverrideAdminEmail] = useState("");
@@ -1355,6 +1356,7 @@ export function AdminStockTransactionClient({
   async function handleCancelConfirm() {
     if (!cancelTarget) return;
     setIsCancelling(true);
+    setCancelError("");
     setSubmitError("");
     setSubmitSuccess("");
     try {
@@ -1365,7 +1367,7 @@ export function AdminStockTransactionClient({
       });
       const data = await response.json();
       if (!response.ok || !data.ok) {
-        setSubmitError(data.error || "Unable to cancel transaction.");
+        setCancelError(data.error || "Unable to cancel transaction.");
         return;
       }
       setSubmitSuccess(`${cancelTarget.docNo || "Selected document"} cancelled successfully.`);
@@ -1376,7 +1378,7 @@ export function AdminStockTransactionClient({
         router.push(`/admin/stock/transactions/${cancelTarget.id}`);
       }
     } catch {
-      setSubmitError("Unable to cancel transaction right now.");
+      setCancelError("Unable to cancel transaction right now.");
     } finally {
       setIsCancelling(false);
     }
@@ -1692,6 +1694,11 @@ export function AdminStockTransactionClient({
                 <input type="password" className="input-rk" value={overrideAdminPassword} onChange={(e) => setOverrideAdminPassword(e.target.value)} placeholder="Enter admin password" />
               </div>
             </div>
+            {cancelError ? (
+              <div className="mt-4 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+                {cancelError}
+              </div>
+            ) : null}
             <div className="mt-6 flex flex-wrap justify-end gap-3">
               <button
                 type="button"
@@ -1772,6 +1779,7 @@ export function AdminStockTransactionClient({
                   if (isCancelling) return;
                   setCancelTarget(null);
                   setCancelReason("");
+                  setCancelError("");
                 }}
                 className="rounded-xl border border-white/15 bg-white/5 px-5 py-3 text-sm text-white/80 transition hover:bg-white/10"
               >
