@@ -1631,6 +1631,7 @@ export function AdminStockTransactionClient({
                             if (item.status === "CANCELLED") return;
                             setCancelTarget(item);
                             setCancelReason("");
+                            setCancelError("");
                           }}
                           className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${
                             item.status === "CANCELLED"
@@ -1694,11 +1695,6 @@ export function AdminStockTransactionClient({
                 <input type="password" className="input-rk" value={overrideAdminPassword} onChange={(e) => setOverrideAdminPassword(e.target.value)} placeholder="Enter admin password" />
               </div>
             </div>
-            {cancelError ? (
-              <div className="mt-4 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
-                {cancelError}
-              </div>
-            ) : null}
             <div className="mt-6 flex flex-wrap justify-end gap-3">
               <button
                 type="button"
@@ -1772,6 +1768,11 @@ export function AdminStockTransactionClient({
                 placeholder="Optional reason for cancellation"
               />
             </div>
+            {cancelError ? (
+              <div className="mt-4 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+                {cancelError}
+              </div>
+            ) : null}
             <div className="mt-6 flex flex-wrap justify-end gap-3">
               <button
                 type="button"

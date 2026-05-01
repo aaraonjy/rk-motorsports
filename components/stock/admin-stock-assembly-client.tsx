@@ -1575,6 +1575,7 @@ export function AdminStockAssemblyClient({
                               if (transaction.status === "CANCELLED") return;
                               setCancelTarget({ id: transaction.id, transactionNo: transaction.transactionNo });
                               setCancelReason("");
+                              setCancelError("");
                             }}
                             className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${
                               transaction.status === "CANCELLED"
@@ -2009,12 +2010,6 @@ export function AdminStockAssemblyClient({
                   })
                 )}
               </div>
-
-              {cancelError ? (
-              <div className="mt-4 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
-                {cancelError}
-              </div>
-            ) : null}
             <div className="mt-5 flex flex-wrap items-center gap-3">
                 <button
                   type="button"
@@ -2099,6 +2094,11 @@ export function AdminStockAssemblyClient({
                 placeholder="Optional cancellation reason"
               />
             </div>
+            {cancelError ? (
+              <div className="mt-4 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+                {cancelError}
+              </div>
+            ) : null}
             <div className="mt-5 flex flex-wrap items-center gap-3">
               <button
                 type="button"
