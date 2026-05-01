@@ -2,7 +2,7 @@
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { AdminDebitNoteClient } from "@/components/admin-debit-note-client";
+import { AdminDebitNoteClient } from "@/components/sales/admin-debit-note-client";
 
 export default async function AdminDebitNotePage() {
   const user = await getSessionUser();

@@ -6,7 +6,7 @@ import { SiteHeaderClient } from "@/components/site-header-client";
 import { AdminGlobalSettingsMenu } from "@/components/admin-global-settings-menu";
 import { AdminStockMenu } from "@/components/stock/admin-stock-menu";
 import { AdminCustomerMenu } from "@/components/admin-customer-menu";
-import { AdminSalesMenu } from "@/components/admin-sales-menu";
+import { AdminSalesMenu } from "@/components/sales/admin-sales-menu";
 
 const publicNav = [
   ["Services", "/#services"],

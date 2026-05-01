@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { AdminSalesInvoiceClient } from "@/components/admin-sales-invoice-client";
+import { AdminSalesInvoiceClient } from "@/components/sales/admin-sales-invoice-client";
 
 function toNumber(value: unknown) {
   const numeric = Number(value ?? 0);

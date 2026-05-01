@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { AdminSalesQuotationClient } from "@/components/admin-sales-quotation-client";
+import { AdminSalesQuotationClient } from "@/components/sales/admin-sales-quotation-client";
 
 export default async function AdminSalesQuotationPage() {
   const user = await getSessionUser();

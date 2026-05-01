@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { AdminCreditNoteClient } from "@/components/admin-credit-note-client";
+import { AdminCreditNoteClient } from "@/components/sales/admin-credit-note-client";
 
 export default async function AdminCreditNotePage() {
   const user = await getSessionUser();
