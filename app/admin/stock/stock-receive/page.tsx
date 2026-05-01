@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { AdminStockTransactionClient } from "@/components/admin-stock-transaction-client";
+import { AdminStockTransactionClient } from "@/components/stock/admin-stock-transaction-client";
 
 export default async function AdminStockReceivePage() {
   const user = await getSessionUser();

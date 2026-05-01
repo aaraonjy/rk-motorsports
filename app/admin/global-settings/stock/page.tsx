@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { AdminStockConfigurationClient } from "@/components/admin-stock-configuration-client";
+import { AdminStockConfigurationClient } from "@/components/stock/admin-stock-configuration-client";
 import {
   DEFAULT_STOCK_NUMBER_FORMAT_CONFIG,
   normalizeMoneyDecimalPlaces,

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { AdminStockTransactionEditClient } from "@/components/admin-stock-transaction-edit-client";
+import { AdminStockTransactionEditClient } from "@/components/stock/admin-stock-transaction-edit-client";
 
 type Params = { params: Promise<{ id: string }> };
 

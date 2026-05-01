@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { AdminAssemblyTemplateClient } from "@/components/admin-assembly-template-client";
+import { AdminAssemblyTemplateClient } from "@/components/stock/admin-assembly-template-client";
 
 type Params = {
   params: Promise<{ productId: string }>;

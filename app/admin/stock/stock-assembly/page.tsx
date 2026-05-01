@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { AdminStockAssemblyClient } from "@/components/admin-stock-assembly-client";
+import { AdminStockAssemblyClient } from "@/components/stock/admin-stock-assembly-client";
 
 export default async function AdminStockAssemblyPage() {
   const user = await getSessionUser();

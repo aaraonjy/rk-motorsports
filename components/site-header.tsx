@@ -4,7 +4,7 @@ import { getSessionUser } from "@/lib/auth";
 import { AdminNotificationBell } from "@/components/admin-notification-bell";
 import { SiteHeaderClient } from "@/components/site-header-client";
 import { AdminGlobalSettingsMenu } from "@/components/admin-global-settings-menu";
-import { AdminStockMenu } from "@/components/admin-stock-menu";
+import { AdminStockMenu } from "@/components/stock/admin-stock-menu";
 import { AdminCustomerMenu } from "@/components/admin-customer-menu";
 import { AdminSalesMenu } from "@/components/admin-sales-menu";
 

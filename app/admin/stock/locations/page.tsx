@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { AdminStockLocationClient } from "@/components/admin-stock-location-client";
+import { AdminStockLocationClient } from "@/components/stock/admin-stock-location-client";
 
 export default async function AdminStockLocationsPage() {
   const user = await getSessionUser();

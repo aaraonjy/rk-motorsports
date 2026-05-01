@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { AdminSerialNoClient } from "@/components/admin-serial-no-client";
+import { AdminSerialNoClient } from "@/components/stock/admin-serial-no-client";
 
 function formatDate(value: Date | null | undefined) {
   return value ? value.toISOString() : null;

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { AdminBatchNoClient } from "@/components/admin-batch-no-client";
+import { AdminBatchNoClient } from "@/components/stock/admin-batch-no-client";
 
 function formatDate(value: Date | null | undefined) {
   return value ? value.toISOString() : null;

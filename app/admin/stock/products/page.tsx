@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { AdminProductMasterClient } from "@/components/admin-product-master-client";
+import { AdminProductMasterClient } from "@/components/stock/admin-product-master-client";
 
 export default async function AdminProductsPage() {
   const user = await getSessionUser();
