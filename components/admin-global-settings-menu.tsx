@@ -5,11 +5,11 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 
 const settingsItems = [
-  { label: "Account Configuration", href: "/admin/settings/account-configuration" },
-  { label: "Audit Logs", href: "/admin/settings/audit-logs" },
-  { label: "Misc", href: "/admin/settings/misc" },
-  { label: "Stock Settings", href: "/admin/settings/stock" },
-  { label: "Tax Configuration", href: "/admin/settings/tax-configuration" },
+  { label: "Account Configuration", href: "/admin/global-settings/account-configuration" },
+  { label: "Audit Logs", href: "/admin/global-settings/audit-logs" },
+  { label: "Misc", href: "/admin/global-settings/misc" },
+  { label: "Stock Settings", href: "/admin/global-settings/stock" },
+  { label: "Tax Configuration", href: "/admin/global-settings/tax-configuration" },
 ] as const;
 
 export function AdminGlobalSettingsMenu() {
@@ -29,7 +29,7 @@ export function AdminGlobalSettingsMenu() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const isActive = pathname.startsWith("/admin/settings");
+  const isActive = pathname.startsWith("/admin/global-settings");
 
   return (
     <div ref={dropdownRef} className="relative">
