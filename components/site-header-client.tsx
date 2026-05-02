@@ -47,27 +47,39 @@ const guestMobileSections: HeaderLinkSection[] = [
   },
 ];
 
-const salesOrderItems: HeaderLink[] = [
-  { label: "QO", href: "/admin/sales/quotation" },
-  { label: "SO", href: "/admin/sales/sales-order" },
-];
-
-const salesDocumentItems: HeaderLink[] = [
-  { label: "DO", href: "/admin/sales/delivery-order" },
-  { label: "INV", href: "/admin/sales/sales-invoice" },
-  { label: "CS", href: "/admin/sales/cash-sales" },
-  { label: "DN", href: "/admin/sales/debit-note" },
-  { label: "CN", href: "/admin/sales/credit-note" },
-];
-
-const salesReturnItems: HeaderLink[] = [
-  { label: "DR", href: "/admin/sales/delivery-return" },
-];
-
 const salesItems: HeaderLink[] = [
-  ...salesOrderItems,
-  ...salesDocumentItems,
-  ...salesReturnItems,
+  { label: "Quotation", href: "/admin/sales/quotation" },
+  { label: "Sales Order", href: "/admin/sales/sales-order" },
+  { label: "Delivery Order", href: "/admin/sales/delivery-order" },
+  { label: "Sales Invoice", href: "/admin/sales/sales-invoice" },
+  { label: "Cash Sales", href: "/admin/sales/cash-sales" },
+  { label: "Debit Note", href: "/admin/sales/debit-note" },
+  { label: "Credit Note", href: "/admin/sales/credit-note" },
+  { label: "Delivery Return", href: "/admin/sales/delivery-return" },
+];
+
+const salesDesktopSections: HeaderLinkSection[] = [
+  {
+    title: "",
+    items: [
+      { label: "Quotation", href: "/admin/sales/quotation" },
+      { label: "Sales Order", href: "/admin/sales/sales-order" },
+    ],
+  },
+  {
+    title: "",
+    items: [
+      { label: "Delivery Order", href: "/admin/sales/delivery-order" },
+      { label: "Sales Invoice", href: "/admin/sales/sales-invoice" },
+      { label: "Cash Sales", href: "/admin/sales/cash-sales" },
+      { label: "Debit Note", href: "/admin/sales/debit-note" },
+      { label: "Credit Note", href: "/admin/sales/credit-note" },
+    ],
+  },
+  {
+    title: "",
+    items: [{ label: "Delivery Return", href: "/admin/sales/delivery-return" }],
+  },
 ];
 
 const stockMasterItems: HeaderLink[] = [
@@ -255,12 +267,14 @@ function AdminSimpleDropdown({ menu }: { menu: DesktopDropdown }) {
       {isOpen ? (
         <div className="absolute left-0 top-[calc(100%+12px)] z-[70] min-w-[290px] max-h-[72vh] overflow-y-auto rounded-2xl border border-white/10 bg-[#0b0b0c]/95 p-2 shadow-2xl backdrop-blur-xl">
           {menu.sections.map((section, sectionIndex) => (
-            <div key={section.title}>
+            <div key={`${section.title || "section"}-${sectionIndex}`}>
               {sectionIndex > 0 ? <div className="my-2 border-t border-white/10" /> : null}
 
-              <p className="px-3 pb-2 pt-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/35">
-                {section.title}
-              </p>
+              {section.title ? (
+                <p className="px-3 pb-2 pt-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/35">
+                  {section.title}
+                </p>
+              ) : null}
 
               <div className="space-y-1">
                 {section.items.map((item) => (
@@ -357,7 +371,7 @@ function AdminOperationsDropdown({ groups }: { groups: OperationGroup[] }) {
               </div>
             ) : (
               activeGroup?.sections.map((section, sectionIndex) => (
-                <div key={section.title}>
+                <div key={`${section.title || "section"}-${sectionIndex}`}>
                   {sectionIndex > 0 ? <div className="my-2 border-t border-white/10" /> : null}
 
                   {section.title ? (
@@ -422,12 +436,8 @@ export function AdminDesktopNavigation() {
     {
       key: "sales",
       label: "Sales",
-      description: "QO, SO, DO, INV",
-      sections: [
-        { title: "", items: salesOrderItems },
-        { title: "", items: salesDocumentItems },
-        { title: "", items: salesReturnItems },
-      ],
+      description: "Quotation, SO, DO, invoice",
+      sections: salesDesktopSections,
     },
     {
       key: "stock",
