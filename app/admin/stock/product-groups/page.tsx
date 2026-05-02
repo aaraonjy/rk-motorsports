@@ -30,7 +30,7 @@ export default async function AdminProductGroupsPage() {
           <AdminMasterListClient
             title="Product Group"
             subtitle="Master Data"
-            apiBase="/api/admin/product-groups"
+            apiBase="/api/admin/stock/product-groups"
             initialItems={items.map((item) => ({
               id: item.id,
               code: item.code,

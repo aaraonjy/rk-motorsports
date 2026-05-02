@@ -4,6 +4,12 @@ import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { createAuditLogFromRequest } from "@/lib/audit";
 
+type Params = {
+  params: Promise<{
+    id: string;
+  }>;
+};
+
 function normalizeCode(value: unknown) {
   return typeof value === "string" ? value.trim().toUpperCase() : "";
 }
@@ -26,10 +32,16 @@ function normalizeTaxType(value: unknown) {
   return value === "SALES" ? "SALES" : "SERVICE";
 }
 
-export async function POST(req: Request) {
+export async function PATCH(req: Request, context: Params) {
   try {
     const admin = await requireAdmin();
+    const { id } = await context.params;
     const body = await req.json().catch(() => ({}));
+
+    const existing = await db.taxCode.findUnique({ where: { id } });
+    if (!existing) {
+      return NextResponse.json({ ok: false, error: "Tax code not found." }, { status: 404 });
+    }
 
     const code = normalizeCode(body.code);
     const description = normalizeText(body.description);
@@ -52,12 +64,30 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "Tax rate must be between 0 and 100." }, { status: 400 });
     }
 
-    const existing = await db.taxCode.findUnique({ where: { code } });
-    if (existing) {
+    const duplicate = await db.taxCode.findFirst({
+      where: {
+        code,
+        NOT: { id },
+      },
+      select: { id: true },
+    });
+
+    if (duplicate) {
       return NextResponse.json({ ok: false, error: `Tax code ${code} already exists.` }, { status: 409 });
     }
 
-    const created = await db.taxCode.create({
+    if (!isActive) {
+      const config = await db.taxConfiguration.findUnique({ where: { id: "default" } });
+      if (config?.defaultPortalTaxCodeId === id || config?.defaultAdminTaxCodeId === id) {
+        return NextResponse.json(
+          { ok: false, error: "This tax code is currently selected as a default tax code. Please change the default selection first." },
+          { status: 400 }
+        );
+      }
+    }
+
+    const updated = await db.taxCode.update({
+      where: { id },
       data: {
         code,
         description,
@@ -74,29 +104,39 @@ export async function POST(req: Request) {
       req,
       user: admin,
       module: "Tax Configuration",
-      action: "CREATE_TAX_CODE",
+      action: "UPDATE_TAX_CODE",
       entityType: "TaxCode",
-      entityId: created.id,
-      entityCode: created.code,
-      description: `${admin.name} created tax code ${created.code}.`,
+      entityId: updated.id,
+      entityCode: updated.code,
+      description: `${admin.name} updated tax code ${updated.code}.`,
+      oldValues: {
+        code: existing.code,
+        description: existing.description,
+        displayLabel: existing.displayLabel,
+        rate: Number(existing.rate),
+        calculationMethod: existing.calculationMethod,
+        taxType: existing.taxType,
+        isActive: existing.isActive,
+        sortOrder: existing.sortOrder,
+      },
       newValues: {
-        code: created.code,
-        description: created.description,
-        displayLabel: created.displayLabel,
-        rate: Number(created.rate),
-        calculationMethod: created.calculationMethod,
-        taxType: created.taxType,
-        isActive: created.isActive,
-        sortOrder: created.sortOrder,
+        code: updated.code,
+        description: updated.description,
+        displayLabel: updated.displayLabel,
+        rate: Number(updated.rate),
+        calculationMethod: updated.calculationMethod,
+        taxType: updated.taxType,
+        isActive: updated.isActive,
+        sortOrder: updated.sortOrder,
       },
       status: "SUCCESS",
     });
 
-    return NextResponse.json({ ok: true, id: created.id });
+    return NextResponse.json({ ok: true });
   } catch (error) {
-    console.error("POST /api/admin/settings/tax-codes failed:", error);
+    console.error("PATCH /api/admin/global-settings/tax-codes/[id] failed:", error);
     return NextResponse.json(
-      { ok: false, error: error instanceof Error ? error.message : "Unable to create tax code." },
+      { ok: false, error: error instanceof Error ? error.message : "Unable to update tax code." },
       { status: error instanceof Error && error.message === "FORBIDDEN" ? 403 : 500 }
     );
   }

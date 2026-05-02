@@ -349,7 +349,7 @@ export function AdminProductMasterClient({
 
     async function loadStockSettings() {
       try {
-        const response = await fetch("/api/admin/settings/stock", { cache: "no-store" });
+        const response = await fetch("/api/admin/global-settings/stock", { cache: "no-store" });
         const data = (await response.json()) as StockSettingsResponse;
         if (!response.ok || !data.ok || cancelled) return;
         setStockSettings(normalizeStockNumberFormatConfig(data.config));
@@ -376,7 +376,7 @@ export function AdminProductMasterClient({
       if (itemTypeFilter !== "ALL") params.set("itemType", itemTypeFilter);
       if (statusFilter !== "ALL") params.set("status", statusFilter);
 
-      const response = await fetch(`/api/admin/products?${params.toString()}`, { cache: "no-store" });
+      const response = await fetch(`/api/admin/stock/products?${params.toString()}`, { cache: "no-store" });
       const data = await response.json();
       if (!response.ok || !data.ok) {
         setProducts([]);
@@ -433,7 +433,7 @@ export function AdminProductMasterClient({
     let detailedProduct = product;
 
     try {
-      const response = await fetch(`/api/admin/products/${product.id}`, { cache: "no-store" });
+      const response = await fetch(`/api/admin/stock/products/${product.id}`, { cache: "no-store" });
       const data = await response.json();
       if (response.ok && data.ok && data.product) {
         detailedProduct = data.product as InventoryProductRecord;
@@ -612,7 +612,7 @@ export function AdminProductMasterClient({
         defaultLocationId: null,
       };
 
-      const response = await fetch(editingId ? `/api/admin/products/${editingId}` : "/api/admin/products", {
+      const response = await fetch(editingId ? `/api/admin/stock/products/${editingId}` : "/api/admin/stock/products", {
         method: editingId ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -643,7 +643,7 @@ export function AdminProductMasterClient({
     setSubmitSuccess("");
     setUomError("");
     try {
-      const response = await fetch(`/api/admin/products/${product.id}`, { method: "DELETE" });
+      const response = await fetch(`/api/admin/stock/products/${product.id}`, { method: "DELETE" });
       const data = await response.json();
       if (!response.ok || !data.ok) {
         setSubmitError(data.error || "Unable to delete product.");

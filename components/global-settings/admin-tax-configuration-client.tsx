@@ -70,7 +70,7 @@ export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) 
     setIsSavingConfig(true);
     setConfigMessage(null);
     try {
-      const response = await fetch("/api/admin/settings/tax-configuration", {
+      const response = await fetch("/api/admin/global-settings/tax-configuration", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(nextConfig),
@@ -109,7 +109,7 @@ export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) 
     setIsCreatingCode(true);
     setTaxCodeMessage(null);
     try {
-      const response = await fetch("/api/admin/settings/tax-codes", {
+      const response = await fetch("/api/admin/global-settings/tax-codes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -151,7 +151,7 @@ export function AdminTaxConfigurationClient({ initialConfig, taxCodes }: Props) 
     setTaxCodeRows((prev) => prev.map((item) => (item.id === row.id ? { ...item, isSaving: true } : item)));
     setTaxCodeMessage(null);
     try {
-      const response = await fetch(`/api/admin/settings/tax-codes/${row.id}`, {
+      const response = await fetch(`/api/admin/global-settings/tax-codes/${row.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

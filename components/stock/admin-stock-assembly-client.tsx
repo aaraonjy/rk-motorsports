@@ -862,8 +862,8 @@ export function AdminStockAssemblyClient({
     async function loadProjectDepartmentOptions() {
       try {
         const [projectRes, departmentRes] = await Promise.all([
-          fetch("/api/admin/misc-projects", { cache: "no-store" }),
-          fetch("/api/admin/misc-departments", { cache: "no-store" }),
+          fetch("/api/admin/global-settings/misc-projects", { cache: "no-store" }),
+          fetch("/api/admin/global-settings/misc-departments", { cache: "no-store" }),
         ]);
         const projectData = await projectRes.json();
         const departmentData = await departmentRes.json();
@@ -915,7 +915,7 @@ export function AdminStockAssemblyClient({
 
     async function loadStockSettings() {
       try {
-        const response = await fetch("/api/admin/settings/stock", { cache: "no-store" });
+        const response = await fetch("/api/admin/global-settings/stock", { cache: "no-store" });
         const data = (await response.json()) as StockSettingsResponse;
         if (!response.ok || !data.ok || cancelled) return;
         setStockSettings(

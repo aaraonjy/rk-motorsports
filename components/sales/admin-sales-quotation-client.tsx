@@ -1087,7 +1087,7 @@ export function AdminSalesQuotationClient({
 
   async function loadLatestProducts() {
     try {
-      const response = await fetch("/api/admin/products?activeOnly=1", { cache: "no-store" });
+      const response = await fetch("/api/admin/stock/products?activeOnly=1", { cache: "no-store" });
       const data = await response.json();
       if (!response.ok || !data.ok || !Array.isArray(data.products)) return;
       setProducts(

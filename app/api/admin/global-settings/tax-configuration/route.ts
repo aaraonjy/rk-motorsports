@@ -98,7 +98,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true });
   } catch (error) {
-    console.error("POST /api/admin/settings/tax-configuration failed:", error);
+    console.error("POST /api/admin/global-settings/tax-configuration failed:", error);
     return NextResponse.json(
       { ok: false, error: error instanceof Error ? error.message : "Unable to save tax configuration." },
       { status: error instanceof Error && error.message === "FORBIDDEN" ? 403 : 500 }

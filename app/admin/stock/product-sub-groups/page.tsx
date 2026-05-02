@@ -48,7 +48,7 @@ export default async function AdminProductSubGroupsPage() {
           <AdminMasterListClient
             title="Product Sub-Group"
             subtitle="Master Data"
-            apiBase="/api/admin/product-sub-groups"
+            apiBase="/api/admin/stock/product-sub-groups"
             requireGroup={true}
             groups={groups}
             initialItems={items.map((item) => ({

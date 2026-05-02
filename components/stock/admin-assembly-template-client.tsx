@@ -273,7 +273,7 @@ export function AdminAssemblyTemplateClient({
     let cancelled = false;
     async function loadStockSettings() {
       try {
-        const response = await fetch("/api/admin/settings/stock", { cache: "no-store" });
+        const response = await fetch("/api/admin/global-settings/stock", { cache: "no-store" });
         const data = (await response.json()) as StockSettingsResponse;
         if (!response.ok || !data.ok || cancelled) return;
         setStockSettings(normalizeStockNumberFormatConfig(data.config));

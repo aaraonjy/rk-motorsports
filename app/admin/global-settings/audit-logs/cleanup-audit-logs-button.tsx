@@ -34,7 +34,7 @@ export function CleanupAuditLogsButton({ retentionDays }: CleanupAuditLogsButton
     setIsSubmitting(true);
 
     try {
-      const response = await fetch("/api/admin/settings/audit-logs/cleanup", {
+      const response = await fetch("/api/admin/global-settings/audit-logs/cleanup", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

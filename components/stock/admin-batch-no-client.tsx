@@ -114,7 +114,7 @@ export function AdminBatchNoClient({ initialRows, initialPagination, products, l
     let cancelled = false;
     async function loadStockSettings() {
       try {
-        const response = await fetch("/api/admin/settings/stock", { cache: "no-store" });
+        const response = await fetch("/api/admin/global-settings/stock", { cache: "no-store" });
         const data = await response.json();
         if (!response.ok || !data.ok || cancelled) return;
         setQtyDecimalPlaces(normalizeStockNumberFormatConfig(data.config).qtyDecimalPlaces);

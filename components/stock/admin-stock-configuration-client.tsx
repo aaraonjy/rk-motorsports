@@ -88,7 +88,7 @@ export function AdminStockConfigurationClient({ initialConfig, locations }: Prop
             defaultLocationId: "",
           };
 
-      const response = await fetch("/api/admin/settings/stock", {
+      const response = await fetch("/api/admin/global-settings/stock", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

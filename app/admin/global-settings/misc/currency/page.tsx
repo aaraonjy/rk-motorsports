@@ -35,7 +35,7 @@ export default async function AdminCurrencyMaintenancePage() {
         <AdminMasterListClient
           title="Currency List"
           subtitle="Currency Master"
-          apiBase="/api/admin/misc-currencies"
+          apiBase="/api/admin/global-settings/misc-currencies"
           initialItems={items}
           initialPagination={{ page: 1, pageSize: 10, total, totalPages: Math.max(1, Math.ceil(total / 10)) }}
           extraFields={[{ key: "symbol", label: "Symbol", placeholder: "RM", required: true, maxLength: 8 }]}

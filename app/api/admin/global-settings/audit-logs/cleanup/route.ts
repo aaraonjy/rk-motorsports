@@ -54,7 +54,7 @@ export async function POST(req: Request) {
       deletedCount: result.count,
     });
   } catch (error) {
-    console.error("POST /api/admin/settings/audit-logs/cleanup failed:", error);
+    console.error("POST /api/admin/global-settings/audit-logs/cleanup failed:", error);
 
     return NextResponse.json(
       { ok: false, error: "Unable to clean audit logs right now." },

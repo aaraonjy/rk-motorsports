@@ -43,7 +43,7 @@ export function AccountConfigurationForm({
     setError(null);
 
     try {
-      const response = await fetch("/api/admin/settings/account-configuration", {
+      const response = await fetch("/api/admin/global-settings/account-configuration", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
