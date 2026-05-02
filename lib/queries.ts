@@ -983,6 +983,23 @@ export async function getCustomerByIdWithIntelligence(customerId: string) {
         registrationIdType: true,
         registrationNo: true,
         taxIdentificationNo: true,
+        creditTermsDays: true,
+        creditLimitAmount: true,
+        customerSalesTransactions: {
+          where: { docType: "INV", status: { not: "CANCELLED" } },
+          select: {
+            id: true,
+            docNo: true,
+            docDate: true,
+            grandTotal: true,
+            payments: { select: { amount: true } },
+            sourceLinks: {
+              select: {
+                targetTransaction: { select: { docType: true, status: true, grandTotal: true } },
+              },
+            },
+          },
+        },
         agent: {
           select: {
             id: true,
