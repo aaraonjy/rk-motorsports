@@ -10,9 +10,27 @@ function toNumber(value: unknown) {
 
 type CreditWarning = {
   type: NotificationType;
+  customerKey: string;
   title: string;
   message: string;
 };
+
+function getCreditNotificationCustomerKey(message: string) {
+  const text = String(message || "").trim();
+  if (!text) return "";
+
+  const hasIndex = text.indexOf(" has " );
+  if (hasIndex > -1) return text.slice(0, hasIndex).trim();
+
+  const outstandingIndex = text.indexOf(" outstanding " );
+  if (outstandingIndex > -1) return text.slice(0, outstandingIndex).trim();
+
+  return text;
+}
+
+function buildCreditNotificationKey(type: NotificationType, customerKey: string) {
+  return `${type}::${customerKey}`;
+}
 
 async function getActiveCreditWarnings() {
   const customers = await db.user.findMany({
@@ -94,6 +112,7 @@ async function getActiveCreditWarnings() {
     if (creditTermsActive && overdueAmount > 0) {
       warnings.push({
         type: "CREDIT_TERMS_OVERDUE" as NotificationType,
+        customerKey: displayName,
         title: "Credit Terms Overdue",
         message: `${displayName} has overdue outstanding invoice amount ${currency} ${overdueAmount.toFixed(2)}${oldestOverdueDays > 0 ? `, oldest overdue ${oldestOverdueDays} day(s)` : ""}.`,
       });
@@ -103,6 +122,7 @@ async function getActiveCreditWarnings() {
     if (creditLimitActive && outstandingAmount > limit) {
       warnings.push({
         type: "CREDIT_LIMIT_EXCEEDED" as NotificationType,
+        customerKey: displayName,
         title: "Credit Limit Exceeded",
         message: `${displayName} outstanding invoice amount is ${currency} ${outstandingAmount.toFixed(2)}, credit limit is ${currency} ${limit.toFixed(2)}.`,
       });
@@ -114,7 +134,9 @@ async function getActiveCreditWarnings() {
 
 async function syncCreditControlNotifications(userId: string) {
   const activeWarnings = await getActiveCreditWarnings();
-  const activeKeys = new Set(activeWarnings.map((warning) => `${warning.type}::${warning.message.split(" has ")[0].split(" outstanding ")[0]}`));
+  const activeWarningMap = new Map(
+    activeWarnings.map((warning) => [buildCreditNotificationKey(warning.type, warning.customerKey), warning])
+  );
 
   const existingCreditNotifications = await db.notification.findMany({
     where: {
@@ -124,22 +146,39 @@ async function syncCreditControlNotifications(userId: string) {
     orderBy: { createdAt: "desc" },
   });
 
-  for (const warning of activeWarnings) {
-    const displayKey = warning.message.split(" has ")[0].split(" outstanding ")[0];
-    const existing = existingCreditNotifications.find(
-      (item) => item.type === warning.type && item.message.startsWith(displayKey)
-    );
+  const existingByKey = new Map<string, typeof existingCreditNotifications>();
 
-    if (existing) {
-      if (existing.title !== warning.title || existing.message !== warning.message) {
+  for (const notification of existingCreditNotifications) {
+    const customerKey = getCreditNotificationCustomerKey(notification.message);
+    if (!customerKey) continue;
+
+    const key = buildCreditNotificationKey(notification.type, customerKey);
+    const list = existingByKey.get(key) || [];
+    list.push(notification);
+    existingByKey.set(key, list);
+  }
+
+  for (const warning of activeWarnings) {
+    const key = buildCreditNotificationKey(warning.type, warning.customerKey);
+    const existingList = existingByKey.get(key) || [];
+    const primary = existingList[0];
+
+    if (primary) {
+      if (primary.title !== warning.title || primary.message !== warning.message) {
         await db.notification.update({
-          where: { id: existing.id },
+          where: { id: primary.id },
           data: {
             title: warning.title,
             message: warning.message,
           },
         });
       }
+
+      const duplicateIds = existingList.slice(1).map((item) => item.id);
+      if (duplicateIds.length > 0) {
+        await db.notification.deleteMany({ where: { id: { in: duplicateIds } } });
+      }
+
       continue;
     }
 
@@ -153,18 +192,17 @@ async function syncCreditControlNotifications(userId: string) {
     });
   }
 
-  const inactiveUnreadIds = existingCreditNotifications
+  const inactiveCreditNotificationIds = existingCreditNotifications
     .filter((item) => {
-      const displayKey = item.message.split(" has ")[0].split(" outstanding ")[0];
-      return !activeKeys.has(`${item.type}::${displayKey}`) && !item.isRead;
+      const customerKey = getCreditNotificationCustomerKey(item.message);
+      if (!customerKey) return false;
+      const key = buildCreditNotificationKey(item.type, customerKey);
+      return !activeWarningMap.has(key);
     })
     .map((item) => item.id);
 
-  if (inactiveUnreadIds.length > 0) {
-    await db.notification.updateMany({
-      where: { id: { in: inactiveUnreadIds } },
-      data: { isRead: true, readAt: new Date() },
-    });
+  if (inactiveCreditNotificationIds.length > 0) {
+    await db.notification.deleteMany({ where: { id: { in: inactiveCreditNotificationIds } } });
   }
 }
 
