@@ -8,6 +8,55 @@ function toNumber(value: unknown) {
   return Number.isFinite(numeric) ? numeric : 0;
 }
 
+
+function buildCustomerCreditSummary(customers: Array<{ id: string; creditTermsDays?: number | null; creditLimitAmount?: unknown }>, invoices: Array<{ customerId: string; docDate: Date; grandTotal: unknown; payments: Array<{ amount: unknown }>; sourceLinks?: Array<{ targetTransaction?: { docType?: string | null; status?: string | null; grandTotal?: unknown } | null }> }>) {
+  const now = new Date();
+  const byCustomer = new Map<string, { creditOutstandingAmount: number; creditOverdueAmount: number; creditOldestOverdueDays: number; creditLimitExceeded: boolean; creditOverdue: boolean }>();
+
+  for (const customer of customers) {
+    const terms = Math.max(0, Number(customer.creditTermsDays ?? 0) || 0);
+    const limit = Math.max(0, Number(customer.creditLimitAmount ?? 0) || 0);
+    let outstandingAmount = 0;
+    let overdueAmount = 0;
+    let oldestOverdueDays = 0;
+
+    for (const invoice of invoices.filter((item) => item.customerId === customer.id)) {
+      const totalPaid = invoice.payments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
+      const adjustment = (invoice.sourceLinks || []).reduce((sum, link) => {
+        const target = link.targetTransaction;
+        if (!target || target.status === "CANCELLED") return sum;
+        if (target.docType === "CN") return sum - Number(target.grandTotal || 0);
+        if (target.docType === "DN") return sum + Number(target.grandTotal || 0);
+        return sum;
+      }, 0);
+      const adjustedTotal = Math.max(0, Number(invoice.grandTotal || 0) + adjustment);
+      const outstanding = Math.max(0, Math.round((adjustedTotal - totalPaid + Number.EPSILON) * 100) / 100);
+      if (outstanding <= 0) continue;
+      outstandingAmount += outstanding;
+
+      const dueDate = new Date(invoice.docDate);
+      dueDate.setDate(dueDate.getDate() + terms);
+      if (terms === 0 || dueDate.getTime() < now.getTime()) {
+        overdueAmount += outstanding;
+        const overdueDays = Math.max(0, Math.floor((now.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)));
+        oldestOverdueDays = Math.max(oldestOverdueDays, overdueDays);
+      }
+    }
+
+    outstandingAmount = Math.round((outstandingAmount + Number.EPSILON) * 100) / 100;
+    overdueAmount = Math.round((overdueAmount + Number.EPSILON) * 100) / 100;
+    byCustomer.set(customer.id, {
+      creditOutstandingAmount: outstandingAmount,
+      creditOverdueAmount: overdueAmount,
+      creditOldestOverdueDays: oldestOverdueDays,
+      creditLimitExceeded: outstandingAmount > 0 && (limit <= 0 || outstandingAmount > limit),
+      creditOverdue: overdueAmount > 0,
+    });
+  }
+
+  return byCustomer;
+}
+
 function sumLinkedQty(
   line: {
     sourceLineLinks?: Array<{ linkType?: string | null; qty?: unknown; claimAmount?: unknown; targetTransaction?: { status?: string | null } | null }>;
@@ -79,6 +128,8 @@ export default async function AdminCashSalesPage() {
         attention: true,
         currency: true,
         agentId: true,
+        creditTermsDays: true,
+        creditLimitAmount: true,
       },
     }),
     db.inventoryProduct.findMany({
@@ -132,6 +183,24 @@ export default async function AdminCashSalesPage() {
       },
     }),
   ]);
+
+  const creditInvoices = await db.salesTransaction.findMany({
+    where: { customerId: { in: customers.map((customer) => customer.id) }, docType: "INV", status: { not: "CANCELLED" } },
+    select: {
+      customerId: true,
+      docDate: true,
+      grandTotal: true,
+      payments: { select: { amount: true } },
+      sourceLinks: { select: { targetTransaction: { select: { docType: true, status: true, grandTotal: true } } } },
+    },
+  });
+  const creditSummaryByCustomer = buildCustomerCreditSummary(customers, creditInvoices);
+  const customersWithCredit = customers.map((customer) => ({
+    ...customer,
+    creditTermsDays: Number(customer.creditTermsDays ?? 0),
+    creditLimitAmount: Number(customer.creditLimitAmount ?? 0),
+    ...(creditSummaryByCustomer.get(customer.id) || { creditOutstandingAmount: 0, creditOverdueAmount: 0, creditOldestOverdueDays: 0, creditLimitExceeded: false, creditOverdue: false }),
+  }));
 
   return (
     <section className="section-pad">
@@ -201,7 +270,7 @@ export default async function AdminCashSalesPage() {
               };
             }),
           }))}
-          initialCustomers={customers}
+          initialCustomers={customersWithCredit}
           initialProducts={products.map((product) => ({
             id: product.id,
             code: product.code,

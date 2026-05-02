@@ -38,6 +38,19 @@ function formatCurrency(value: number) {
   }).format(value);
 }
 
+
+function getCreditStatusLabel(customer: any) {
+  if (customer.creditControl?.creditOverdue) return "Overdue";
+  if (customer.creditControl?.creditLimitExceeded) return "Over Limit";
+  return "OK";
+}
+
+function getCreditStatusClass(customer: any) {
+  if (customer.creditControl?.creditOverdue) return "border-red-500/30 bg-red-500/10 text-red-300";
+  if (customer.creditControl?.creditLimitExceeded) return "border-amber-500/30 bg-amber-500/10 text-amber-300";
+  return "border-emerald-500/30 bg-emerald-500/10 text-emerald-300";
+}
+
 function formatDateTime(value: Date | null) {
   if (!value) return "-";
 
@@ -215,6 +228,19 @@ export default async function AdminCustomerDetailPage({
                   <span className="text-white/45">Currency:</span> {customer.currency || "MYR"}
                 </p>
                 <p>
+                  <span className="text-white/45">Credit Terms:</span> {customer.creditControl?.creditTermsDays ?? 0} day(s)
+                </p>
+                <p>
+                  <span className="text-white/45">Credit Limit:</span> {formatCurrency(Number(customer.creditControl?.creditLimitAmount || 0))}
+                </p>
+                <p>
+                  <span className="text-white/45">Credit Status:</span>{" "}
+                  <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${getCreditStatusClass(customer)}`}>{getCreditStatusLabel(customer)}</span>
+                </p>
+                <p>
+                  <span className="text-white/45">Outstanding INV:</span> {formatCurrency(Number(customer.creditControl?.creditOutstandingAmount || 0))}
+                </p>
+                <p>
                   <span className="text-white/45">Account Source:</span>{" "}
                   {customer.accountSource === "ADMIN" ? "Admin Created" : "Self Registered"}
                 </p>
@@ -285,6 +311,14 @@ export default async function AdminCustomerDetailPage({
                 <p>
                   <span className="text-white/45">Tax Identification No.:</span>{" "}
                   {customer.taxIdentificationNo || "-"}
+                </p>
+                <p>
+                  <span className="text-white/45">Credit Terms:</span>{" "}
+                  {customer.creditControl?.creditTermsDays ?? 0} day(s)
+                </p>
+                <p>
+                  <span className="text-white/45">Credit Limit:</span>{" "}
+                  {formatCurrency(Number(customer.creditControl?.creditLimitAmount || 0))}
                 </p>
                 <p>
                   <span className="text-white/45">Attention:</span> {customer.attention || "-"}

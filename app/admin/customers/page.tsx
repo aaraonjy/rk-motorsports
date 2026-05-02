@@ -80,6 +80,13 @@ type CustomerRecord = {
   registrationIdType: string | null;
   registrationNo: string | null;
   taxIdentificationNo: string | null;
+  creditTermsDays: number;
+  creditLimitAmount: string | number;
+  creditOutstandingAmount?: number;
+  creditOverdueAmount?: number;
+  creditOldestOverdueDays?: number;
+  creditLimitExceeded?: boolean;
+  creditOverdue?: boolean;
   deliveryAddresses: CustomerDeliveryAddress[];
   accountSource: "PORTAL" | "ADMIN";
   portalAccess: boolean;

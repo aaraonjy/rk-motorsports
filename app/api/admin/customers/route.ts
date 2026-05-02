@@ -17,6 +17,18 @@ function getNullableText(body: Record<string, unknown>, key: string) {
   return value || null;
 }
 
+function getNonNegativeInt(body: Record<string, unknown>, key: string) {
+  const numeric = Number(body[key] ?? 0);
+  if (!Number.isFinite(numeric) || numeric < 0) return 0;
+  return Math.trunc(numeric);
+}
+
+function getNonNegativeMoney(body: Record<string, unknown>, key: string) {
+  const numeric = Number(body[key] ?? 0);
+  if (!Number.isFinite(numeric) || numeric < 0) return 0;
+  return Math.round((numeric + Number.EPSILON) * 100) / 100;
+}
+
 async function resolveCountryCode(value: string) {
   const countryCode = value.trim().toUpperCase() || "MY";
   const country = await db.country.findFirst({ where: { code: countryCode, isActive: true }, select: { code: true } });
@@ -169,6 +181,8 @@ export async function POST(req: Request) {
       registrationIdType: normalizeRegistrationIdType(getText(body, "registrationIdType")) as any,
       registrationNo: getNullableText(body, "registrationNo"),
       taxIdentificationNo: getNullableText(body, "taxIdentificationNo"),
+      creditTermsDays: getNonNegativeInt(body, "creditTermsDays"),
+      creditLimitAmount: getNonNegativeMoney(body, "creditLimitAmount"),
       deliveryAddresses: deliveryAddresses.length > 0 ? { create: deliveryAddresses } : undefined,
     },
   });

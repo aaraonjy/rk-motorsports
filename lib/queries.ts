@@ -1,6 +1,77 @@
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 
+function toCreditNumber(value: Prisma.Decimal | number | string | null | undefined) {
+  const numeric = Number(value ?? 0);
+  return Number.isFinite(numeric) ? numeric : 0;
+}
+
+function buildCustomerCreditControl(customer: {
+  creditTermsDays?: number | null;
+  creditLimitAmount?: Prisma.Decimal | number | string | null;
+  customerSalesTransactions?: Array<{
+    id: string;
+    docNo: string;
+    docDate: Date;
+    grandTotal: Prisma.Decimal | number | string;
+    payments?: Array<{ amount: Prisma.Decimal | number | string }>;
+    sourceLinks?: Array<{
+      targetTransaction?: { docType?: string | null; status?: string | null; grandTotal?: Prisma.Decimal | number | string | null } | null;
+    }>;
+  }>;
+}) {
+  const creditTermsDays = Math.max(0, Number(customer.creditTermsDays ?? 0) || 0);
+  const creditLimitAmount = Math.max(0, toCreditNumber(customer.creditLimitAmount));
+  const now = new Date();
+
+  let outstandingAmount = 0;
+  let overdueAmount = 0;
+  let oldestOverdueDays = 0;
+
+  for (const invoice of customer.customerSalesTransactions || []) {
+    const totalPaid = (invoice.payments || []).reduce((sum, payment) => sum + toCreditNumber(payment.amount), 0);
+    const adjustment = (invoice.sourceLinks || []).reduce((sum, link) => {
+      const target = link.targetTransaction;
+      if (!target || target.status === "CANCELLED") return sum;
+      if (target.docType === "CN") return sum - toCreditNumber(target.grandTotal);
+      if (target.docType === "DN") return sum + toCreditNumber(target.grandTotal);
+      return sum;
+    }, 0);
+    const adjustedTotal = Math.max(0, toCreditNumber(invoice.grandTotal) + adjustment);
+    const outstanding = Math.max(0, Math.round((adjustedTotal - totalPaid + Number.EPSILON) * 100) / 100);
+    if (outstanding <= 0) continue;
+
+    outstandingAmount += outstanding;
+
+    if (creditTermsDays > 0) {
+      const dueDate = new Date(invoice.docDate);
+      dueDate.setDate(dueDate.getDate() + creditTermsDays);
+      if (dueDate.getTime() < now.getTime()) {
+        overdueAmount += outstanding;
+        const overdueDays = Math.max(0, Math.floor((now.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)));
+        oldestOverdueDays = Math.max(oldestOverdueDays, overdueDays);
+      }
+    } else if (outstanding > 0) {
+      overdueAmount += outstanding;
+      const overdueDays = Math.max(0, Math.floor((now.getTime() - new Date(invoice.docDate).getTime()) / (1000 * 60 * 60 * 24)));
+      oldestOverdueDays = Math.max(oldestOverdueDays, overdueDays);
+    }
+  }
+
+  outstandingAmount = Math.round((outstandingAmount + Number.EPSILON) * 100) / 100;
+  overdueAmount = Math.round((overdueAmount + Number.EPSILON) * 100) / 100;
+
+  return {
+    creditTermsDays,
+    creditLimitAmount,
+    creditOutstandingAmount: outstandingAmount,
+    creditOverdueAmount: overdueAmount,
+    creditOldestOverdueDays: oldestOverdueDays,
+    creditLimitExceeded: outstandingAmount > 0 && (creditLimitAmount <= 0 || outstandingAmount > creditLimitAmount),
+    creditOverdue: overdueAmount > 0,
+  };
+}
+
 export async function getProducts() {
   return db.product.findMany({
     where: { isActive: true },
@@ -548,6 +619,23 @@ export async function getCustomers(filters?: CustomersOptions) {
         registrationIdType: true,
         registrationNo: true,
         taxIdentificationNo: true,
+        creditTermsDays: true,
+        creditLimitAmount: true,
+        customerSalesTransactions: {
+          where: { docType: "INV", status: { not: "CANCELLED" } },
+          select: {
+            id: true,
+            docNo: true,
+            docDate: true,
+            grandTotal: true,
+            payments: { select: { amount: true } },
+            sourceLinks: {
+              select: {
+                targetTransaction: { select: { docType: true, status: true, grandTotal: true } },
+              },
+            },
+          },
+        },
         agent: {
           select: {
             id: true,
@@ -586,7 +674,11 @@ export async function getCustomers(filters?: CustomersOptions) {
   ]);
 
   return {
-    customers,
+    customers: customers.map((customer) => ({
+      ...customer,
+      ...buildCustomerCreditControl(customer),
+      customerSalesTransactions: undefined,
+    })),
     totalCount,
     currentPage: page,
     pageSize,
@@ -706,6 +798,23 @@ export async function getCustomersReport(filters?: CustomersReportOptions) {
         registrationIdType: true,
         registrationNo: true,
         taxIdentificationNo: true,
+        creditTermsDays: true,
+        creditLimitAmount: true,
+        customerSalesTransactions: {
+          where: { docType: "INV", status: { not: "CANCELLED" } },
+          select: {
+            id: true,
+            docNo: true,
+            docDate: true,
+            grandTotal: true,
+            payments: { select: { amount: true } },
+            sourceLinks: {
+              select: {
+                targetTransaction: { select: { docType: true, status: true, grandTotal: true } },
+              },
+            },
+          },
+        },
         agent: {
           select: {
             id: true,
@@ -929,8 +1038,12 @@ export async function getCustomerByIdWithIntelligence(customerId: string) {
   const averageOrderValue = totalOrders > 0 ? Math.round((totalSpent / totalOrders) * 100) / 100 : 0;
   const lastOrderDate = totalOrders > 0 ? validOrders[0].createdAt : null;
 
+  const creditControl = buildCustomerCreditControl(customer);
+
   return {
     ...customer,
+    customerSalesTransactions: undefined,
+    creditControl,
     intelligence: {
       totalOrders,
       totalSpent,

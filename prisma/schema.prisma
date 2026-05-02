@@ -206,6 +206,8 @@ model User {
   registrationIdType     CustomerRegistrationIdType?
   registrationNo         String?
   taxIdentificationNo    String?
+  creditTermsDays       Int                 @default(0)
+  creditLimitAmount     Decimal             @default(0) @db.Decimal(14, 2)
   resetToken             String?
   resetTokenExpiry       DateTime?
   createdAt              DateTime            @default(now())

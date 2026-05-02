@@ -71,6 +71,13 @@ type CustomerRecord = {
   registrationIdType: string | null;
   registrationNo: string | null;
   taxIdentificationNo: string | null;
+  creditTermsDays: number;
+  creditLimitAmount: string | number;
+  creditOutstandingAmount?: number;
+  creditOverdueAmount?: number;
+  creditOldestOverdueDays?: number;
+  creditLimitExceeded?: boolean;
+  creditOverdue?: boolean;
   accountSource: "PORTAL" | "ADMIN";
   portalAccess: boolean;
   createdAt: string;
@@ -138,6 +145,8 @@ type CustomerFormState = {
   registrationIdType: string;
   registrationNo: string;
   taxIdentificationNo: string;
+  creditTermsDays: string;
+  creditLimitAmount: string;
 };
 
 type CustomerApiResponse = {
@@ -200,6 +209,8 @@ function getInitialForm(customer: CustomerRecord | null): CustomerFormState {
     registrationIdType: customer?.registrationIdType || "BRN",
     registrationNo: customer?.registrationNo || "",
     taxIdentificationNo: customer?.taxIdentificationNo || "",
+    creditTermsDays: String(customer?.creditTermsDays ?? 0),
+    creditLimitAmount: String(customer?.creditLimitAmount ?? 0),
   };
 }
 
@@ -264,6 +275,28 @@ function getPortalAccessBadge(enabled: boolean) {
     : "inline-flex min-w-[88px] items-center justify-center rounded-full border border-white/15 bg-white/10 px-3 py-1 text-center text-xs font-semibold text-white/75 transition hover:bg-white/15";
 }
 
+
+function getCreditBadge(customer: CustomerRecord) {
+  if (customer.creditOverdue) {
+    return "inline-flex min-w-[120px] items-center justify-center rounded-full border border-red-500/30 bg-red-500/15 px-3 py-1 text-center text-xs font-semibold text-red-300";
+  }
+  if (customer.creditLimitExceeded) {
+    return "inline-flex min-w-[120px] items-center justify-center rounded-full border border-amber-500/30 bg-amber-500/15 px-3 py-1 text-center text-xs font-semibold text-amber-300";
+  }
+  return "inline-flex min-w-[120px] items-center justify-center rounded-full border border-emerald-500/30 bg-emerald-500/15 px-3 py-1 text-center text-xs font-semibold text-emerald-300";
+}
+
+function getCreditLabel(customer: CustomerRecord) {
+  if (customer.creditOverdue) return "Overdue";
+  if (customer.creditLimitExceeded) return "Over Limit";
+  return "OK";
+}
+
+function money(value: unknown) {
+  const numeric = Number(value ?? 0);
+  return numeric.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 function FieldLabel({ children }: { children: ReactNode }) {
   return <label className="mb-2 block text-sm text-white/70">{children}</label>;
 }
@@ -275,6 +308,8 @@ function TextInput({
   type = "text",
   required = false,
   disabled = false,
+  min,
+  step,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -282,6 +317,8 @@ function TextInput({
   type?: string;
   required?: boolean;
   disabled?: boolean;
+  min?: string;
+  step?: string;
 }) {
   return (
     <input
@@ -290,6 +327,8 @@ function TextInput({
       onChange={(e) => onChange(e.target.value)}
       required={required}
       disabled={disabled}
+      min={min}
+      step={step}
       placeholder={placeholder}
       className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 pr-10 text-sm text-white outline-none transition placeholder:text-white/30 hover:border-white/20 focus:border-white/25 disabled:cursor-not-allowed disabled:opacity-60"
     />
@@ -825,6 +864,16 @@ function CustomerModal({
                 />
               </div>
               <div>
+                <FieldLabel>Credit Terms (Days)</FieldLabel>
+                <TextInput type="number" min="0" step="1" value={form.creditTermsDays} onChange={(value) => updateField("creditTermsDays", value.replace(/[^0-9]/g, ""))} placeholder="0" />
+                <p className="mt-2 text-xs text-white/40">0 means cash/immediate payment.</p>
+              </div>
+              <div>
+                <FieldLabel>Credit Limit (RM)</FieldLabel>
+                <TextInput type="number" min="0" step="0.01" value={form.creditLimitAmount} onChange={(value) => updateField("creditLimitAmount", value)} placeholder="0.00" />
+                <p className="mt-2 text-xs text-white/40">0 means no credit limit allowed.</p>
+              </div>
+              <div>
                 <SearchableSelect
                   label="Agent"
                   placeholder="Search or select agent"
@@ -1065,6 +1114,7 @@ export function AdminCustomerManagement({ customers, agents, countries, currenci
               <th className="w-[260px] px-4 py-4">Email</th>
               <th className="w-[150px] px-4 py-4">Source</th>
               <th className="w-[140px] px-4 py-4">Portal Access</th>
+              <th className="w-[170px] px-4 py-4">Credit Control</th>
               <th className="w-[110px] px-4 py-4">Orders</th>
               <th className="w-[160px] px-4 py-4">Created Date</th>
               <th className="w-[200px] px-4 py-4">Action</th>
@@ -1084,6 +1134,12 @@ export function AdminCustomerManagement({ customers, agents, countries, currenci
                     {isTogglingId === customer.id ? "Updating..." : customer.portalAccess ? "Enabled" : "Disabled"}
                   </button>
                 </td>
+                <td className="px-4 py-4">
+                  <div className="space-y-2">
+                    <span className={getCreditBadge(customer)}>{getCreditLabel(customer)}</span>
+                    <div className="text-xs text-white/45">Outstanding RM {money(customer.creditOutstandingAmount || 0)}</div>
+                  </div>
+                </td>
                 <td className="px-4 py-4 text-white/85">{customer._count.orders}</td>
                 <td className="px-4 py-4 text-white/65"><div>{new Date(customer.createdAt).toLocaleDateString()}</div><div className="text-xs text-white/35">{new Date(customer.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true })}</div></td>
                 <td className="px-4 py-4">
@@ -1094,7 +1150,7 @@ export function AdminCustomerManagement({ customers, agents, countries, currenci
                 </td>
               </tr>
             )) : (
-              <tr><td colSpan={10} className="px-4 py-10 text-center text-white/45">No customers found for the selected filters.</td></tr>
+              <tr><td colSpan={11} className="px-4 py-10 text-center text-white/45">No customers found for the selected filters.</td></tr>
             )}
           </tbody>
         </table>

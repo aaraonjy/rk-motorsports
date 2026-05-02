@@ -45,6 +45,13 @@ type CustomerOption = {
   attention?: string | null;
   currency?: string | null;
   agentId?: string | null;
+  creditTermsDays?: number | null;
+  creditLimitAmount?: number | string | null;
+  creditOutstandingAmount?: number | null;
+  creditOverdueAmount?: number | null;
+  creditOldestOverdueDays?: number | null;
+  creditLimitExceeded?: boolean | null;
+  creditOverdue?: boolean | null;
 };
 
 type ProductOption = {
@@ -499,6 +506,33 @@ function formatDate(value: string | Date | null | undefined) {
   return date.toLocaleDateString("en-MY", { timeZone: "Asia/Kuala_Lumpur", day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
+
+
+function getCustomerCreditWarning(customer: CustomerOption | null) {
+  if (!customer) return null;
+  const outstanding = Number(customer.creditOutstandingAmount || 0);
+  const limit = Number(customer.creditLimitAmount || 0);
+  const overdue = Number(customer.creditOverdueAmount || 0);
+  const oldestDays = Number(customer.creditOldestOverdueDays || 0);
+
+  if (customer.creditOverdue) {
+    return {
+      tone: "danger" as const,
+      title: "Credit Terms Overdue",
+      message: `This customer has overdue outstanding invoice amount RM ${money(overdue)}${oldestDays > 0 ? `, oldest overdue ${oldestDays} day(s)` : ""}. Admin may still proceed after review.`,
+    };
+  }
+
+  if (customer.creditLimitExceeded) {
+    return {
+      tone: "warning" as const,
+      title: "Credit Limit Exceeded",
+      message: `This customer outstanding invoice amount is RM ${money(outstanding)}, credit limit is RM ${money(limit)}. Admin may still proceed after review.`,
+    };
+  }
+
+  return null;
+}
 
 function formatDateInput(value: string | Date | null | undefined) {
   if (!value) return todayInput();
@@ -1112,6 +1146,7 @@ export function AdminCashSalesClient({
   }, [availableSourceOrders, selectedSourceOrderIds]);
 
   const selectedCustomer = useMemo(() => initialCustomers.find((item) => item.id === customerId) || null, [customerId, initialCustomers]);
+  const customerCreditWarning = useMemo(() => getCustomerCreditWarning(selectedCustomer), [selectedCustomer]);
 
   function isGeneratedFromSalesOrder(transaction: CashSalesRecord) {
     return (transaction.targetLinks || []).some((link) => link.sourceTransaction?.docType === "SO" || String(link.sourceTransaction?.docNo || "").startsWith("SO-"));
@@ -2112,6 +2147,12 @@ export function AdminCashSalesClient({
                   <div><label className="label-rk">Customer Name</label><input className="input-rk" value={customerName} readOnly /></div>
                   <div><label className="label-rk">Email</label><input className="input-rk" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
                   <div><label className="label-rk">Contact No</label><input className="input-rk" value={contactNo} onChange={(e) => setContactNo(e.target.value)} /></div>
+                  {customerCreditWarning ? (
+                    <div className={`md:col-span-2 xl:col-span-4 rounded-2xl border px-4 py-3 text-sm ${customerCreditWarning.tone === "danger" ? "border-red-500/30 bg-red-500/10 text-red-200" : "border-amber-500/30 bg-amber-500/10 text-amber-200"}`}>
+                      <div className="font-semibold uppercase tracking-[0.18em]">{customerCreditWarning.title}</div>
+                      <p className="mt-2 leading-6">{customerCreditWarning.message}</p>
+                    </div>
+                  ) : null}
                   <div className="md:col-span-2"><label className="label-rk">Document Description</label><input className="input-rk" value={docDesc} onChange={(e) => setDocDesc(e.target.value)} /></div>
                   <div><label className="label-rk">Attention</label><input className="input-rk" value={attention} onChange={(e) => setAttention(e.target.value)} /></div>
                   <SearchableSelect label="Agent" placeholder="No Agent" options={agentOptions} value={agentId} onChange={(option) => setAgentId(option?.id || "")} />
