@@ -6,17 +6,17 @@ const MISC_CARDS = [
   {
     title: "Project Maintenance",
     description: "Manage project master data for stock transaction document grouping.",
-    href: "/admin/global-settings/misc/project",
+    href: "/admin/global-settings/misc/projects",
   },
   {
     title: "Department Maintenance",
     description: "Manage department master data under each project for stock transaction filtering and reporting.",
-    href: "/admin/global-settings/misc/department",
+    href: "/admin/global-settings/misc/departments",
   },
   {
     title: "Agent Maintenance",
     description: "Manage sales or service agents for customer profile assignment and future reporting.",
-    href: "/admin/global-settings/misc/agent",
+    href: "/admin/global-settings/misc/agents",
   },
   {
     title: "Country Maintenance",
