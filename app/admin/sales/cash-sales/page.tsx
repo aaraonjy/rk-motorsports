@@ -89,7 +89,7 @@ export default async function AdminCashSalesPage() {
 
   const [customers, products, locations, agents, projects, departments, stockConfig, taxConfig, taxCodes, salesOrders] = await Promise.all([
     db.user.findMany({
-      where: { role: "CUSTOMER" },
+      where: { role: "CUSTOMER", isActive: true },
       orderBy: [{ customerAccountNo: "asc" }, { name: "asc" }],
       select: {
         id: true,

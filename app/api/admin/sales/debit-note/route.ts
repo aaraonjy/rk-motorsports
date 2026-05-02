@@ -191,7 +191,7 @@ function calculateInvoiceOutstanding(invoice: InvoiceOutstandingInput) {
 
 async function getSourceInvoices(tx: Prisma.TransactionClient) {
   const invoices = await tx.salesTransaction.findMany({
-    where: { docType: "INV", status: { not: "CANCELLED" } },
+    where: { docType: "INV", status: { not: "CANCELLED" }, customer: { isActive: true } },
     orderBy: [{ docDate: "desc" }, { docNo: "desc" }],
     include: {
       payments: true,
@@ -235,6 +235,7 @@ async function buildDebitNoteData(body: any, tx: Prisma.TransactionClient) {
 
   if (!sourceInvoice || sourceInvoice.docType !== "INV") throw new Error("Selected Sales Invoice is invalid.");
   if (sourceInvoice.status === "CANCELLED") throw new Error("Cancelled Sales Invoice cannot be debited.");
+  if (sourceInvoice.customer && !sourceInvoice.customer.isActive) throw new Error("Inactive customer cannot be used for Sales transactions.");
 
   const balance = calculateInvoiceOutstanding(sourceInvoice);
   if (balance.outstanding <= 0) throw new Error("Fully paid Sales Invoice cannot be debited.");

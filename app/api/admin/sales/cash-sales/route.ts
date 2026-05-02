@@ -677,10 +677,10 @@ async function buildCashSalesData(body: any, tx: Prisma.TransactionClient) {
   if (rawLines.length === 0) throw new Error("Please add at least one product line.");
 
   const customer = await tx.user.findFirst({
-    where: { id: customerId, role: "CUSTOMER" },
+    where: { id: customerId, role: "CUSTOMER", isActive: true },
     include: { agent: true },
   });
-  if (!customer) throw new Error("Selected customer is invalid.");
+  if (!customer) throw new Error("Selected customer is invalid or inactive.");
 
   const numberFormat = await loadStockNumberFormat(tx);
   const taxSettings = await loadTaxSettings(tx);

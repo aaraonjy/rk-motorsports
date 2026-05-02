@@ -152,7 +152,7 @@ function withCancellationDetails<T extends Record<string, any>>(transaction: T) 
 
 async function getSourceDeliveryOrders(tx: Prisma.TransactionClient) {
   const deliveryOrders = await tx.salesTransaction.findMany({
-    where: { docType: "DO", status: { not: "CANCELLED" } },
+    where: { docType: "DO", status: { not: "CANCELLED" }, customer: { isActive: true } },
     orderBy: [{ docDate: "desc" }, { docNo: "desc" }],
     include: {
       sourceLinks: {
@@ -386,6 +386,7 @@ export async function POST(req: Request) {
       const source = await tx.salesTransaction.findUnique({
         where: { id: sourceTransactionId },
         include: {
+          customer: true,
           lines: {
             orderBy: { lineNo: "asc" },
             include: {
@@ -399,6 +400,7 @@ export async function POST(req: Request) {
       });
 
       if (!source || source.docType !== "DO" || source.status === "CANCELLED") throw new Error("Selected Delivery Order is invalid.");
+      if (source.customer && !source.customer.isActive) throw new Error("Inactive customer cannot be used for Sales transactions.");
       const sourceLineMap = new Map(source.lines.map((line) => [line.id, line]));
 
       const preparedLines = rawLines.map((line, index) => {

@@ -332,7 +332,7 @@ export async function POST(req: Request) {
 
     const [customer, config, taxConfig, activeTaxCodes] = await Promise.all([
       db.user.findFirst({
-        where: { id: customerId, role: "CUSTOMER" },
+        where: { id: customerId, role: "CUSTOMER", isActive: true },
         include: { agent: true },
       }),
       db.stockConfiguration.findUnique({ where: { id: "default" } }),
@@ -350,7 +350,7 @@ export async function POST(req: Request) {
       }),
     ]);
 
-    if (!customer) return NextResponse.json({ ok: false, error: "Selected customer is invalid." }, { status: 400 });
+    if (!customer) return NextResponse.json({ ok: false, error: "Selected customer is invalid or inactive." }, { status: 400 });
 
     const taxModuleEnabled = Boolean(taxConfig?.taxModuleEnabled);
     const taxCalculationMode = normalizeTaxCalculationMode(taxConfig?.taxCalculationMode);

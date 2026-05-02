@@ -176,7 +176,7 @@ function withCancellationDetails<T extends Record<string, any>>(transaction: T) 
 
 async function getSourceInvoices(tx: Prisma.TransactionClient) {
   const invoices = await tx.salesTransaction.findMany({
-    where: { docType: "INV", status: { not: "CANCELLED" } },
+    where: { docType: "INV", status: { not: "CANCELLED" }, customer: { isActive: true } },
     orderBy: [{ docDate: "desc" }, { docNo: "desc" }],
     include: {
       lines: {
@@ -312,6 +312,7 @@ async function buildCreditNoteData(body: any, tx: Prisma.TransactionClient) {
 
   if (!sourceInvoice || sourceInvoice.docType !== "INV") throw new Error("Selected Sales Invoice is invalid.");
   if (sourceInvoice.status === "CANCELLED") throw new Error("Cancelled Sales Invoice cannot be credited.");
+  if (sourceInvoice.customer && !sourceInvoice.customer.isActive) throw new Error("Inactive customer cannot be used for Sales transactions.");
 
   const sourceLines = new Map(sourceInvoice.lines.map((line) => [line.id, line]));
   const rawLines = Array.isArray(body.lines) ? (body.lines as CreditNoteLinePayload[]) : [];
