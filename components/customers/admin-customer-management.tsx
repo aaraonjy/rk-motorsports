@@ -490,6 +490,7 @@ function CustomerModal({
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [accountSuffixTouched, setAccountSuffixTouched] = useState(false);
   const [isAccountOverrideOpen, setIsAccountOverrideOpen] = useState(false);
   const [accountOverrideDraft, setAccountOverrideDraft] = useState("");
@@ -526,6 +527,7 @@ function CustomerModal({
     setError(null);
     setIsSubmitting(false);
     setIsDeleting(false);
+    setIsDeleteConfirmOpen(false);
   }, [customer, isOpen]);
 
   const accountSuffixLength = getAccountSuffixLength(accountConfiguration.customerAccountNoFormat);
@@ -762,10 +764,13 @@ function CustomerModal({
     }
   }
 
-  async function handleDeleteCustomer() {
+  function handleDeleteCustomer() {
     if (!customer || !canDeleteCustomer) return;
-    const confirmed = window.confirm("Delete this customer profile? This action cannot be undone.");
-    if (!confirmed) return;
+    setIsDeleteConfirmOpen(true);
+  }
+
+  async function confirmDeleteCustomer() {
+    if (!customer || !canDeleteCustomer) return;
 
     setError(null);
     setIsDeleting(true);
@@ -776,10 +781,12 @@ function CustomerModal({
 
       if (!response.ok || !data.ok) {
         setError(data.error || "Unable to delete customer right now.");
+        setIsDeleteConfirmOpen(false);
         return;
       }
 
       onSaved("Customer deleted successfully.");
+      setIsDeleteConfirmOpen(false);
       onClose();
     } catch {
       setError("Unable to delete customer right now.");
@@ -1075,6 +1082,41 @@ function CustomerModal({
           </div>
         ) : null}
 
+
+        {isDeleteConfirmOpen && customer ? (
+          <div className="fixed inset-0 z-[135] flex items-center justify-center bg-black/75 px-4">
+            <div className="w-full max-w-lg rounded-[2rem] border border-red-500/30 bg-zinc-950 p-6 shadow-2xl">
+              <p className="text-sm font-semibold uppercase tracking-[0.24em] text-red-300/80">Delete Customer</p>
+              <h3 className="mt-3 text-2xl font-bold text-white">Delete this customer profile?</h3>
+              <p className="mt-3 text-sm leading-6 text-white/60">
+                This action cannot be undone. This customer has no related transactions, so the profile can be permanently deleted.
+              </p>
+              <div className="mt-5 rounded-2xl border border-white/10 bg-black/30 p-4 text-sm text-white/75">
+                <div className="font-semibold text-white">{customer.name}</div>
+                <div className="mt-1 text-white/50">A/C No.: {customer.customerAccountNo || "-"}</div>
+              </div>
+              <div className="mt-6 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsDeleteConfirmOpen(false)}
+                  disabled={isDeleting}
+                  className="rounded-xl border border-white/15 px-4 py-2.5 text-sm text-white/75 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmDeleteCustomer}
+                  disabled={isDeleting}
+                  className="rounded-xl border border-red-500/40 bg-red-500/10 px-5 py-2.5 text-sm font-semibold text-red-200 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isDeleting ? "Deleting..." : "Delete Customer"}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
         {isDeliveryAddressModalOpen ? (
           <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/75 px-4 py-6">
             <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-[2rem] border border-white/10 bg-zinc-950 p-6 shadow-2xl">
@@ -1228,20 +1270,20 @@ export function AdminCustomerManagement({ customers, agents, countries, currenci
         </div>
 
         <div className="overflow-x-auto border-t border-white/10">
-        <table className="min-w-full table-fixed text-left text-sm">
+        <table className="min-w-[1280px] text-left text-sm">
           <thead className="bg-black/50 text-white/65">
             <tr>
-              <th className="w-[70px] px-4 py-4">No.</th>
+              <th className="w-[60px] px-4 py-4">No.</th>
               <th className="w-[150px] px-4 py-4">A/C No.</th>
               <th className="w-[220px] px-4 py-4">Customer</th>
-              <th className="w-[180px] px-4 py-4">Phone</th>
-              <th className="w-[260px] px-4 py-4">Email</th>
+              <th className="w-[150px] px-4 py-4">Phone</th>
+              <th className="w-[230px] px-4 py-4">Email</th>
               <th className="w-[150px] px-4 py-4">Source</th>
               <th className="w-[140px] px-4 py-4">Portal Access</th>
               <th className="w-[120px] px-4 py-4">Status</th>
               <th className="w-[170px] px-4 py-4">Credit Control</th>
               <th className="w-[110px] px-4 py-4">Orders</th>
-              <th className="w-[200px] px-4 py-4">Action</th>
+              <th className="w-[150px] px-4 py-4">Action</th>
             </tr>
           </thead>
           <tbody>
@@ -1269,11 +1311,11 @@ export function AdminCustomerManagement({ customers, agents, countries, currenci
                 <td className="px-4 py-4">
                   <div className="flex flex-col gap-2">
                     {customer.isActive ? (
-                      <Link href={`/admin/customers/${customer.id}/create-order`} onClick={(e) => e.stopPropagation()} className="inline-flex w-full items-center justify-center rounded-xl border border-white/15 bg-black/30 px-4 py-2 text-center text-white transition hover:bg-white/10">Create Order</Link>
+                      <Link href={`/admin/customers/${customer.id}/create-order`} onClick={(e) => e.stopPropagation()} className="inline-flex w-full items-center justify-center rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-center text-white transition hover:bg-white/10">Create Order</Link>
                     ) : (
                       <span className="inline-flex w-full cursor-not-allowed items-center justify-center rounded-xl border border-white/10 bg-black/20 px-4 py-2 text-center text-white/35">Inactive</span>
                     )}
-                    <button type="button" onClick={(e) => { e.stopPropagation(); setEditingCustomer(customer); }} className="rounded-xl border border-white/15 bg-black/30 px-4 py-2 text-white transition hover:bg-white/10">Edit</button>
+                    <button type="button" onClick={(e) => { e.stopPropagation(); setEditingCustomer(customer); }} className="rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-white transition hover:bg-white/10">Edit</button>
                   </div>
                 </td>
               </tr>

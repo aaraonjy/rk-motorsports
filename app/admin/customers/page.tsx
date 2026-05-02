@@ -163,21 +163,21 @@ export default async function AdminCustomersPage({
         <div className="mt-8 space-y-4">
           <div className="card-rk p-6 text-white/75">
             <p>
-              Search by customer name, A/C No., phone number, or email, then filter by account
-              source and portal access status.
+              Search by customer name, A/C No., contact number, or email, then filter by account
+              source, portal access, and customer status.
             </p>
           </div>
 
-          <form method="get" className="card-rk grid gap-4 p-6 md:grid-cols-2 xl:grid-cols-5">
+          <form method="get" className="card-rk grid items-end gap-4 p-6 md:grid-cols-2 xl:grid-cols-[minmax(220px,1.15fr)_minmax(180px,1fr)_minmax(180px,1fr)_minmax(180px,1fr)_auto]">
             <div>
               <label className="mb-2 block text-sm text-white/65">
-                Name / A/C No. / Phone Number / Email
+                Name / A/C No. / Contact No
               </label>
               <input
                 type="text"
                 name="search"
                 defaultValue={search}
-                placeholder="Search name, A/C No., phone, or email"
+                placeholder="Search name, A/C No., contact, or email"
                 className="w-full rounded-xl border border-white/15 bg-black/50 px-4 py-3 text-white outline-none placeholder:text-white/35"
               />
             </div>
@@ -281,7 +281,7 @@ export default async function AdminCustomersPage({
               </div>
             </div>
 
-            <div className="flex flex-wrap items-end gap-3 xl:justify-end">
+            <div className="flex flex-wrap items-end gap-3 xl:justify-end xl:whitespace-nowrap">
               <input type="hidden" name="page" value="1" />
               <button
                 type="submit"
