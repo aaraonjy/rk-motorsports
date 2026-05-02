@@ -57,11 +57,23 @@ function formatDateTime(value: Date | null) {
   if (!value) return "-";
 
   return new Intl.DateTimeFormat("en-MY", {
+    timeZone: "Asia/Kuala_Lumpur",
     year: "numeric",
     month: "numeric",
     day: "numeric",
     hour: "numeric",
     minute: "2-digit",
+  }).format(value);
+}
+
+function formatDocumentDate(value: Date | null) {
+  if (!value) return "-";
+
+  return new Intl.DateTimeFormat("en-MY", {
+    timeZone: "Asia/Kuala_Lumpur",
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
   }).format(value);
 }
 
@@ -88,6 +100,7 @@ type SalesHistoryItem = {
   docType: string;
   docNo: string;
   docDate: Date;
+  createdAt: Date;
   docDesc: string | null;
   status: string;
   amount: number;
@@ -520,6 +533,7 @@ export default async function AdminCustomerDetailPage({
                     <th className="px-6 py-4 font-medium">Status</th>
                     <th className="px-6 py-4 font-medium">Amount</th>
                     <th className="px-6 py-4 font-medium">Doc Date</th>
+                    <th className="px-6 py-4 font-medium">Created At</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -567,7 +581,10 @@ export default async function AdminCustomerDetailPage({
                             : amountDisplay}
                         </td>
                         <td className="px-6 py-5 text-white/65">
-                          {formatDateTime(order.docDate)}
+                          {formatDocumentDate(order.docDate)}
+                        </td>
+                        <td className="px-6 py-5 text-white/65">
+                          {formatDateTime(order.createdAt)}
                         </td>
                       </tr>
                     );

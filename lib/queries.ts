@@ -1108,7 +1108,7 @@ export async function getCustomerByIdWithIntelligence(
     await Promise.all([
       db.salesTransaction.findMany({
         where: salesHistoryWhere,
-        orderBy: [{ docDate: "desc" }, { docNo: "desc" }],
+        orderBy: [{ createdAt: "desc" }, { docDate: "desc" }, { docNo: "desc" }],
         skip: transactionSkip,
         take: transactionPageSize,
         select: {
@@ -1116,6 +1116,7 @@ export async function getCustomerByIdWithIntelligence(
           docType: true,
           docNo: true,
           docDate: true,
+          createdAt: true,
           docDesc: true,
           status: true,
           grandTotal: true,
@@ -1124,11 +1125,12 @@ export async function getCustomerByIdWithIntelligence(
       db.salesTransaction.count({ where: salesHistoryWhere }),
       db.salesTransaction.findMany({
         where: salesTotalWhere,
-        orderBy: [{ docDate: "desc" }, { docNo: "desc" }],
+        orderBy: [{ createdAt: "desc" }, { docDate: "desc" }, { docNo: "desc" }],
         select: {
           id: true,
           docType: true,
           docDate: true,
+          createdAt: true,
           grandTotal: true,
         },
       }),
@@ -1143,6 +1145,7 @@ export async function getCustomerByIdWithIntelligence(
       docType: transaction.docType,
       docNo: transaction.docNo,
       docDate: transaction.docDate,
+      createdAt: transaction.createdAt,
       docDesc: transaction.docDesc,
       status: transaction.status,
       amount,
@@ -1167,7 +1170,7 @@ export async function getCustomerByIdWithIntelligence(
   const averageOrderValue =
     totalOrders > 0 ? Math.round((totalSpent / totalOrders) * 100) / 100 : 0;
   const lastOrderDate =
-    orderTransactions.length > 0 ? orderTransactions[0].docDate : null;
+    orderTransactions.length > 0 ? orderTransactions[0].createdAt : null;
 
   const creditControl = buildCustomerCreditControl(customer);
 
