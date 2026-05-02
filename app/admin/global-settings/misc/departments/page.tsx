@@ -30,7 +30,7 @@ export default async function AdminDepartmentsPage() {
           <AdminMasterListClient
             title="Department"
             subtitle="Misc"
-            apiBase="/api/admin/global-settings/misc-departments"
+            apiBase="/api/admin/global-settings/misc/departments"
             requireGroup={true}
             groupLabelTitle="Project"
             groupPlaceholder="Select project"

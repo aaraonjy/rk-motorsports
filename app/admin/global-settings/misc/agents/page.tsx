@@ -25,7 +25,7 @@ export default async function AdminAgentsPage() {
           <AdminMasterListClient
             title="Agent"
             subtitle="Misc"
-            apiBase="/api/admin/global-settings/misc-agents"
+            apiBase="/api/admin/global-settings/misc/agents"
             initialItems={items.map((item) => ({
               id: item.id,
               code: item.code,

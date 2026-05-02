@@ -862,8 +862,8 @@ export function AdminStockAssemblyClient({
     async function loadProjectDepartmentOptions() {
       try {
         const [projectRes, departmentRes] = await Promise.all([
-          fetch("/api/admin/global-settings/misc-projects", { cache: "no-store" }),
-          fetch("/api/admin/global-settings/misc-departments", { cache: "no-store" }),
+          fetch("/api/admin/global-settings/misc/projects", { cache: "no-store" }),
+          fetch("/api/admin/global-settings/misc/departments", { cache: "no-store" }),
         ]);
         const projectData = await projectRes.json();
         const departmentData = await departmentRes.json();

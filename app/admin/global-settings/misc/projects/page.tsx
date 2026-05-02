@@ -21,7 +21,7 @@ export default async function AdminProjectsPage() {
           <AdminMasterListClient
             title="Project"
             subtitle="Misc"
-            apiBase="/api/admin/global-settings/misc-projects"
+            apiBase="/api/admin/global-settings/misc/projects"
             initialItems={items.map((item) => ({ id: item.id, code: item.code, name: item.name, isActive: item.isActive }))}
             initialPagination={{
               page: 1,

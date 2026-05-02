@@ -35,7 +35,7 @@ export default async function AdminCountryMaintenancePage() {
         <AdminMasterListClient
           title="Country List"
           subtitle="Country Master"
-          apiBase="/api/admin/global-settings/misc-countries"
+          apiBase="/api/admin/global-settings/misc/country"
           initialItems={items}
           initialPagination={{ page: 1, pageSize: 10, total, totalPages: Math.max(1, Math.ceil(total / 10)) }}
         />
