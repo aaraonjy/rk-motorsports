@@ -139,6 +139,7 @@ async function syncCreditControlNotifications(userId: string) {
             message: warning.message,
             isRead: false,
             readAt: null,
+            createdAt: new Date(),
           },
         });
       }

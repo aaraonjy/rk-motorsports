@@ -20,8 +20,7 @@ type NotificationsResponse = {
   unreadCount: number;
 };
 
-//const REFRESH_INTERVAL_MS = 20_000;
-  const REFRESH_INTERVAL_MS = 180_000;
+const REFRESH_INTERVAL_MS = 60_000;
 
 function formatRelativeTime(value: string) {
   const date = new Date(value);
@@ -77,7 +76,24 @@ export function AdminNotificationBell() {
       loadNotifications(false);
     }, REFRESH_INTERVAL_MS);
 
-    return () => window.clearInterval(interval);
+    function handleWindowFocus() {
+      loadNotifications(false);
+    }
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === "visible") {
+        loadNotifications(false);
+      }
+    }
+
+    window.addEventListener("focus", handleWindowFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", handleWindowFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, []);
 
   useEffect(() => {
@@ -158,7 +174,13 @@ export function AdminNotificationBell() {
     <div ref={wrapperRef} className="relative">
       <button
         type="button"
-        onClick={() => setOpen((prev) => !prev)}
+        onClick={() => {
+          setOpen((prev) => {
+            const nextOpen = !prev;
+            if (nextOpen) loadNotifications(false);
+            return nextOpen;
+          });
+        }}
         className="relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-white/5 text-white/85 transition hover:bg-white/10"
         aria-label="Notifications"
       >
