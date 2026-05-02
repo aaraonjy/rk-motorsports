@@ -84,6 +84,7 @@ type CustomerRecord = {
   _count: {
     orders: number;
   };
+  salesTransactionOrderCount?: number;
 };
 
 type Props = {
@@ -1190,7 +1191,7 @@ export function AdminCustomerManagement({ customers, agents, countries, currenci
                     <div className="text-xs text-white/45">Outstanding {customer.currency || "MYR"} {money(customer.creditOutstandingAmount || 0)}</div>
                   </div>
                 </td>
-                <td className="px-4 py-4 text-white/85">{customer._count.orders}</td>
+                <td className="px-4 py-4 text-white/85">{customer.salesTransactionOrderCount ?? customer._count.orders}</td>
                 <td className="px-4 py-4">
                   <div className="flex flex-col gap-2">
                     <Link href={`/admin/customers/${customer.id}/create-order`} onClick={(e) => e.stopPropagation()} className="inline-flex w-full items-center justify-center rounded-xl border border-white/15 bg-black/30 px-4 py-2 text-center text-white transition hover:bg-white/10">Create Order</Link>

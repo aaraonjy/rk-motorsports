@@ -652,7 +652,7 @@ export async function getCustomers(filters?: CustomersOptions) {
         creditTermsDays: true,
         creditLimitAmount: true,
         customerSalesTransactions: {
-          where: { docType: "INV", status: { not: "CANCELLED" } },
+          where: { docType: { in: ["INV", "CS"] }, status: { not: "CANCELLED" } },
           select: {
             id: true,
             docType: true,
@@ -710,6 +710,9 @@ export async function getCustomers(filters?: CustomersOptions) {
     customers: customers.map((customer) => ({
       ...customer,
       ...buildCustomerCreditControl(customer),
+      salesTransactionOrderCount: customer.customerSalesTransactions.filter((transaction) =>
+        transaction.docType === "INV" || transaction.docType === "CS",
+      ).length,
       customerSalesTransactions: undefined,
     })),
     totalCount,
