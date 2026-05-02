@@ -1270,7 +1270,7 @@ export function AdminCustomerManagement({ customers, agents, countries, currenci
         </div>
 
         <div className="overflow-x-auto border-t border-white/10">
-        <table className="min-w-[1280px] text-left text-sm">
+        <table className="min-w-[980px] text-left text-sm">
           <thead className="bg-black/50 text-white/65">
             <tr>
               <th className="w-[60px] px-4 py-4">No.</th>
@@ -1278,8 +1278,6 @@ export function AdminCustomerManagement({ customers, agents, countries, currenci
               <th className="w-[220px] px-4 py-4">Customer</th>
               <th className="w-[150px] px-4 py-4">Phone</th>
               <th className="w-[230px] px-4 py-4">Email</th>
-              <th className="w-[150px] px-4 py-4">Source</th>
-              <th className="w-[140px] px-4 py-4">Portal Access</th>
               <th className="w-[120px] px-4 py-4">Status</th>
               <th className="w-[170px] px-4 py-4">Credit Control</th>
               <th className="w-[110px] px-4 py-4">Orders</th>
@@ -1294,12 +1292,6 @@ export function AdminCustomerManagement({ customers, agents, countries, currenci
                 <td className="px-4 py-4"><div className="break-words font-semibold text-white/90">{customer.name}</div></td>
                 <td className="break-words px-4 py-4 text-white/85">{customer.phone || "-"}</td>
                 <td className="break-words px-4 py-4 text-white/85">{customer.email}</td>
-                <td className="px-4 py-4"><span className={getSourceBadge(customer.accountSource)}>{getSourceLabel(customer.accountSource)}</span></td>
-                <td className="px-4 py-4">
-                  <button type="button" onClick={(e) => { e.stopPropagation(); setPortalAccessTarget(customer); }} disabled={isTogglingId === customer.id} className={getPortalAccessBadge(customer.portalAccess)}>
-                    {isTogglingId === customer.id ? "Updating..." : customer.portalAccess ? "Enabled" : "Disabled"}
-                  </button>
-                </td>
                 <td className="px-4 py-4"><span className={getCustomerStatusBadge(customer.isActive)}>{getCustomerStatusLabel(customer.isActive)}</span></td>
                 <td className="px-4 py-4">
                   <div className="space-y-2">
@@ -1320,7 +1312,7 @@ export function AdminCustomerManagement({ customers, agents, countries, currenci
                 </td>
               </tr>
             )) : (
-              <tr><td colSpan={11} className="px-4 py-10 text-center text-white/45">No customers found for the selected filters.</td></tr>
+              <tr><td colSpan={9} className="px-4 py-10 text-center text-white/45">No customers found for the selected filters.</td></tr>
             )}
           </tbody>
         </table>
