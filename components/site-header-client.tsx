@@ -47,15 +47,27 @@ const guestMobileSections: HeaderLinkSection[] = [
   },
 ];
 
+const salesOrderItems: HeaderLink[] = [
+  { label: "QO", href: "/admin/sales/quotation" },
+  { label: "SO", href: "/admin/sales/sales-order" },
+];
+
+const salesDocumentItems: HeaderLink[] = [
+  { label: "DO", href: "/admin/sales/delivery-order" },
+  { label: "INV", href: "/admin/sales/sales-invoice" },
+  { label: "CS", href: "/admin/sales/cash-sales" },
+  { label: "DN", href: "/admin/sales/debit-note" },
+  { label: "CN", href: "/admin/sales/credit-note" },
+];
+
+const salesReturnItems: HeaderLink[] = [
+  { label: "DR", href: "/admin/sales/delivery-return" },
+];
+
 const salesItems: HeaderLink[] = [
-  { label: "Quotation", href: "/admin/sales/quotation" },
-  { label: "Sales Order", href: "/admin/sales/sales-order" },
-  { label: "Delivery Order", href: "/admin/sales/delivery-order" },
-  { label: "Sales Invoice", href: "/admin/sales/sales-invoice" },
-  { label: "Cash Sales", href: "/admin/sales/cash-sales" },
-  { label: "Debit Note", href: "/admin/sales/debit-note" },
-  { label: "Credit Note", href: "/admin/sales/credit-note" },
-  { label: "Delivery Return", href: "/admin/sales/delivery-return" },
+  ...salesOrderItems,
+  ...salesDocumentItems,
+  ...salesReturnItems,
 ];
 
 const stockMasterItems: HeaderLink[] = [
@@ -348,9 +360,11 @@ function AdminOperationsDropdown({ groups }: { groups: OperationGroup[] }) {
                 <div key={section.title}>
                   {sectionIndex > 0 ? <div className="my-2 border-t border-white/10" /> : null}
 
-                  <p className="px-3 pb-2 pt-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/35">
-                    {section.title}
-                  </p>
+                  {section.title ? (
+                    <p className="px-3 pb-2 pt-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/35">
+                      {section.title}
+                    </p>
+                  ) : null}
 
                   <div className="space-y-1">
                     {section.items.map((item) => (
@@ -408,8 +422,12 @@ export function AdminDesktopNavigation() {
     {
       key: "sales",
       label: "Sales",
-      description: "Quotation, SO, DO, invoice",
-      sections: [{ title: "Sales", items: salesItems }],
+      description: "QO, SO, DO, INV",
+      sections: [
+        { title: "", items: salesOrderItems },
+        { title: "", items: salesDocumentItems },
+        { title: "", items: salesReturnItems },
+      ],
     },
     {
       key: "stock",
