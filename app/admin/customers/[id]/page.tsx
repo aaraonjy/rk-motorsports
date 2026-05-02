@@ -533,7 +533,7 @@ export default async function AdminCustomerDetailPage({
                     return (
                       <tr
                         key={order.id}
-                        className={`border-t border-white/10 align-top ${order.status === "CANCELLED" ? "bg-red-500/[0.03] text-white/55" : ""}`}
+                        className={`border-t border-white/10 align-top ${order.status === "CANCELLED" || order.docType === "CN" ? "bg-red-500/[0.03] text-white/55" : ""}`}
                       >
                         <td className="px-6 py-5 md:px-8">
                           <div className="font-medium text-white">
