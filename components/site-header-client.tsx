@@ -20,6 +20,15 @@ type HeaderLinkSection = {
   items: HeaderLink[];
 };
 
+type OperationGroup = {
+  key: string;
+  label: string;
+  description: string;
+  sections: HeaderLinkSection[];
+  disabled?: boolean;
+  disabledTitle?: string;
+};
+
 type DesktopDropdown = {
   label: string;
   sections: HeaderLinkSection[];
@@ -88,16 +97,20 @@ const adminMobileSections: HeaderLinkSection[] = [
     ],
   },
   {
-    title: "Operations - Sales",
+    title: "Sales",
     items: salesItems,
   },
   {
-    title: "Operations - Stock",
+    title: "Stock Master",
+    items: stockMasterItems,
+  },
+  {
+    title: "Stock Transactions",
     items: [...stockTransactionItems, ...stockTrackingItems],
   },
   {
     title: "Master Data",
-    items: [{ label: "Customer Profile", href: "/admin/customers" }, ...stockMasterItems],
+    items: [{ label: "Customer Profile", href: "/admin/customers" }],
   },
   {
     title: "Settings",
@@ -138,13 +151,15 @@ function getStockDisabledItems(options: {
   });
 }
 
-function ChevronIcon({ open }: { open: boolean }) {
+function ChevronIcon({ open, direction = "down" }: { open: boolean; direction?: "down" | "right" }) {
+  const rotation = direction === "right" ? "-rotate-90" : open ? "rotate-180" : "";
+
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       viewBox="0 0 20 20"
       fill="currentColor"
-      className={`h-4 w-4 transition ${open ? "rotate-180" : ""}`}
+      className={`h-4 w-4 transition ${rotation}`}
       aria-hidden="true"
     >
       <path
@@ -156,7 +171,41 @@ function ChevronIcon({ open }: { open: boolean }) {
   );
 }
 
-function AdminDesktopDropdown({ menu }: { menu: DesktopDropdown }) {
+function hasActiveSection(pathname: string, sections: HeaderLinkSection[]) {
+  return sections.some((section) =>
+    section.items.some((item) => !item.disabled && isActivePath(pathname, item.href)),
+  );
+}
+
+function AdminDropdownLink({ item, onClick }: { item: HeaderLink; onClick: () => void }) {
+  const pathname = usePathname();
+  const active = isActivePath(pathname, item.href);
+
+  if (item.disabled) {
+    return (
+      <div
+        className="block cursor-not-allowed rounded-xl px-3 py-3 text-sm text-white/35"
+        title={item.disabledTitle}
+      >
+        {item.label}
+      </div>
+    );
+  }
+
+  return (
+    <Link
+      href={item.href}
+      className={`block rounded-xl px-3 py-3 text-sm transition hover:bg-white/10 hover:text-white ${
+        active ? "bg-white/10 text-white" : "text-white/85"
+      }`}
+      onClick={onClick}
+    >
+      {item.label}
+    </Link>
+  );
+}
+
+function AdminSimpleDropdown({ menu }: { menu: DesktopDropdown }) {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
@@ -176,9 +225,7 @@ function AdminDesktopDropdown({ menu }: { menu: DesktopDropdown }) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const isActive = menu.sections.some((section) =>
-    section.items.some((item) => isActivePath(pathname, item.href)),
-  );
+  const isActive = hasActiveSection(pathname, menu.sections);
 
   return (
     <div ref={dropdownRef} className="relative">
@@ -204,37 +251,116 @@ function AdminDesktopDropdown({ menu }: { menu: DesktopDropdown }) {
               </p>
 
               <div className="space-y-1">
-                {section.items.map((item) => {
-                  const active = isActivePath(pathname, item.href);
-
-                  if (item.disabled) {
-                    return (
-                      <div
-                        key={item.href}
-                        className="block cursor-not-allowed rounded-xl px-3 py-3 text-sm text-white/35"
-                        title={item.disabledTitle}
-                      >
-                        {item.label}
-                      </div>
-                    );
-                  }
-
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      className={`block rounded-xl px-3 py-3 text-sm transition hover:bg-white/10 hover:text-white ${
-                        active ? "bg-white/10 text-white" : "text-white/85"
-                      }`}
-                      onClick={() => setIsOpen(false)}
-                    >
-                      {item.label}
-                    </Link>
-                  );
-                })}
+                {section.items.map((item) => (
+                  <AdminDropdownLink key={item.href} item={item} onClick={() => setIsOpen(false)} />
+                ))}
               </div>
             </div>
           ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function AdminOperationsDropdown({ groups }: { groups: OperationGroup[] }) {
+  const pathname = usePathname();
+  const [isOpen, setIsOpen] = useState(false);
+  const [activeGroupKey, setActiveGroupKey] = useState(groups[0]?.key ?? "");
+  const dropdownRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const activeGroup = groups.find((group) => hasActiveSection(pathname, group.sections));
+    setActiveGroupKey(activeGroup?.key ?? groups[0]?.key ?? "");
+    setIsOpen(false);
+  }, [groups, pathname]);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const activeGroup = groups.find((group) => group.key === activeGroupKey) ?? groups[0];
+  const isActive = groups.some((group) => hasActiveSection(pathname, group.sections));
+
+  return (
+    <div ref={dropdownRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setIsOpen((prev) => !prev)}
+        className={`inline-flex items-center gap-2 text-sm font-medium transition hover:text-white ${
+          isActive ? "text-white" : "text-white/80"
+        }`}
+      >
+        <span>Operations</span>
+        <ChevronIcon open={isOpen} />
+      </button>
+
+      {isOpen ? (
+        <div className="absolute left-0 top-[calc(100%+12px)] z-[70] flex rounded-2xl border border-white/10 bg-[#0b0b0c]/95 p-2 shadow-2xl backdrop-blur-xl">
+          <div className="w-[240px] space-y-1">
+            {groups.map((group) => {
+              const groupActive = hasActiveSection(pathname, group.sections);
+              const selected = activeGroup?.key === group.key;
+
+              return (
+                <button
+                  key={group.key}
+                  type="button"
+                  disabled={group.disabled}
+                  onMouseEnter={() => setActiveGroupKey(group.key)}
+                  onFocus={() => setActiveGroupKey(group.key)}
+                  onClick={() => setActiveGroupKey(group.key)}
+                  className={`flex w-full items-center justify-between rounded-xl px-3 py-3 text-left transition ${
+                    group.disabled
+                      ? "cursor-not-allowed text-white/35"
+                      : selected || groupActive
+                        ? "bg-white/10 text-white"
+                        : "text-white/85 hover:bg-white/10 hover:text-white"
+                  }`}
+                  title={group.disabledTitle}
+                >
+                  <span>
+                    <span className="block text-sm font-medium">{group.label}</span>
+                    <span className="mt-0.5 block text-xs text-white/40">{group.description}</span>
+                  </span>
+                  <ChevronIcon open={false} direction="right" />
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="mx-2 w-px bg-white/10" />
+
+          <div className="w-[300px] max-h-[72vh] overflow-y-auto pr-1">
+            {activeGroup?.disabled ? (
+              <div className="rounded-xl px-3 py-4 text-sm text-white/45">
+                {activeGroup.disabledTitle ?? "This module will be available later."}
+              </div>
+            ) : (
+              activeGroup?.sections.map((section, sectionIndex) => (
+                <div key={section.title}>
+                  {sectionIndex > 0 ? <div className="my-2 border-t border-white/10" /> : null}
+
+                  <p className="px-3 pb-2 pt-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/35">
+                    {section.title}
+                  </p>
+
+                  <div className="space-y-1">
+                    {section.items.map((item) => (
+                      <AdminDropdownLink key={item.href} item={item} onClick={() => setIsOpen(false)} />
+                    ))}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         </div>
       ) : null}
     </div>
@@ -278,30 +404,47 @@ export function AdminDesktopNavigation() {
     multiLocationEnabled,
   });
 
-  const dropdowns: DesktopDropdown[] = [
+  const operationGroups: OperationGroup[] = [
     {
-      label: "Operations",
+      key: "sales",
+      label: "Sales",
+      description: "Quotation, SO, DO, invoice",
+      sections: [{ title: "Sales", items: salesItems }],
+    },
+    {
+      key: "stock",
+      label: "Stock",
+      description: "Products, stock movement, tracking",
       sections: [
-        { title: "Sales", items: salesItems },
+        { title: "Stock Master", items: stockMasterItems },
         { title: "Stock Transactions", items: stockOperationItems },
-        { title: "Stock Tracking", items: stockTrackingItems },
+        { title: "Batch & Serial", items: stockTrackingItems },
       ],
     },
     {
-      label: "Master",
-      sections: [
-        {
-          title: "Customers",
-          items: [{ label: "Customer Profile", href: "/admin/customers" }],
-        },
-        { title: "Product & Stock Master", items: stockMasterItems },
-      ],
-    },
-    {
-      label: "Settings",
-      sections: [{ title: "Global Settings", items: settingsItems }],
+      key: "purchase",
+      label: "Purchase",
+      description: "Coming soon",
+      sections: [],
+      disabled: true,
+      disabledTitle: "Purchase module has not been added yet.",
     },
   ];
+
+  const masterMenu: DesktopDropdown = {
+    label: "Master",
+    sections: [
+      {
+        title: "Customer Master",
+        items: [{ label: "Customer Profile", href: "/admin/customers" }],
+      },
+    ],
+  };
+
+  const settingsMenu: DesktopDropdown = {
+    label: "Settings",
+    sections: [{ title: "Global Settings", items: settingsItems }],
+  };
 
   const reportActive = isActivePath(pathname, "/admin/reports");
 
@@ -316,9 +459,8 @@ export function AdminDesktopNavigation() {
         Dashboard
       </Link>
 
-      {dropdowns.map((menu) => (
-        <AdminDesktopDropdown key={menu.label} menu={menu} />
-      ))}
+      <AdminOperationsDropdown groups={operationGroups} />
+      <AdminSimpleDropdown menu={masterMenu} />
 
       <Link
         href="/admin/reports"
@@ -328,6 +470,8 @@ export function AdminDesktopNavigation() {
       >
         Reports
       </Link>
+
+      <AdminSimpleDropdown menu={settingsMenu} />
     </>
   );
 }
