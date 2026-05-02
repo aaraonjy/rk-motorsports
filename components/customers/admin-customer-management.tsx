@@ -1278,7 +1278,6 @@ export function AdminCustomerManagement({ customers, agents, countries, currenci
               <th className="w-[220px] px-4 py-4">Customer</th>
               <th className="w-[150px] px-4 py-4">Phone</th>
               <th className="w-[230px] px-4 py-4">Email</th>
-              <th className="w-[120px] px-4 py-4">Status</th>
               <th className="w-[170px] px-4 py-4">Credit Control</th>
               <th className="w-[110px] px-4 py-4">Orders</th>
               <th className="w-[150px] px-4 py-4">Action</th>
@@ -1292,7 +1291,6 @@ export function AdminCustomerManagement({ customers, agents, countries, currenci
                 <td className="px-4 py-4"><div className="break-words font-semibold text-white/90">{customer.name}</div></td>
                 <td className="break-words px-4 py-4 text-white/85">{customer.phone || "-"}</td>
                 <td className="break-words px-4 py-4 text-white/85">{customer.email}</td>
-                <td className="px-4 py-4"><span className={getCustomerStatusBadge(customer.isActive)}>{getCustomerStatusLabel(customer.isActive)}</span></td>
                 <td className="px-4 py-4">
                   <div className="space-y-2">
                     <span className={getCreditBadge(customer)}>{getCreditLabel(customer)}</span>
@@ -1312,7 +1310,7 @@ export function AdminCustomerManagement({ customers, agents, countries, currenci
                 </td>
               </tr>
             )) : (
-              <tr><td colSpan={9} className="px-4 py-10 text-center text-white/45">No customers found for the selected filters.</td></tr>
+              <tr><td colSpan={8} className="px-4 py-10 text-center text-white/45">No customers found for the selected filters.</td></tr>
             )}
           </tbody>
         </table>
