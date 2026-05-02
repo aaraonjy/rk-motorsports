@@ -549,24 +549,30 @@ function formatDate(value: string | Date | null | undefined) {
 
 function getCustomerCreditWarning(customer: CustomerOption | null) {
   if (!customer) return null;
-  const outstanding = Number(customer.creditOutstandingAmount || 0);
-  const limit = Number(customer.creditLimitAmount || 0);
-  const overdue = Number(customer.creditOverdueAmount || 0);
-  const oldestDays = Number(customer.creditOldestOverdueDays || 0);
 
-  if (customer.creditOverdue) {
+  const currency = customer.currency || "MYR";
+  const creditTermsDays = Math.max(0, Number(customer.creditTermsDays || 0) || 0);
+  const creditLimitAmount = Math.max(0, Number(customer.creditLimitAmount || 0) || 0);
+  const outstanding = Math.max(0, Number(customer.creditOutstandingAmount || 0) || 0);
+  const overdue = Math.max(0, Number(customer.creditOverdueAmount || 0) || 0);
+  const oldestDays = Math.max(0, Number(customer.creditOldestOverdueDays || 0) || 0);
+
+  const creditTermsActive = creditTermsDays > 0;
+  const creditLimitActive = !creditTermsActive && creditLimitAmount > 0;
+
+  if (creditTermsActive && overdue > 0) {
     return {
       tone: "danger" as const,
       title: "Credit Terms Overdue",
-      message: `This customer has overdue outstanding invoice amount RM ${money(overdue)}${oldestDays > 0 ? `, oldest overdue ${oldestDays} day(s)` : ""}. Admin may still proceed after review.`,
+      message: `This customer has overdue outstanding invoice amount ${currency} ${money(overdue)}${oldestDays > 0 ? `, oldest overdue ${oldestDays} day(s)` : ""}. Admin may still proceed after review.`,
     };
   }
 
-  if (customer.creditLimitExceeded) {
+  if (creditLimitActive && outstanding > creditLimitAmount) {
     return {
       tone: "warning" as const,
       title: "Credit Limit Exceeded",
-      message: `This customer outstanding invoice amount is RM ${money(outstanding)}, credit limit is RM ${money(limit)}. Admin may still proceed after review.`,
+      message: `This customer outstanding invoice amount is ${currency} ${money(outstanding)}, credit limit is ${currency} ${money(creditLimitAmount)}. Admin may still proceed after review.`,
     };
   }
 
