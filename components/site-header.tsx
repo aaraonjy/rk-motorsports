@@ -2,11 +2,11 @@ import Link from "next/link";
 import Image from "next/image";
 import { getSessionUser } from "@/lib/auth";
 import { AdminNotificationBell } from "@/components/shared/admin-notification-bell";
-import { MobileSiteHeaderMenu, SiteHeaderClient } from "@/components/site-header-client";
-import { AdminGlobalSettingsMenu } from "@/components/global-settings/admin-global-settings-menu";
-import { AdminStockMenu } from "@/components/stock/admin-stock-menu";
-import { AdminCustomerMenu } from "@/components/customers/admin-customer-menu";
-import { AdminSalesMenu } from "@/components/sales/admin-sales-menu";
+import {
+  AdminDesktopNavigation,
+  MobileSiteHeaderMenu,
+  SiteHeaderClient,
+} from "@/components/site-header-client";
 
 const publicNav = [
   ["Services", "/#services"],
@@ -16,14 +16,9 @@ const publicNav = [
   ["Contact", "/contact"],
 ] as const;
 
-const adminNav = [
-  ["Dashboard", "/admin"],
-  ["Report", "/admin/reports"],
-] as const;
-
 export async function SiteHeader() {
   const user = await getSessionUser();
-  const nav = user?.role === "ADMIN" ? adminNav : publicNav;
+  const isAdmin = user?.role === "ADMIN";
 
   return (
     <header className="absolute left-0 top-0 z-50 w-full bg-transparent">
@@ -41,19 +36,19 @@ export async function SiteHeader() {
 
         <div className="flex items-center gap-3 md:gap-10">
           <nav className="hidden items-center gap-8 md:flex">
-            {nav.map(([label, href]) => (
-              <Link
-                key={href}
-                href={href}
-                className="text-sm font-medium text-white/80 transition hover:text-white"
-              >
-                {label}
-              </Link>
-            ))}
-            {user?.role === "ADMIN" ? <AdminCustomerMenu /> : null}
-            {user?.role === "ADMIN" ? <AdminSalesMenu /> : null}
-            {user?.role === "ADMIN" ? <AdminStockMenu /> : null}
-            {user?.role === "ADMIN" ? <AdminGlobalSettingsMenu /> : null}
+            {isAdmin ? (
+              <AdminDesktopNavigation />
+            ) : (
+              publicNav.map(([label, href]) => (
+                <Link
+                  key={href}
+                  href={href}
+                  className="text-sm font-medium text-white/80 transition hover:text-white"
+                >
+                  {label}
+                </Link>
+              ))
+            )}
           </nav>
 
           <div className="hidden h-6 w-px bg-white/10 md:block" />

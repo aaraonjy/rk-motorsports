@@ -11,11 +11,18 @@ type HeaderUser = {
 type HeaderLink = {
   label: string;
   href: string;
+  disabled?: boolean;
+  disabledTitle?: string;
 };
 
 type HeaderLinkSection = {
   title: string;
   items: HeaderLink[];
+};
+
+type DesktopDropdown = {
+  label: string;
+  sections: HeaderLinkSection[];
 };
 
 const guestMobileSections: HeaderLinkSection[] = [
@@ -31,55 +38,70 @@ const guestMobileSections: HeaderLinkSection[] = [
   },
 ];
 
+const salesItems: HeaderLink[] = [
+  { label: "Quotation", href: "/admin/sales/quotation" },
+  { label: "Sales Order", href: "/admin/sales/sales-order" },
+  { label: "Delivery Order", href: "/admin/sales/delivery-order" },
+  { label: "Sales Invoice", href: "/admin/sales/sales-invoice" },
+  { label: "Cash Sales", href: "/admin/sales/cash-sales" },
+  { label: "Debit Note", href: "/admin/sales/debit-note" },
+  { label: "Credit Note", href: "/admin/sales/credit-note" },
+  { label: "Delivery Return", href: "/admin/sales/delivery-return" },
+];
+
+const stockMasterItems: HeaderLink[] = [
+  { label: "Product List", href: "/admin/stock/products" },
+  { label: "Product Group", href: "/admin/stock/product-groups" },
+  { label: "Product Sub-Group", href: "/admin/stock/product-sub-groups" },
+  { label: "Product Brand", href: "/admin/stock/brands" },
+  { label: "Stock Location", href: "/admin/stock/locations" },
+];
+
+const stockTransactionItems: HeaderLink[] = [
+  { label: "Opening Stock", href: "/admin/stock/opening-stock" },
+  { label: "Stock Receive", href: "/admin/stock/stock-receive" },
+  { label: "Stock Issue", href: "/admin/stock/stock-issue" },
+  { label: "Stock Adjustment", href: "/admin/stock/stock-adjustment" },
+  { label: "Stock Assembly", href: "/admin/stock/stock-assembly" },
+  { label: "Stock Transfer", href: "/admin/stock/stock-transfer" },
+];
+
+const stockTrackingItems: HeaderLink[] = [
+  { label: "Batch No", href: "/admin/stock/batch-no" },
+  { label: "Serial No", href: "/admin/stock/serial-no" },
+];
+
+const settingsItems: HeaderLink[] = [
+  { label: "Account Configuration", href: "/admin/global-settings/account-configuration" },
+  { label: "Audit Logs", href: "/admin/global-settings/audit-logs" },
+  { label: "Misc", href: "/admin/global-settings/misc" },
+  { label: "Stock Settings", href: "/admin/global-settings/stock" },
+  { label: "Tax Configuration", href: "/admin/global-settings/tax-configuration" },
+];
+
 const adminMobileSections: HeaderLinkSection[] = [
   {
     title: "Main",
     items: [
       { label: "Dashboard", href: "/admin" },
-      { label: "Report", href: "/admin/reports" },
-      { label: "Customer Profile", href: "/admin/customers" },
+      { label: "Reports", href: "/admin/reports" },
     ],
   },
   {
-    title: "Sales",
-    items: [
-      { label: "Quotation", href: "/admin/sales/quotation" },
-      { label: "Sales Order", href: "/admin/sales/sales-order" },
-      { label: "Delivery Order", href: "/admin/sales/delivery-order" },
-      { label: "Sales Invoice", href: "/admin/sales/sales-invoice" },
-      { label: "Cash Sales", href: "/admin/sales/cash-sales" },
-      { label: "Debit Note", href: "/admin/sales/debit-note" },
-      { label: "Credit Note", href: "/admin/sales/credit-note" },
-      { label: "Delivery Return", href: "/admin/sales/delivery-return" },
-    ],
+    title: "Operations - Sales",
+    items: salesItems,
   },
   {
-    title: "Stock",
-    items: [
-      { label: "Product List", href: "/admin/stock/products" },
-      { label: "Product Group", href: "/admin/stock/product-groups" },
-      { label: "Product Sub-Group", href: "/admin/stock/product-sub-groups" },
-      { label: "Product Brand", href: "/admin/stock/brands" },
-      { label: "Stock Location", href: "/admin/stock/locations" },
-      { label: "Opening Stock", href: "/admin/stock/opening-stock" },
-      { label: "Stock Receive", href: "/admin/stock/stock-receive" },
-      { label: "Stock Issue", href: "/admin/stock/stock-issue" },
-      { label: "Stock Adjustment", href: "/admin/stock/stock-adjustment" },
-      { label: "Stock Assembly", href: "/admin/stock/stock-assembly" },
-      { label: "Stock Transfer", href: "/admin/stock/stock-transfer" },
-      { label: "Batch No", href: "/admin/stock/batch-no" },
-      { label: "Serial No", href: "/admin/stock/serial-no" },
-    ],
+    title: "Operations - Stock",
+    items: [...stockTransactionItems, ...stockTrackingItems],
   },
   {
-    title: "Global Settings",
-    items: [
-      { label: "Account Configuration", href: "/admin/global-settings/account-configuration" },
-      { label: "Audit Logs", href: "/admin/global-settings/audit-logs" },
-      { label: "Misc", href: "/admin/global-settings/misc" },
-      { label: "Stock Settings", href: "/admin/global-settings/stock" },
-      { label: "Tax Configuration", href: "/admin/global-settings/tax-configuration" },
-    ],
+    title: "Master Data",
+    items: [{ label: "Customer Profile", href: "/admin/customers" }, ...stockMasterItems],
+  },
+  {
+    title: "Settings",
+    items: settingsItems,
   },
 ];
 
@@ -87,6 +109,227 @@ function isActivePath(pathname: string, href: string) {
   if (href === "/admin") return pathname === href;
   if (href.startsWith("/#")) return pathname === "/";
   return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+function getStockDisabledItems(options: {
+  stockModuleEnabled: boolean;
+  multiLocationEnabled: boolean;
+}) {
+  const { stockModuleEnabled, multiLocationEnabled } = options;
+
+  return stockTransactionItems.map((item) => {
+    if (!stockModuleEnabled) {
+      return {
+        ...item,
+        disabled: true,
+        disabledTitle: "Enable Stock Control in Stock Settings to use this feature.",
+      };
+    }
+
+    if (item.href === "/admin/stock/stock-transfer" && !multiLocationEnabled) {
+      return {
+        ...item,
+        disabled: true,
+        disabledTitle: "Enable Multi Location in Stock Settings to use Stock Transfer.",
+      };
+    }
+
+    return item;
+  });
+}
+
+function ChevronIcon({ open }: { open: boolean }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 20 20"
+      fill="currentColor"
+      className={`h-4 w-4 transition ${open ? "rotate-180" : ""}`}
+      aria-hidden="true"
+    >
+      <path
+        fillRule="evenodd"
+        d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z"
+        clipRule="evenodd"
+      />
+    </svg>
+  );
+}
+
+function AdminDesktopDropdown({ menu }: { menu: DesktopDropdown }) {
+  const pathname = usePathname();
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    setIsOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const isActive = menu.sections.some((section) =>
+    section.items.some((item) => isActivePath(pathname, item.href)),
+  );
+
+  return (
+    <div ref={dropdownRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setIsOpen((prev) => !prev)}
+        className={`inline-flex items-center gap-2 text-sm font-medium transition hover:text-white ${
+          isActive ? "text-white" : "text-white/80"
+        }`}
+      >
+        <span>{menu.label}</span>
+        <ChevronIcon open={isOpen} />
+      </button>
+
+      {isOpen ? (
+        <div className="absolute left-0 top-[calc(100%+12px)] z-[70] min-w-[290px] max-h-[72vh] overflow-y-auto rounded-2xl border border-white/10 bg-[#0b0b0c]/95 p-2 shadow-2xl backdrop-blur-xl">
+          {menu.sections.map((section, sectionIndex) => (
+            <div key={section.title}>
+              {sectionIndex > 0 ? <div className="my-2 border-t border-white/10" /> : null}
+
+              <p className="px-3 pb-2 pt-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/35">
+                {section.title}
+              </p>
+
+              <div className="space-y-1">
+                {section.items.map((item) => {
+                  const active = isActivePath(pathname, item.href);
+
+                  if (item.disabled) {
+                    return (
+                      <div
+                        key={item.href}
+                        className="block cursor-not-allowed rounded-xl px-3 py-3 text-sm text-white/35"
+                        title={item.disabledTitle}
+                      >
+                        {item.label}
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={`block rounded-xl px-3 py-3 text-sm transition hover:bg-white/10 hover:text-white ${
+                        active ? "bg-white/10 text-white" : "text-white/85"
+                      }`}
+                      onClick={() => setIsOpen(false)}
+                    >
+                      {item.label}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+export function AdminDesktopNavigation() {
+  const pathname = usePathname();
+  const [stockModuleEnabled, setStockModuleEnabled] = useState(true);
+  const [multiLocationEnabled, setMultiLocationEnabled] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadStockSettings() {
+      try {
+        const response = await fetch("/api/admin/global-settings/stock", { cache: "no-store" });
+        const data = await response.json();
+
+        if (!response.ok || !data.ok || cancelled) return;
+
+        setStockModuleEnabled(Boolean(data.config?.stockModuleEnabled));
+        setMultiLocationEnabled(Boolean(data.config?.multiLocationEnabled));
+      } catch {
+        if (!cancelled) {
+          setStockModuleEnabled(true);
+          setMultiLocationEnabled(true);
+        }
+      }
+    }
+
+    void loadStockSettings();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const stockOperationItems = getStockDisabledItems({
+    stockModuleEnabled,
+    multiLocationEnabled,
+  });
+
+  const dropdowns: DesktopDropdown[] = [
+    {
+      label: "Operations",
+      sections: [
+        { title: "Sales", items: salesItems },
+        { title: "Stock Transactions", items: stockOperationItems },
+        { title: "Stock Tracking", items: stockTrackingItems },
+      ],
+    },
+    {
+      label: "Master",
+      sections: [
+        {
+          title: "Customers",
+          items: [{ label: "Customer Profile", href: "/admin/customers" }],
+        },
+        { title: "Product & Stock Master", items: stockMasterItems },
+      ],
+    },
+    {
+      label: "Settings",
+      sections: [{ title: "Global Settings", items: settingsItems }],
+    },
+  ];
+
+  const reportActive = isActivePath(pathname, "/admin/reports");
+
+  return (
+    <>
+      <Link
+        href="/admin"
+        className={`text-sm font-medium transition hover:text-white ${
+          pathname === "/admin" ? "text-white" : "text-white/80"
+        }`}
+      >
+        Dashboard
+      </Link>
+
+      {dropdowns.map((menu) => (
+        <AdminDesktopDropdown key={menu.label} menu={menu} />
+      ))}
+
+      <Link
+        href="/admin/reports"
+        className={`text-sm font-medium transition hover:text-white ${
+          reportActive ? "text-white" : "text-white/80"
+        }`}
+      >
+        Reports
+      </Link>
+    </>
+  );
 }
 
 export function SiteHeaderClient({ user }: { user: HeaderUser }) {
@@ -100,10 +343,7 @@ export function SiteHeaderClient({ user }: { user: HeaderUser }) {
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(event.target as Node)
-      ) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsDashboardOpen(false);
       }
     }
@@ -122,19 +362,7 @@ export function SiteHeaderClient({ user }: { user: HeaderUser }) {
         className="inline-flex items-center gap-2 rounded-full border border-white/20 px-4 py-2 text-white/85 transition hover:bg-white/10"
       >
         <span>{user.role === "ADMIN" ? "Admin" : "Dashboard"}</span>
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 20 20"
-          fill="currentColor"
-          className={`h-4 w-4 transition ${isDashboardOpen ? "rotate-180" : ""}`}
-          aria-hidden="true"
-        >
-          <path
-            fillRule="evenodd"
-            d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z"
-            clipRule="evenodd"
-          />
-        </svg>
+        <ChevronIcon open={isDashboardOpen} />
       </button>
 
       {isDashboardOpen ? (
@@ -243,6 +471,18 @@ export function MobileSiteHeaderMenu({ user }: { user: HeaderUser | null }) {
                     <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
                       {section.items.map((item) => {
                         const active = isActivePath(pathname, item.href);
+
+                        if (item.disabled) {
+                          return (
+                            <div
+                              key={item.href}
+                              className="block cursor-not-allowed border-b border-white/10 px-4 py-3 text-sm text-white/35 last:border-b-0"
+                              title={item.disabledTitle}
+                            >
+                              {item.label}
+                            </div>
+                          );
+                        }
 
                         return (
                           <Link
