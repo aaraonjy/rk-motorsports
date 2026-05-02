@@ -46,8 +46,10 @@ function getCreditStatusLabel(customer: any) {
 }
 
 function getCreditStatusClass(customer: any) {
-  if (customer.creditControl?.creditOverdue) return "border-red-500/30 bg-red-500/10 text-red-300";
-  if (customer.creditControl?.creditLimitExceeded) return "border-amber-500/30 bg-amber-500/10 text-amber-300";
+  if (customer.creditControl?.creditOverdue)
+    return "border-red-500/30 bg-red-500/10 text-red-300";
+  if (customer.creditControl?.creditLimitExceeded)
+    return "border-amber-500/30 bg-amber-500/10 text-amber-300";
   return "border-emerald-500/30 bg-emerald-500/10 text-emerald-300";
 }
 
@@ -119,7 +121,8 @@ function getDocumentAmountClass(docType: string) {
 
 function getDocumentTypeClass(docType: string) {
   if (docType === "CN") return "border-red-500/30 bg-red-500/10 text-red-300";
-  if (docType === "DN") return "border-amber-500/30 bg-amber-500/10 text-amber-300";
+  if (docType === "DN")
+    return "border-amber-500/30 bg-amber-500/10 text-amber-300";
   if (docType === "CS") return "border-sky-500/30 bg-sky-500/10 text-sky-300";
   return "border-white/15 bg-white/5 text-white/75";
 }
@@ -159,7 +162,11 @@ function getSalesStatusLabel(status: string) {
 }
 
 function SectionTitle({ children }: { children: ReactNode }) {
-  return <div className="text-sm font-semibold uppercase tracking-[0.18em] text-white/45">{children}</div>;
+  return (
+    <div className="text-sm font-semibold uppercase tracking-[0.18em] text-white/45">
+      {children}
+    </div>
+  );
 }
 
 function DetailField({ label, value }: { label: string; value: ReactNode }) {
@@ -180,17 +187,31 @@ function compactAddress(lines: Array<string | null | undefined>) {
 
 type CustomerDetailPageProps = {
   params: Promise<{ id: string }>;
+  searchParams?: Promise<{ transactionPage?: string }>;
 };
+
+function buildTransactionPageHref(customerId: string, page: number) {
+  return `/admin/customers/${customerId}?transactionPage=${page}`;
+}
 
 export default async function AdminCustomerDetailPage({
   params,
+  searchParams,
 }: CustomerDetailPageProps) {
   const user = await getSessionUser();
   if (!user) redirect("/login");
   if (user.role !== "ADMIN") redirect("/dashboard");
 
   const { id } = await params;
-  const customer = await getCustomerByIdWithIntelligence(id);
+  const query = (await searchParams) || {};
+  const transactionPage = Math.max(
+    1,
+    Number(query.transactionPage || "1") || 1,
+  );
+  const customer = await getCustomerByIdWithIntelligence(id, {
+    transactionPage,
+    transactionPageSize: 10,
+  });
 
   if (!customer) {
     notFound();
@@ -198,12 +219,35 @@ export default async function AdminCustomerDetailPage({
 
   const customerView = customer as any;
   const currency = customer.currency || "MYR";
-  const creditControlType = Number(customer.creditControl?.creditTermsDays || 0) > 0
-    ? "Credit Terms"
-    : Number(customer.creditControl?.creditLimitAmount || 0) > 0
-      ? "Credit Limit"
-      : "None";
-  const secondaryDeliveryAddresses = Array.isArray(customerView.deliveryAddresses) ? customerView.deliveryAddresses : [];
+  const creditControlType =
+    Number(customer.creditControl?.creditTermsDays || 0) > 0
+      ? "Credit Terms"
+      : Number(customer.creditControl?.creditLimitAmount || 0) > 0
+        ? "Credit Limit"
+        : "None";
+  const secondaryDeliveryAddresses = Array.isArray(
+    customerView.deliveryAddresses,
+  )
+    ? customerView.deliveryAddresses
+    : [];
+  const salesTransactionPagination =
+    customerView.salesTransactionPagination || {
+      currentPage: 1,
+      pageSize: 10,
+      totalCount: customer.orders.length,
+      totalPages: 1,
+    };
+  const firstHistoryRecord =
+    salesTransactionPagination.totalCount === 0
+      ? 0
+      : (salesTransactionPagination.currentPage - 1) *
+          salesTransactionPagination.pageSize +
+        1;
+  const lastHistoryRecord = Math.min(
+    salesTransactionPagination.currentPage *
+      salesTransactionPagination.pageSize,
+    salesTransactionPagination.totalCount,
+  );
 
   return (
     <section className="section-pad">
@@ -227,7 +271,10 @@ export default async function AdminCustomerDetailPage({
           <div className="rounded-2xl border border-white/10 bg-black/20 p-5">
             <SectionTitle>Basic Info</SectionTitle>
             <div className="mt-4 grid gap-4 md:grid-cols-2">
-              <DetailField label="A/C No." value={customer.customerAccountNo || "-"} />
+              <DetailField
+                label="A/C No."
+                value={customer.customerAccountNo || "-"}
+              />
               <DetailField label="Customer Name" value={customer.name} />
               <DetailField label="Email" value={customer.email} />
               <DetailField label="Phone 1" value={customer.phone || "-"} />
@@ -249,10 +296,15 @@ export default async function AdminCustomerDetailPage({
                   customer.billingAddressLine2,
                   customer.billingAddressLine3,
                   customer.billingAddressLine4,
-                  [customer.billingPostCode, customer.billingCity].filter(Boolean).join(" "),
+                  [customer.billingPostCode, customer.billingCity]
+                    .filter(Boolean)
+                    .join(" "),
                   customer.billingCountryCode,
                 ]).map((line, index) => (
-                  <div key={`${line}-${index}`} className="rounded-xl border border-white/10 bg-black/40 px-4 py-3">
+                  <div
+                    key={`${line}-${index}`}
+                    className="rounded-xl border border-white/10 bg-black/40 px-4 py-3"
+                  >
                     {line}
                   </div>
                 ))}
@@ -270,10 +322,15 @@ export default async function AdminCustomerDetailPage({
                   customer.deliveryAddressLine2,
                   customer.deliveryAddressLine3,
                   customer.deliveryAddressLine4,
-                  [customer.deliveryPostCode, customer.deliveryCity].filter(Boolean).join(" "),
+                  [customer.deliveryPostCode, customer.deliveryCity]
+                    .filter(Boolean)
+                    .join(" "),
                   customer.deliveryCountryCode,
                 ]).map((line, index) => (
-                  <div key={`${line}-${index}`} className="rounded-xl border border-white/10 bg-black/40 px-4 py-3">
+                  <div
+                    key={`${line}-${index}`}
+                    className="rounded-xl border border-white/10 bg-black/40 px-4 py-3"
+                  >
                     {line}
                   </div>
                 ))}
@@ -285,16 +342,31 @@ export default async function AdminCustomerDetailPage({
             <div className="mt-6 rounded-2xl border border-white/10 bg-black/20 p-5">
               <SectionTitle>Secondary Delivery Addresses</SectionTitle>
               <div className="mt-4 space-y-3">
-                {secondaryDeliveryAddresses.map((address: any, index: number) => (
-                  <div key={address.id || index} className="rounded-2xl border border-white/10 bg-black/25 p-4 text-sm text-white/70">
-                    <div className="font-semibold text-white">{address.label || `Address ${index + 1}`}</div>
-                    <div className="mt-1 break-words">
-                      {[address.addressLine1, address.addressLine2, address.addressLine3, address.addressLine4, address.postCode, address.city, address.countryCode]
-                        .filter(Boolean)
-                        .join(", ") || "-"}
+                {secondaryDeliveryAddresses.map(
+                  (address: any, index: number) => (
+                    <div
+                      key={address.id || index}
+                      className="rounded-2xl border border-white/10 bg-black/25 p-4 text-sm text-white/70"
+                    >
+                      <div className="font-semibold text-white">
+                        {address.label || `Address ${index + 1}`}
+                      </div>
+                      <div className="mt-1 break-words">
+                        {[
+                          address.addressLine1,
+                          address.addressLine2,
+                          address.addressLine3,
+                          address.addressLine4,
+                          address.postCode,
+                          address.city,
+                          address.countryCode,
+                        ]
+                          .filter(Boolean)
+                          .join(", ") || "-"}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ),
+                )}
               </div>
             </div>
           ) : null}
@@ -306,23 +378,85 @@ export default async function AdminCustomerDetailPage({
               <DetailField label="Currency" value={currency} />
               <DetailField label="Credit Control" value={creditControlType} />
               {creditControlType === "Credit Terms" ? (
-                <DetailField label="Credit Terms (Days)" value={`${customer.creditControl?.creditTermsDays ?? 0} day(s)`} />
+                <DetailField
+                  label="Credit Terms (Days)"
+                  value={`${customer.creditControl?.creditTermsDays ?? 0} day(s)`}
+                />
               ) : null}
               {creditControlType === "Credit Limit" ? (
-                <DetailField label={`Credit Limit (${currency})`} value={formatCurrency(Number(customer.creditControl?.creditLimitAmount || 0), currency)} />
+                <DetailField
+                  label={`Credit Limit (${currency})`}
+                  value={formatCurrency(
+                    Number(customer.creditControl?.creditLimitAmount || 0),
+                    currency,
+                  )}
+                />
               ) : null}
-              <DetailField label="Credit Status" value={<span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${getCreditStatusClass(customer)}`}>{getCreditStatusLabel(customer)}</span>} />
-              <DetailField label={`Outstanding INV (${currency})`} value={formatCurrency(Number(customer.creditControl?.creditOutstandingAmount || 0), currency)} />
-              <DetailField label="Agent" value={customer.agent ? `${customer.agent.code} — ${customer.agent.name}` : "No Agent"} />
-              <DetailField label="Nature of Business" value={customer.natureOfBusiness || "-"} />
-              <DetailField label="Attention" value={customer.attention || "-"} />
-              <DetailField label="Contact" value={customer.contactPerson || "-"} />
-              <DetailField label="Registration Type" value={customer.registrationIdType || "-"} />
-              <DetailField label="Business Registration No." value={customer.registrationNo || "-"} />
-              <DetailField label="Tax Identification No." value={customer.taxIdentificationNo || "-"} />
-              <DetailField label="Account Source" value={customer.accountSource === "ADMIN" ? "Admin Created" : "Self Registered"} />
-              <DetailField label="Portal Access" value={customer.portalAccess ? "Enabled" : "Disabled"} />
-              <DetailField label="Created Date" value={formatDateTime(customer.createdAt)} />
+              <DetailField
+                label="Credit Status"
+                value={
+                  <span
+                    className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${getCreditStatusClass(customer)}`}
+                  >
+                    {getCreditStatusLabel(customer)}
+                  </span>
+                }
+              />
+              <DetailField
+                label={`Outstanding INV (${currency})`}
+                value={formatCurrency(
+                  Number(customer.creditControl?.creditOutstandingAmount || 0),
+                  currency,
+                )}
+              />
+              <DetailField
+                label="Agent"
+                value={
+                  customer.agent
+                    ? `${customer.agent.code} — ${customer.agent.name}`
+                    : "No Agent"
+                }
+              />
+              <DetailField
+                label="Nature of Business"
+                value={customer.natureOfBusiness || "-"}
+              />
+              <DetailField
+                label="Attention"
+                value={customer.attention || "-"}
+              />
+              <DetailField
+                label="Contact"
+                value={customer.contactPerson || "-"}
+              />
+              <DetailField
+                label="Registration Type"
+                value={customer.registrationIdType || "-"}
+              />
+              <DetailField
+                label="Business Registration No."
+                value={customer.registrationNo || "-"}
+              />
+              <DetailField
+                label="Tax Identification No."
+                value={customer.taxIdentificationNo || "-"}
+              />
+              <DetailField
+                label="Account Source"
+                value={
+                  customer.accountSource === "ADMIN"
+                    ? "Admin Created"
+                    : "Self Registered"
+                }
+              />
+              <DetailField
+                label="Portal Access"
+                value={customer.portalAccess ? "Enabled" : "Disabled"}
+              />
+              <DetailField
+                label="Created Date"
+                value={formatDateTime(customer.createdAt)}
+              />
             </div>
           </div>
 
@@ -344,7 +478,10 @@ export default async function AdminCustomerDetailPage({
             <div className="rounded-2xl border border-white/10 bg-black/30 p-5">
               <p className="text-sm text-white/45">Avg Order Value</p>
               <p className="mt-3 text-3xl font-bold text-white">
-                {formatCurrency(customer.intelligence.averageOrderValue, currency)}
+                {formatCurrency(
+                  customer.intelligence.averageOrderValue,
+                  currency,
+                )}
               </p>
             </div>
 
@@ -359,9 +496,12 @@ export default async function AdminCustomerDetailPage({
 
         <div className="card-rk overflow-hidden">
           <div className="border-b border-white/10 px-6 py-5 md:px-8">
-            <h2 className="text-2xl font-semibold text-white">Sales Transaction History</h2>
+            <h2 className="text-2xl font-semibold text-white">
+              Sales Transaction History
+            </h2>
             <p className="mt-2 text-sm text-white/60">
-              Review Sales Invoice, Cash Sales, Debit Note, and Credit Note records for this customer.
+              Review Sales Invoice, Cash Sales, Debit Note, and Credit Note
+              records for this customer.
             </p>
           </div>
 
@@ -385,28 +525,46 @@ export default async function AdminCustomerDetailPage({
                 <tbody>
                   {(customer.orders as SalesHistoryItem[]).map((order) => {
                     const signedAmount = Number(order.signedAmount || 0);
-                    const amountDisplay = formatCurrency(Math.abs(signedAmount), currency);
+                    const amountDisplay = formatCurrency(
+                      Math.abs(signedAmount),
+                      currency,
+                    );
 
                     return (
-                      <tr key={order.id} className="border-t border-white/10 align-top">
+                      <tr
+                        key={order.id}
+                        className={`border-t border-white/10 align-top ${order.status === "CANCELLED" ? "bg-red-500/[0.03] text-white/55" : ""}`}
+                      >
                         <td className="px-6 py-5 md:px-8">
-                          <div className="font-medium text-white">{order.docNo}</div>
+                          <div className="font-medium text-white">
+                            {order.docNo}
+                          </div>
                         </td>
                         <td className="px-6 py-5">
-                          <div className="font-medium text-white">{getDocumentTitle(order)}</div>
+                          <div className="font-medium text-white">
+                            {getDocumentTitle(order)}
+                          </div>
                         </td>
                         <td className="px-6 py-5">
-                          <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-medium ${getDocumentTypeClass(order.docType)}`}>
+                          <span
+                            className={`inline-flex rounded-full border px-3 py-1 text-xs font-medium ${getDocumentTypeClass(order.docType)}`}
+                          >
                             {getDocumentTypeLabel(order.docType)}
                           </span>
                         </td>
                         <td className="px-6 py-5">
-                          <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-medium ${getSalesStatusClasses(order.status)}`}>
+                          <span
+                            className={`inline-flex rounded-full border px-3 py-1 text-xs font-medium ${getSalesStatusClasses(order.status)}`}
+                          >
                             {getSalesStatusLabel(order.status)}
                           </span>
                         </td>
-                        <td className={`px-6 py-5 font-medium ${getDocumentAmountClass(order.docType)}`}>
-                          {order.docType === "CN" ? `-${amountDisplay}` : amountDisplay}
+                        <td
+                          className={`px-6 py-5 font-medium ${getDocumentAmountClass(order.docType)}`}
+                        >
+                          {order.docType === "CN"
+                            ? `-${amountDisplay}`
+                            : amountDisplay}
                         </td>
                         <td className="px-6 py-5 text-white/65">
                           {formatDateTime(order.docDate)}
@@ -418,6 +576,57 @@ export default async function AdminCustomerDetailPage({
               </table>
             </div>
           )}
+
+          {salesTransactionPagination.totalCount > 0 ? (
+            <div className="flex flex-col gap-3 border-t border-white/10 px-6 py-4 text-sm text-white/55 md:flex-row md:items-center md:justify-between md:px-8">
+              <div>
+                Showing {firstHistoryRecord}–{lastHistoryRecord} of{" "}
+                {salesTransactionPagination.totalCount} transaction(s)
+              </div>
+
+              {salesTransactionPagination.totalPages > 1 ? (
+                <div className="flex items-center gap-2">
+                  {salesTransactionPagination.currentPage > 1 ? (
+                    <Link
+                      href={buildTransactionPageHref(
+                        id,
+                        salesTransactionPagination.currentPage - 1,
+                      )}
+                      className="rounded-xl border border-white/15 px-4 py-2 text-white/75 transition hover:bg-white/10 hover:text-white"
+                    >
+                      Previous
+                    </Link>
+                  ) : (
+                    <span className="cursor-not-allowed rounded-xl border border-white/10 px-4 py-2 text-white/30">
+                      Previous
+                    </span>
+                  )}
+
+                  <span className="px-2 text-white/45">
+                    Page {salesTransactionPagination.currentPage} of{" "}
+                    {salesTransactionPagination.totalPages}
+                  </span>
+
+                  {salesTransactionPagination.currentPage <
+                  salesTransactionPagination.totalPages ? (
+                    <Link
+                      href={buildTransactionPageHref(
+                        id,
+                        salesTransactionPagination.currentPage + 1,
+                      )}
+                      className="rounded-xl border border-white/15 px-4 py-2 text-white/75 transition hover:bg-white/10 hover:text-white"
+                    >
+                      Next
+                    </Link>
+                  ) : (
+                    <span className="cursor-not-allowed rounded-xl border border-white/10 px-4 py-2 text-white/30">
+                      Next
+                    </span>
+                  )}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       </div>
     </section>

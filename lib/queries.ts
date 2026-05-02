@@ -1,7 +1,9 @@
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 
-function toCreditNumber(value: Prisma.Decimal | number | string | null | undefined) {
+function toCreditNumber(
+  value: Prisma.Decimal | number | string | null | undefined,
+) {
   const numeric = Number(value ?? 0);
   return Number.isFinite(numeric) ? numeric : 0;
 }
@@ -12,17 +14,28 @@ function buildCustomerCreditControl(customer: {
   customerSalesTransactions?: Array<{
     id: string;
     docType?: string | null;
+    status?: string | null;
     docNo: string;
     docDate: Date;
     grandTotal: Prisma.Decimal | number | string;
     payments?: Array<{ amount: Prisma.Decimal | number | string }>;
     sourceLinks?: Array<{
-      targetTransaction?: { docType?: string | null; status?: string | null; grandTotal?: Prisma.Decimal | number | string | null } | null;
+      targetTransaction?: {
+        docType?: string | null;
+        status?: string | null;
+        grandTotal?: Prisma.Decimal | number | string | null;
+      } | null;
     }>;
   }>;
 }) {
-  const creditTermsDays = Math.max(0, Number(customer.creditTermsDays ?? 0) || 0);
-  const creditLimitAmount = Math.max(0, toCreditNumber(customer.creditLimitAmount));
+  const creditTermsDays = Math.max(
+    0,
+    Number(customer.creditTermsDays ?? 0) || 0,
+  );
+  const creditLimitAmount = Math.max(
+    0,
+    toCreditNumber(customer.creditLimitAmount),
+  );
   const creditTermsActive = creditTermsDays > 0;
   const creditLimitActive = !creditTermsActive && creditLimitAmount > 0;
   const now = new Date();
@@ -32,18 +45,30 @@ function buildCustomerCreditControl(customer: {
   let oldestOverdueDays = 0;
 
   for (const invoice of customer.customerSalesTransactions || []) {
+    if (invoice.status === "CANCELLED") continue;
     if (invoice.docType && invoice.docType !== "INV") continue;
 
-    const totalPaid = (invoice.payments || []).reduce((sum, payment) => sum + toCreditNumber(payment.amount), 0);
+    const totalPaid = (invoice.payments || []).reduce(
+      (sum, payment) => sum + toCreditNumber(payment.amount),
+      0,
+    );
     const adjustment = (invoice.sourceLinks || []).reduce((sum, link) => {
       const target = link.targetTransaction;
       if (!target || target.status === "CANCELLED") return sum;
-      if (target.docType === "CN") return sum - toCreditNumber(target.grandTotal);
-      if (target.docType === "DN") return sum + toCreditNumber(target.grandTotal);
+      if (target.docType === "CN")
+        return sum - toCreditNumber(target.grandTotal);
+      if (target.docType === "DN")
+        return sum + toCreditNumber(target.grandTotal);
       return sum;
     }, 0);
-    const adjustedTotal = Math.max(0, toCreditNumber(invoice.grandTotal) + adjustment);
-    const outstanding = Math.max(0, Math.round((adjustedTotal - totalPaid + Number.EPSILON) * 100) / 100);
+    const adjustedTotal = Math.max(
+      0,
+      toCreditNumber(invoice.grandTotal) + adjustment,
+    );
+    const outstanding = Math.max(
+      0,
+      Math.round((adjustedTotal - totalPaid + Number.EPSILON) * 100) / 100,
+    );
     if (outstanding <= 0) continue;
 
     outstandingAmount += outstanding;
@@ -53,13 +78,19 @@ function buildCustomerCreditControl(customer: {
       dueDate.setDate(dueDate.getDate() + creditTermsDays);
       if (dueDate.getTime() < now.getTime()) {
         overdueAmount += outstanding;
-        const overdueDays = Math.max(0, Math.floor((now.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)));
+        const overdueDays = Math.max(
+          0,
+          Math.floor(
+            (now.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24),
+          ),
+        );
         oldestOverdueDays = Math.max(oldestOverdueDays, overdueDays);
       }
     }
   }
 
-  outstandingAmount = Math.round((outstandingAmount + Number.EPSILON) * 100) / 100;
+  outstandingAmount =
+    Math.round((outstandingAmount + Number.EPSILON) * 100) / 100;
   overdueAmount = Math.round((overdueAmount + Number.EPSILON) * 100) / 100;
 
   return {
@@ -68,7 +99,8 @@ function buildCustomerCreditControl(customer: {
     creditOutstandingAmount: outstandingAmount,
     creditOverdueAmount: overdueAmount,
     creditOldestOverdueDays: oldestOverdueDays,
-    creditLimitExceeded: creditLimitActive && outstandingAmount > creditLimitAmount,
+    creditLimitExceeded:
+      creditLimitActive && outstandingAmount > creditLimitAmount,
     creditOverdue: creditTermsActive && overdueAmount > 0,
   };
 }
@@ -87,7 +119,7 @@ type UserOrdersOptions = {
 
 export async function getRecentOrdersForUser(
   userId: string,
-  options?: UserOrdersOptions
+  options?: UserOrdersOptions,
 ) {
   const page = Math.max(1, options?.page ?? 1);
   const pageSize = Math.max(1, options?.pageSize ?? 5);
@@ -161,8 +193,11 @@ type AllOrdersOptions = {
   summary?: string;
 };
 
-function buildPaymentStatusWhere(filters?: AllOrdersOptions): Prisma.OrderWhereInput | null {
-  const wantsPaymentStatus = filters?.paymentStatus && filters.paymentStatus !== "ALL";
+function buildPaymentStatusWhere(
+  filters?: AllOrdersOptions,
+): Prisma.OrderWhereInput | null {
+  const wantsPaymentStatus =
+    filters?.paymentStatus && filters.paymentStatus !== "ALL";
   const wantsOutstandingOnly = !!filters?.outstandingOnly;
 
   if (!wantsPaymentStatus && !wantsOutstandingOnly) return null;
@@ -295,7 +330,7 @@ function buildOrderWhere(
     ignoreStatus?: boolean;
     ignorePaymentStatus?: boolean;
     ignoreSummary?: boolean;
-  }
+  },
 ): Prisma.OrderWhereInput {
   const createdAt = buildCreatedAtWhere(filters);
 
@@ -379,15 +414,9 @@ function buildOrderWhere(
     ...(filters?.source && filters.source !== "ALL"
       ? { source: filters.source as any }
       : {}),
-    ...(filters?.documentType === "CS"
-      ? { docType: "CS" }
-      : {}),
-    ...(filters?.documentType === "INV"
-      ? { docType: "INV" }
-      : {}),
-    ...(filters?.documentType === "CN"
-      ? { creditNote: { isNot: null } }
-      : {}),
+    ...(filters?.documentType === "CS" ? { docType: "CS" } : {}),
+    ...(filters?.documentType === "INV" ? { docType: "INV" } : {}),
+    ...(filters?.documentType === "CN" ? { creditNote: { isNot: null } } : {}),
     ...(Object.keys(createdAt).length > 0 ? { createdAt } : {}),
   };
 
@@ -415,7 +444,7 @@ function buildOrderWhere(
 }
 
 export async function getAdminOrderSummaryCounts(
-  filters?: AllOrdersOptions
+  filters?: AllOrdersOptions,
 ): Promise<AdminOrderSummaryCounts> {
   const summaryContextFilters: AllOrdersOptions = {
     ...filters,
@@ -437,7 +466,7 @@ export async function getAdminOrderSummaryCounts(
           {
             ignoreStatus: true,
             ignorePaymentStatus: true,
-          }
+          },
         ),
       }),
       db.order.count({
@@ -449,7 +478,7 @@ export async function getAdminOrderSummaryCounts(
           {
             ignoreStatus: true,
             ignorePaymentStatus: true,
-          }
+          },
         ),
       }),
       db.order.count({
@@ -461,7 +490,7 @@ export async function getAdminOrderSummaryCounts(
           {
             ignoreStatus: true,
             ignorePaymentStatus: true,
-          }
+          },
         ),
       }),
       db.order.count({
@@ -473,7 +502,7 @@ export async function getAdminOrderSummaryCounts(
           {
             ignoreStatus: true,
             ignorePaymentStatus: true,
-          }
+          },
         ),
       }),
     ]);
@@ -633,7 +662,9 @@ export async function getCustomers(filters?: CustomersOptions) {
             payments: { select: { amount: true } },
             sourceLinks: {
               select: {
-                targetTransaction: { select: { docType: true, status: true, grandTotal: true } },
+                targetTransaction: {
+                  select: { docType: true, status: true, grandTotal: true },
+                },
               },
             },
           },
@@ -774,71 +805,73 @@ export async function getCustomersReport(filters?: CustomersReportOptions) {
       customerAccountNo: true,
       email: true,
       phone: true,
-        phone2: true,
-        fax: true,
-        billingAddressLine1: true,
-        billingAddressLine2: true,
-        billingAddressLine3: true,
-        billingAddressLine4: true,
-        billingCity: true,
-        billingPostCode: true,
-        billingCountryCode: true,
-        deliveryAddressLine1: true,
-        deliveryAddressLine2: true,
-        deliveryAddressLine3: true,
-        deliveryAddressLine4: true,
-        deliveryCity: true,
-        deliveryPostCode: true,
-        deliveryCountryCode: true,
-        area: true,
-        attention: true,
-        contactPerson: true,
-        emailCc: true,
-        currency: true,
-        agentId: true,
-        natureOfBusiness: true,
-        registrationIdType: true,
-        registrationNo: true,
-        taxIdentificationNo: true,
-        creditTermsDays: true,
-        creditLimitAmount: true,
-        customerSalesTransactions: {
-          where: { docType: "INV", status: { not: "CANCELLED" } },
-          select: {
-            id: true,
-            docType: true,
-            docNo: true,
-            docDate: true,
-            grandTotal: true,
-            payments: { select: { amount: true } },
-            sourceLinks: {
-              select: {
-                targetTransaction: { select: { docType: true, status: true, grandTotal: true } },
+      phone2: true,
+      fax: true,
+      billingAddressLine1: true,
+      billingAddressLine2: true,
+      billingAddressLine3: true,
+      billingAddressLine4: true,
+      billingCity: true,
+      billingPostCode: true,
+      billingCountryCode: true,
+      deliveryAddressLine1: true,
+      deliveryAddressLine2: true,
+      deliveryAddressLine3: true,
+      deliveryAddressLine4: true,
+      deliveryCity: true,
+      deliveryPostCode: true,
+      deliveryCountryCode: true,
+      area: true,
+      attention: true,
+      contactPerson: true,
+      emailCc: true,
+      currency: true,
+      agentId: true,
+      natureOfBusiness: true,
+      registrationIdType: true,
+      registrationNo: true,
+      taxIdentificationNo: true,
+      creditTermsDays: true,
+      creditLimitAmount: true,
+      customerSalesTransactions: {
+        where: { docType: "INV", status: { not: "CANCELLED" } },
+        select: {
+          id: true,
+          docType: true,
+          docNo: true,
+          docDate: true,
+          grandTotal: true,
+          payments: { select: { amount: true } },
+          sourceLinks: {
+            select: {
+              targetTransaction: {
+                select: { docType: true, status: true, grandTotal: true },
               },
             },
           },
         },
-        agent: {
-          select: {
-            id: true,
-            code: true,
-            name: true,
-          },
+      },
+      agent: {
+        select: {
+          id: true,
+          code: true,
+          name: true,
         },
-        deliveryAddresses: {
-          orderBy: { createdAt: "asc" },
-          select: {
-            id: true,
-            label: true,
-            addressLine1: true,
-            addressLine2: true,
-            addressLine3: true,
-            addressLine4: true,
-            city: true,
-            postCode: true,
-            countryCode: true,
-          },
+      },
+      deliveryAddresses: {
+        orderBy: { createdAt: "asc" },
+        select: {
+          id: true,
+          label: true,
+          addressLine1: true,
+          addressLine2: true,
+          addressLine3: true,
+          addressLine4: true,
+          city: true,
+          postCode: true,
+          countryCode: true,
         },
+      },
       accountSource: true,
       portalAccess: true,
       createdAt: true,
@@ -859,10 +892,19 @@ export async function getCustomersReport(filters?: CustomersReportOptions) {
   });
 
   return customers.map((customer) => {
-    const validOrders = customer.orders.filter((order) => order.status !== "CANCELLED");
+    const validOrders = customer.orders.filter(
+      (order) => order.status !== "CANCELLED",
+    );
     const totalOrders = validOrders.length;
     const totalSpent = validOrders.reduce((sum, order) => {
-      return sum + Number(order.orderType === "CUSTOM_ORDER" ? order.customGrandTotal || 0 : order.totalAmount || 0);
+      return (
+        sum +
+        Number(
+          order.orderType === "CUSTOM_ORDER"
+            ? order.customGrandTotal || 0
+            : order.totalAmount || 0,
+        )
+      );
     }, 0);
 
     const lastOrderDate = totalOrders > 0 ? validOrders[0].createdAt : null;
@@ -889,53 +931,53 @@ export async function getCustomerById(customerId: string) {
       customerAccountNo: true,
       email: true,
       phone: true,
-        phone2: true,
-        fax: true,
-        billingAddressLine1: true,
-        billingAddressLine2: true,
-        billingAddressLine3: true,
-        billingAddressLine4: true,
-        billingCity: true,
-        billingPostCode: true,
-        billingCountryCode: true,
-        deliveryAddressLine1: true,
-        deliveryAddressLine2: true,
-        deliveryAddressLine3: true,
-        deliveryAddressLine4: true,
-        deliveryCity: true,
-        deliveryPostCode: true,
-        deliveryCountryCode: true,
-        area: true,
-        attention: true,
-        contactPerson: true,
-        emailCc: true,
-        currency: true,
-        agentId: true,
-        natureOfBusiness: true,
-        registrationIdType: true,
-        registrationNo: true,
-        taxIdentificationNo: true,
-        agent: {
-          select: {
-            id: true,
-            code: true,
-            name: true,
-          },
+      phone2: true,
+      fax: true,
+      billingAddressLine1: true,
+      billingAddressLine2: true,
+      billingAddressLine3: true,
+      billingAddressLine4: true,
+      billingCity: true,
+      billingPostCode: true,
+      billingCountryCode: true,
+      deliveryAddressLine1: true,
+      deliveryAddressLine2: true,
+      deliveryAddressLine3: true,
+      deliveryAddressLine4: true,
+      deliveryCity: true,
+      deliveryPostCode: true,
+      deliveryCountryCode: true,
+      area: true,
+      attention: true,
+      contactPerson: true,
+      emailCc: true,
+      currency: true,
+      agentId: true,
+      natureOfBusiness: true,
+      registrationIdType: true,
+      registrationNo: true,
+      taxIdentificationNo: true,
+      agent: {
+        select: {
+          id: true,
+          code: true,
+          name: true,
         },
-        deliveryAddresses: {
-          orderBy: { createdAt: "asc" },
-          select: {
-            id: true,
-            label: true,
-            addressLine1: true,
-            addressLine2: true,
-            addressLine3: true,
-            addressLine4: true,
-            city: true,
-            postCode: true,
-            countryCode: true,
-          },
+      },
+      deliveryAddresses: {
+        orderBy: { createdAt: "asc" },
+        select: {
+          id: true,
+          label: true,
+          addressLine1: true,
+          addressLine2: true,
+          addressLine3: true,
+          addressLine4: true,
+          city: true,
+          postCode: true,
+          countryCode: true,
         },
+      },
       accountSource: true,
       portalAccess: true,
       createdAt: true,
@@ -948,7 +990,20 @@ export async function getCustomerById(customerId: string) {
   });
 }
 
-export async function getCustomerByIdWithIntelligence(customerId: string) {
+export async function getCustomerByIdWithIntelligence(
+  customerId: string,
+  options?: { transactionPage?: number; transactionPageSize?: number },
+) {
+  const transactionPage = Math.max(
+    1,
+    Number(options?.transactionPage ?? 1) || 1,
+  );
+  const transactionPageSize = Math.max(
+    1,
+    Number(options?.transactionPageSize ?? 10) || 10,
+  );
+  const transactionSkip = (transactionPage - 1) * transactionPageSize;
+
   const customer = await db.user.findFirst({
     where: {
       id: customerId,
@@ -960,64 +1015,99 @@ export async function getCustomerByIdWithIntelligence(customerId: string) {
       customerAccountNo: true,
       email: true,
       phone: true,
-        phone2: true,
-        fax: true,
-        billingAddressLine1: true,
-        billingAddressLine2: true,
-        billingAddressLine3: true,
-        billingAddressLine4: true,
-        billingCity: true,
-        billingPostCode: true,
-        billingCountryCode: true,
-        deliveryAddressLine1: true,
-        deliveryAddressLine2: true,
-        deliveryAddressLine3: true,
-        deliveryAddressLine4: true,
-        deliveryCity: true,
-        deliveryPostCode: true,
-        deliveryCountryCode: true,
-        area: true,
-        attention: true,
-        contactPerson: true,
-        emailCc: true,
-        currency: true,
-        agentId: true,
-        natureOfBusiness: true,
-        registrationIdType: true,
-        registrationNo: true,
-        taxIdentificationNo: true,
-        creditTermsDays: true,
-        creditLimitAmount: true,
-        agent: {
-          select: {
-            id: true,
-            code: true,
-            name: true,
+      phone2: true,
+      fax: true,
+      billingAddressLine1: true,
+      billingAddressLine2: true,
+      billingAddressLine3: true,
+      billingAddressLine4: true,
+      billingCity: true,
+      billingPostCode: true,
+      billingCountryCode: true,
+      deliveryAddressLine1: true,
+      deliveryAddressLine2: true,
+      deliveryAddressLine3: true,
+      deliveryAddressLine4: true,
+      deliveryCity: true,
+      deliveryPostCode: true,
+      deliveryCountryCode: true,
+      area: true,
+      attention: true,
+      contactPerson: true,
+      emailCc: true,
+      currency: true,
+      agentId: true,
+      natureOfBusiness: true,
+      registrationIdType: true,
+      registrationNo: true,
+      taxIdentificationNo: true,
+      creditTermsDays: true,
+      creditLimitAmount: true,
+      customerSalesTransactions: {
+        where: { docType: "INV", status: { not: "CANCELLED" } },
+        select: {
+          id: true,
+          docType: true,
+          status: true,
+          docNo: true,
+          docDate: true,
+          grandTotal: true,
+          payments: { select: { amount: true } },
+          sourceLinks: {
+            select: {
+              targetTransaction: {
+                select: { docType: true, status: true, grandTotal: true },
+              },
+            },
           },
         },
-        deliveryAddresses: {
-          orderBy: { createdAt: "asc" },
-          select: {
-            id: true,
-            label: true,
-            addressLine1: true,
-            addressLine2: true,
-            addressLine3: true,
-            addressLine4: true,
-            city: true,
-            postCode: true,
-            countryCode: true,
-          },
+      },
+      agent: {
+        select: {
+          id: true,
+          code: true,
+          name: true,
         },
+      },
+      deliveryAddresses: {
+        orderBy: { createdAt: "asc" },
+        select: {
+          id: true,
+          label: true,
+          addressLine1: true,
+          addressLine2: true,
+          addressLine3: true,
+          addressLine4: true,
+          city: true,
+          postCode: true,
+          countryCode: true,
+        },
+      },
       accountSource: true,
       portalAccess: true,
       createdAt: true,
-      customerSalesTransactions: {
-        where: {
-          docType: { in: ["INV", "CS", "DN", "CN"] },
-          status: { not: "CANCELLED" },
-        },
-        orderBy: { docDate: "desc" },
+    },
+  });
+
+  if (!customer) return null;
+
+  const salesHistoryWhere: Prisma.SalesTransactionWhereInput = {
+    customerId,
+    docType: { in: ["INV", "CS", "DN", "CN"] as any },
+  };
+
+  const salesTotalWhere: Prisma.SalesTransactionWhereInput = {
+    ...salesHistoryWhere,
+    status: { not: "CANCELLED" as any },
+  };
+
+  const [transactionHistoryRows, transactionHistoryCount, totalRows] =
+    await Promise.all([
+      db.salesTransaction.findMany({
+        where: salesHistoryWhere,
+        orderBy: [{ docDate: "desc" }, { docNo: "desc" }],
+        skip: transactionSkip,
+        take: transactionPageSize,
         select: {
           id: true,
           docType: true,
@@ -1026,22 +1116,22 @@ export async function getCustomerByIdWithIntelligence(customerId: string) {
           docDesc: true,
           status: true,
           grandTotal: true,
-          customerName: true,
-          customerAccountNo: true,
-          payments: { select: { amount: true } },
-          sourceLinks: {
-            select: {
-              targetTransaction: { select: { docType: true, status: true, grandTotal: true } },
-            },
-          },
         },
-      },
-    },
-  });
+      }),
+      db.salesTransaction.count({ where: salesHistoryWhere }),
+      db.salesTransaction.findMany({
+        where: salesTotalWhere,
+        orderBy: [{ docDate: "desc" }, { docNo: "desc" }],
+        select: {
+          id: true,
+          docType: true,
+          docDate: true,
+          grandTotal: true,
+        },
+      }),
+    ]);
 
-  if (!customer) return null;
-
-  const transactionHistory = customer.customerSalesTransactions.map((transaction) => {
+  const transactionHistory = transactionHistoryRows.map((transaction) => {
     const amount = toCreditNumber(transaction.grandTotal ?? 0);
     const signedAmount = transaction.docType === "CN" ? -amount : amount;
 
@@ -1057,15 +1147,24 @@ export async function getCustomerByIdWithIntelligence(customerId: string) {
     };
   });
 
-  const orderTransactions = transactionHistory.filter((transaction) =>
-    transaction.docType === "INV" || transaction.docType === "CS"
+  const orderTransactions = totalRows.filter(
+    (transaction) =>
+      transaction.docType === "INV" || transaction.docType === "CS",
   );
   const totalOrders = orderTransactions.length;
-  const totalSpent = Math.round(
-    (transactionHistory.reduce((sum, transaction) => sum + transaction.signedAmount, 0) + Number.EPSILON) * 100
-  ) / 100;
-  const averageOrderValue = totalOrders > 0 ? Math.round((totalSpent / totalOrders) * 100) / 100 : 0;
-  const lastOrderDate = orderTransactions.length > 0 ? orderTransactions[0].docDate : null;
+  const totalSpent =
+    Math.round(
+      (totalRows.reduce((sum, transaction) => {
+        const amount = toCreditNumber(transaction.grandTotal ?? 0);
+        return sum + (transaction.docType === "CN" ? -amount : amount);
+      }, 0) +
+        Number.EPSILON) *
+        100,
+    ) / 100;
+  const averageOrderValue =
+    totalOrders > 0 ? Math.round((totalSpent / totalOrders) * 100) / 100 : 0;
+  const lastOrderDate =
+    orderTransactions.length > 0 ? orderTransactions[0].docDate : null;
 
   const creditControl = buildCustomerCreditControl(customer);
 
@@ -1073,6 +1172,15 @@ export async function getCustomerByIdWithIntelligence(customerId: string) {
     ...customer,
     customerSalesTransactions: undefined,
     orders: transactionHistory,
+    salesTransactionPagination: {
+      currentPage: transactionPage,
+      pageSize: transactionPageSize,
+      totalCount: transactionHistoryCount,
+      totalPages: Math.max(
+        1,
+        Math.ceil(transactionHistoryCount / transactionPageSize),
+      ),
+    },
     creditControl,
     intelligence: {
       totalOrders,
