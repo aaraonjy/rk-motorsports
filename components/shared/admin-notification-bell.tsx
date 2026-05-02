@@ -20,7 +20,8 @@ type NotificationsResponse = {
   unreadCount: number;
 };
 
-const REFRESH_INTERVAL_MS = 60_000;
+//const REFRESH_INTERVAL_MS = 60_000;
+const REFRESH_INTERVAL_MS = 120_000;
 
 function formatRelativeTime(value: string) {
   const date = new Date(value);
