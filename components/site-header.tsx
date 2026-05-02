@@ -2,7 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { getSessionUser } from "@/lib/auth";
 import { AdminNotificationBell } from "@/components/shared/admin-notification-bell";
-import { SiteHeaderClient } from "@/components/site-header-client";
+import { MobileSiteHeaderMenu, SiteHeaderClient } from "@/components/site-header-client";
 import { AdminGlobalSettingsMenu } from "@/components/global-settings/admin-global-settings-menu";
 import { AdminStockMenu } from "@/components/stock/admin-stock-menu";
 import { AdminCustomerMenu } from "@/components/customers/admin-customer-menu";
@@ -34,12 +34,12 @@ export async function SiteHeader() {
             alt="RK Motorsports"
             width={180}
             height={44}
-            className="h-10 w-auto object-contain"
+            className="h-9 w-auto object-contain md:h-10"
             priority
           />
         </Link>
 
-        <div className="flex items-center gap-10">
+        <div className="flex items-center gap-3 md:gap-10">
           <nav className="hidden items-center gap-8 md:flex">
             {nav.map(([label, href]) => (
               <Link
@@ -58,7 +58,7 @@ export async function SiteHeader() {
 
           <div className="hidden h-6 w-px bg-white/10 md:block" />
 
-          <div className="flex items-center gap-4 text-sm">
+          <div className="hidden items-center gap-4 text-sm md:flex">
             {user ? (
               <>
                 <AdminNotificationBell />
@@ -81,6 +81,11 @@ export async function SiteHeader() {
                 Login
               </Link>
             )}
+          </div>
+
+          <div className="flex items-center gap-3 md:hidden">
+            {user ? <AdminNotificationBell /> : null}
+            <MobileSiteHeaderMenu user={user} />
           </div>
         </div>
       </div>
