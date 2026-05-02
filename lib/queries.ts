@@ -22,6 +22,8 @@ function buildCustomerCreditControl(customer: {
 }) {
   const creditTermsDays = Math.max(0, Number(customer.creditTermsDays ?? 0) || 0);
   const creditLimitAmount = Math.max(0, toCreditNumber(customer.creditLimitAmount));
+  const creditTermsActive = creditTermsDays > 0;
+  const creditLimitActive = !creditTermsActive && creditLimitAmount > 0;
   const now = new Date();
 
   let outstandingAmount = 0;
@@ -43,7 +45,7 @@ function buildCustomerCreditControl(customer: {
 
     outstandingAmount += outstanding;
 
-    if (creditTermsDays > 0) {
+    if (creditTermsActive) {
       const dueDate = new Date(invoice.docDate);
       dueDate.setDate(dueDate.getDate() + creditTermsDays);
       if (dueDate.getTime() < now.getTime()) {
@@ -51,10 +53,6 @@ function buildCustomerCreditControl(customer: {
         const overdueDays = Math.max(0, Math.floor((now.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)));
         oldestOverdueDays = Math.max(oldestOverdueDays, overdueDays);
       }
-    } else if (outstanding > 0) {
-      overdueAmount += outstanding;
-      const overdueDays = Math.max(0, Math.floor((now.getTime() - new Date(invoice.docDate).getTime()) / (1000 * 60 * 60 * 24)));
-      oldestOverdueDays = Math.max(oldestOverdueDays, overdueDays);
     }
   }
 
@@ -67,8 +65,8 @@ function buildCustomerCreditControl(customer: {
     creditOutstandingAmount: outstandingAmount,
     creditOverdueAmount: overdueAmount,
     creditOldestOverdueDays: oldestOverdueDays,
-    creditLimitExceeded: outstandingAmount > 0 && (creditLimitAmount <= 0 || outstandingAmount > creditLimitAmount),
-    creditOverdue: overdueAmount > 0,
+    creditLimitExceeded: creditLimitActive && outstandingAmount > creditLimitAmount,
+    creditOverdue: creditTermsActive && overdueAmount > 0,
   };
 }
 

@@ -150,6 +150,11 @@ export async function PATCH(
     return Response.json({ ok: false, error: error instanceof Error ? error.message : "Invalid country or currency selection." }, { status: 400 });
   }
 
+  const requestedCreditTermsDays = getNonNegativeInt(body, "creditTermsDays");
+  const requestedCreditLimitAmount = getNonNegativeMoney(body, "creditLimitAmount");
+  const creditTermsDays = requestedCreditTermsDays > 0 ? requestedCreditTermsDays : 0;
+  const creditLimitAmount = creditTermsDays > 0 ? 0 : requestedCreditLimitAmount;
+
   await db.user.update({
     where: { id },
     data: {
@@ -183,8 +188,8 @@ export async function PATCH(
       registrationIdType: normalizeRegistrationIdType(getText(body, "registrationIdType")) as any,
       registrationNo: getNullableText(body, "registrationNo"),
       taxIdentificationNo: getNullableText(body, "taxIdentificationNo"),
-      creditTermsDays: getNonNegativeInt(body, "creditTermsDays"),
-      creditLimitAmount: getNonNegativeMoney(body, "creditLimitAmount"),
+      creditTermsDays,
+      creditLimitAmount,
       deliveryAddresses: {
         deleteMany: {},
         ...(deliveryAddresses.length > 0 ? { create: deliveryAddresses } : {}),

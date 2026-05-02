@@ -145,6 +145,7 @@ type CustomerFormState = {
   registrationIdType: string;
   registrationNo: string;
   taxIdentificationNo: string;
+  creditControlType: "NONE" | "TERMS" | "LIMIT";
   creditTermsDays: string;
   creditLimitAmount: string;
 };
@@ -209,6 +210,7 @@ function getInitialForm(customer: CustomerRecord | null): CustomerFormState {
     registrationIdType: customer?.registrationIdType || "BRN",
     registrationNo: customer?.registrationNo || "",
     taxIdentificationNo: customer?.taxIdentificationNo || "",
+    creditControlType: Number(customer?.creditTermsDays ?? 0) > 0 ? "TERMS" : Number(customer?.creditLimitAmount ?? 0) > 0 ? "LIMIT" : "NONE",
     creditTermsDays: String(customer?.creditTermsDays ?? 0),
     creditLimitAmount: String(customer?.creditLimitAmount ?? 0),
   };
@@ -295,11 +297,6 @@ function getCreditLabel(customer: CustomerRecord) {
 function money(value: unknown) {
   const numeric = Number(value ?? 0);
   return numeric.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
-function getCurrencyCode(value: string | null | undefined) {
-  const currency = String(value || "MYR").trim().toUpperCase();
-  return currency || "MYR";
 }
 
 function FieldLabel({ children }: { children: ReactNode }) {
@@ -598,18 +595,44 @@ function CustomerModal({
     []
   );
 
-  const selectedCurrencyCode = getCurrencyCode(form.currency);
+  const creditControlOptions = useMemo<SearchableSelectOption[]>(
+    () => [
+      { id: "NONE", label: "None", searchText: "none no credit control" },
+      { id: "TERMS", label: "Credit Terms", searchText: "credit terms days overdue" },
+      { id: "LIMIT", label: "Credit Limit", searchText: "credit limit amount over limit" },
+    ],
+    []
+  );
+
+  const selectedCurrencyCode = String(form.currency || "MYR").trim().toUpperCase() || "MYR";
 
   if (!isOpen) return null;
 
   const isPortalCustomer = customer?.accountSource === "PORTAL";
 
   function updateField<K extends keyof CustomerFormState>(key: K, value: CustomerFormState[K]) {
-    setForm((prev) => ({
-      ...prev,
-      [key]: value,
-      ...(key === "name" && mode === "create" ? { customerAccountNoSuffix: "" } : {}),
-    }));
+    setForm((prev) => {
+      const next = {
+        ...prev,
+        [key]: value,
+        ...(key === "name" && mode === "create" ? { customerAccountNoSuffix: "" } : {}),
+      };
+
+      if (key === "creditControlType") {
+        if (value === "NONE") {
+          next.creditTermsDays = "0";
+          next.creditLimitAmount = "0";
+        }
+        if (value === "TERMS") {
+          next.creditLimitAmount = "0";
+        }
+        if (value === "LIMIT") {
+          next.creditTermsDays = "0";
+        }
+      }
+
+      return next;
+    });
 
     if (key === "name" && mode === "create") {
       setAccountSuffixTouched(false);
@@ -683,6 +706,8 @@ function CustomerModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...form,
+          creditTermsDays: form.creditControlType === "TERMS" ? form.creditTermsDays : "0",
+          creditLimitAmount: form.creditControlType === "LIMIT" ? form.creditLimitAmount : "0",
           name: form.name.trim(),
           customerAccountNo: mode === "create" ? previewAccountNo || null : customer?.customerAccountNo,
           email: form.email.trim(),
@@ -871,15 +896,29 @@ function CustomerModal({
                 />
               </div>
               <div>
-                <FieldLabel>Credit Terms (Days)</FieldLabel>
-                <TextInput type="number" min="0" step="1" value={form.creditTermsDays} onChange={(value) => updateField("creditTermsDays", value.replace(/[^0-9]/g, ""))} placeholder="0" />
-                <p className="mt-2 text-xs text-white/40">0 means cash/immediate payment.</p>
+                <SearchableSelect
+                  label="Credit Control"
+                  placeholder="Select credit control"
+                  options={creditControlOptions}
+                  value={form.creditControlType}
+                  onChange={(option) => updateField("creditControlType", (option?.id as CustomerFormState["creditControlType"]) || "NONE")}
+                />
+                <p className="mt-2 text-xs text-white/40">Only one credit control method can be active per customer.</p>
               </div>
-              <div>
-                <FieldLabel>Credit Limit ({selectedCurrencyCode})</FieldLabel>
-                <TextInput type="number" min="0" step="0.01" value={form.creditLimitAmount} onChange={(value) => updateField("creditLimitAmount", value)} placeholder="0.00" />
-                <p className="mt-2 text-xs text-white/40">0 means no credit limit allowed.</p>
-              </div>
+              {form.creditControlType === "TERMS" ? (
+                <div>
+                  <FieldLabel>Credit Terms (Days)</FieldLabel>
+                  <TextInput type="number" min="1" step="1" value={form.creditTermsDays} onChange={(value) => updateField("creditTermsDays", value.replace(/[^0-9]/g, ""))} placeholder="30" />
+                  <p className="mt-2 text-xs text-white/40">Admin will be notified when unpaid invoice age is over this number of days.</p>
+                </div>
+              ) : null}
+              {form.creditControlType === "LIMIT" ? (
+                <div>
+                  <FieldLabel>Credit Limit ({selectedCurrencyCode})</FieldLabel>
+                  <TextInput type="number" min="0" step="0.01" value={form.creditLimitAmount} onChange={(value) => updateField("creditLimitAmount", value)} placeholder="0.00" />
+                  <p className="mt-2 text-xs text-white/40">Admin will be notified when total outstanding invoices exceed this amount.</p>
+                </div>
+              ) : null}
               <div>
                 <SearchableSelect
                   label="Agent"
@@ -1123,7 +1162,6 @@ export function AdminCustomerManagement({ customers, agents, countries, currenci
               <th className="w-[140px] px-4 py-4">Portal Access</th>
               <th className="w-[170px] px-4 py-4">Credit Control</th>
               <th className="w-[110px] px-4 py-4">Orders</th>
-              <th className="w-[160px] px-4 py-4">Created Date</th>
               <th className="w-[200px] px-4 py-4">Action</th>
             </tr>
           </thead>
@@ -1144,11 +1182,10 @@ export function AdminCustomerManagement({ customers, agents, countries, currenci
                 <td className="px-4 py-4">
                   <div className="space-y-2">
                     <span className={getCreditBadge(customer)}>{getCreditLabel(customer)}</span>
-                    <div className="text-xs text-white/45">Outstanding {getCurrencyCode(customer.currency)} {money(customer.creditOutstandingAmount || 0)}</div>
+                    <div className="text-xs text-white/45">Outstanding {customer.currency || "MYR"} {money(customer.creditOutstandingAmount || 0)}</div>
                   </div>
                 </td>
                 <td className="px-4 py-4 text-white/85">{customer._count.orders}</td>
-                <td className="px-4 py-4 text-white/65"><div>{new Date(customer.createdAt).toLocaleDateString()}</div><div className="text-xs text-white/35">{new Date(customer.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true })}</div></td>
                 <td className="px-4 py-4">
                   <div className="flex flex-col gap-2">
                     <Link href={`/admin/customers/${customer.id}/create-order`} onClick={(e) => e.stopPropagation()} className="inline-flex w-full items-center justify-center rounded-xl border border-white/15 bg-black/30 px-4 py-2 text-center text-white transition hover:bg-white/10">Create Order</Link>
@@ -1157,7 +1194,7 @@ export function AdminCustomerManagement({ customers, agents, countries, currenci
                 </td>
               </tr>
             )) : (
-              <tr><td colSpan={11} className="px-4 py-10 text-center text-white/45">No customers found for the selected filters.</td></tr>
+              <tr><td colSpan={10} className="px-4 py-10 text-center text-white/45">No customers found for the selected filters.</td></tr>
             )}
           </tbody>
         </table>
