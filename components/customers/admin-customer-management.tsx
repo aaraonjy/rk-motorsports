@@ -1145,11 +1145,16 @@ export function AdminCustomerManagement({ customers, agents, countries, currenci
         </div>
       ) : null}
 
-      <div className="flex justify-end">
-        <button type="button" onClick={() => setIsCreateOpen(true)} className="rounded-xl border border-white/15 bg-black/30 px-4 py-3 text-white transition hover:bg-white/10">Add Customer</button>
-      </div>
+      <div className="rounded-3xl border border-white/20 bg-black/60 shadow-xl shadow-black/40 backdrop-blur-md">
+        <div className="flex flex-col gap-3 px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-white">Customer Records</h2>
+            <p className="mt-1 text-sm text-white/45">Manage customer profiles, portal access, and credit control status.</p>
+          </div>
+          <button type="button" onClick={() => setIsCreateOpen(true)} className="w-full rounded-xl border border-white/15 bg-black/30 px-4 py-3 text-white transition hover:bg-white/10 sm:w-auto">Add Customer</button>
+        </div>
 
-      <div className="overflow-x-auto rounded-3xl border border-white/20 bg-black/60 shadow-xl shadow-black/40 backdrop-blur-md">
+        <div className="overflow-x-auto border-t border-white/10">
         <table className="min-w-full table-fixed text-left text-sm">
           <thead className="bg-black/50 text-white/65">
             <tr>
@@ -1198,6 +1203,7 @@ export function AdminCustomerManagement({ customers, agents, countries, currenci
             )}
           </tbody>
         </table>
+        </div>
       </div>
 
       <CustomerModal isOpen={isCreateOpen} mode="create" customer={null} agents={agents} countries={countries} currencies={currencies} accountConfiguration={accountConfiguration} existingCustomerAccountNos={existingCustomerAccountNos} onClose={() => setIsCreateOpen(false)} onSaved={handleSaved} />

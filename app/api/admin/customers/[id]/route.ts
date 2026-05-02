@@ -1,6 +1,5 @@
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { resolveCustomerAccountNo } from "@/lib/customer-account";
 import { CUSTOMER_REGISTRATION_ID_TYPES } from "@/lib/customer-profile-options";
 
 function getText(body: Record<string, unknown>, key: string) {
@@ -127,14 +126,9 @@ export async function PATCH(
     return Response.json({ ok: false, error: error instanceof Error ? error.message : "Selected agent is not available." }, { status: 400 });
   }
 
-  const requestedAccountNo = getNullableText(body, "customerAccountNo");
-  const accountNoResult = requestedAccountNo
-    ? await resolveCustomerAccountNo({ db, customerName: name, overrideAccountNo: requestedAccountNo, excludeCustomerId: id })
-    : null;
-
-  if (accountNoResult && !accountNoResult.ok) {
-    return Response.json({ ok: false, error: accountNoResult.error }, { status: 400 });
-  }
+  // Keep the existing customer A/C No unchanged during profile edits.
+  // The A/C No initial is only used for auto-generation during customer creation;
+  // renaming a customer must not force the existing A/C No to match the new name initial.
 
   let billingCountryCode = "MY";
   let deliveryCountryCode = "MY";
@@ -163,7 +157,6 @@ export async function PATCH(
       phone: phone || null,
       phone2: getNullableText(body, "phone2"),
       fax: getNullableText(body, "fax"),
-      ...(accountNoResult?.ok ? { customerAccountNo: accountNoResult.customerAccountNo } : {}),
       billingAddressLine1: getNullableText(body, "billingAddressLine1"),
       billingAddressLine2: getNullableText(body, "billingAddressLine2"),
       billingAddressLine3: getNullableText(body, "billingAddressLine3"),
