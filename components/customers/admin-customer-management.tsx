@@ -297,6 +297,11 @@ function money(value: unknown) {
   return numeric.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+function getCurrencyCode(value: string | null | undefined) {
+  const currency = String(value || "MYR").trim().toUpperCase();
+  return currency || "MYR";
+}
+
 function FieldLabel({ children }: { children: ReactNode }) {
   return <label className="mb-2 block text-sm text-white/70">{children}</label>;
 }
@@ -593,6 +598,8 @@ function CustomerModal({
     []
   );
 
+  const selectedCurrencyCode = getCurrencyCode(form.currency);
+
   if (!isOpen) return null;
 
   const isPortalCustomer = customer?.accountSource === "PORTAL";
@@ -869,7 +876,7 @@ function CustomerModal({
                 <p className="mt-2 text-xs text-white/40">0 means cash/immediate payment.</p>
               </div>
               <div>
-                <FieldLabel>Credit Limit (RM)</FieldLabel>
+                <FieldLabel>Credit Limit ({selectedCurrencyCode})</FieldLabel>
                 <TextInput type="number" min="0" step="0.01" value={form.creditLimitAmount} onChange={(value) => updateField("creditLimitAmount", value)} placeholder="0.00" />
                 <p className="mt-2 text-xs text-white/40">0 means no credit limit allowed.</p>
               </div>
@@ -1137,7 +1144,7 @@ export function AdminCustomerManagement({ customers, agents, countries, currenci
                 <td className="px-4 py-4">
                   <div className="space-y-2">
                     <span className={getCreditBadge(customer)}>{getCreditLabel(customer)}</span>
-                    <div className="text-xs text-white/45">Outstanding RM {money(customer.creditOutstandingAmount || 0)}</div>
+                    <div className="text-xs text-white/45">Outstanding {getCurrencyCode(customer.currency)} {money(customer.creditOutstandingAmount || 0)}</div>
                   </div>
                 </td>
                 <td className="px-4 py-4 text-white/85">{customer._count.orders}</td>
