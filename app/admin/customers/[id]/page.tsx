@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { getSessionUser } from "@/lib/auth";
 import { getCustomerByIdWithIntelligence } from "@/lib/queries";
 import { redirect, notFound } from "next/navigation";
@@ -29,15 +30,14 @@ function toSafeNumber(value: unknown) {
   return Number.isFinite(converted) ? converted : 0;
 }
 
-function formatCurrency(value: number) {
+function formatCurrency(value: number, currency = "MYR") {
   return new Intl.NumberFormat("en-MY", {
     style: "currency",
-    currency: "MYR",
+    currency,
     maximumFractionDigits: 2,
     minimumFractionDigits: 2,
   }).format(value);
 }
-
 
 function getCreditStatusLabel(customer: any) {
   if (customer.creditControl?.creditOverdue) return "Overdue";
@@ -157,6 +157,26 @@ function getStatusLabel(status: string) {
   }
 }
 
+function SectionTitle({ children }: { children: ReactNode }) {
+  return <div className="text-sm font-semibold uppercase tracking-[0.18em] text-white/45">{children}</div>;
+}
+
+function DetailField({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div>
+      <p className="mb-2 text-sm text-white/70">{label}</p>
+      <div className="min-h-[46px] rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white/80">
+        {value || "-"}
+      </div>
+    </div>
+  );
+}
+
+function compactAddress(lines: Array<string | null | undefined>) {
+  const values = lines.map((line) => String(line || "").trim()).filter(Boolean);
+  return values.length > 0 ? values : ["-"];
+}
+
 type CustomerDetailPageProps = {
   params: Promise<{ id: string }>;
 };
@@ -174,6 +194,15 @@ export default async function AdminCustomerDetailPage({
   if (!customer) {
     notFound();
   }
+
+  const customerView = customer as any;
+  const currency = customer.currency || "MYR";
+  const creditControlType = Number(customer.creditControl?.creditTermsDays || 0) > 0
+    ? "Credit Terms"
+    : Number(customer.creditControl?.creditLimitAmount || 0) > 0
+      ? "Credit Limit"
+      : "None";
+  const secondaryDeliveryAddresses = Array.isArray(customerView.deliveryAddresses) ? customerView.deliveryAddresses : [];
 
   return (
     <section className="section-pad">
@@ -194,142 +223,105 @@ export default async function AdminCustomerDetailPage({
         </div>
 
         <div className="card-rk p-6 md:p-8">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/45">
-                Customer Information
-              </p>
-              <div className="mt-4 space-y-2 text-sm text-white/75">
-                <p>
-                  <span className="text-white/45">A/C No.:</span>{" "}
-                  {customer.customerAccountNo || "-"}
-                </p>
-                <p>
-                  <span className="text-white/45">Email:</span> {customer.email}
-                </p>
-                <p>
-                  <span className="text-white/45">Email CC:</span>{" "}
-                  {customer.emailCc || "-"}
-                </p>
-                <p>
-                  <span className="text-white/45">Phone 1:</span> {customer.phone || "-"}
-                </p>
-                <p>
-                  <span className="text-white/45">Phone 2:</span> {customer.phone2 || "-"}
-                </p>
-                <p>
-                  <span className="text-white/45">Agent:</span>{" "}
-                  {customer.agent ? `${customer.agent.code} - ${customer.agent.name}` : "-"}
-                </p>
-                <p>
-                  <span className="text-white/45">Area:</span> {customer.area || "-"}
-                </p>
-                <p>
-                  <span className="text-white/45">Currency:</span> {customer.currency || "MYR"}
-                </p>
-                <p>
-                  <span className="text-white/45">Credit Terms:</span> {customer.creditControl?.creditTermsDays ?? 0} day(s)
-                </p>
-                <p>
-                  <span className="text-white/45">Credit Limit:</span> {formatCurrency(Number(customer.creditControl?.creditLimitAmount || 0))}
-                </p>
-                <p>
-                  <span className="text-white/45">Credit Status:</span>{" "}
-                  <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${getCreditStatusClass(customer)}`}>{getCreditStatusLabel(customer)}</span>
-                </p>
-                <p>
-                  <span className="text-white/45">Outstanding INV:</span> {formatCurrency(Number(customer.creditControl?.creditOutstandingAmount || 0))}
-                </p>
-                <p>
-                  <span className="text-white/45">Account Source:</span>{" "}
-                  {customer.accountSource === "ADMIN" ? "Admin Created" : "Self Registered"}
-                </p>
-                <p>
-                  <span className="text-white/45">Portal Access:</span>{" "}
-                  {customer.portalAccess ? "Enabled" : "Disabled"}
-                </p>
-                <p>
-                  <span className="text-white/45">Created Date:</span>{" "}
-                  {formatDateTime(customer.createdAt)}
-                </p>
+          <div className="rounded-2xl border border-white/10 bg-black/20 p-5">
+            <SectionTitle>Basic Info</SectionTitle>
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <DetailField label="A/C No." value={customer.customerAccountNo || "-"} />
+              <DetailField label="Customer Name" value={customer.name} />
+              <DetailField label="Email" value={customer.email} />
+              <DetailField label="Phone 1" value={customer.phone || "-"} />
+              <DetailField label="Phone 2" value={customer.phone2 || "-"} />
+              <DetailField label="Fax" value={customer.fax || "-"} />
+              <DetailField label="Email CC" value={customer.emailCc || "-"} />
+            </div>
+          </div>
+
+          <div className="mt-6 grid gap-6 lg:grid-cols-2">
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-5">
+              <div className="flex min-h-[38px] items-center justify-between gap-3">
+                <SectionTitle>Billing Address</SectionTitle>
+                <div className="h-9 w-9" aria-hidden="true" />
+              </div>
+              <div className="mt-4 space-y-3 text-sm text-white/75">
+                {compactAddress([
+                  customer.billingAddressLine1,
+                  customer.billingAddressLine2,
+                  customer.billingAddressLine3,
+                  customer.billingAddressLine4,
+                  [customer.billingPostCode, customer.billingCity].filter(Boolean).join(" "),
+                  customer.billingCountryCode,
+                ]).map((line, index) => (
+                  <div key={`${line}-${index}`} className="rounded-xl border border-white/10 bg-black/40 px-4 py-3">
+                    {line}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-5">
+              <div className="flex min-h-[38px] items-center justify-between gap-3">
+                <SectionTitle>Default Delivery Address</SectionTitle>
+                <div className="h-9 w-9" aria-hidden="true" />
+              </div>
+              <div className="mt-4 space-y-3 text-sm text-white/75">
+                {compactAddress([
+                  customer.deliveryAddressLine1,
+                  customer.deliveryAddressLine2,
+                  customer.deliveryAddressLine3,
+                  customer.deliveryAddressLine4,
+                  [customer.deliveryPostCode, customer.deliveryCity].filter(Boolean).join(" "),
+                  customer.deliveryCountryCode,
+                ]).map((line, index) => (
+                  <div key={`${line}-${index}`} className="rounded-xl border border-white/10 bg-black/40 px-4 py-3">
+                    {line}
+                  </div>
+                ))}
               </div>
             </div>
           </div>
 
-
-
-          <div className="mt-8 grid gap-4 md:grid-cols-2">
-            <div className="rounded-2xl border border-white/10 bg-black/30 p-5">
-              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-white/45">
-                Billing Address
-              </p>
-              <div className="mt-4 space-y-1 text-sm text-white/70">
-                <p>{customer.billingAddressLine1 || "-"}</p>
-                {customer.billingAddressLine2 ? <p>{customer.billingAddressLine2}</p> : null}
-                {customer.billingAddressLine3 ? <p>{customer.billingAddressLine3}</p> : null}
-                {customer.billingAddressLine4 ? <p>{customer.billingAddressLine4}</p> : null}
-                <p>
-                  {[customer.billingPostCode, customer.billingCity].filter(Boolean).join(" ") || "-"}
-                </p>
-                <p>{customer.billingCountryCode || "-"}</p>
+          {secondaryDeliveryAddresses.length > 0 ? (
+            <div className="mt-6 rounded-2xl border border-white/10 bg-black/20 p-5">
+              <SectionTitle>Secondary Delivery Addresses</SectionTitle>
+              <div className="mt-4 space-y-3">
+                {secondaryDeliveryAddresses.map((address: any, index: number) => (
+                  <div key={address.id || index} className="rounded-2xl border border-white/10 bg-black/25 p-4 text-sm text-white/70">
+                    <div className="font-semibold text-white">{address.label || `Address ${index + 1}`}</div>
+                    <div className="mt-1 break-words">
+                      {[address.addressLine1, address.addressLine2, address.addressLine3, address.addressLine4, address.postCode, address.city, address.countryCode]
+                        .filter(Boolean)
+                        .join(", ") || "-"}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
+          ) : null}
 
-            <div className="rounded-2xl border border-white/10 bg-black/30 p-5">
-              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-white/45">
-                Delivery Address
-              </p>
-              <div className="mt-4 space-y-1 text-sm text-white/70">
-                <p>{customer.deliveryAddressLine1 || "-"}</p>
-                {customer.deliveryAddressLine2 ? <p>{customer.deliveryAddressLine2}</p> : null}
-                {customer.deliveryAddressLine3 ? <p>{customer.deliveryAddressLine3}</p> : null}
-                {customer.deliveryAddressLine4 ? <p>{customer.deliveryAddressLine4}</p> : null}
-                <p>
-                  {[customer.deliveryPostCode, customer.deliveryCity].filter(Boolean).join(" ") || "-"}
-                </p>
-                <p>{customer.deliveryCountryCode || "-"}</p>
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-white/10 bg-black/30 p-5 md:col-span-2">
-              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-white/45">
-                Business Details
-              </p>
-              <div className="mt-4 grid gap-3 text-sm text-white/70 md:grid-cols-2">
-                <p>
-                  <span className="text-white/45">Nature of Business:</span>{" "}
-                  {customer.natureOfBusiness || "-"}
-                </p>
-                <p>
-                  <span className="text-white/45">Registration Type:</span>{" "}
-                  {customer.registrationIdType || "-"}
-                </p>
-                <p>
-                  <span className="text-white/45">Business Registration No.:</span>{" "}
-                  {customer.registrationNo || "-"}
-                </p>
-                <p>
-                  <span className="text-white/45">Tax Identification No.:</span>{" "}
-                  {customer.taxIdentificationNo || "-"}
-                </p>
-                <p>
-                  <span className="text-white/45">Credit Terms:</span>{" "}
-                  {customer.creditControl?.creditTermsDays ?? 0} day(s)
-                </p>
-                <p>
-                  <span className="text-white/45">Credit Limit:</span>{" "}
-                  {formatCurrency(Number(customer.creditControl?.creditLimitAmount || 0))}
-                </p>
-                <p>
-                  <span className="text-white/45">Attention:</span> {customer.attention || "-"}
-                </p>
-                <p>
-                  <span className="text-white/45">Contact:</span> {customer.contactPerson || "-"}
-                </p>
-                <p>
-                  <span className="text-white/45">Fax:</span> {customer.fax || "-"}
-                </p>
-              </div>
+          <div className="mt-6 rounded-2xl border border-white/10 bg-black/20 p-5">
+            <SectionTitle>Business Info</SectionTitle>
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <DetailField label="Area" value={customer.area || "-"} />
+              <DetailField label="Currency" value={currency} />
+              <DetailField label="Credit Control" value={creditControlType} />
+              {creditControlType === "Credit Terms" ? (
+                <DetailField label="Credit Terms (Days)" value={`${customer.creditControl?.creditTermsDays ?? 0} day(s)`} />
+              ) : null}
+              {creditControlType === "Credit Limit" ? (
+                <DetailField label={`Credit Limit (${currency})`} value={formatCurrency(Number(customer.creditControl?.creditLimitAmount || 0), currency)} />
+              ) : null}
+              <DetailField label="Credit Status" value={<span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${getCreditStatusClass(customer)}`}>{getCreditStatusLabel(customer)}</span>} />
+              <DetailField label={`Outstanding INV (${currency})`} value={formatCurrency(Number(customer.creditControl?.creditOutstandingAmount || 0), currency)} />
+              <DetailField label="Agent" value={customer.agent ? `${customer.agent.code} — ${customer.agent.name}` : "No Agent"} />
+              <DetailField label="Nature of Business" value={customer.natureOfBusiness || "-"} />
+              <DetailField label="Attention" value={customer.attention || "-"} />
+              <DetailField label="Contact" value={customer.contactPerson || "-"} />
+              <DetailField label="Registration Type" value={customer.registrationIdType || "-"} />
+              <DetailField label="Business Registration No." value={customer.registrationNo || "-"} />
+              <DetailField label="Tax Identification No." value={customer.taxIdentificationNo || "-"} />
+              <DetailField label="Account Source" value={customer.accountSource === "ADMIN" ? "Admin Created" : "Self Registered"} />
+              <DetailField label="Portal Access" value={customer.portalAccess ? "Enabled" : "Disabled"} />
+              <DetailField label="Created Date" value={formatDateTime(customer.createdAt)} />
             </div>
           </div>
 
