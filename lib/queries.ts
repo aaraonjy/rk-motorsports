@@ -11,6 +11,7 @@ function buildCustomerCreditControl(customer: {
   creditLimitAmount?: Prisma.Decimal | number | string | null;
   customerSalesTransactions?: Array<{
     id: string;
+    docType?: string | null;
     docNo: string;
     docDate: Date;
     grandTotal: Prisma.Decimal | number | string;
@@ -31,6 +32,8 @@ function buildCustomerCreditControl(customer: {
   let oldestOverdueDays = 0;
 
   for (const invoice of customer.customerSalesTransactions || []) {
+    if (invoice.docType && invoice.docType !== "INV") continue;
+
     const totalPaid = (invoice.payments || []).reduce((sum, payment) => sum + toCreditNumber(payment.amount), 0);
     const adjustment = (invoice.sourceLinks || []).reduce((sum, link) => {
       const target = link.targetTransaction;
@@ -623,6 +626,7 @@ export async function getCustomers(filters?: CustomersOptions) {
           where: { docType: "INV", status: { not: "CANCELLED" } },
           select: {
             id: true,
+            docType: true,
             docNo: true,
             docDate: true,
             grandTotal: true,
@@ -802,6 +806,7 @@ export async function getCustomersReport(filters?: CustomersReportOptions) {
           where: { docType: "INV", status: { not: "CANCELLED" } },
           select: {
             id: true,
+            docType: true,
             docNo: true,
             docDate: true,
             grandTotal: true,
@@ -983,21 +988,6 @@ export async function getCustomerByIdWithIntelligence(customerId: string) {
         taxIdentificationNo: true,
         creditTermsDays: true,
         creditLimitAmount: true,
-        customerSalesTransactions: {
-          where: { docType: "INV", status: { not: "CANCELLED" } },
-          select: {
-            id: true,
-            docNo: true,
-            docDate: true,
-            grandTotal: true,
-            payments: { select: { amount: true } },
-            sourceLinks: {
-              select: {
-                targetTransaction: { select: { docType: true, status: true, grandTotal: true } },
-              },
-            },
-          },
-        },
         agent: {
           select: {
             id: true,
@@ -1022,21 +1012,28 @@ export async function getCustomerByIdWithIntelligence(customerId: string) {
       accountSource: true,
       portalAccess: true,
       createdAt: true,
-      orders: {
-        orderBy: { createdAt: "desc" },
+      customerSalesTransactions: {
+        where: {
+          docType: { in: ["INV", "CS", "DN", "CN"] },
+          status: { not: "CANCELLED" },
+        },
+        orderBy: { docDate: "desc" },
         select: {
           id: true,
-          orderNumber: true,
-          orderType: true,
-          customTitle: true,
-          selectedTuneLabel: true,
-          tuningType: true,
-          totalAmount: true,
-          customGrandTotal: true,
-          vehicleNo: true,
-          createdByAdminId: true,
+          docType: true,
+          docNo: true,
+          docDate: true,
+          docDesc: true,
           status: true,
-          createdAt: true,
+          grandTotal: true,
+          customerName: true,
+          customerAccountNo: true,
+          payments: { select: { amount: true } },
+          sourceLinks: {
+            select: {
+              targetTransaction: { select: { docType: true, status: true, grandTotal: true } },
+            },
+          },
         },
       },
     },
@@ -1044,20 +1041,38 @@ export async function getCustomerByIdWithIntelligence(customerId: string) {
 
   if (!customer) return null;
 
-  const validOrders = customer.orders.filter((order) => order.status !== "CANCELLED");
-  const totalOrders = validOrders.length;
-  const totalSpent = validOrders.reduce((sum, order) => {
-    return sum + Number(order.orderType === "CUSTOM_ORDER" ? order.customGrandTotal || 0 : order.totalAmount || 0);
-  }, 0);
+  const transactionHistory = customer.customerSalesTransactions.map((transaction) => {
+    const amount = toCreditNumber(transaction.grandTotal ?? 0);
+    const signedAmount = transaction.docType === "CN" ? -amount : amount;
 
+    return {
+      id: transaction.id,
+      docType: transaction.docType,
+      docNo: transaction.docNo,
+      docDate: transaction.docDate,
+      docDesc: transaction.docDesc,
+      status: transaction.status,
+      amount,
+      signedAmount,
+    };
+  });
+
+  const orderTransactions = transactionHistory.filter((transaction) =>
+    transaction.docType === "INV" || transaction.docType === "CS"
+  );
+  const totalOrders = orderTransactions.length;
+  const totalSpent = Math.round(
+    (transactionHistory.reduce((sum, transaction) => sum + transaction.signedAmount, 0) + Number.EPSILON) * 100
+  ) / 100;
   const averageOrderValue = totalOrders > 0 ? Math.round((totalSpent / totalOrders) * 100) / 100 : 0;
-  const lastOrderDate = totalOrders > 0 ? validOrders[0].createdAt : null;
+  const lastOrderDate = orderTransactions.length > 0 ? orderTransactions[0].docDate : null;
 
   const creditControl = buildCustomerCreditControl(customer);
 
   return {
     ...customer,
     customerSalesTransactions: undefined,
+    orders: transactionHistory,
     creditControl,
     intelligence: {
       totalOrders,

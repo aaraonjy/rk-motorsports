@@ -81,77 +81,78 @@ function formatRelativeDate(value: Date | null) {
   return formatDateTime(value);
 }
 
-function getOrderTitle(order: {
-  orderType: "STANDARD_TUNING" | "CUSTOM_ORDER";
-  customTitle: string | null;
-  selectedTuneLabel: string | null;
-  tuningType: string;
-}) {
-  if (order.orderType === "CUSTOM_ORDER") {
-    return order.customTitle || "Custom Order";
-  }
-
-  return order.selectedTuneLabel || `${order.tuningType} Tune`;
-}
-
-function getOrderDisplayAmount(order: {
-  orderType: "STANDARD_TUNING" | "CUSTOM_ORDER";
-  totalAmount: unknown;
-  customGrandTotal: unknown;
-}) {
-  return order.orderType === "CUSTOM_ORDER"
-    ? toSafeNumber(order.customGrandTotal)
-    : toSafeNumber(order.totalAmount);
-}
-
-function getCustomerProfileDisplayStatus(order: {
-  createdByAdminId: string | null;
+type SalesHistoryItem = {
+  id: string;
+  docType: string;
+  docNo: string;
+  docDate: Date;
+  docDesc: string | null;
   status: string;
-}) {
-  if (order.createdByAdminId && order.status !== "COMPLETED" && order.status !== "CANCELLED") {
-    return "FILE_RECEIVED";
-  }
+  amount: number;
+  signedAmount: number;
+};
 
-  return order.status;
+function getDocumentTypeLabel(docType: string) {
+  switch (docType) {
+    case "INV":
+      return "Sales Invoice";
+    case "CS":
+      return "Cash Sales";
+    case "DN":
+      return "Debit Note";
+    case "CN":
+      return "Credit Note";
+    default:
+      return docType || "-";
+  }
 }
 
-function getStatusClasses(status: string) {
+function getDocumentTitle(order: SalesHistoryItem) {
+  return order.docDesc || getDocumentTypeLabel(order.docType);
+}
+
+function getDocumentAmountClass(docType: string) {
+  if (docType === "CN") return "text-red-300";
+  if (docType === "DN") return "text-amber-200";
+  return "text-white";
+}
+
+function getDocumentTypeClass(docType: string) {
+  if (docType === "CN") return "border-red-500/30 bg-red-500/10 text-red-300";
+  if (docType === "DN") return "border-amber-500/30 bg-amber-500/10 text-amber-300";
+  if (docType === "CS") return "border-sky-500/30 bg-sky-500/10 text-sky-300";
+  return "border-white/15 bg-white/5 text-white/75";
+}
+
+function getSalesStatusClasses(status: string) {
   switch (status) {
-    case "READY_FOR_DOWNLOAD":
     case "COMPLETED":
       return "border-emerald-500/30 bg-emerald-500/10 text-emerald-300";
     case "CANCELLED":
       return "border-red-500/30 bg-red-500/10 text-red-300";
-    case "IN_PROGRESS":
-      return "border-violet-500/30 bg-violet-500/10 text-violet-300";
-    case "FILE_RECEIVED":
-    case "RECEIVED":
-      return "border-sky-500/30 bg-sky-500/10 text-sky-300";
-    case "AWAITING_PAYMENT":
+    case "PARTIAL":
       return "border-amber-500/30 bg-amber-500/10 text-amber-300";
-    case "PAID":
-      return "border-cyan-500/30 bg-cyan-500/15 text-cyan-300";
+    case "OPEN":
+      return "border-sky-500/30 bg-sky-500/10 text-sky-300";
+    case "PENDING":
+      return "border-white/15 bg-white/5 text-white/75";
     default:
       return "border-white/15 bg-white/5 text-white/75";
   }
 }
 
-function getStatusLabel(status: string) {
+function getSalesStatusLabel(status: string) {
   switch (status) {
-    case "FILE_RECEIVED":
-    case "RECEIVED":
-      return "Received";
-    case "IN_PROGRESS":
-      return "In Progress";
-    case "AWAITING_PAYMENT":
-      return "Pending Payment";
-    case "READY_FOR_DOWNLOAD":
+    case "OPEN":
+      return "Open";
+    case "PARTIAL":
+      return "Partial";
     case "COMPLETED":
       return "Completed";
     case "CANCELLED":
       return "Cancelled";
-    case "PAID":
-      return "Paid";
+    case "PENDING":
+      return "Pending";
     default:
       return status.replaceAll("_", " ");
   }
@@ -336,14 +337,14 @@ export default async function AdminCustomerDetailPage({
             <div className="rounded-2xl border border-white/10 bg-black/30 p-5">
               <p className="text-sm text-white/45">Total Spent</p>
               <p className="mt-3 text-3xl font-bold text-white">
-                {formatCurrency(customer.intelligence.totalSpent)}
+                {formatCurrency(customer.intelligence.totalSpent, currency)}
               </p>
             </div>
 
             <div className="rounded-2xl border border-white/10 bg-black/30 p-5">
               <p className="text-sm text-white/45">Avg Order Value</p>
               <p className="mt-3 text-3xl font-bold text-white">
-                {formatCurrency(customer.intelligence.averageOrderValue)}
+                {formatCurrency(customer.intelligence.averageOrderValue, currency)}
               </p>
             </div>
 
@@ -358,58 +359,57 @@ export default async function AdminCustomerDetailPage({
 
         <div className="card-rk overflow-hidden">
           <div className="border-b border-white/10 px-6 py-5 md:px-8">
-            <h2 className="text-2xl font-semibold text-white">Order History</h2>
+            <h2 className="text-2xl font-semibold text-white">Sales Transaction History</h2>
             <p className="mt-2 text-sm text-white/60">
-              Review all orders placed under this customer profile.
+              Review Sales Invoice, Cash Sales, Debit Note, and Credit Note records for this customer.
             </p>
           </div>
 
           {customer.orders.length === 0 ? (
             <div className="px-6 py-12 text-center text-white/55 md:px-8">
-              No orders found for this customer yet.
+              No sales transactions found for this customer yet.
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="min-w-full text-left text-sm text-white/80">
                 <thead className="bg-black/30 text-white/50">
                   <tr>
-                    <th className="px-6 py-4 font-medium md:px-8">Order No.</th>
-                    <th className="px-6 py-4 font-medium">Title</th>
-                    <th className="px-6 py-4 font-medium">Type</th>
+                    <th className="px-6 py-4 font-medium md:px-8">Doc No.</th>
+                    <th className="px-6 py-4 font-medium">Description</th>
+                    <th className="px-6 py-4 font-medium">Document Type</th>
                     <th className="px-6 py-4 font-medium">Status</th>
                     <th className="px-6 py-4 font-medium">Amount</th>
-                    <th className="px-6 py-4 font-medium">Created</th>
+                    <th className="px-6 py-4 font-medium">Doc Date</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {customer.orders.map((order) => {
-                    const displayStatus = getCustomerProfileDisplayStatus(order);
+                  {(customer.orders as SalesHistoryItem[]).map((order) => {
+                    const signedAmount = Number(order.signedAmount || 0);
+                    const amountDisplay = formatCurrency(Math.abs(signedAmount), currency);
 
                     return (
                       <tr key={order.id} className="border-t border-white/10 align-top">
                         <td className="px-6 py-5 md:px-8">
-                          <div className="font-medium text-white">{order.orderNumber}</div>
+                          <div className="font-medium text-white">{order.docNo}</div>
                         </td>
                         <td className="px-6 py-5">
-                          <div className="font-medium text-white">{getOrderTitle(order)}</div>
-                        </td>
-                        <td className="px-6 py-5 text-white/65">
-                          {order.orderType === "CUSTOM_ORDER" ? "Custom Order" : "Standard Tuning"}
+                          <div className="font-medium text-white">{getDocumentTitle(order)}</div>
                         </td>
                         <td className="px-6 py-5">
-                          <span
-                            className={`inline-flex rounded-full border px-3 py-1 text-xs font-medium ${getStatusClasses(
-                              displayStatus
-                            )}`}
-                          >
-                            {getStatusLabel(displayStatus)}
+                          <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-medium ${getDocumentTypeClass(order.docType)}`}>
+                            {getDocumentTypeLabel(order.docType)}
                           </span>
                         </td>
-                        <td className="px-6 py-5 font-medium text-white">
-                          {formatCurrency(getOrderDisplayAmount(order))}
+                        <td className="px-6 py-5">
+                          <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-medium ${getSalesStatusClasses(order.status)}`}>
+                            {getSalesStatusLabel(order.status)}
+                          </span>
+                        </td>
+                        <td className={`px-6 py-5 font-medium ${getDocumentAmountClass(order.docType)}`}>
+                          {order.docType === "CN" ? `-${amountDisplay}` : amountDisplay}
                         </td>
                         <td className="px-6 py-5 text-white/65">
-                          {formatDateTime(order.createdAt)}
+                          {formatDateTime(order.docDate)}
                         </td>
                       </tr>
                     );
