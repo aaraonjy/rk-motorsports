@@ -184,6 +184,7 @@ model User {
   customerAccountNo      String?             @unique
   accountSource          AccountSource       @default(PORTAL)
   portalAccess           Boolean             @default(true)
+  isActive               Boolean             @default(true)
   billingAddressLine1    String?
   billingAddressLine2    String?
   billingAddressLine3    String?

@@ -176,6 +176,7 @@ export async function PATCH(
       contactPerson: getNullableText(body, "contactPerson"),
       emailCc: getNullableText(body, "emailCc"),
       currency,
+      isActive: body.isActive === false ? false : true,
       agentId,
       natureOfBusiness: getNullableText(body, "natureOfBusiness"),
       registrationIdType: normalizeRegistrationIdType(getText(body, "registrationIdType")) as any,
@@ -189,6 +190,46 @@ export async function PATCH(
       },
     },
   });
+
+  return Response.json({ ok: true });
+}
+
+
+export async function DELETE(
+  _req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  await requireAdmin();
+  const { id } = await params;
+
+  const customer = await db.user.findFirst({
+    where: { id, role: "CUSTOMER" },
+    select: { id: true, name: true },
+  });
+
+  if (!customer) {
+    return Response.json({ ok: false, error: "Customer not found." }, { status: 404 });
+  }
+
+  const [orderCount, salesTransactionCount, creditNoteCount] = await Promise.all([
+    db.order.count({ where: { userId: id } }),
+    db.salesTransaction.count({ where: { customerId: id } }),
+    db.creditNote.count({ where: { customerId: id } }),
+  ]);
+
+  const totalLinkedRecords = orderCount + salesTransactionCount + creditNoteCount;
+
+  if (totalLinkedRecords > 0) {
+    return Response.json(
+      {
+        ok: false,
+        error: "This customer already has transactions and cannot be deleted. Please set the customer as inactive instead.",
+      },
+      { status: 409 }
+    );
+  }
+
+  await db.user.delete({ where: { id } });
 
   return Response.json({ ok: true });
 }

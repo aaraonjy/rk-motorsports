@@ -563,6 +563,7 @@ type CustomersOptions = {
   search?: string;
   source?: string;
   portalAccess?: string;
+  status?: string;
   page?: number;
   pageSize?: number;
 };
@@ -574,6 +575,11 @@ export async function getCustomers(filters?: CustomersOptions) {
 
   const where: Prisma.UserWhereInput = {
     role: "CUSTOMER",
+    ...(filters?.status === "INACTIVE"
+      ? { isActive: false }
+      : filters?.status === "ALL"
+        ? {}
+        : { isActive: true }),
     ...(filters?.search
       ? {
           OR: [
@@ -692,10 +698,13 @@ export async function getCustomers(filters?: CustomersOptions) {
         },
         accountSource: true,
         portalAccess: true,
+        isActive: true,
         createdAt: true,
         _count: {
           select: {
             orders: true,
+            customerSalesTransactions: true,
+            creditNotes: true,
           },
         },
       },
@@ -713,6 +722,10 @@ export async function getCustomers(filters?: CustomersOptions) {
       salesTransactionOrderCount: customer.customerSalesTransactions.filter((transaction) =>
         transaction.docType === "INV" || transaction.docType === "CS",
       ).length,
+      customerProfileTransactionCount:
+        (customer._count.orders || 0) +
+        (customer._count.customerSalesTransactions || 0) +
+        (customer._count.creditNotes || 0),
       customerSalesTransactions: undefined,
     })),
     totalCount,
@@ -877,6 +890,7 @@ export async function getCustomersReport(filters?: CustomersReportOptions) {
       },
       accountSource: true,
       portalAccess: true,
+      isActive: true,
       createdAt: true,
       orders: {
         where: orderWhere,
@@ -983,6 +997,7 @@ export async function getCustomerById(customerId: string) {
       },
       accountSource: true,
       portalAccess: true,
+      isActive: true,
       createdAt: true,
       _count: {
         select: {
@@ -1088,6 +1103,7 @@ export async function getCustomerByIdWithIntelligence(
       },
       accountSource: true,
       portalAccess: true,
+      isActive: true,
       createdAt: true,
     },
   });

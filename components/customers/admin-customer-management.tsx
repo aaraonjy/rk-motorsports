@@ -80,11 +80,15 @@ type CustomerRecord = {
   creditOverdue?: boolean;
   accountSource: "PORTAL" | "ADMIN";
   portalAccess: boolean;
+  isActive: boolean;
   createdAt: string;
   _count: {
     orders: number;
+    customerSalesTransactions?: number;
+    creditNotes?: number;
   };
   salesTransactionOrderCount?: number;
+  customerProfileTransactionCount?: number;
 };
 
 type Props = {
@@ -149,6 +153,7 @@ type CustomerFormState = {
   creditControlType: "NONE" | "TERMS" | "LIMIT";
   creditTermsDays: string;
   creditLimitAmount: string;
+  isActive: boolean;
 };
 
 type CustomerApiResponse = {
@@ -214,6 +219,7 @@ function getInitialForm(customer: CustomerRecord | null): CustomerFormState {
     creditControlType: Number(customer?.creditTermsDays ?? 0) > 0 ? "TERMS" : Number(customer?.creditLimitAmount ?? 0) > 0 ? "LIMIT" : "NONE",
     creditTermsDays: String(customer?.creditTermsDays ?? 0),
     creditLimitAmount: String(customer?.creditLimitAmount ?? 0),
+    isActive: customer?.isActive ?? true,
   };
 }
 
@@ -278,6 +284,15 @@ function getPortalAccessBadge(enabled: boolean) {
     : "inline-flex min-w-[88px] items-center justify-center rounded-full border border-white/15 bg-white/10 px-3 py-1 text-center text-xs font-semibold text-white/75 transition hover:bg-white/15";
 }
 
+function getCustomerStatusBadge(isActive: boolean) {
+  return isActive
+    ? "inline-flex min-w-[88px] items-center justify-center rounded-full border border-emerald-500/30 bg-emerald-500/15 px-3 py-1 text-center text-xs font-semibold text-emerald-300"
+    : "inline-flex min-w-[88px] items-center justify-center rounded-full border border-red-500/30 bg-red-500/15 px-3 py-1 text-center text-xs font-semibold text-red-300";
+}
+
+function getCustomerStatusLabel(isActive: boolean) {
+  return isActive ? "Active" : "Inactive";
+}
 
 function getCreditBadge(customer: CustomerRecord) {
   if (customer.creditOverdue) {
@@ -474,6 +489,7 @@ function CustomerModal({
   const [form, setForm] = useState<CustomerFormState>(() => getInitialForm(customer));
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [accountSuffixTouched, setAccountSuffixTouched] = useState(false);
   const [isAccountOverrideOpen, setIsAccountOverrideOpen] = useState(false);
   const [accountOverrideDraft, setAccountOverrideDraft] = useState("");
@@ -509,6 +525,7 @@ function CustomerModal({
     });
     setError(null);
     setIsSubmitting(false);
+    setIsDeleting(false);
   }, [customer, isOpen]);
 
   const accountSuffixLength = getAccountSuffixLength(accountConfiguration.customerAccountNoFormat);
@@ -610,6 +627,7 @@ function CustomerModal({
   if (!isOpen) return null;
 
   const isPortalCustomer = customer?.accountSource === "PORTAL";
+  const canDeleteCustomer = mode === "edit" && customer ? Number(customer.customerProfileTransactionCount ?? customer._count.orders ?? 0) === 0 : false;
 
   function updateField<K extends keyof CustomerFormState>(key: K, value: CustomerFormState[K]) {
     setForm((prev) => {
@@ -713,6 +731,7 @@ function CustomerModal({
           customerAccountNo: mode === "create" ? previewAccountNo || null : customer?.customerAccountNo,
           email: form.email.trim(),
           phone: form.phone.trim(),
+          isActive: form.isActive,
           agentId: form.agentId || null,
           deliveryAddresses: form.deliveryAddresses.map((address) => ({
             label: address.label.trim(),
@@ -743,6 +762,32 @@ function CustomerModal({
     }
   }
 
+  async function handleDeleteCustomer() {
+    if (!customer || !canDeleteCustomer) return;
+    const confirmed = window.confirm("Delete this customer profile? This action cannot be undone.");
+    if (!confirmed) return;
+
+    setError(null);
+    setIsDeleting(true);
+
+    try {
+      const response = await fetch(`/api/admin/customers/${customer.id}`, { method: "DELETE" });
+      const data = (await response.json()) as CustomerApiResponse;
+
+      if (!response.ok || !data.ok) {
+        setError(data.error || "Unable to delete customer right now.");
+        return;
+      }
+
+      onSaved("Customer deleted successfully.");
+      onClose();
+    } catch {
+      setError("Unable to delete customer right now.");
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 px-4 py-6">
       <div className="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-2xl border border-white/10 bg-zinc-950 p-6 shadow-2xl">
@@ -753,6 +798,18 @@ function CustomerModal({
               {mode === "create" ? "Create a full customer profile for walk-in or admin-managed jobs." : "Update the customer profile details below."}
             </p>
           </div>
+
+          {mode === "edit" ? (
+            <label className="flex shrink-0 cursor-pointer items-center gap-3 rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white/75 transition hover:bg-white/10">
+              <input
+                type="checkbox"
+                checked={!form.isActive}
+                onChange={(e) => updateField("isActive", !e.target.checked)}
+                className="h-4 w-4 accent-red-500"
+              />
+              Set Inactive
+            </label>
+          ) : null}
         </div>
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-6">
@@ -948,11 +1005,26 @@ function CustomerModal({
 
           {error ? <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200"><div className="font-semibold uppercase tracking-[0.18em] text-red-300/80">Save Failed</div><p className="mt-2 leading-6">{error}</p></div> : null}
 
-          <div className="flex items-center justify-end gap-3 pt-2">
-            <button type="button" onClick={onClose} disabled={isSubmitting} className="rounded-xl border border-white/15 px-4 py-2.5 text-sm text-white/75 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-50">Cancel</button>
-            <button type="submit" disabled={isSubmitting} className="rounded-xl border border-white/15 bg-black/30 px-4 py-2.5 text-sm text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50">
-              {isSubmitting ? (mode === "create" ? "Creating..." : "Saving...") : mode === "create" ? "Add Customer" : "Save Changes"}
-            </button>
+          <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              {canDeleteCustomer ? (
+                <button
+                  type="button"
+                  onClick={handleDeleteCustomer}
+                  disabled={isSubmitting || isDeleting}
+                  className="rounded-xl border border-red-500/40 px-4 py-2.5 text-sm text-red-300 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isDeleting ? "Deleting..." : "Delete Customer"}
+                </button>
+              ) : null}
+            </div>
+
+            <div className="flex items-center justify-end gap-3">
+              <button type="button" onClick={onClose} disabled={isSubmitting || isDeleting} className="rounded-xl border border-white/15 px-4 py-2.5 text-sm text-white/75 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-50">Cancel</button>
+              <button type="submit" disabled={isSubmitting || isDeleting} className="rounded-xl border border-white/15 bg-black/30 px-4 py-2.5 text-sm text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50">
+                {isSubmitting ? (mode === "create" ? "Creating..." : "Saving...") : mode === "create" ? "Add Customer" : "Save Changes"}
+              </button>
+            </div>
           </div>
         </form>
 
@@ -1166,6 +1238,7 @@ export function AdminCustomerManagement({ customers, agents, countries, currenci
               <th className="w-[260px] px-4 py-4">Email</th>
               <th className="w-[150px] px-4 py-4">Source</th>
               <th className="w-[140px] px-4 py-4">Portal Access</th>
+              <th className="w-[120px] px-4 py-4">Status</th>
               <th className="w-[170px] px-4 py-4">Credit Control</th>
               <th className="w-[110px] px-4 py-4">Orders</th>
               <th className="w-[200px] px-4 py-4">Action</th>
@@ -1185,6 +1258,7 @@ export function AdminCustomerManagement({ customers, agents, countries, currenci
                     {isTogglingId === customer.id ? "Updating..." : customer.portalAccess ? "Enabled" : "Disabled"}
                   </button>
                 </td>
+                <td className="px-4 py-4"><span className={getCustomerStatusBadge(customer.isActive)}>{getCustomerStatusLabel(customer.isActive)}</span></td>
                 <td className="px-4 py-4">
                   <div className="space-y-2">
                     <span className={getCreditBadge(customer)}>{getCreditLabel(customer)}</span>
@@ -1194,13 +1268,17 @@ export function AdminCustomerManagement({ customers, agents, countries, currenci
                 <td className="px-4 py-4 text-white/85">{customer.salesTransactionOrderCount ?? customer._count.orders}</td>
                 <td className="px-4 py-4">
                   <div className="flex flex-col gap-2">
-                    <Link href={`/admin/customers/${customer.id}/create-order`} onClick={(e) => e.stopPropagation()} className="inline-flex w-full items-center justify-center rounded-xl border border-white/15 bg-black/30 px-4 py-2 text-center text-white transition hover:bg-white/10">Create Order</Link>
+                    {customer.isActive ? (
+                      <Link href={`/admin/customers/${customer.id}/create-order`} onClick={(e) => e.stopPropagation()} className="inline-flex w-full items-center justify-center rounded-xl border border-white/15 bg-black/30 px-4 py-2 text-center text-white transition hover:bg-white/10">Create Order</Link>
+                    ) : (
+                      <span className="inline-flex w-full cursor-not-allowed items-center justify-center rounded-xl border border-white/10 bg-black/20 px-4 py-2 text-center text-white/35">Inactive</span>
+                    )}
                     <button type="button" onClick={(e) => { e.stopPropagation(); setEditingCustomer(customer); }} className="rounded-xl border border-white/15 bg-black/30 px-4 py-2 text-white transition hover:bg-white/10">Edit</button>
                   </div>
                 </td>
               </tr>
             )) : (
-              <tr><td colSpan={10} className="px-4 py-10 text-center text-white/45">No customers found for the selected filters.</td></tr>
+              <tr><td colSpan={11} className="px-4 py-10 text-center text-white/45">No customers found for the selected filters.</td></tr>
             )}
           </tbody>
         </table>
