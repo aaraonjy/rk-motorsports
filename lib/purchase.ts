@@ -579,11 +579,36 @@ export async function updatePurchaseTransaction(docType: PurchaseDocType, id: st
 
 export async function cancelPurchaseTransaction(docType: PurchaseDocType, id: string, adminId: string, reason?: string | null) {
   return db.$transaction(async (tx) => {
-    const current = await tx.purchaseTransaction.findUnique({ where: { id }, include: { sourceLinks: true, targetLinks: true } });
+    const current = await tx.purchaseTransaction.findUnique({
+      where: { id },
+      include: {
+        sourceLinks: { include: { targetTransaction: true } },
+        targetLinks: true,
+      },
+    });
     if (!current || current.docType !== docType) throw new Error("Document not found.");
     if (current.status === "CANCELLED") return current;
-    if (current.stockTransactionId) throw new Error("This document already posted stock movement. Please reverse it using the proper return/adjustment flow.");
-    const updated = await tx.purchaseTransaction.update({ where: { id }, data: { status: "CANCELLED", cancelledByAdminId: adminId, cancelledAt: new Date(), cancelReason: normalizeText(reason) || "Cancelled by admin" } });
+
+    const activeDownstream = current.sourceLinks.filter((link) => link.targetTransaction.status !== "CANCELLED");
+    if (activeDownstream.length > 0) {
+      const generatedDocs = activeDownstream.map((link) => link.targetTransaction.docNo).filter(Boolean).join(", ");
+      throw new Error(`Cannot cancel this document because it has active generated document${activeDownstream.length > 1 ? "s" : ""}${generatedDocs ? `: ${generatedDocs}` : ""}. Please cancel the downstream document first.`);
+    }
+
+    if (current.stockTransactionId) {
+      await tx.stockLedger.deleteMany({ where: { sourceId: current.id, sourceType: `PURCHASE_${current.docType}` } });
+      await tx.stockTransaction.updateMany({ where: { id: current.stockTransactionId }, data: { status: StockTransactionStatus.CANCELLED } });
+    }
+
+    const updated = await tx.purchaseTransaction.update({
+      where: { id },
+      data: {
+        status: "CANCELLED",
+        cancelledByAdminId: adminId,
+        cancelledAt: new Date(),
+        cancelReason: normalizeText(reason) || "Cancelled by admin",
+      },
+    });
     for (const link of current.targetLinks) await refreshSourceStatus(tx, link.sourceTransactionId);
     return updated;
   });

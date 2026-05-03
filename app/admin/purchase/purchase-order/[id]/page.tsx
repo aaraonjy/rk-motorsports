@@ -1,22 +1,140 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getSessionUser } from "@/lib/auth";
+import { getSessionUser, requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { cancelPurchaseTransaction } from "@/lib/purchase";
+import type { PurchaseDocType } from "@prisma/client";
 
-type Params = { params: Promise<{ id: string }>; searchParams?: Promise<{ success?: string }> };
+type Params = { params: Promise<{ id: string }>; searchParams?: Promise<{ success?: string; error?: string }> };
 
-const DOC_TYPE = "PO";
+const DOC_TYPE = "PO" as PurchaseDocType;
 const TITLE = "Purchase Order";
+const TITLE_LOWER = "purchase order";
 const LIST_PATH = "/admin/purchase/purchase-order";
+const SUMMARY_TITLE = "Purchase Order Summary";
+const PRODUCT_NOTE = "Delivery and invoice progress will be updated by future GRN / Purchase Invoice documents using line-level links.";
 
-function money(value: unknown) { const numeric = Number(value ?? 0); return Number.isFinite(numeric) ? numeric.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0.00"; }
-function formatDate(value: Date | string | null | undefined) { if (!value) return "-"; const date = new Date(value); if (Number.isNaN(date.getTime())) return "-"; return date.toLocaleDateString("en-MY", { timeZone: "Asia/Kuala_Lumpur", day: "2-digit", month: "2-digit", year: "numeric" }); }
-function formatDateTime(value: Date | string | null | undefined) { if (!value) return "-"; const date = new Date(value); if (Number.isNaN(date.getTime())) return "-"; return date.toLocaleString("en-MY", { timeZone: "Asia/Kuala_Lumpur", day: "2-digit", month: "2-digit", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true }).replace(/am|pm/i, (value) => value.toLowerCase()); }
-function getStatusClass(status: string) { if (status === "CANCELLED") return "border-red-500/25 bg-red-500/10 text-red-200"; if (status === "COMPLETED") return "border-sky-500/25 bg-sky-500/10 text-sky-200"; if (status === "PARTIAL") return "border-indigo-500/25 bg-indigo-500/10 text-indigo-200"; return "border-amber-500/25 bg-amber-500/10 text-amber-200"; }
-function ReadonlyField({ label, value, className = "" }: { label: string; value: string; className?: string }) { return <div className={className}><label className="label-rk">{label}</label><input className="input-rk" value={value} readOnly disabled /></div>; }
-function ReadonlyTextArea({ label, value, className = "" }: { label: string; value: string; className?: string }) { return <div className={className}><label className="label-rk">{label}</label><textarea className="input-rk min-h-[96px] resize-none" value={value} readOnly disabled /></div>; }
-function purchaseRoute(docType: string | null | undefined) { const value = String(docType || "").toUpperCase(); if (value === "PO") return "purchase-order"; if (value === "GRN") return "goods-received-note"; if (value === "PI") return "purchase-invoice"; return ""; }
-function active(item?: { status?: string | null } | null) { return item && String(item.status || "").toUpperCase() !== "CANCELLED"; }
+function money(value: unknown) {
+  const numeric = Number(value ?? 0);
+  return Number.isFinite(numeric) ? numeric.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0.00";
+}
+
+function toNumber(value: unknown) {
+  const numeric = Number(value ?? 0);
+  return Number.isFinite(numeric) ? numeric : 0;
+}
+
+function formatDate(value: Date | string | null | undefined) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleDateString("en-MY", { timeZone: "Asia/Kuala_Lumpur", day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
+function formatDateTime(value: Date | string | null | undefined) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleString("en-MY", {
+    timeZone: "Asia/Kuala_Lumpur",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).replace(/am|pm/i, (value) => value.toLowerCase());
+}
+
+function getPurchaseRouteByDocType(docType: string | null | undefined) {
+  const value = String(docType || "").toUpperCase();
+  if (value === "PO") return "purchase-order";
+  if (value === "GRN") return "goods-received-note";
+  if (value === "PI") return "purchase-invoice";
+  return "";
+}
+
+function isActivePurchaseTrace(status: string | null | undefined) {
+  return String(status || "").toUpperCase() !== "CANCELLED";
+}
+
+function getLinkedQty(
+  line: { sourceLineLinks?: Array<{ linkType?: string | null; qty?: unknown; targetTransaction?: { status?: string | null } | null }> },
+  linkType: "RECEIVED_TO" | "INVOICED_TO",
+) {
+  return (line.sourceLineLinks || [])
+    .filter((link) => link.linkType === linkType)
+    .filter((link) => isActivePurchaseTrace(link.targetTransaction?.status))
+    .reduce((sum, link) => sum + toNumber(link.qty), 0);
+}
+
+function getLinkedAmount(
+  line: { sourceLineLinks?: Array<{ linkType?: string | null; claimAmount?: unknown; targetTransaction?: { status?: string | null } | null }> },
+  linkType: "RECEIVED_TO" | "INVOICED_TO",
+) {
+  return (line.sourceLineLinks || [])
+    .filter((link) => link.linkType === linkType)
+    .filter((link) => isActivePurchaseTrace(link.targetTransaction?.status))
+    .reduce((sum, link) => sum + toNumber(link.claimAmount), 0);
+}
+
+function ReadonlyField({ label, value, className = "" }: { label: string; value: string; className?: string }) {
+  return (
+    <div className={className}>
+      <label className="label-rk">{label}</label>
+      <input className="input-rk" value={value} readOnly disabled />
+    </div>
+  );
+}
+
+function ReadonlyTextArea({ label, value, className = "" }: { label: string; value: string; className?: string }) {
+  return (
+    <div className={className}>
+      <label className="label-rk">{label}</label>
+      <textarea className="input-rk min-h-[96px] resize-none" value={value} readOnly disabled />
+    </div>
+  );
+}
+
+function AddressPanel({
+  title,
+  address,
+}: {
+  title: string;
+  address: {
+    addressLine1?: string | null;
+    addressLine2?: string | null;
+    addressLine3?: string | null;
+    addressLine4?: string | null;
+    city?: string | null;
+    postCode?: string | null;
+  };
+}) {
+  return (
+    <div className="rounded-[1.75rem] border border-white/10 p-5">
+      <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-white/45">{title}</h3>
+      <div className="mt-5 grid gap-4 md:grid-cols-2">
+        <ReadonlyField label="Address Line 1" value={address.addressLine1 || ""} />
+        <ReadonlyField label="Address Line 2" value={address.addressLine2 || ""} />
+        <ReadonlyField label="Address Line 3" value={address.addressLine3 || ""} />
+        <ReadonlyField label="Address Line 4" value={address.addressLine4 || ""} />
+        <ReadonlyField label="City" value={address.city || ""} />
+        <ReadonlyField label="Post Code" value={address.postCode || ""} />
+      </div>
+    </div>
+  );
+}
+
+async function cancelPurchaseAction(formData: FormData) {
+  "use server";
+  const admin = await requireAdmin();
+  const id = String(formData.get("id") || "");
+  const docType = String(formData.get("docType") || "") as PurchaseDocType;
+  const listPath = String(formData.get("listPath") || "/admin/purchase");
+  const reason = String(formData.get("reason") || "Cancelled by admin");
+  await cancelPurchaseTransaction(docType, id, admin.id, reason);
+  redirect(`${listPath}?success=${encodeURIComponent("Document cancelled successfully.")}`);
+}
 
 export default async function PurchaseDetailPage({ params, searchParams }: Params) {
   const user = await getSessionUser();
@@ -26,55 +144,303 @@ export default async function PurchaseDetailPage({ params, searchParams }: Param
   const { id } = await params;
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const successMessage = typeof resolvedSearchParams?.success === "string" ? resolvedSearchParams.success.trim() : "";
+  const errorMessage = typeof resolvedSearchParams?.error === "string" ? resolvedSearchParams.error.trim() : "";
 
   const transaction = await db.purchaseTransaction.findUnique({
     where: { id },
     include: {
-      supplier: { select: { id: true, name: true, supplierAccountNo: true } },
       agent: { select: { id: true, code: true, name: true } },
       project: { select: { id: true, code: true, name: true } },
       department: { select: { id: true, code: true, name: true, projectId: true } },
       revisedFrom: { select: { id: true, docNo: true } },
       revisions: { select: { id: true, docNo: true, status: true } },
-      sourceLinks: { include: { targetTransaction: { select: { id: true, docType: true, docNo: true, status: true } } } },
-      targetLinks: { include: { sourceTransaction: { select: { id: true, docType: true, docNo: true, status: true } } } },
-      lines: { orderBy: { lineNo: "asc" }, include: { sourceLineLinks: { include: { targetTransaction: { select: { id: true, docType: true, docNo: true, status: true } }, sourceTransaction: { select: { id: true, docType: true, docNo: true, status: true } } } } } },
+      sourceLinks: {
+        include: { targetTransaction: { select: { id: true, docType: true, docNo: true, status: true } } },
+      },
+      targetLinks: {
+        include: { sourceTransaction: { select: { id: true, docType: true, docNo: true, status: true } } },
+      },
+      lines: {
+        orderBy: { lineNo: "asc" },
+        include: {
+          inventoryProduct: { select: { id: true, itemType: true } },
+          sourceLineLinks: {
+            include: { targetTransaction: { select: { id: true, docType: true, docNo: true, status: true } } },
+          },
+        },
+      },
     },
   });
 
   if (!transaction || transaction.docType !== DOC_TYPE) {
-    return <section className="section-pad"><div className="container-rk max-w-5xl"><p className="text-white/70">{TITLE} not found.</p></div></section>;
+    return (
+      <section className="section-pad">
+        <div className="container-rk max-w-5xl">
+          <p className="text-white/70">{TITLE} not found.</p>
+        </div>
+      </section>
+    );
   }
 
   const currency = transaction.currency || "MYR";
-  const generatedFrom = transaction.targetLinks.map((link) => link.sourceTransaction).filter(active);
-  const generatedTo = transaction.sourceLinks.map((link) => link.targetTransaction).filter(active);
+  const activeGeneratedFromDocuments = transaction.targetLinks
+    .map((link) => link.sourceTransaction)
+    .filter((item) => item && isActivePurchaseTrace(item.status));
+  const activeGeneratedToDocuments = transaction.sourceLinks
+    .map((link) => link.targetTransaction)
+    .filter((item) => item && isActivePurchaseTrace(item.status));
+  const canCancel = transaction.status !== "CANCELLED" && activeGeneratedToDocuments.length === 0;
+
+  const billingAddress = {
+    addressLine1: transaction.billingAddressLine1,
+    addressLine2: transaction.billingAddressLine2,
+    addressLine3: transaction.billingAddressLine3,
+    addressLine4: transaction.billingAddressLine4,
+    city: transaction.billingCity,
+    postCode: transaction.billingPostCode,
+  };
+  const deliveryAddress = {
+    addressLine1: transaction.deliveryAddressLine1,
+    addressLine2: transaction.deliveryAddressLine2,
+    addressLine3: transaction.deliveryAddressLine3,
+    addressLine4: transaction.deliveryAddressLine4,
+    city: transaction.deliveryCity,
+    postCode: transaction.deliveryPostCode,
+  };
 
   return (
     <section className="section-pad">
       <div className="container-rk max-w-7xl space-y-6">
-        {successMessage ? <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">{successMessage}</div> : null}
+        {successMessage ? (
+          <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+            {successMessage}
+          </div>
+        ) : null}
+        {errorMessage ? (
+          <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+            {errorMessage}
+          </div>
+        ) : null}
+
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.24em] text-red-400/80">{TITLE}</p>
             <h1 className="mt-3 text-4xl font-bold">{transaction.docNo}</h1>
-            <p className="mt-4 max-w-3xl text-white/70">View {TITLE.toLowerCase()} details in read-only mode.</p>
-            {generatedFrom.length > 0 ? <div className="mt-3 flex flex-wrap items-center gap-2 text-sm"><span className="text-sky-200">Generated from:</span>{generatedFrom.map((source, index) => { const route = purchaseRoute(source?.docType); const content = `${source?.docNo || "-"}${generatedFrom.length > 1 && index < generatedFrom.length - 1 ? "," : ""}`; return route ? <Link key={source?.id} href={`/admin/purchase/${route}/${source?.id}`} className="text-sky-200 underline-offset-4 hover:underline">{content}</Link> : <span key={source?.id} className="text-sky-200">{content}</span>; })}</div> : null}
-            {generatedTo.length > 0 ? <div className="mt-2 flex flex-wrap items-center gap-2 text-sm"><span className="text-sky-200">Generated to:</span>{generatedTo.map((target, index) => { const route = purchaseRoute(target?.docType); const content = `${target?.docNo || "-"}${generatedTo.length > 1 && index < generatedTo.length - 1 ? "," : ""}`; return route ? <Link key={target?.id} href={`/admin/purchase/${route}/${target?.id}`} className="text-sky-200 underline-offset-4 hover:underline">{content}</Link> : <span key={target?.id} className="text-sky-200">{content}</span>; })}</div> : null}
-            {transaction.revisedFrom?.docNo ? <Link href={`${LIST_PATH}/${transaction.revisedFrom.id}`} className="mt-3 block w-fit rounded-lg px-2 py-1 text-sm text-white/45 transition hover:bg-white/5 hover:text-white/80">↳ Revision of {transaction.revisedFrom.docNo}</Link> : null}
+            <p className="mt-4 max-w-3xl text-white/70">View {TITLE_LOWER} details in read-only mode.</p>
+            {activeGeneratedFromDocuments.length > 0 ? (
+              <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+                <span className="text-sky-200">Generated from:</span>
+                {activeGeneratedFromDocuments.map((source, index) => {
+                  const route = getPurchaseRouteByDocType(source?.docType);
+                  const content = `${source?.docNo || "-"}${activeGeneratedFromDocuments.length > 1 && index < activeGeneratedFromDocuments.length - 1 ? "," : ""}`;
+                  return route ? (
+                    <Link key={source?.id} href={`/admin/purchase/${route}/${source?.id}`} className="text-sky-200 underline-offset-4 hover:underline">
+                      {content}
+                    </Link>
+                  ) : (
+                    <span key={source?.id} className="text-sky-200">{content}</span>
+                  );
+                })}
+              </div>
+            ) : null}
+            {activeGeneratedToDocuments.length > 0 ? (
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+                <span className="text-sky-200">Generated to:</span>
+                {activeGeneratedToDocuments.map((target, index) => {
+                  const route = getPurchaseRouteByDocType(target?.docType);
+                  const content = `${target?.docNo || "-"}${activeGeneratedToDocuments.length > 1 && index < activeGeneratedToDocuments.length - 1 ? "," : ""}`;
+                  return route ? (
+                    <Link key={target?.id} href={`/admin/purchase/${route}/${target?.id}`} className="text-sky-200 underline-offset-4 hover:underline">
+                      {content}
+                    </Link>
+                  ) : (
+                    <span key={target?.id} className="text-sky-200">{content}</span>
+                  );
+                })}
+              </div>
+            ) : null}
+            {transaction.revisedFrom?.docNo ? (
+              <Link href={`${LIST_PATH}/${transaction.revisedFrom.id}`} className="mt-3 block w-fit rounded-lg px-2 py-1 text-sm text-white/45 transition hover:bg-white/5 hover:text-white/80">
+                ↳ Revision of {transaction.revisedFrom.docNo}
+              </Link>
+            ) : null}
           </div>
-          <div className="flex flex-wrap gap-3"><Link href={LIST_PATH} className="rounded-xl border border-white/15 bg-white/5 px-5 py-3 text-sm text-white/80 transition hover:bg-white/10">Back</Link><Link href={`${LIST_PATH}?edit=${transaction.id}`} className={`rounded-xl px-5 py-3 text-sm font-semibold text-white transition ${transaction.status === "CANCELLED" ? "pointer-events-none cursor-not-allowed border border-white/10 bg-white/5 opacity-50" : "border border-white/15 bg-white/5 hover:bg-white/10"}`}>Edit</Link></div>
+          <div className="flex flex-wrap gap-3">
+            <Link href={LIST_PATH} className="rounded-xl border border-white/15 bg-white/5 px-5 py-3 text-sm text-white/80 transition hover:bg-white/10">
+              Back
+            </Link>
+            <Link
+              href={`${LIST_PATH}?edit=${transaction.id}`}
+              className={`rounded-xl px-5 py-3 text-sm font-semibold text-white transition ${
+                transaction.status === "CANCELLED"
+                  ? "pointer-events-none cursor-not-allowed border border-white/10 bg-white/5 opacity-50"
+                  : "border border-white/15 bg-white/5 hover:bg-white/10"
+              }`}
+            >
+              Edit
+            </Link>
+            {transaction.status !== "CANCELLED" ? (
+              <form action={cancelPurchaseAction}>
+                <input type="hidden" name="id" value={transaction.id} />
+                <input type="hidden" name="docType" value={DOC_TYPE} />
+                <input type="hidden" name="listPath" value={LIST_PATH} />
+                <input type="hidden" name="reason" value="Cancelled by admin" />
+                <button
+                  type="submit"
+                  disabled={!canCancel}
+                  title={!canCancel ? "Cancel downstream generated document first." : "Cancel document"}
+                  className={`rounded-xl px-5 py-3 text-sm font-semibold text-white transition ${
+                    canCancel ? "border border-red-500/30 bg-red-600/80 hover:bg-red-500" : "cursor-not-allowed border border-white/10 bg-white/5 opacity-50"
+                  }`}
+                >
+                  Cancel
+                </button>
+              </form>
+            ) : null}
+          </div>
         </div>
 
-        <div className="card-rk p-5 md:p-8">
-          {transaction.status === "CANCELLED" ? <div className="mb-6 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-4 text-sm text-red-100"><div className="font-semibold">This {TITLE.toLowerCase()} has been cancelled.</div><div className="mt-3 space-y-2 text-white/85"><div>Cancelled At: {formatDateTime(transaction.cancelledAt)}</div><div>Cancelled By: {transaction.cancelledByAdminId || "-"}</div><div>Reason: {transaction.cancelReason || "-"}</div></div></div> : null}
-          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4"><ReadonlyField label="Doc No" value={transaction.docNo} /><ReadonlyField label="Doc Date" value={formatDate(transaction.docDate)} /><ReadonlyField label="Status" value={transaction.status} /><ReadonlyField label="Currency" value={currency} /><ReadonlyField label="Supplier A/C No" value={transaction.supplierAccountNo || ""} /><ReadonlyField label="Supplier Name" value={transaction.supplierName || ""} /><ReadonlyField label="Email" value={transaction.email || ""} /><ReadonlyField label="Contact No" value={transaction.contactNo || ""} /><ReadonlyField label="Reference" value={transaction.reference || ""} /><ReadonlyField label="Agent" value={transaction.agent ? `${transaction.agent.code} — ${transaction.agent.name}` : ""} /><ReadonlyField label="Project" value={transaction.project ? `${transaction.project.code} — ${transaction.project.name}` : ""} /><ReadonlyField label="Department" value={transaction.department ? `${transaction.department.code} — ${transaction.department.name}` : ""} /></div>
-          <div className="mt-6 grid gap-6 lg:grid-cols-2"><div className="rounded-[1.75rem] border border-white/10 p-5"><h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-white/45">Billing Address</h3><div className="mt-5 grid gap-4 md:grid-cols-2"><ReadonlyField label="Address Line 1" value={transaction.billingAddressLine1 || ""} /><ReadonlyField label="Address Line 2" value={transaction.billingAddressLine2 || ""} /><ReadonlyField label="Address Line 3" value={transaction.billingAddressLine3 || ""} /><ReadonlyField label="Address Line 4" value={transaction.billingAddressLine4 || ""} /><ReadonlyField label="City" value={transaction.billingCity || ""} /><ReadonlyField label="Post Code" value={transaction.billingPostCode || ""} /></div></div><div className="rounded-[1.75rem] border border-white/10 p-5"><h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-white/45">Delivery Address</h3><div className="mt-5 grid gap-4 md:grid-cols-2"><ReadonlyField label="Address Line 1" value={transaction.deliveryAddressLine1 || ""} /><ReadonlyField label="Address Line 2" value={transaction.deliveryAddressLine2 || ""} /><ReadonlyField label="Address Line 3" value={transaction.deliveryAddressLine3 || ""} /><ReadonlyField label="Address Line 4" value={transaction.deliveryAddressLine4 || ""} /><ReadonlyField label="City" value={transaction.deliveryCity || ""} /><ReadonlyField label="Post Code" value={transaction.deliveryPostCode || ""} /></div></div></div>
+        {transaction.status === "CANCELLED" ? (
+          <div className="rounded-2xl border border-red-500/25 bg-red-500/10 p-5 text-sm text-red-100">
+            <div className="font-semibold">This {TITLE_LOWER} has been cancelled.</div>
+            <div className="mt-2">Cancelled At: {formatDate(transaction.cancelledAt)}</div>
+            <div className="mt-1">Cancelled By: {transaction.cancelledByAdminId || "-"}</div>
+            <div className="mt-1">Reason: {transaction.cancelReason || "-"}</div>
+          </div>
+        ) : null}
+
+        <div className="rounded-[2rem] border border-white/10 bg-black/45 p-5 backdrop-blur-md md:p-6">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.24em] text-white/40">{TITLE}</p>
+              <h2 className="mt-4 text-4xl font-bold">View {TITLE}</h2>
+              <p className="mt-4 max-w-3xl text-white/70">Use the same purchase document layout in read-only mode for easier review and checking.</p>
+            </div>
+            <div className="grid min-w-[250px] grid-cols-[110px_1fr] gap-x-3 gap-y-2 text-xs text-white/55">
+              <div className="text-right">Created By:</div>
+              <div className="text-left font-semibold text-white/75">{transaction.createdByAdminId || "-"}</div>
+              <div className="text-right">Created Date:</div>
+              <div className="text-left font-semibold text-white/75">{formatDateTime(transaction.createdAt)}</div>
+            </div>
+          </div>
+
+          <div className="mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+            <ReadonlyField label="Doc Date" value={formatDate(transaction.docDate)} />
+            <ReadonlyField label="System Doc No" value={transaction.docNo} className="xl:col-span-3" />
+            <ReadonlyField label="A/C No" value={transaction.supplierAccountNo || ""} />
+            <ReadonlyField label="Supplier Name" value={transaction.supplierName || ""} />
+            <ReadonlyField label="Email" value={transaction.email || ""} />
+            <ReadonlyField label="Status" value={transaction.status} />
+            <ReadonlyField label="Document Description" value={transaction.docDesc || ""} className="xl:col-span-2" />
+            <ReadonlyField label="Attention" value={transaction.attention || ""} />
+            <ReadonlyField label="Contact No" value={transaction.contactNo || ""} />
+            <ReadonlyField label="Agent" value={transaction.agent ? `${transaction.agent.code} — ${transaction.agent.name}` : ""} />
+            {transaction.project ? <ReadonlyField label="Project" value={`${transaction.project.code} — ${transaction.project.name}`} /> : null}
+            {transaction.department ? <ReadonlyField label="Department" value={`${transaction.department.code} — ${transaction.department.name}`} /> : null}
+          </div>
+
+          <div className="mt-6">
+            <AddressPanel title="Billing Address" address={billingAddress} />
+          </div>
+
+          <div className="mt-6 grid gap-5 md:grid-cols-2">
+            <ReadonlyTextArea label="Remarks" value={transaction.remarks || ""} />
+            <ReadonlyTextArea label="Footer Remarks" value={transaction.footerRemarks || ""} />
+          </div>
+
+          <div className="mt-8 rounded-[1.5rem] border border-white/10 p-4">
+            <h3 className="text-lg font-bold">Products</h3>
+            <p className="mt-2 text-xs text-white/45">{PRODUCT_NOTE}</p>
+            <div className="mt-4 overflow-x-auto">
+              <table className="min-w-full divide-y divide-white/10 text-sm">
+                <thead className="text-left text-white/45">
+                  <tr>
+                    <th className="px-4 py-3">Product</th>
+                    <th className="px-4 py-3">UOM</th>
+                    <th className="px-4 py-3 text-right">Qty</th>
+                    {DOC_TYPE === "PO" ? <th className="px-4 py-3 text-right">Received</th> : null}
+                    {DOC_TYPE === "PO" ? <th className="px-4 py-3 text-right">Remaining GRN</th> : null}
+                    {DOC_TYPE !== "PI" ? <th className="px-4 py-3 text-right">Invoiced</th> : null}
+                    {DOC_TYPE !== "PI" ? <th className="px-4 py-3 text-right">Remaining PI</th> : null}
+                    <th className="px-4 py-3 text-right">Unit Cost</th>
+                    <th className="px-4 py-3 text-right">Discount</th>
+                    <th className="px-4 py-3">Location</th>
+                    <th className="px-4 py-3">Tax Code</th>
+                    <th className="px-4 py-3 text-right">Product Total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/10 text-white/80">
+                  {transaction.lines.length === 0 ? (
+                    <tr><td colSpan={DOC_TYPE === "PI" ? 8 : DOC_TYPE === "PO" ? 12 : 10} className="px-4 py-8 text-center text-white/50">No product line found.</td></tr>
+                  ) : (
+                    transaction.lines.map((line) => {
+                      const isServiceItem = line.inventoryProduct?.itemType === "SERVICE_ITEM";
+                      const receivedQty = getLinkedQty(line, "RECEIVED_TO");
+                      const receivedAmount = getLinkedAmount(line, "RECEIVED_TO");
+                      const invoicedQty = getLinkedQty(line, "INVOICED_TO");
+                      const invoicedAmount = getLinkedAmount(line, "INVOICED_TO");
+                      return (
+                        <tr key={line.id}>
+                          <td className="px-4 py-4">
+                            <div className="font-semibold text-white">{line.productCode}</div>
+                            <div className="mt-1 text-xs text-white/50">{line.productDescription}</div>
+                            {line.batchNo ? <div className="mt-1 text-xs text-white/40">Batch: {line.batchNo}</div> : null}
+                            {line.remarks ? <div className="mt-2 text-xs text-white/40">Remarks: {line.remarks}</div> : null}
+                          </td>
+                          <td className="px-4 py-4">{line.uom}</td>
+                          <td className="px-4 py-4 text-right">{money(line.qty)}</td>
+                          {DOC_TYPE === "PO" ? <td className="px-4 py-4 text-right">{isServiceItem ? money(receivedAmount) : money(receivedQty)}</td> : null}
+                          {DOC_TYPE === "PO" ? <td className="px-4 py-4 text-right">{isServiceItem ? money(Math.max(0, toNumber(line.lineTotal) - receivedAmount)) : money(Math.max(0, toNumber(line.qty) - receivedQty))}</td> : null}
+                          {DOC_TYPE !== "PI" ? <td className="px-4 py-4 text-right">{isServiceItem ? money(invoicedAmount) : money(invoicedQty)}</td> : null}
+                          {DOC_TYPE !== "PI" ? <td className="px-4 py-4 text-right">{isServiceItem ? money(Math.max(0, toNumber(line.lineTotal) - invoicedAmount)) : money(Math.max(0, toNumber(line.qty) - invoicedQty))}</td> : null}
+                          <td className="px-4 py-4 text-right">{money(line.unitCost)}</td>
+                          <td className="px-4 py-4 text-right">{line.discountType === "AMOUNT" ? `${currency} ${money(line.discountAmount)}` : `${money(line.discountRate)}%`}</td>
+                          <td className="px-4 py-4">{line.locationCode ? `${line.locationCode} — ${line.locationName || ""}` : "-"}</td>
+                          <td className="px-4 py-4">{line.taxCode || "-"}</td>
+                          <td className="px-4 py-4 text-right">{money(line.lineTotal)}</td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_360px]">
+            <div className="space-y-5">
+              <ReadonlyTextArea label="Terms & Conditions" value={transaction.termsAndConditions || ""} />
+              <ReadonlyTextArea label="Bank Account" value={transaction.bankAccount || ""} />
+            </div>
+            <div className="rounded-[1.5rem] border border-white/10 p-5">
+              <h3 className="text-xl font-bold">{SUMMARY_TITLE}</h3>
+              <div className="mt-5 space-y-4 text-sm">
+                <div className="flex justify-between gap-4"><span className="text-white/65">Subtotal</span><span>{money(transaction.subtotal)}</span></div>
+                <div className="flex justify-between gap-4"><span className="text-white/65">Discount</span><span>{money(transaction.discountTotal)}</span></div>
+                <div className="flex justify-between gap-4"><span className="text-white/65">Tax</span><span>{money(transaction.taxTotal)}</span></div>
+                <div className="border-t border-white/10 pt-4">
+                  <div className="flex justify-between gap-4 text-xl font-bold">
+                    <span>Grand Total ({currency})</span>
+                    <span>{money(transaction.grandTotal)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {transaction.revisions.length > 0 ? (
+            <div className="mt-8 rounded-[1.5rem] border border-white/10 p-4">
+              <h3 className="text-lg font-bold">Revision History</h3>
+              <div className="mt-3 space-y-2">
+                {transaction.revisions.map((revision) => (
+                  <Link key={revision.id} href={`${LIST_PATH}/${revision.id}`} className="block rounded-xl border border-white/10 px-4 py-3 text-sm text-white/70 transition hover:bg-white/5 hover:text-white">
+                    ↳ Revised to {revision.docNo} ({revision.status})
+                  </Link>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </div>
-
-        <div className="card-rk overflow-hidden"><div className="border-b border-white/10 px-5 py-4 md:px-8"><h2 className="text-xl font-semibold text-white">Body</h2></div><div className="overflow-x-auto"><table className="min-w-[1080px] text-left text-sm"><thead className="bg-black/30 text-white/45"><tr><th className="px-5 py-4">No.</th><th className="px-5 py-4">Product</th><th className="px-5 py-4">Description</th><th className="px-5 py-4">Qty</th><th className="px-5 py-4">UOM</th><th className="px-5 py-4">Unit Cost</th><th className="px-5 py-4">Location</th><th className="px-5 py-4 text-right">Amount</th></tr></thead><tbody>{transaction.lines.map((line) => (<tr key={line.id} className="border-t border-white/10"><td className="px-5 py-4 text-white/45">{line.lineNo}</td><td className="px-5 py-4 text-white">{line.productCode}</td><td className="px-5 py-4 text-white/75">{line.productDescription}</td><td className="px-5 py-4 text-white/75">{money(line.qty)}</td><td className="px-5 py-4 text-white/75">{line.uom}</td><td className="px-5 py-4 text-white/75">{money(line.unitCost)}</td><td className="px-5 py-4 text-white/75">{line.locationCode ? `${line.locationCode} — ${line.locationName || ""}` : "-"}</td><td className="px-5 py-4 text-right text-white">{money(line.lineTotal)}</td></tr>))}</tbody></table></div></div>
-
-        <div className="grid gap-6 lg:grid-cols-[1fr_360px]"><div className="card-rk p-5 md:p-8"><h2 className="text-xl font-semibold text-white">Footer</h2><div className="mt-5 grid gap-4"><ReadonlyTextArea label="Terms & Conditions" value={transaction.termsAndConditions || ""} /><ReadonlyTextArea label="Bank Account" value={transaction.bankAccount || ""} /><ReadonlyTextArea label="Footer Remarks" value={transaction.footerRemarks || ""} /></div></div><div className="card-rk p-5"><h2 className="text-xl font-semibold text-white">Summary</h2><div className="mt-5 space-y-4 text-sm"><div className="flex justify-between"><span className="text-white/60">Subtotal</span><span>{money(transaction.subtotal)}</span></div><div className="flex justify-between"><span className="text-white/60">Discount</span><span>{money(transaction.discountTotal)}</span></div><div className="flex justify-between"><span className="text-white/60">Tax</span><span>{money(transaction.taxTotal)}</span></div><div className="flex justify-between border-t border-white/10 pt-4 text-lg font-bold"><span>Grand Total</span><span>{money(transaction.grandTotal)}</span></div></div></div></div>
       </div>
     </section>
   );
