@@ -120,6 +120,7 @@ type PurchaseTransactionRecord = {
     discountType?: string | null;
     locationId?: string | null;
     batchNo?: string | null;
+    serialNos?: string[] | null;
     taxCodeId?: string | null;
     remarks?: string | null;
   }>;
@@ -162,6 +163,7 @@ type LineForm = {
   discountType: "PERCENT" | "AMOUNT";
   locationId: string;
   batchNo: string;
+  serialNos: string[];
   taxCodeId: string;
   remarks: string;
 };
@@ -189,7 +191,7 @@ function getDecimalPlaces(value: unknown, fallback = 2) { const numeric = Number
 function formatDecimalInput(value: unknown, decimalPlaces: number) { const numeric = Number(value ?? 0); if (!Number.isFinite(numeric)) return (0).toFixed(decimalPlaces); return numeric.toFixed(decimalPlaces); }
 function normalizeDocNoInput(value: string) { return value.toUpperCase().replace(/\s+/g, "").slice(0, 30); }
 function lineAmount(line: LineForm) { const qty = Math.max(0, Number(line.qty || 0)); const unitCost = Math.max(0, Number(line.unitCost || 0)); const subtotal = roundMoney(qty * unitCost); const discountRate = Math.max(0, Number(line.discountRate || 0)); const discount = line.discountType === "AMOUNT" ? discountRate : roundMoney(subtotal * (discountRate / 100)); return Math.max(0, roundMoney(subtotal - discount)); }
-function emptyLine(defaultLocationId = "", defaultTaxCodeId = "", qtyDecimalPlaces = 2, unitCostDecimalPlaces = 2): LineForm { return { sourceLineId: "", sourceTransactionId: "", inventoryProductId: "", productCode: "", productDescription: "", itemType: "STOCK_ITEM", uom: "", qty: formatDecimalInput(1, qtyDecimalPlaces), unitCost: formatDecimalInput(0, unitCostDecimalPlaces), discountRate: "0", discountType: "PERCENT", locationId: defaultLocationId, batchNo: "", taxCodeId: defaultTaxCodeId, remarks: "" }; }
+function emptyLine(defaultLocationId = "", defaultTaxCodeId = "", qtyDecimalPlaces = 2, unitCostDecimalPlaces = 2): LineForm { return { sourceLineId: "", sourceTransactionId: "", inventoryProductId: "", productCode: "", productDescription: "", itemType: "STOCK_ITEM", uom: "", qty: formatDecimalInput(1, qtyDecimalPlaces), unitCost: formatDecimalInput(0, unitCostDecimalPlaces), discountRate: "0", discountType: "PERCENT", locationId: defaultLocationId, batchNo: "", serialNos: [], taxCodeId: defaultTaxCodeId, remarks: "" }; }
 function statusClass(status: string) { if (status === "CANCELLED") return "border-red-500/25 bg-red-500/10 text-red-200"; if (status === "COMPLETED") return "border-sky-500/25 bg-sky-500/10 text-sky-200"; if (status === "PARTIAL") return "border-indigo-500/25 bg-indigo-500/10 text-indigo-200"; return "border-amber-500/25 bg-amber-500/10 text-amber-200"; }
 
 
@@ -470,6 +472,7 @@ export function AdminPurchaseInvoiceClient(props: Props) {
       discountType: line.discountType === "AMOUNT" ? "AMOUNT" : "PERCENT",
       locationId: line.locationId || props.defaultLocationId,
       batchNo: line.batchNo || "",
+      serialNos: Array.isArray(line.serialNos) ? line.serialNos : [],
       taxCodeId: line.taxCodeId || defaultTaxCodeId,
       remarks: line.remarks || "",
     })));
@@ -500,6 +503,12 @@ export function AdminPurchaseInvoiceClient(props: Props) {
     const tax = calculateTaxBreakdown({ subtotal, discount, taxRate: headerTaxCode?.rate || 0, calculationMethod: headerTaxCode?.calculationMethod || null, taxEnabled: props.taxConfig.taxModuleEnabled && Boolean(headerTaxCode) });
     return { subtotal, discount, tax: tax.taxAmount, grandTotal: tax.grandTotalAfterTax };
   }, [lines, props.taxConfig, taxMode, headerTaxCode]);
+
+  const docDateCompact = form.docDate ? form.docDate.replace(/-/g, "") : todayInput().replace(/-/g, "");
+  const autoDocNoPreview = `${DOC_TYPE}-${docDateCompact}-0001`;
+  const docNoPreview = editingTransaction?.docNo || (manualDocNoEnabled ? docNo : autoDocNoPreview);
+  const hasRequiredLine = lines.some((line) => line.inventoryProductId && line.uom && Number(line.qty || 0) > 0);
+  const canSubmit = Boolean(form.supplierId && hasRequiredLine) && !isSubmitting;
 
   function applySupplier(supplierId: string) {
     const supplier = props.initialSuppliers.find((item) => item.id === supplierId);
@@ -623,7 +632,7 @@ export function AdminPurchaseInvoiceClient(props: Props) {
             <p className="text-sm font-semibold uppercase tracking-[0.24em] text-red-400/80">{TITLE}</p>
             <h2 className="mt-3 text-3xl font-bold">{pageTitle}</h2>
           </div>
-          {!editingTransaction ? (
+          {!editingTransaction && true ? (
             <button
               type="button"
               onClick={() => { setShowGenerateFrom((prev) => !prev); setActiveTab("HEADER"); }}
@@ -646,14 +655,14 @@ export function AdminPurchaseInvoiceClient(props: Props) {
         <div>
           {activeTab === "HEADER" ? (
             <div className="mt-6 space-y-6">
-              {showGenerateFrom && !editingTransaction ? (
+              {showGenerateFrom && !editingTransaction && true ? (
                 <div className="rounded-2xl border border-white/10 bg-black/20 p-5">
                   <SearchableSelect label="Generate From" placeholder="Direct Create" options={sourceDocumentOptions} value={sourceTransaction?.id || ""} onChange={(option) => router.push(option?.id ? `${DETAIL_PATH}?source=${option.id}` : DETAIL_PATH)} />
                 </div>
               ) : null}
               <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
                 <div><label className="label-rk">Doc Date</label><input type="date" value={form.docDate} onChange={(e) => setForm((prev) => ({ ...prev, docDate: e.target.value }))} className="input-rk" /></div>
-                <div className="xl:col-span-3"><label className="label-rk">System Doc No</label><div className="flex overflow-hidden rounded-xl border border-white/10 bg-black/40"><input value={manualDocNoEnabled ? docNo : editingTransaction?.docNo || ""} onChange={(e) => setDocNo(normalizeDocNoInput(e.target.value))} readOnly={!manualDocNoEnabled || Boolean(editingTransaction)} placeholder="Auto-generated" className="min-h-[52px] flex-1 bg-transparent px-4 text-white outline-none disabled:text-white/60" /><button type="button" disabled={Boolean(editingTransaction)} onClick={() => setManualDocNoEnabled((prev) => !prev)} className="px-4 text-xs text-white/45 hover:text-white disabled:opacity-40">{manualDocNoEnabled ? "Auto" : "Click to override"}</button></div></div>
+                <div className="xl:col-span-3"><label className="label-rk">System Doc No</label><div className="flex overflow-hidden rounded-xl border border-white/10 bg-black/40"><input value={docNoPreview} onChange={(e) => setDocNo(normalizeDocNoInput(e.target.value))} readOnly={!manualDocNoEnabled || Boolean(editingTransaction)} placeholder="Auto-generated" className="min-h-[52px] flex-1 bg-transparent px-4 text-white outline-none disabled:text-white/60" /><button type="button" disabled={Boolean(editingTransaction)} onClick={() => { if (!manualDocNoEnabled) setDocNo(normalizeDocNoInput(docNoPreview)); setManualDocNoEnabled((prev) => !prev); }} className="px-4 text-xs text-white/45 hover:text-white disabled:opacity-40">{manualDocNoEnabled ? "Auto" : "Click to override"}</button></div></div>
                 <SearchableSelect label="A/C No" placeholder="Search or select supplier" options={supplierOptions} value={form.supplierId} onChange={(option) => applySupplier(option?.id || "")} />
                 <div><label className="label-rk">Supplier Name</label><input value={form.supplierName} onChange={(e) => setForm((prev) => ({ ...prev, supplierName: e.target.value }))} className="input-rk" /></div>
                 <div><label className="label-rk">Email</label><input value={form.email} onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))} className="input-rk" /></div>
@@ -679,7 +688,50 @@ export function AdminPurchaseInvoiceClient(props: Props) {
             <div className="space-y-5">
               {lines.map((line, index) => {
                 const product = props.initialProducts.find((item) => item.id === line.inventoryProductId) || null;
-                return <div key={index} className="rounded-[1.75rem] border border-white/10 p-5"><div className="mb-5 flex items-center justify-between"><h3 className="text-lg font-semibold text-white">Product {index + 1}</h3>{lines.length > 1 ? <button type="button" onClick={() => removeLine(index)} className="rounded-xl border border-red-500/30 px-4 py-2 text-sm text-red-300 transition hover:bg-red-500/10">Remove</button> : null}</div><div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4"><div className="md:col-span-2"><SearchableSelect label="Product" placeholder="Search or select product" options={productOptions} value={line.inventoryProductId} onChange={(option) => applyProduct(index, option?.id || "")} /></div><SearchableSelect label="UOM" placeholder="Select UOM" options={getProductUomOptions(product).map((option) => ({ id: option.id, label: option.label, searchText: option.label.toLowerCase() }))} value={line.uom} disabled={!product} onChange={(option) => updateLine(index, "uom", option?.id || product?.baseUom || "")} /><div><label className="label-rk">Qty</label><input value={line.qty} onChange={(e) => updateLine(index, "qty", e.target.value)} className="input-rk" /></div><div><label className="label-rk">Purchase Unit Cost</label><input value={line.unitCost} onChange={(e) => updateLine(index, "unitCost", e.target.value)} className="input-rk" /></div><div><label className="label-rk">Discount</label><div className="grid grid-cols-[1fr_120px] gap-3"><input value={line.discountRate} onChange={(e) => updateLine(index, "discountRate", e.target.value)} className="input-rk" /><CompactSelect options={discountTypeOptions} value={line.discountType} onChange={(value) => updateLine(index, "discountType", value)} /></div></div><div className="md:col-span-2"><SearchableSelect label="Location" placeholder="Search or select location" options={locationOptions} value={line.locationId} onChange={(option) => updateLine(index, "locationId", option?.id || "")} /><p className="mt-2 text-xs text-white/40">Purchase stock will be received into this location where applicable.</p></div><div><label className="label-rk">Batch No</label><input value={line.batchNo} onChange={(e) => updateLine(index, "batchNo", e.target.value.toUpperCase())} className="input-rk" /></div>{props.taxConfig.taxModuleEnabled && taxMode === "LINE_ITEM" ? <SearchableSelect label="Tax Code" placeholder="No Tax" options={taxCodeOptions} value={line.taxCodeId} onChange={(option) => updateLine(index, "taxCodeId", option?.id || "")} /> : null}<div className="md:col-span-2 xl:col-span-4"><label className="label-rk">Product Remarks</label><textarea value={line.remarks} onChange={(e) => updateLine(index, "remarks", e.target.value)} className="input-rk min-h-[80px]" /></div><div><label className="label-rk">Gross Amount</label><input value={money(lineAmount(line))} readOnly className="input-rk" /></div></div></div>;
+                const grossAmount = lineAmount(line);
+                const selectedLineTaxCode = props.taxConfig.taxCodes.find((item) => item.id === line.taxCodeId) || (taxMode === "LINE_ITEM" ? props.taxConfig.taxCodes.find((item) => item.id === props.taxConfig.defaultAdminTaxCodeId) : null);
+                const lineTax = calculateLineItemTaxBreakdown({
+                  lineTotal: grossAmount,
+                  taxRate: selectedLineTaxCode?.rate || 0,
+                  calculationMethod: selectedLineTaxCode?.calculationMethod || null,
+                  taxEnabled: props.taxConfig.taxModuleEnabled && Boolean(selectedLineTaxCode),
+                });
+                const balanceText = product ? "Qty Balance: -" : "Select product and location to view balance.";
+                return (
+                  <div key={index} className="rounded-[1.75rem] border border-white/10 p-5">
+                    <div className="mb-5 flex items-center justify-between">
+                      <h3 className="text-lg font-semibold text-white">Product {index + 1}</h3>
+                      {lines.length > 1 ? (
+                        <button type="button" onClick={() => removeLine(index)} className="rounded-xl border border-red-500/30 px-4 py-2 text-sm text-red-300 transition hover:bg-red-500/10">Remove</button>
+                      ) : null}
+                    </div>
+                    <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+                      <div className="md:col-span-2">
+                        <SearchableSelect label="Product" placeholder="Search or select product" options={productOptions} value={line.inventoryProductId} onChange={(option) => applyProduct(index, option?.id || "")} />
+                      </div>
+                      <SearchableSelect label="UOM" placeholder="Select UOM" options={getProductUomOptions(product).map((option) => ({ id: option.id, label: option.label, searchText: option.label.toLowerCase() }))} value={line.uom} disabled={!product} onChange={(option) => updateLine(index, "uom", option?.id || product?.baseUom || "")} />
+                      <div><label className="label-rk">Qty</label><input value={line.qty} onChange={(e) => updateLine(index, "qty", e.target.value)} className="input-rk" /></div>
+                      <div><label className="label-rk">Purchase Unit Cost</label><input value={line.unitCost} onChange={(e) => updateLine(index, "unitCost", e.target.value)} className="input-rk" /></div>
+                      <div><label className="label-rk">Discount</label><div className="grid grid-cols-[1fr_120px] gap-3"><input value={line.discountRate} onChange={(e) => updateLine(index, "discountRate", e.target.value)} className="input-rk" /><CompactSelect options={discountTypeOptions} value={line.discountType} onChange={(value) => updateLine(index, "discountType", value)} /></div></div>
+                      <div className="md:col-span-2">
+                        <SearchableSelect label="Location" placeholder="Search or select location" options={locationOptions} value={line.locationId} onChange={(option) => updateLine(index, "locationId", option?.id || "")} />
+                        <p className="mt-2 text-xs text-white/40">{balanceText}</p>
+                      </div>
+                      {product?.batchTracking ? (
+                        <div><label className="label-rk">Batch No</label><input value={line.batchNo} onChange={(e) => updateLine(index, "batchNo", e.target.value.toUpperCase())} className="input-rk" /></div>
+                      ) : null}
+                      {product?.serialNumberTracking ? (
+                        <div><label className="label-rk">Serial No</label><textarea value={line.serialNos.join("\n")} onChange={(e) => setLines((prev) => prev.map((item, itemIndex) => itemIndex === index ? { ...item, serialNos: e.target.value.split(/\r?\n/).map((serial) => serial.trim()).filter(Boolean) } : item))} className="input-rk min-h-[52px]" placeholder="One serial number per line" /></div>
+                      ) : null}
+                      {props.taxConfig.taxModuleEnabled && taxMode === "LINE_ITEM" ? (
+                        <SearchableSelect label="Tax Code" placeholder="No Tax" options={taxCodeOptions} value={line.taxCodeId} onChange={(option) => updateLine(index, "taxCodeId", option?.id || "")} />
+                      ) : null}
+                      <div><label className="label-rk">Tax Amount</label><input value={money(lineTax.taxAmount)} readOnly className="input-rk" /></div>
+                      <div><label className="label-rk">Gross Amount</label><input value={money(grossAmount)} readOnly className="input-rk" /></div>
+                      <div className="md:col-span-2 xl:col-span-4"><label className="label-rk">Product Remarks</label><textarea value={line.remarks} onChange={(e) => updateLine(index, "remarks", e.target.value)} className="input-rk min-h-[80px]" /></div>
+                    </div>
+                  </div>
+                );
               })}
               <button type="button" onClick={addLine} className="rounded-xl border border-white/15 px-4 py-3 text-sm text-white/75 transition hover:bg-white/10 hover:text-white">+ Add Product</button>
             </div>
@@ -693,7 +745,7 @@ export function AdminPurchaseInvoiceClient(props: Props) {
           ) : null}
         </div>
 
-        <div className="mt-8 flex justify-end gap-3 border-t border-white/10 pt-5"><button type="button" onClick={() => { setIsCreateOpen(false); router.push(DETAIL_PATH); }} className="rounded-xl border border-white/15 px-5 py-3 text-sm text-white/80 transition hover:bg-white/10">Close</button><button type="submit" disabled={isSubmitting} className="rounded-xl bg-red-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-50">{isSubmitting ? "Saving..." : `Save ${TITLE}`}</button></div>
+        <div className="mt-8 flex justify-end gap-3 border-t border-white/10 pt-5"><button type="button" onClick={() => { setIsCreateOpen(false); router.push(DETAIL_PATH); }} className="rounded-xl border border-white/15 px-5 py-3 text-sm text-white/80 transition hover:bg-white/10">Close</button><button type="submit" disabled={!canSubmit} className="rounded-xl bg-red-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-50">{isSubmitting ? "Saving..." : `Save ${TITLE}`}</button></div>
       </form>
           </div>
         </div>
