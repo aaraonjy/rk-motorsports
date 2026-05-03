@@ -597,10 +597,7 @@ export async function cancelPurchaseTransaction(docType: PurchaseDocType, id: st
     });
     if (!current || current.docType !== docType) throw new Error("Document not found.");
     if (current.status === "CANCELLED") {
-      return tx.purchaseTransaction.findUnique({
-        where: { id },
-        include: { cancelledByAdmin: { select: { id: true, name: true, email: true } } },
-      });
+      return tx.purchaseTransaction.findUnique({ where: { id } });
     }
 
     const activeDownstream = current.sourceLinks.filter((link) => link.targetTransaction.status !== "CANCELLED");
@@ -661,7 +658,7 @@ export async function cancelPurchaseTransaction(docType: PurchaseDocType, id: st
         cancelledAt: new Date(),
         cancelReason: normalizeText(reason) || "Cancelled by admin",
       },
-      include: { cancelledByAdmin: { select: { id: true, name: true, email: true } } },
+ 
     });
     for (const link of current.targetLinks) await refreshSourceStatus(tx, link.sourceTransactionId);
     return updated;
