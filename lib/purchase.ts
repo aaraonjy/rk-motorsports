@@ -374,7 +374,7 @@ export async function createPurchaseTransaction(docType: PurchaseDocType, body: 
     const supplier = await assertActiveSupplier(tx, supplierId);
     const taxSettings = await loadTaxSettings(tx);
     const headerTaxCode = await snapshotTaxCode(tx, normalizeText(body.taxCodeId));
-    const lines = await mapLines(tx, body.lines, taxSettings.taxModuleEnabled, null);
+    const lines = await mapLines(tx, body.lines, taxSettings.taxModuleEnabled, taxSettings.taxCalculationMode === "LINE_ITEM" ? taxSettings.defaultAdminTaxCodeId : null);
     const totals = calculateTotals(lines, taxSettings.taxCalculationMode, taxSettings.taxModuleEnabled, headerTaxCode);
 
     const sourceTransactionId = normalizeText(body.sourceTransactionId);
@@ -390,7 +390,7 @@ export async function createPurchaseTransaction(docType: PurchaseDocType, body: 
         docType,
         docNo,
         docDate,
-        docDesc: normalizeText(body.docDesc) || DOC_LABEL[docType],
+        docDesc: normalizeText(body.docDesc),
         status: "OPEN",
         supplierId: supplier.id,
         supplierAccountNo: supplier.supplierAccountNo,
@@ -510,13 +510,13 @@ export async function updatePurchaseTransaction(docType: PurchaseDocType, id: st
     const supplier = await assertActiveSupplier(tx, supplierId);
     const taxSettings = await loadTaxSettings(tx);
     const headerTaxCode = await snapshotTaxCode(tx, normalizeText(body.taxCodeId));
-    const lines = await mapLines(tx, body.lines, taxSettings.taxModuleEnabled, null);
+    const lines = await mapLines(tx, body.lines, taxSettings.taxModuleEnabled, taxSettings.taxCalculationMode === "LINE_ITEM" ? taxSettings.defaultAdminTaxCodeId : null);
     const totals = calculateTotals(lines, taxSettings.taxCalculationMode, taxSettings.taxModuleEnabled, headerTaxCode);
     const updated = await tx.purchaseTransaction.update({
       where: { id },
       data: {
         docDate,
-        docDesc: normalizeText(body.docDesc) || current.docDesc,
+        docDesc: normalizeText(body.docDesc),
         supplierId: supplier.id,
         supplierAccountNo: supplier.supplierAccountNo,
         supplierName: normalizeText(body.supplierName) || supplier.name,
