@@ -173,13 +173,13 @@ export default async function PurchaseDetailPage({ params, searchParams }: Param
     where: { id: transaction.createdByAdminId },
     select: { name: true, email: true },
   });
-  const createdByName = createdAdmin?.name || createdAdmin?.email || "-";
   const cancelledAdmin = transaction.cancelledByAdminId
     ? await db.user.findUnique({
         where: { id: transaction.cancelledByAdminId },
         select: { name: true, email: true },
       })
     : null;
+  const createdByName = createdAdmin?.name || createdAdmin?.email || "-";
   const cancelledByName = cancelledAdmin?.name || cancelledAdmin?.email || "-";
   const currency = transaction.currency || "MYR";
   const activeGeneratedFromDocuments = transaction.targetLinks
@@ -188,6 +188,7 @@ export default async function PurchaseDetailPage({ params, searchParams }: Param
   const activeGeneratedToDocuments = transaction.sourceLinks
     .map((link) => link.targetTransaction)
     .filter((item) => item && isActivePurchaseTrace(item.status));
+  const canEdit = transaction.status !== "CANCELLED" && activeGeneratedFromDocuments.length === 0;
 
   const billingAddress = {
     addressLine1: transaction.billingAddressLine1,
@@ -270,7 +271,7 @@ export default async function PurchaseDetailPage({ params, searchParams }: Param
             <Link
               href={`${LIST_PATH}?edit=${transaction.id}`}
               className={`rounded-xl px-5 py-3 text-sm font-semibold text-white transition ${
-                transaction.status === "CANCELLED"
+                !canEdit
                   ? "pointer-events-none cursor-not-allowed border border-white/10 bg-white/5 opacity-50"
                   : "border border-white/15 bg-white/5 hover:bg-white/10"
               }`}

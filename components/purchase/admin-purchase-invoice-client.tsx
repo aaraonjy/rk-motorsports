@@ -1053,6 +1053,10 @@ export function AdminPurchaseInvoiceClient(props: Props) {
     return (item.sourceLinks || []).some((link) => link.targetTransaction && link.targetTransaction.status !== "CANCELLED");
   }
 
+  function hasActiveSourceDocument(item: PurchaseTransactionRecord) {
+    return (item.targetLinks || []).some((link) => link.sourceTransaction && link.sourceTransaction.status !== "CANCELLED");
+  }
+
   function openCancelDialog(item: PurchaseTransactionRecord) {
     if (hasActiveDownstream(item)) {
       setError(`Please cancel downstream generated document first before cancelling this ${TITLE}.`);
@@ -1296,32 +1300,36 @@ export function AdminPurchaseInvoiceClient(props: Props) {
                     <td className="px-4 py-4 text-right">
                       {item.status !== "CANCELLED" ? (
                         <div className="flex flex-wrap justify-end gap-2">
-                          <button
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setMessage("");
-                              setError("");
-                              setCancelNotice(null);
-                              router.push(`${DETAIL_PATH}?edit=${item.id}`);
-                            }}
-                            className="rounded-xl border border-white/15 px-3 py-2 text-xs text-white/75 transition hover:bg-white/10"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setMessage("");
-                              setError("");
-                              setCancelNotice(null);
-                              router.push(`${DETAIL_PATH}?edit=${item.id}`);
-                            }}
-                            className="rounded-xl border border-sky-500/30 px-3 py-2 text-xs text-sky-200 transition hover:bg-sky-500/10"
-                          >
-                            Edit Revise
-                          </button>
+                          {!hasActiveSourceDocument(item) ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setMessage("");
+                                  setError("");
+                                  setCancelNotice(null);
+                                  router.push(`${DETAIL_PATH}?edit=${item.id}`);
+                                }}
+                                className="rounded-xl border border-white/15 px-3 py-2 text-xs text-white/75 transition hover:bg-white/10"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setMessage("");
+                                  setError("");
+                                  setCancelNotice(null);
+                                  router.push(`${DETAIL_PATH}?edit=${item.id}`);
+                                }}
+                                className="rounded-xl border border-sky-500/30 px-3 py-2 text-xs text-sky-200 transition hover:bg-sky-500/10"
+                              >
+                                Edit Revise
+                              </button>
+                            </>
+                          ) : null}
                           <button
                             type="button"
                             onClick={(event) => {
@@ -2052,7 +2060,6 @@ export function AdminPurchaseInvoiceClient(props: Props) {
                 <h3 className="mt-3 text-2xl font-bold">{SOURCE_MODAL_TITLE}</h3>
                 <p className="mt-3 text-sm leading-6 text-white/60">{SOURCE_MODAL_DESCRIPTION}</p>
               </div>
-              <button type="button" onClick={() => setIsGenerateFromOpen(false)} className="rounded-xl border border-white/15 px-4 py-2.5 text-sm text-white/75 transition hover:bg-white/10">Close</button>
             </div>
 
             <div className="mt-5">

@@ -596,8 +596,47 @@ export async function cancelPurchaseTransaction(docType: PurchaseDocType, id: st
     }
 
     if (current.stockTransactionId) {
-      await tx.stockLedger.deleteMany({ where: { sourceId: current.id, sourceType: `PURCHASE_${current.docType}` } });
-      await tx.stockTransaction.updateMany({ where: { id: current.stockTransactionId }, data: { status: StockTransactionStatus.CANCELLED } });
+      const stockTransaction = await tx.stockTransaction.findUnique({
+        where: { id: current.stockTransactionId },
+        include: { lines: true },
+      });
+
+      if (stockTransaction) {
+        for (const stockLine of stockTransaction.lines) {
+          if (!stockLine.locationId) continue;
+          const values = buildLedgerValues(createStoredQtyDecimal(stockLine.qty), "OUT");
+          await tx.stockLedger.create({
+            data: {
+              movementDate: new Date(),
+              movementType: StockTransactionType.SR,
+              movementDirection: StockMovementDirection.OUT,
+              qty: values.qty,
+              qtyIn: values.qtyIn,
+              qtyOut: values.qtyOut,
+              batchNo: stockLine.batchNo,
+              inventoryProductId: stockLine.inventoryProductId,
+              locationId: stockLine.locationId,
+              transactionId: stockTransaction.id,
+              transactionLineId: stockLine.id,
+              referenceNo: current.docNo,
+              referenceText: `Cancel ${current.docType} ${current.docNo}`,
+              sourceType: `PURCHASE_${current.docType}_CANCEL`,
+              sourceId: current.id,
+              remarks: normalizeText(reason) || "Cancelled by admin",
+            },
+          });
+        }
+      }
+
+      await tx.stockTransaction.updateMany({
+        where: { id: current.stockTransactionId },
+        data: {
+          status: StockTransactionStatus.CANCELLED,
+          cancelledByAdminId: adminId,
+          cancelledAt: new Date(),
+          cancelReason: normalizeText(reason) || "Cancelled by admin",
+        },
+      });
     }
 
     const updated = await tx.purchaseTransaction.update({
