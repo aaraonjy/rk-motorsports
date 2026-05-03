@@ -335,62 +335,6 @@ async function createStockReceive(tx: Prisma.TransactionClient, transaction: any
   return stockTransaction.id;
 }
 
-
-async function reverseAndDetachStockReceive(tx: Prisma.TransactionClient, transaction: any, reason?: string | null) {
-  if (!transaction.stockTransactionId) return;
-
-  const stockTransaction = await tx.stockTransaction.findUnique({
-    where: { id: transaction.stockTransactionId },
-    include: { lines: true },
-  });
-
-  if (!stockTransaction) {
-    await tx.purchaseTransaction.update({ where: { id: transaction.id }, data: { stockTransactionId: null } });
-    return;
-  }
-
-  if (stockTransaction.status !== StockTransactionStatus.CANCELLED) {
-    for (const stockLine of stockTransaction.lines) {
-      if (!stockLine.locationId) continue;
-      const values = buildLedgerValues(createStoredQtyDecimal(stockLine.qty), "OUT");
-      await tx.stockLedger.create({
-        data: {
-          movementDate: new Date(),
-          movementType: StockTransactionType.SR,
-          movementDirection: StockMovementDirection.OUT,
-          qty: values.qty,
-          qtyIn: values.qtyIn,
-          qtyOut: values.qtyOut,
-          batchNo: stockLine.batchNo,
-          inventoryProductId: stockLine.inventoryProductId,
-          locationId: stockLine.locationId,
-          transactionId: stockTransaction.id,
-          transactionLineId: stockLine.id,
-          referenceNo: transaction.docNo,
-          referenceText: `Replace ${transaction.docType} ${transaction.docNo}`,
-          sourceType: `PURCHASE_${transaction.docType}_REPLACE`,
-          sourceId: transaction.id,
-          remarks: normalizeText(reason) || "Reversed before purchase document update",
-        },
-      });
-    }
-
-    await tx.stockTransaction.update({
-      where: { id: stockTransaction.id },
-      data: {
-        status: StockTransactionStatus.CANCELLED,
-        docNo: null,
-        cancelReason: normalizeText(reason) || "Reversed before purchase document update",
-        cancelledAt: new Date(),
-      },
-    });
-  } else if (stockTransaction.docNo) {
-    await tx.stockTransaction.update({ where: { id: stockTransaction.id }, data: { docNo: null } });
-  }
-
-  await tx.purchaseTransaction.update({ where: { id: transaction.id }, data: { stockTransactionId: null } });
-}
-
 async function refreshSourceStatus(tx: Prisma.TransactionClient, sourceTransactionId: string) {
   const source = await tx.purchaseTransaction.findUnique({
     where: { id: sourceTransactionId },
@@ -433,13 +377,19 @@ export async function createPurchaseTransaction(docType: PurchaseDocType, body: 
     const lines = await mapLines(tx, body.lines, taxSettings.taxModuleEnabled, taxSettings.taxCalculationMode === "LINE_ITEM" ? taxSettings.defaultAdminTaxCodeId : null);
     const totals = calculateTotals(lines, taxSettings.taxCalculationMode, taxSettings.taxModuleEnabled, headerTaxCode);
 
-    const sourceTransactionId = normalizeText(body.sourceTransactionId);
-    let sourceDocType: PurchaseDocType | null = null;
-    if (sourceTransactionId) {
-      const source = await tx.purchaseTransaction.findUnique({ where: { id: sourceTransactionId }, select: { id: true, docType: true, status: true } });
-      if (!source || source.status === "CANCELLED") throw new Error("Source document is not available.");
-      sourceDocType = source.docType;
+    const sourceTransactionIds = Array.from(new Set([
+      normalizeText(body.sourceTransactionId),
+      ...((body.lines || []).map((line) => normalizeText(line.sourceTransactionId)).filter(Boolean) as string[]),
+    ].filter(Boolean) as string[]));
+    const sourceTransactions = sourceTransactionIds.length
+      ? await tx.purchaseTransaction.findMany({ where: { id: { in: sourceTransactionIds } }, select: { id: true, docType: true, status: true } })
+      : [];
+    if (sourceTransactions.length !== sourceTransactionIds.length || sourceTransactions.some((source) => source.status === "CANCELLED")) {
+      throw new Error("Source document is not available.");
     }
+    const firstSourceTransactionId = sourceTransactionIds[0] || null;
+    const firstSource = firstSourceTransactionId ? sourceTransactions.find((source) => source.id === firstSourceTransactionId) : null;
+    let sourceDocType: PurchaseDocType | null = firstSource?.docType || null;
 
     const transaction = await tx.purchaseTransaction.create({
       data: {
@@ -524,18 +474,21 @@ export async function createPurchaseTransaction(docType: PurchaseDocType, body: 
       include: { lines: true },
     });
 
-    if (sourceTransactionId) {
-      await tx.purchaseTransactionLink.create({ data: { sourceTransactionId, targetTransactionId: transaction.id, linkType: "GENERATED_FROM" } });
+    if (sourceTransactionIds.length > 0) {
+      for (const sourceTransactionId of sourceTransactionIds) {
+        await tx.purchaseTransactionLink.create({ data: { sourceTransactionId, targetTransactionId: transaction.id, linkType: "GENERATED_FROM" } });
+      }
       const linkType: PurchaseLineLinkType = docType === "GRN" ? "RECEIVED_TO" : "INVOICED_TO";
       for (let index = 0; index < lines.length; index += 1) {
         const sourceLineId = lines[index].sourceLineId;
-        if (!sourceLineId) continue;
+        const lineSourceTransactionId = lines[index].sourceTransactionId || firstSourceTransactionId;
+        if (!sourceLineId || !lineSourceTransactionId) continue;
         const targetLine = transaction.lines[index];
         await tx.purchaseTransactionLineLink.create({
           data: {
             sourceLineId,
             targetLineId: targetLine.id,
-            sourceTransactionId,
+            sourceTransactionId: lineSourceTransactionId,
             targetTransactionId: transaction.id,
             linkType,
             qty: targetLine.qty,
@@ -543,7 +496,7 @@ export async function createPurchaseTransaction(docType: PurchaseDocType, body: 
           },
         });
       }
-      await refreshSourceStatus(tx, sourceTransactionId);
+      for (const sourceTransactionId of sourceTransactionIds) await refreshSourceStatus(tx, sourceTransactionId);
     }
 
     if (shouldPostStock(docType, sourceDocType)) {
@@ -556,26 +509,11 @@ export async function createPurchaseTransaction(docType: PurchaseDocType, body: 
 
 export async function updatePurchaseTransaction(docType: PurchaseDocType, id: string, body: PurchasePayload, adminId: string) {
   return db.$transaction(async (tx) => {
-    const current = await tx.purchaseTransaction.findUnique({
-      where: { id },
-      include: {
-        sourceLinks: { include: { targetTransaction: true } },
-        targetLinks: true,
-        lines: true,
-      },
-    });
+    const current = await tx.purchaseTransaction.findUnique({ where: { id }, include: { targetLinks: true, lines: true } });
     if (!current || current.docType !== docType) throw new Error("Document not found.");
     if (current.status === "CANCELLED") throw new Error("Cancelled document cannot be edited.");
-
-    if (current.targetLinks.length > 0) {
-      throw new Error("This document was generated from another document and cannot be edited. Please cancel it and create a new document instead.");
-    }
-
-    const activeDownstream = current.sourceLinks.filter((link) => link.targetTransaction.status !== "CANCELLED");
-    if (activeDownstream.length > 0) {
-      throw new Error("This document has generated downstream document records. Please cancel the downstream document first.");
-    }
-
+    if (current.targetLinks.length > 0 || current.stockTransactionId) throw new Error("This document has generated/stock records. Please create a revised document instead.");
+    await tx.purchaseTransactionLine.deleteMany({ where: { transactionId: id } });
     const docDate = normalizeDate(body.docDate);
     const supplierId = normalizeText(body.supplierId) || current.supplierId;
     const supplier = await assertActiveSupplier(tx, supplierId);
@@ -583,14 +521,6 @@ export async function updatePurchaseTransaction(docType: PurchaseDocType, id: st
     const headerTaxCode = await snapshotTaxCode(tx, normalizeText(body.taxCodeId));
     const lines = await mapLines(tx, body.lines, taxSettings.taxModuleEnabled, taxSettings.taxCalculationMode === "LINE_ITEM" ? taxSettings.defaultAdminTaxCodeId : null);
     const totals = calculateTotals(lines, taxSettings.taxCalculationMode, taxSettings.taxModuleEnabled, headerTaxCode);
-
-    const shouldReplaceStock = shouldPostStock(docType, null);
-    if (shouldReplaceStock && current.stockTransactionId) {
-      await reverseAndDetachStockReceive(tx, current, "Reversed before purchase document update");
-    }
-
-    await tx.purchaseTransactionLine.deleteMany({ where: { transactionId: id } });
-
     const updated = await tx.purchaseTransaction.update({
       where: { id },
       data: {
@@ -599,21 +529,6 @@ export async function updatePurchaseTransaction(docType: PurchaseDocType, id: st
         supplierId: supplier.id,
         supplierAccountNo: supplier.supplierAccountNo,
         supplierName: normalizeText(body.supplierName) || supplier.name,
-        billingAddressLine1: normalizeText(body.billingAddressLine1) || supplier.billingAddressLine1,
-        billingAddressLine2: normalizeText(body.billingAddressLine2) || supplier.billingAddressLine2,
-        billingAddressLine3: normalizeText(body.billingAddressLine3) || supplier.billingAddressLine3,
-        billingAddressLine4: normalizeText(body.billingAddressLine4) || supplier.billingAddressLine4,
-        billingCity: normalizeText(body.billingCity) || supplier.billingCity,
-        billingPostCode: normalizeText(body.billingPostCode) || supplier.billingPostCode,
-        billingCountryCode: normalizeText(body.billingCountryCode) || supplier.billingCountryCode,
-        deliveryAddressLine1: normalizeText(body.deliveryAddressLine1) || supplier.deliveryAddressLine1,
-        deliveryAddressLine2: normalizeText(body.deliveryAddressLine2) || supplier.deliveryAddressLine2,
-        deliveryAddressLine3: normalizeText(body.deliveryAddressLine3) || supplier.deliveryAddressLine3,
-        deliveryAddressLine4: normalizeText(body.deliveryAddressLine4) || supplier.deliveryAddressLine4,
-        deliveryCity: normalizeText(body.deliveryCity) || supplier.deliveryCity,
-        deliveryPostCode: normalizeText(body.deliveryPostCode) || supplier.deliveryPostCode,
-        deliveryCountryCode: normalizeText(body.deliveryCountryCode) || supplier.deliveryCountryCode,
-        attention: normalizeText(body.attention) || supplier.attention,
         contactNo: normalizeText(body.contactNo) || supplier.phone,
         email: normalizeText(body.email) || supplier.email,
         currency: normalizeText(body.currency) || supplier.currency || "MYR",
@@ -666,13 +581,7 @@ export async function updatePurchaseTransaction(docType: PurchaseDocType, id: st
           remarks: line.remarks,
         })) },
       },
-      include: { lines: true },
     });
-
-    if (shouldReplaceStock) {
-      await createStockReceive(tx, updated, lines);
-    }
-
     return updated;
   });
 }
@@ -687,7 +596,12 @@ export async function cancelPurchaseTransaction(docType: PurchaseDocType, id: st
       },
     });
     if (!current || current.docType !== docType) throw new Error("Document not found.");
-    if (current.status === "CANCELLED") return current;
+    if (current.status === "CANCELLED") {
+      return tx.purchaseTransaction.findUnique({
+        where: { id },
+        include: { cancelledByAdmin: { select: { id: true, name: true, email: true } } },
+      });
+    }
 
     const activeDownstream = current.sourceLinks.filter((link) => link.targetTransaction.status !== "CANCELLED");
     if (activeDownstream.length > 0) {
@@ -747,6 +661,7 @@ export async function cancelPurchaseTransaction(docType: PurchaseDocType, id: st
         cancelledAt: new Date(),
         cancelReason: normalizeText(reason) || "Cancelled by admin",
       },
+      include: { cancelledByAdmin: { select: { id: true, name: true, email: true } } },
     });
     for (const link of current.targetLinks) await refreshSourceStatus(tx, link.sourceTransactionId);
     return updated;
