@@ -10,8 +10,6 @@ import type { CustomerAccountNoFormat } from "@prisma/client";
 type SuppliersPageProps = {
   searchParams?: Promise<{
     search?: string;
-    source?: string;
-    portalAccess?: string;
     status?: string;
     page?: string;
   }>;
@@ -89,8 +87,6 @@ type SupplierRecord = {
   creditLimitExceeded?: boolean;
   creditOverdue?: boolean;
   deliveryAddresses: SupplierDeliveryAddress[];
-  accountSource: "PORTAL" | "ADMIN";
-  portalAccess: boolean;
   isActive: boolean;
   createdAt: Date;
   _count: {
@@ -107,16 +103,12 @@ export default async function AdminSuppliersPage({
 
   const params = (await searchParams) || {};
   const search = params.search || "";
-  const source = params.source || "ALL";
-  const portalAccess = params.portalAccess || "ALL";
   const status = params.status || "ACTIVE";
   const page = Math.max(1, Number(params.page || "1") || 1);
 
   const [result, agents, countries, currencies, accountConfig, existingAccountNos] = await Promise.all([
     getSuppliers({
       search,
-      source,
-      portalAccess,
       status,
       page,
       pageSize: 10,
@@ -167,7 +159,7 @@ export default async function AdminSuppliersPage({
             </p>
           </div>
 
-          <form method="get" className="card-rk grid items-end gap-4 p-6 md:grid-cols-2 xl:grid-cols-[minmax(220px,1.15fr)_minmax(180px,1fr)_minmax(180px,1fr)_minmax(180px,1fr)_auto]">
+          <form method="get" className="card-rk grid items-end gap-4 p-6 md:grid-cols-2 xl:grid-cols-[minmax(260px,1.4fr)_minmax(220px,1fr)_auto]">
             <div>
               <label className="mb-2 block text-sm text-white/65">
                 Name / A/C No. / Contact No
@@ -179,72 +171,6 @@ export default async function AdminSuppliersPage({
                 placeholder="Search name, A/C No., contact, or email"
                 className="w-full rounded-xl border border-white/15 bg-black/50 px-4 py-3 text-white outline-none placeholder:text-white/35"
               />
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm text-white/65">
-                Account Source
-              </label>
-              <div className="relative">
-                <select
-                  name="source"
-                  defaultValue={source}
-                  className="w-full appearance-none rounded-xl border border-white/15 bg-black/50 px-4 py-3 pr-12 text-white outline-none"
-                >
-                  <option value="ALL">All Sources</option>
-                  <option value="PORTAL">Self Registered</option>
-                  <option value="ADMIN">Admin Created</option>
-                </select>
-
-                <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/60">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                    className="h-5 w-5"
-                    aria-hidden="true"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.51a.75.75 0 0 1-1.08 0l-4.25-4.51a.75.75 0 0 1 .02-1.06Z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm text-white/65">
-                Portal Access
-              </label>
-              <div className="relative">
-                <select
-                  name="portalAccess"
-                  defaultValue={portalAccess}
-                  className="w-full appearance-none rounded-xl border border-white/15 bg-black/50 px-4 py-3 pr-12 text-white outline-none"
-                >
-                  <option value="ALL">All Access States</option>
-                  <option value="ENABLED">Enabled</option>
-                  <option value="DISABLED">Disabled</option>
-                </select>
-
-                <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/60">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                    className="h-5 w-5"
-                    aria-hidden="true"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.51a.75.75 0 0 1-1.08 0l-4.25-4.51a.75.75 0 0 1 .02-1.06Z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                </div>
-              </div>
             </div>
 
             <div>
@@ -322,8 +248,6 @@ export default async function AdminSuppliersPage({
             basePath="/admin/suppliers"
             params={{
               search: search || undefined,
-              source: source !== "ALL" ? source : undefined,
-              portalAccess: portalAccess !== "ALL" ? portalAccess : undefined,
               status: status !== "ACTIVE" ? status : undefined,
             }}
           />

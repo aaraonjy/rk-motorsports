@@ -1215,8 +1215,6 @@ export async function getCustomerByIdWithIntelligence(
 
 type SuppliersOptions = {
   search?: string;
-  source?: string;
-  portalAccess?: string;
   status?: string;
   page?: number;
   pageSize?: number;
@@ -1329,8 +1327,6 @@ export async function getSuppliers(filters?: SuppliersOptions) {
     suppliers: suppliers.map((supplier) => ({
       ...supplier,
       ...buildSupplierCreditControl(supplier),
-      accountSource: "ADMIN" as const,
-      portalAccess: false,
       salesTransactionOrderCount: 0,
       supplierProfileTransactionCount: 0,
       _count: {
@@ -1413,8 +1409,6 @@ export async function getSupplierByIdWithIntelligence(
 
   return {
     ...supplier,
-    accountSource: "ADMIN" as const,
-    portalAccess: false,
     orders: [],
     purchaseTransactionPagination: {
       currentPage: transactionPage,

@@ -77,8 +77,6 @@ type SupplierRecord = {
   creditOldestOverdueDays?: number;
   creditLimitExceeded?: boolean;
   creditOverdue?: boolean;
-  accountSource: "PORTAL" | "ADMIN";
-  portalAccess: boolean;
   isActive: boolean;
   createdAt: string;
   _count: {
@@ -265,22 +263,6 @@ function getNextAccountSuffix(args: {
     }, 0) + 1;
 
   return `${args.initial}${String(nextSequence).padStart(args.sequenceDigits, "0")}`;
-}
-
-function getSourceBadge(source: "PORTAL" | "ADMIN") {
-  return source === "ADMIN"
-    ? "inline-flex min-w-[110px] items-center justify-center rounded-full border border-amber-500/30 bg-amber-500/15 px-3 py-1 text-center text-xs font-semibold text-amber-300"
-    : "inline-flex min-w-[110px] items-center justify-center rounded-full border border-sky-500/30 bg-sky-500/15 px-3 py-1 text-center text-xs font-semibold text-sky-300";
-}
-
-function getSourceLabel(source: "PORTAL" | "ADMIN") {
-  return source === "ADMIN" ? "Admin Created" : "Self Registered";
-}
-
-function getPortalAccessBadge(enabled: boolean) {
-  return enabled
-    ? "inline-flex min-w-[88px] items-center justify-center rounded-full border border-emerald-500/30 bg-emerald-500/15 px-3 py-1 text-center text-xs font-semibold text-emerald-300 transition hover:bg-emerald-500/20"
-    : "inline-flex min-w-[88px] items-center justify-center rounded-full border border-white/15 bg-white/10 px-3 py-1 text-center text-xs font-semibold text-white/75 transition hover:bg-white/15";
 }
 
 function getSupplierStatusBadge(isActive: boolean) {
@@ -627,7 +609,6 @@ function SupplierModal({
 
   if (!isOpen) return null;
 
-  const isPortalSupplier = supplier?.accountSource === "PORTAL";
   const canDeleteSupplier = mode === "edit" && supplier ? Number(supplier.supplierProfileTransactionCount ?? supplier._count.orders ?? 0) === 0 : false;
 
   function updateField<K extends keyof SupplierFormState>(key: K, value: SupplierFormState[K]) {
@@ -850,8 +831,7 @@ function SupplierModal({
               </div>
               <div>
                 <FieldLabel>Email</FieldLabel>
-                <TextInput type="email" value={form.email} onChange={(value) => updateField("email", value)} disabled={mode === "edit" && isPortalSupplier} placeholder="Enter email address" />
-                {mode === "edit" && isPortalSupplier ? <p className="mt-2 text-xs text-white/45">Email is locked for self-registered suppliers to avoid unexpected login issues.</p> : null}
+                <TextInput type="email" value={form.email} onChange={(value) => updateField("email", value)} placeholder="Enter email address" />
               </div>
               <div>
                 <FieldLabel>Phone 1</FieldLabel>
@@ -1154,93 +1134,12 @@ function SupplierModal({
   );
 }
 
-function TempPasswordModal({ password, onClose }: { password: string | null; onClose: () => void }) {
-  const [copied, setCopied] = useState(false);
-  if (!password) return null;
-
-  async function handleCopy() {
-    if (!password) return;
-    try {
-      await navigator.clipboard.writeText(password);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      setCopied(false);
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/70 px-4">
-      <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-zinc-950 p-6 shadow-2xl">
-        <h3 className="text-lg font-semibold text-white">Portal Access Enabled</h3>
-        <p className="mt-2 text-sm leading-6 text-white/60">The supplier can now log in to the portal using this temporary password. Please save it now because it will not be shown again.</p>
-        <div className="mt-5 rounded-xl border border-emerald-500/25 bg-emerald-500/10 p-4">
-          <div className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-300/80">Temporary Password</div>
-          <div className="mt-2 break-all text-lg font-semibold text-white">{password}</div>
-        </div>
-        <div className="mt-6 flex items-center justify-end gap-3">
-          <button type="button" onClick={handleCopy} className={`rounded-xl border px-4 py-2.5 text-sm transition ${copied ? "border-emerald-400 bg-emerald-400/10 text-emerald-300" : "border-white/15 text-white/80 hover:bg-white/10"}`}>{copied ? "Copied ✓" : "Copy Password"}</button>
-          <button type="button" onClick={onClose} className="rounded-xl border border-white/15 bg-black/30 px-4 py-2.5 text-sm text-white transition hover:bg-white/10">Close</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function PortalAccessConfirmModal({ supplier, isSubmitting, onClose, onConfirm }: { supplier: SupplierRecord | null; isSubmitting: boolean; onClose: () => void; onConfirm: () => void }) {
-  if (!supplier) return null;
-  const isEnabling = !supplier.portalAccess;
-
-  return (
-    <div className="fixed inset-0 z-[115] flex items-center justify-center bg-black/70 px-4">
-      <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-zinc-950 p-6 shadow-2xl">
-        <h3 className="text-lg font-semibold text-white">{isEnabling ? "Enable Portal Access" : "Disable Portal Access"}</h3>
-        <p className="mt-2 text-sm leading-6 text-white/60">
-          {isEnabling ? `Are you sure you want to enable portal access for ${supplier.name}? A new temporary password will be generated immediately.` : `Are you sure you want to disable portal access for ${supplier.name}? They will no longer be able to log in to the portal.`}
-        </p>
-        <div className="mt-6 flex items-center justify-end gap-3">
-          <button type="button" onClick={onClose} disabled={isSubmitting} className="rounded-xl border border-white/15 px-4 py-2.5 text-sm text-white/75 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-50">No</button>
-          <button type="button" onClick={onConfirm} disabled={isSubmitting} className={`rounded-xl border px-4 py-2.5 text-sm transition disabled:cursor-not-allowed disabled:opacity-50 ${isEnabling ? "border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10" : "border-red-500/40 text-red-300 hover:bg-red-500/10"}`}>{isSubmitting ? "Updating..." : "Yes"}</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export function AdminSupplierManagement({ suppliers, agents, countries, currencies, accountConfiguration, existingSupplierAccountNos, currentPage, pageSize }: Props) {
   const router = useRouter();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<SupplierRecord | null>(null);
-  const [isTogglingId, setIsTogglingId] = useState<string | null>(null);
-  const [tempPassword, setTempPassword] = useState<string | null>(null);
-  const [portalAccessTarget, setPortalAccessTarget] = useState<SupplierRecord | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState("");
 
-
-  async function togglePortalAccess(userId: string) {
-    try {
-      setIsTogglingId(userId);
-      const response = await fetch(`/api/admin/suppliers/${userId}/portal-access`, { method: "PATCH" });
-      const data = (await response.json()) as SupplierApiResponse;
-      if (!response.ok || !data.ok) {
-        alert(data.error || "Failed to update portal access.");
-        return;
-      }
-      if (data.tempPassword) setTempPassword(data.tempPassword);
-      router.refresh();
-    } catch {
-      alert("Failed to update portal access.");
-    } finally {
-      setIsTogglingId(null);
-    }
-  }
-
-  async function handleConfirmPortalAccess() {
-    if (!portalAccessTarget) return;
-    const userId = portalAccessTarget.id;
-    setPortalAccessTarget(null);
-    await togglePortalAccess(userId);
-  }
 
   function handleSaved(message: string) {
     setSubmitSuccess(message);
@@ -1299,11 +1198,6 @@ export function AdminSupplierManagement({ suppliers, agents, countries, currenci
                 <td className="px-4 py-4 text-white/85">{supplier.salesTransactionOrderCount ?? supplier._count.orders}</td>
                 <td className="px-4 py-4">
                   <div className="flex flex-col gap-2">
-                    {supplier.isActive ? (
-                      <span className="inline-flex w-full cursor-not-allowed items-center justify-center rounded-xl border border-white/10 bg-black/20 px-4 py-2 text-center text-white/35">Create Purchase</span>
-                    ) : (
-                      <span className="inline-flex w-full cursor-not-allowed items-center justify-center rounded-xl border border-white/10 bg-black/20 px-4 py-2 text-center text-white/35">Inactive</span>
-                    )}
                     <button type="button" onClick={(e) => { e.stopPropagation(); setEditingSupplier(supplier); }} className="rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-white transition hover:bg-white/10">Edit</button>
                   </div>
                 </td>
@@ -1318,8 +1212,6 @@ export function AdminSupplierManagement({ suppliers, agents, countries, currenci
 
       <SupplierModal isOpen={isCreateOpen} mode="create" supplier={null} agents={agents} countries={countries} currencies={currencies} accountConfiguration={accountConfiguration} existingSupplierAccountNos={existingSupplierAccountNos} onClose={() => setIsCreateOpen(false)} onSaved={handleSaved} />
       <SupplierModal isOpen={editingSupplier !== null} mode="edit" supplier={editingSupplier} agents={agents} countries={countries} currencies={currencies} accountConfiguration={accountConfiguration} existingSupplierAccountNos={existingSupplierAccountNos} onClose={() => setEditingSupplier(null)} onSaved={handleSaved} />
-      <PortalAccessConfirmModal supplier={portalAccessTarget} isSubmitting={!!(portalAccessTarget && isTogglingId === portalAccessTarget.id)} onClose={() => setPortalAccessTarget(null)} onConfirm={handleConfirmPortalAccess} />
-      <TempPasswordModal password={tempPassword} onClose={() => setTempPassword(null)} />
     </>
   );
 }
