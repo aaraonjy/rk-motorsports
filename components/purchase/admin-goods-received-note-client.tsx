@@ -594,8 +594,9 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
     e.preventDefault();
     setError(""); setMessage(""); setIsSubmitting(true);
     try {
-      const isUpdate = Boolean(editingTransaction && !isRevisionMode);
-      const response = await fetch(isUpdate ? `${API_PATH}/${editingTransaction.id}` : API_PATH, {
+      const updateTransactionId = !isRevisionMode ? editingTransaction?.id || "" : "";
+      const isUpdate = Boolean(updateTransactionId);
+      const response = await fetch(isUpdate ? `${API_PATH}/${updateTransactionId}` : API_PATH, {
         method: isUpdate ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
