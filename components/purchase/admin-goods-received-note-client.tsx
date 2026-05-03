@@ -65,6 +65,7 @@ type TaxCodeOption = {
 type PurchaseTransactionRecord = {
   id: string;
   docNo: string;
+  docType?: "PO" | "GRN" | "PI" | string | null;
   docDate: string;
   docDesc?: string | null;
   supplierId?: string | null;
