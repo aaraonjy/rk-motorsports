@@ -397,8 +397,8 @@ export function AdminPurchaseOrderClient(props: Props) {
 
   const discountTypeOptions = useMemo<SearchableSelectOption[]>(() => [
     { id: "PERCENT", label: "%", searchText: "% percent" },
-    { id: "AMOUNT", label: "Amount", searchText: "amount" },
-  ], []);
+    { id: "AMOUNT", label: form.currency || "MYR", searchText: `${form.currency || "MYR"} amount currency` },
+  ], [form.currency]);
 
   const supplierOptions = useMemo<SearchableSelectOption[]>(() => props.initialSuppliers.map((supplier) => {
     const label = `${supplier.supplierAccountNo ? `${supplier.supplierAccountNo} — ` : ""}${supplier.name}`;
@@ -555,6 +555,37 @@ export function AdminPurchaseOrderClient(props: Props) {
   function addLine() { setLines((prev) => [...prev, emptyLine(props.defaultLocationId, defaultTaxCodeId, qtyDecimalPlaces, unitCostDecimalPlaces)]); }
   function removeLine(index: number) { setLines((prev) => prev.length <= 1 ? prev : prev.filter((_, lineIndex) => lineIndex !== index)); }
 
+  function resetCreateForm() {
+    setActiveTab("HEADER");
+    setDocNo("");
+    setDocNoDraft("");
+    setManualDocNoEnabled(false);
+    setShowDocNoOverride(false);
+    setShowGenerateFrom(false);
+    setForm({
+      docDate: todayInput(),
+      docDesc: TITLE,
+      supplierId: "",
+      supplierName: "",
+      supplierAccountNo: "",
+      contactNo: "",
+      email: "",
+      currency: "MYR",
+      reference: "",
+      remarks: "",
+      attention: "",
+      agentId: "",
+      projectId: "",
+      departmentId: "",
+      taxCodeId: "",
+      termsAndConditions: "",
+      bankAccount: "",
+      footerRemarks: "",
+    });
+    setLines([emptyLine(props.defaultLocationId, defaultTaxCodeId, qtyDecimalPlaces, unitCostDecimalPlaces)]);
+    setError("");
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(""); setMessage(""); setIsSubmitting(true);
@@ -603,7 +634,7 @@ export function AdminPurchaseOrderClient(props: Props) {
             <h2 className="mt-4 text-2xl font-bold">Existing {TITLE} Records</h2>
             <p className="mt-4 max-w-3xl text-sm leading-6 text-white/70">Manage {TITLE.toLowerCase()} transaction records.</p>
           </div>
-          <button type="button" onClick={() => { setIsCreateOpen(true); setActiveTab("HEADER"); }} className="inline-flex items-center justify-center rounded-xl bg-red-500 px-5 py-3 font-semibold text-white transition hover:bg-red-400">
+          <button type="button" onClick={() => { resetCreateForm(); setIsCreateOpen(true); router.push(DETAIL_PATH); }} className="inline-flex items-center justify-center rounded-xl bg-red-500 px-5 py-3 font-semibold text-white transition hover:bg-red-400">
             Create {TITLE}
           </button>
         </div>
@@ -635,15 +666,7 @@ export function AdminPurchaseOrderClient(props: Props) {
                   <tr key={item.id} onClick={() => router.push(`${DETAIL_PATH}/${item.id}`)} className="cursor-pointer text-white/80 transition hover:bg-white/[0.04]">
                     <td className="px-4 py-4">
                       <div className="font-semibold text-white">{item.docNo}</div>
-                      {item.revisedFrom?.docNo ? (
-                        <Link
-                          href={`${DETAIL_PATH}/${item.revisedFrom.id}`}
-                          onClick={(event) => event.stopPropagation()}
-                          className="mt-2 block w-fit text-xs text-white/40 underline-offset-4 transition hover:text-white/70 hover:underline"
-                        >
-                          ↳ Revision of {item.revisedFrom.docNo}
-                        </Link>
-                      ) : null}
+                      {item.revisedFrom?.docNo ? <div className="mt-2 text-xs text-white/40 no-underline">↳ Revision of {item.revisedFrom.docNo}</div> : null}
                     </td>
                     <td className="px-4 py-4">{formatDate(item.docDate)}</td>
                     <td className="px-4 py-4">
@@ -765,7 +788,7 @@ export function AdminPurchaseOrderClient(props: Props) {
                       <div><label className="label-rk">Discount</label><div className="grid grid-cols-[1fr_120px] gap-3"><input value={line.discountRate} onChange={(e) => updateLine(index, "discountRate", e.target.value)} className="input-rk" /><CompactSelect options={discountTypeOptions} value={line.discountType} onChange={(value) => updateLine(index, "discountType", value)} /></div></div>
                       <div className="md:col-span-2">
                         <SearchableSelect label="Location" placeholder="Search or select location" options={locationOptions} value={line.locationId} onChange={(option) => updateLine(index, "locationId", option?.id || "")} />
-                        <p className="mt-2 text-xs text-white/40">{balanceText}</p>
+                        <p className="mt-2 text-xs text-white/40 no-underline">{balanceText}</p>
                       </div>
                       
                       {props.taxConfig.taxModuleEnabled && taxMode === "LINE_ITEM" ? (
@@ -790,7 +813,7 @@ export function AdminPurchaseOrderClient(props: Props) {
           ) : null}
         </div>
 
-        <div className="mt-8 flex justify-end gap-3 border-t border-white/10 pt-5"><button type="button" onClick={() => { setIsCreateOpen(false); router.push(DETAIL_PATH); }} className="rounded-xl border border-white/15 px-5 py-3 text-sm text-white/80 transition hover:bg-white/10">Close</button><button type="submit" disabled={!canSubmit} className="rounded-xl bg-red-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-50">{isSubmitting ? "Saving..." : `Save ${TITLE}`}</button></div>
+        <div className="mt-8 flex justify-end gap-3 border-t border-white/10 pt-5"><button type="button" onClick={() => { resetCreateForm(); setIsCreateOpen(false); router.push(DETAIL_PATH); }} className="rounded-xl border border-white/15 px-5 py-3 text-sm text-white/80 transition hover:bg-white/10">Close</button><button type="submit" disabled={!canSubmit} className="rounded-xl bg-red-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-50">{isSubmitting ? "Saving..." : `Save ${TITLE}`}</button></div>
       </form>
           </div>
         </div>
