@@ -1053,6 +1053,10 @@ export function AdminPurchaseInvoiceClient(props: Props) {
     return (item.sourceLinks || []).some((link) => link.targetTransaction && link.targetTransaction.status !== "CANCELLED");
   }
 
+  function hasGeneratedFromSource(item: PurchaseTransactionRecord) {
+    return (item.targetLinks || []).some((link) => link.sourceTransaction && link.sourceTransaction.status !== "CANCELLED");
+  }
+
   function hasActiveSourceDocument(item: PurchaseTransactionRecord) {
     return (item.targetLinks || []).some((link) => link.sourceTransaction && link.sourceTransaction.status !== "CANCELLED");
   }
@@ -1298,53 +1302,60 @@ export function AdminPurchaseInvoiceClient(props: Props) {
                     </td>
                     <td className="px-4 py-4 text-right">{`${item.currency || "MYR"} ${money(item.grandTotal)}`}</td>
                     <td className="px-4 py-4 text-right">
-                      {item.status !== "CANCELLED" ? (
+                      {item.status === "CANCELLED" ? (
+                        <span className="text-xs text-white/35">Cancelled</span>
+                      ) : hasActiveDownstream(item) ? (
+                        <span className="inline-flex rounded-xl border border-white/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-white/45">LOCKED</span>
+                      ) : hasActiveSourceDocument(item) ? (
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            openCancelDialog(item);
+                          }}
+                          className="rounded-xl border border-red-500/30 px-3 py-2 text-xs text-red-200 transition hover:bg-red-500/10"
+                        >
+                          Cancel
+                        </button>
+                      ) : (
                         <div className="flex flex-wrap justify-end gap-2">
-                          {!hasActiveSourceDocument(item) ? (
-                            <>
-                              <button
-                                type="button"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  setMessage("");
-                                  setError("");
-                                  setCancelNotice(null);
-                                  router.push(`${DETAIL_PATH}?edit=${item.id}`);
-                                }}
-                                className="rounded-xl border border-white/15 px-3 py-2 text-xs text-white/75 transition hover:bg-white/10"
-                              >
-                                Edit
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  setMessage("");
-                                  setError("");
-                                  setCancelNotice(null);
-                                  router.push(`${DETAIL_PATH}?edit=${item.id}`);
-                                }}
-                                className="rounded-xl border border-sky-500/30 px-3 py-2 text-xs text-sky-200 transition hover:bg-sky-500/10"
-                              >
-                                Edit Revise
-                              </button>
-                            </>
-                          ) : null}
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setMessage("");
+                              setError("");
+                              setCancelNotice(null);
+                              router.push(`${DETAIL_PATH}?edit=${item.id}`);
+                            }}
+                            className="rounded-xl border border-white/15 px-3 py-2 text-xs text-white/75 transition hover:bg-white/10"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setMessage("");
+                              setError("");
+                              setCancelNotice(null);
+                              router.push(`${DETAIL_PATH}?edit=${item.id}&revise=1`);
+                            }}
+                            className="rounded-xl border border-sky-500/30 px-3 py-2 text-xs text-sky-200 transition hover:bg-sky-500/10"
+                          >
+                            Edit Revise
+                          </button>
                           <button
                             type="button"
                             onClick={(event) => {
                               event.stopPropagation();
                               openCancelDialog(item);
                             }}
-                            disabled={hasActiveDownstream(item)}
-                            title={hasActiveDownstream(item) ? "Cancel downstream generated document first." : "Cancel document"}
-                            className={`rounded-xl border px-3 py-2 text-xs transition ${hasActiveDownstream(item) ? "cursor-not-allowed border-white/10 text-white/30" : "border-red-500/30 text-red-200 hover:bg-red-500/10"}`}
+                            className="rounded-xl border border-red-500/30 px-3 py-2 text-xs text-red-200 transition hover:bg-red-500/10"
                           >
                             Cancel
                           </button>
                         </div>
-                      ) : (
-                        <span className="text-xs text-white/35">Cancelled</span>
                       )}
                     </td>
                   </tr>

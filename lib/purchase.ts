@@ -335,6 +335,55 @@ async function createStockReceive(tx: Prisma.TransactionClient, transaction: any
   return stockTransaction.id;
 }
 
+async function reversePostedStockReceive(tx: Prisma.TransactionClient, transaction: any, adminId: string, reason?: string | null) {
+  if (!transaction.stockTransactionId) return;
+  const stockTransaction = await tx.stockTransaction.findUnique({
+    where: { id: transaction.stockTransactionId },
+    include: { lines: true },
+  });
+  if (!stockTransaction || stockTransaction.status === StockTransactionStatus.CANCELLED) return;
+
+  for (const stockLine of stockTransaction.lines) {
+    if (!stockLine.locationId) continue;
+    const values = buildLedgerValues(createStoredQtyDecimal(stockLine.qty), "OUT");
+    await tx.stockLedger.create({
+      data: {
+        movementDate: new Date(),
+        movementType: StockTransactionType.SR,
+        movementDirection: StockMovementDirection.OUT,
+        qty: values.qty,
+        qtyIn: values.qtyIn,
+        qtyOut: values.qtyOut,
+        batchNo: stockLine.batchNo,
+        inventoryProductId: stockLine.inventoryProductId,
+        locationId: stockLine.locationId,
+        transactionId: stockTransaction.id,
+        transactionLineId: stockLine.id,
+        referenceNo: transaction.docNo,
+        referenceText: `Reverse ${transaction.docType} ${transaction.docNo}`,
+        sourceType: `PURCHASE_${transaction.docType}_REVERSAL`,
+        sourceId: transaction.id,
+        remarks: normalizeText(reason) || "Purchase document updated or cancelled",
+      },
+    });
+  }
+
+  await tx.stockTransaction.updateMany({
+    where: { id: transaction.stockTransactionId },
+    data: {
+      status: StockTransactionStatus.CANCELLED,
+      cancelledByAdminId: adminId,
+      cancelledAt: new Date(),
+      cancelReason: normalizeText(reason) || "Purchase document updated or cancelled",
+    },
+  });
+
+  await tx.purchaseTransaction.update({
+    where: { id: transaction.id },
+    data: { stockTransactionId: null },
+  });
+}
+
 async function refreshSourceStatus(tx: Prisma.TransactionClient, sourceTransactionId: string) {
   const source = await tx.purchaseTransaction.findUnique({
     where: { id: sourceTransactionId },
@@ -500,10 +549,24 @@ export async function createPurchaseTransaction(docType: PurchaseDocType, body: 
 
 export async function updatePurchaseTransaction(docType: PurchaseDocType, id: string, body: PurchasePayload, adminId: string) {
   return db.$transaction(async (tx) => {
-    const current = await tx.purchaseTransaction.findUnique({ where: { id }, include: { targetLinks: true, lines: true } });
+    const current = await tx.purchaseTransaction.findUnique({
+      where: { id },
+      include: {
+        sourceLinks: { include: { targetTransaction: true } },
+        targetLinks: { include: { sourceTransaction: true } },
+        lines: true,
+      },
+    });
     if (!current || current.docType !== docType) throw new Error("Document not found.");
     if (current.status === "CANCELLED") throw new Error("Cancelled document cannot be edited.");
-    if (current.targetLinks.length > 0 || current.stockTransactionId) throw new Error("This document has generated/stock records. Please create a revised document instead.");
+
+    const activeDownstream = current.sourceLinks.filter((link) => link.targetTransaction?.status !== "CANCELLED");
+    if (activeDownstream.length > 0) throw new Error("This document has generated documents. Please cancel the downstream document first.");
+
+    const activeSource = current.targetLinks.find((link) => link.sourceTransaction?.status !== "CANCELLED");
+    if (activeSource) throw new Error("This document was generated from another document. Please cancel and generate a new document instead.");
+
+    await reversePostedStockReceive(tx, current, adminId, "Purchase document updated");
     await tx.purchaseTransactionLine.deleteMany({ where: { transactionId: id } });
     const docDate = normalizeDate(body.docDate);
     const supplierId = normalizeText(body.supplierId) || current.supplierId;
@@ -573,6 +636,11 @@ export async function updatePurchaseTransaction(docType: PurchaseDocType, id: st
         })) },
       },
     });
+
+    if (shouldPostStock(docType, null)) {
+      await createStockReceive(tx, updated, lines);
+    }
+
     return updated;
   });
 }
@@ -595,49 +663,7 @@ export async function cancelPurchaseTransaction(docType: PurchaseDocType, id: st
       throw new Error(`Cannot cancel this document because it has active generated document${activeDownstream.length > 1 ? "s" : ""}${generatedDocs ? `: ${generatedDocs}` : ""}. Please cancel the downstream document first.`);
     }
 
-    if (current.stockTransactionId) {
-      const stockTransaction = await tx.stockTransaction.findUnique({
-        where: { id: current.stockTransactionId },
-        include: { lines: true },
-      });
-
-      if (stockTransaction) {
-        for (const stockLine of stockTransaction.lines) {
-          if (!stockLine.locationId) continue;
-          const values = buildLedgerValues(createStoredQtyDecimal(stockLine.qty), "OUT");
-          await tx.stockLedger.create({
-            data: {
-              movementDate: new Date(),
-              movementType: StockTransactionType.SR,
-              movementDirection: StockMovementDirection.OUT,
-              qty: values.qty,
-              qtyIn: values.qtyIn,
-              qtyOut: values.qtyOut,
-              batchNo: stockLine.batchNo,
-              inventoryProductId: stockLine.inventoryProductId,
-              locationId: stockLine.locationId,
-              transactionId: stockTransaction.id,
-              transactionLineId: stockLine.id,
-              referenceNo: current.docNo,
-              referenceText: `Cancel ${current.docType} ${current.docNo}`,
-              sourceType: `PURCHASE_${current.docType}_CANCEL`,
-              sourceId: current.id,
-              remarks: normalizeText(reason) || "Cancelled by admin",
-            },
-          });
-        }
-      }
-
-      await tx.stockTransaction.updateMany({
-        where: { id: current.stockTransactionId },
-        data: {
-          status: StockTransactionStatus.CANCELLED,
-          cancelledByAdminId: adminId,
-          cancelledAt: new Date(),
-          cancelReason: normalizeText(reason) || "Cancelled by admin",
-        },
-      });
-    }
+    await reversePostedStockReceive(tx, current, adminId, normalizeText(reason) || "Cancelled by admin");
 
     const updated = await tx.purchaseTransaction.update({
       where: { id },
