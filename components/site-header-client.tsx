@@ -467,10 +467,11 @@ export function AdminDesktopNavigation() {
     sections: [
       {
         title: "Customer Master",
-        items: [
-      { label: "Customer Profile", href: "/admin/customers" },
-      { label: "Supplier Profile", href: "/admin/suppliers" },
-    ],
+        items: [{ label: "Customer Profile", href: "/admin/customers" }],
+      },
+      {
+        title: "Supplier Master",
+        items: [{ label: "Supplier Profile", href: "/admin/suppliers" }],
       },
     ],
   };

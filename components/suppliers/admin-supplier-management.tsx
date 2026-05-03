@@ -40,7 +40,7 @@ type SupplierRecord = {
   id: string;
   name: string;
   supplierAccountNo: string | null;
-  email: string;
+  email: string | null;
   phone: string | null;
   phone2: string | null;
   fax: string | null;
@@ -849,8 +849,8 @@ function SupplierModal({
                 <TextInput value={form.name} onChange={(value) => updateField("name", value)} required placeholder="Enter supplier name" />
               </div>
               <div>
-                <FieldLabel>Email <span className="text-red-300">*</span></FieldLabel>
-                <TextInput type="email" value={form.email} onChange={(value) => updateField("email", value)} required disabled={mode === "edit" && isPortalSupplier} placeholder="Enter email address" />
+                <FieldLabel>Email</FieldLabel>
+                <TextInput type="email" value={form.email} onChange={(value) => updateField("email", value)} disabled={mode === "edit" && isPortalSupplier} placeholder="Enter email address" />
                 {mode === "edit" && isPortalSupplier ? <p className="mt-2 text-xs text-white/45">Email is locked for self-registered suppliers to avoid unexpected login issues.</p> : null}
               </div>
               <div>

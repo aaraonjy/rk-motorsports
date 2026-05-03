@@ -52,7 +52,7 @@ type SupplierRecord = {
   id: string;
   name: string;
   supplierAccountNo: string | null;
-  email: string;
+  email: string | null;
   phone: string | null;
   phone2: string | null;
   fax: string | null;

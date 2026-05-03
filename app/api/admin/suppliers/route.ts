@@ -98,11 +98,12 @@ export async function POST(req: Request) {
   const phone = getText(body, "phone");
 
   if (!name) return Response.json({ ok: false, error: "Supplier name is required." }, { status: 400 });
-  if (!email) return Response.json({ ok: false, error: "Email is required." }, { status: 400 });
-  if (!isValidEmail(email)) return Response.json({ ok: false, error: "Please enter a valid email address." }, { status: 400 });
+  if (email && !isValidEmail(email)) return Response.json({ ok: false, error: "Please enter a valid email address." }, { status: 400 });
 
-  const existingEmail = await db.supplier.findUnique({ where: { email } });
-  if (existingEmail) return Response.json({ ok: false, error: "This email is already used by another supplier." }, { status: 409 });
+  if (email) {
+    const existingEmail = await db.supplier.findUnique({ where: { email } });
+    if (existingEmail) return Response.json({ ok: false, error: "This email is already used by another supplier." }, { status: 409 });
+  }
 
   if (phone) {
     const existingPhone = await db.supplier.findUnique({ where: { phone } });
@@ -148,7 +149,7 @@ export async function POST(req: Request) {
   await db.supplier.create({
     data: {
       name,
-      email,
+      email: email || null,
       phone: phone || null,
       phone2: getNullableText(body, "phone2"),
       fax: getNullableText(body, "fax"),

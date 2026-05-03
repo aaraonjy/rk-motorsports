@@ -593,7 +593,7 @@ model Supplier {
   id                     String                    @id @default(cuid())
   name                   String
   supplierAccountNo      String?                   @unique
-  email                  String                    @unique
+  email                  String?                   @unique
   phone                  String?                   @unique
   phone2                 String?
   fax                    String?

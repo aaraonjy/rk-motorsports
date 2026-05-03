@@ -101,14 +101,15 @@ export async function PATCH(
   const phone = getText(body, "phone");
 
   if (!name) return Response.json({ ok: false, error: "Supplier name is required." }, { status: 400 });
-  if (!email) return Response.json({ ok: false, error: "Email is required." }, { status: 400 });
-  if (!isValidEmail(email)) return Response.json({ ok: false, error: "Please enter a valid email address." }, { status: 400 });
+  if (email && !isValidEmail(email)) return Response.json({ ok: false, error: "Please enter a valid email address." }, { status: 400 });
 
   const supplier = await db.supplier.findUnique({ where: { id } });
   if (!supplier) return Response.json({ ok: false, error: "Supplier not found." }, { status: 404 });
 
-  const existingEmail = await db.supplier.findFirst({ where: { email, NOT: { id } } });
-  if (existingEmail) return Response.json({ ok: false, error: "This email is already used by another supplier." }, { status: 409 });
+  if (email) {
+    const existingEmail = await db.supplier.findFirst({ where: { email, NOT: { id } } });
+    if (existingEmail) return Response.json({ ok: false, error: "This email is already used by another supplier." }, { status: 409 });
+  }
 
   if (phone) {
     const existingPhone = await db.supplier.findFirst({ where: { phone, NOT: { id } }, select: { id: true } });
@@ -145,7 +146,7 @@ export async function PATCH(
     where: { id },
     data: {
       name,
-      email,
+      email: email || null,
       phone: phone || null,
       phone2: getNullableText(body, "phone2"),
       fax: getNullableText(body, "fax"),
