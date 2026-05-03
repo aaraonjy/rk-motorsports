@@ -82,6 +82,20 @@ const salesDesktopSections: HeaderLinkSection[] = [
   },
 ];
 
+
+const purchaseItems: HeaderLink[] = [
+  { label: "Purchase Order", href: "/admin/purchase/purchase-order" },
+  { label: "Goods Received Note", href: "/admin/purchase/goods-received-note" },
+  { label: "Purchase Invoice", href: "/admin/purchase/purchase-invoice" },
+];
+
+const purchaseDesktopSections: HeaderLinkSection[] = [
+  {
+    title: "",
+    items: purchaseItems,
+  },
+];
+
 const stockMasterItems: HeaderLink[] = [
   { label: "Product List", href: "/admin/stock/products" },
   { label: "Product Group", href: "/admin/stock/product-groups" },
@@ -123,6 +137,10 @@ const adminMobileSections: HeaderLinkSection[] = [
   {
     title: "Sales",
     items: salesItems,
+  },
+  {
+    title: "Purchase",
+    items: purchaseItems,
   },
   {
     title: "Stock Master",
@@ -455,10 +473,8 @@ export function AdminDesktopNavigation() {
     {
       key: "purchase",
       label: "Purchase",
-      description: "Coming soon",
-      sections: [],
-      disabled: true,
-      disabledTitle: "Purchase module has not been added yet.",
+      description: "PO, GRN, purchase invoice",
+      sections: purchaseDesktopSections,
     },
   ];
 

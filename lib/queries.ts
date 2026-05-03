@@ -1213,6 +1213,7 @@ export async function getCustomerByIdWithIntelligence(
   };
 }
 
+
 type SuppliersOptions = {
   search?: string;
   status?: string;
@@ -1223,18 +1224,53 @@ type SuppliersOptions = {
 function buildSupplierCreditControl(supplier: {
   creditTermsDays?: number | null;
   creditLimitAmount?: Prisma.Decimal | number | string | null;
+  purchaseTransactions?: Array<{
+    id: string;
+    docType?: string | null;
+    status?: string | null;
+    docNo: string;
+    docDate: Date;
+    grandTotal: Prisma.Decimal | number | string;
+  }>;
 }) {
   const creditTermsDays = Math.max(0, Number(supplier.creditTermsDays ?? 0) || 0);
   const creditLimitAmount = Math.max(0, toCreditNumber(supplier.creditLimitAmount));
+  const creditTermsActive = creditTermsDays > 0;
+  const creditLimitActive = !creditTermsActive && creditLimitAmount > 0;
+  const now = new Date();
+
+  let outstandingAmount = 0;
+  let overdueAmount = 0;
+  let oldestOverdueDays = 0;
+
+  for (const invoice of supplier.purchaseTransactions || []) {
+    if (invoice.status === "CANCELLED") continue;
+    if (invoice.docType !== "PI") continue;
+    const outstanding = Math.max(0, toCreditNumber(invoice.grandTotal));
+    if (outstanding <= 0) continue;
+    outstandingAmount += outstanding;
+    if (creditTermsActive) {
+      const dueDate = new Date(invoice.docDate);
+      dueDate.setDate(dueDate.getDate() + creditTermsDays);
+      if (dueDate.getTime() < now.getTime()) {
+        overdueAmount += outstanding;
+        const overdueDays = Math.max(0, Math.floor((now.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)));
+        oldestOverdueDays = Math.max(oldestOverdueDays, overdueDays);
+      }
+    }
+  }
+
+  outstandingAmount = Math.round((outstandingAmount + Number.EPSILON) * 100) / 100;
+  overdueAmount = Math.round((overdueAmount + Number.EPSILON) * 100) / 100;
 
   return {
     creditTermsDays,
     creditLimitAmount,
-    creditOutstandingAmount: 0,
-    creditOverdueAmount: 0,
-    creditOldestOverdueDays: 0,
-    creditLimitExceeded: false,
-    creditOverdue: false,
+    creditOutstandingAmount: outstandingAmount,
+    creditOverdueAmount: overdueAmount,
+    creditOldestOverdueDays: oldestOverdueDays,
+    creditLimitExceeded: creditLimitActive && outstandingAmount > creditLimitAmount,
+    creditOverdue: creditTermsActive && overdueAmount > 0,
   };
 }
 
@@ -1313,8 +1349,13 @@ export async function getSuppliers(filters?: SuppliersOptions) {
             countryCode: true,
           },
         },
+        purchaseTransactions: {
+          where: { docType: "PI", status: { not: "CANCELLED" } },
+          select: { id: true, docType: true, status: true, docNo: true, docDate: true, grandTotal: true },
+        },
         isActive: true,
         createdAt: true,
+        _count: { select: { purchaseTransactions: true } },
       },
       orderBy: { createdAt: "desc" },
       skip,
@@ -1327,13 +1368,10 @@ export async function getSuppliers(filters?: SuppliersOptions) {
     suppliers: suppliers.map((supplier) => ({
       ...supplier,
       ...buildSupplierCreditControl(supplier),
-      salesTransactionOrderCount: 0,
-      supplierProfileTransactionCount: 0,
-      _count: {
-        orders: 0,
-        supplierSalesTransactions: 0,
-        creditNotes: 0,
-      },
+      purchaseTransactionOrderCount: supplier.purchaseTransactions.filter((transaction) => transaction.docType === "PI").length,
+      supplierProfileTransactionCount: supplier._count.purchaseTransactions || 0,
+      purchaseTransactions: undefined,
+      _count: { orders: supplier._count.purchaseTransactions || 0 },
     })),
     totalCount,
     currentPage: page,
@@ -1348,6 +1386,7 @@ export async function getSupplierByIdWithIntelligence(
 ) {
   const transactionPage = Math.max(1, Number(options?.transactionPage ?? 1) || 1);
   const transactionPageSize = Math.max(1, Number(options?.transactionPageSize ?? 10) || 10);
+  const transactionSkip = (transactionPage - 1) * transactionPageSize;
 
   const supplier = await db.supplier.findFirst({
     where: { id: supplierId },
@@ -1385,6 +1424,10 @@ export async function getSupplierByIdWithIntelligence(
       taxIdentificationNo: true,
       creditTermsDays: true,
       creditLimitAmount: true,
+      purchaseTransactions: {
+        where: { docType: "PI", status: { not: "CANCELLED" } },
+        select: { id: true, docType: true, status: true, docNo: true, docDate: true, grandTotal: true },
+      },
       agent: { select: { id: true, code: true, name: true } },
       deliveryAddresses: {
         orderBy: { createdAt: "asc" },
@@ -1407,22 +1450,77 @@ export async function getSupplierByIdWithIntelligence(
 
   if (!supplier) return null;
 
+  const purchaseHistoryWhere: Prisma.PurchaseTransactionWhereInput = {
+    supplierId,
+    docType: { in: ["PI"] as any },
+  };
+  const purchaseTotalWhere: Prisma.PurchaseTransactionWhereInput = {
+    ...purchaseHistoryWhere,
+    status: { not: "CANCELLED" as any },
+  };
+
+  const [transactionHistoryRows, transactionHistoryCount, totalRows] = await Promise.all([
+    db.purchaseTransaction.findMany({
+      where: purchaseHistoryWhere,
+      orderBy: [{ createdAt: "desc" }, { docDate: "desc" }, { docNo: "desc" }],
+      skip: transactionSkip,
+      take: transactionPageSize,
+      select: {
+        id: true,
+        docType: true,
+        docNo: true,
+        docDate: true,
+        createdAt: true,
+        docDesc: true,
+        status: true,
+        grandTotal: true,
+      },
+    }),
+    db.purchaseTransaction.count({ where: purchaseHistoryWhere }),
+    db.purchaseTransaction.findMany({
+      where: purchaseTotalWhere,
+      orderBy: [{ createdAt: "desc" }, { docDate: "desc" }, { docNo: "desc" }],
+      select: { id: true, docType: true, docDate: true, createdAt: true, grandTotal: true },
+    }),
+  ]);
+
+  const transactionHistory = transactionHistoryRows.map((transaction) => {
+    const amount = toCreditNumber(transaction.grandTotal ?? 0);
+    return {
+      id: transaction.id,
+      docType: transaction.docType,
+      docNo: transaction.docNo,
+      docDate: transaction.docDate,
+      createdAt: transaction.createdAt,
+      docDesc: transaction.docDesc,
+      status: transaction.status,
+      amount,
+      signedAmount: amount,
+    };
+  });
+
+  const totalPurchases = totalRows.length;
+  const totalSpent = Math.round((totalRows.reduce((sum, transaction) => sum + toCreditNumber(transaction.grandTotal ?? 0), 0) + Number.EPSILON) * 100) / 100;
+  const averageOrderValue = totalPurchases > 0 ? Math.round((totalSpent / totalPurchases) * 100) / 100 : 0;
+  const lastOrderDate = totalRows.length > 0 ? totalRows[0].createdAt : null;
+
   return {
     ...supplier,
-    orders: [],
+    purchaseTransactions: undefined,
+    orders: transactionHistory,
     purchaseTransactionPagination: {
       currentPage: transactionPage,
       pageSize: transactionPageSize,
-      totalCount: 0,
-      totalPages: 1,
+      totalCount: transactionHistoryCount,
+      totalPages: Math.max(1, Math.ceil(transactionHistoryCount / transactionPageSize)),
     },
     creditControl: buildSupplierCreditControl(supplier),
     intelligence: {
-      totalOrders: 0,
-      totalPurchases: 0,
-      totalSpent: 0,
-      averageOrderValue: 0,
-      lastOrderDate: null,
+      totalOrders: totalPurchases,
+      totalPurchases,
+      totalSpent,
+      averageOrderValue,
+      lastOrderDate,
     },
   };
 }
