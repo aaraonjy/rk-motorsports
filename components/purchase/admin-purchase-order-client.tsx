@@ -302,6 +302,76 @@ export function AdminPurchaseOrderClient(props: Props) {
   }
 
   const pageTitle = editingTransaction ? `Edit ${TITLE}` : `Create ${TITLE}`;
+  const isFormMode = Boolean(searchParams.get("create") === "1" || editingTransaction || sourceTransaction);
+
+  if (!isFormMode) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-4xl font-bold text-white">{TITLE}</h1>
+          <p className="mt-3 text-white/65">{SUBTITLE}</p>
+        </div>
+
+        <div className="card-rk overflow-hidden">
+          <div className="flex flex-wrap items-start justify-between gap-4 border-b border-white/10 px-5 py-5 md:px-8">
+            <div>
+              <h2 className="text-xl font-semibold text-white">{TITLE} Records</h2>
+              <p className="mt-2 text-sm text-white/50">Manage {TITLE.toLowerCase()} transaction records.</p>
+            </div>
+            <Link href={`${DETAIL_PATH}?create=1`} className="rounded-xl border border-white/15 bg-black/30 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10">
+              Add {TITLE}
+            </Link>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-left text-sm">
+              <thead className="bg-black/30 text-white/45">
+                <tr>
+                  <th className="px-5 py-4">Doc No.</th>
+                  <th className="px-5 py-4">Date</th>
+                  <th className="px-5 py-4">Supplier</th>
+                  <th className="px-5 py-4">Reference</th>
+                  <th className="px-5 py-4">Status</th>
+                  <th className="px-5 py-4 text-right">Amount</th>
+                  <th className="px-5 py-4 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {props.initialTransactions.length > 0 ? (
+                  props.initialTransactions.map((transaction) => (
+                    <tr key={transaction.id} className="border-t border-white/10 hover:bg-white/[0.03]">
+                      <td className="px-5 py-4">
+                        <Link href={`${DETAIL_PATH}/${transaction.id}`} className="font-semibold text-white underline-offset-4 hover:underline">
+                          {transaction.docNo}
+                        </Link>
+                      </td>
+                      <td className="px-5 py-4 text-white/60">{formatDate(transaction.docDate)}</td>
+                      <td className="px-5 py-4 text-white/75">{transaction.supplierName || "-"}</td>
+                      <td className="px-5 py-4 text-white/60">{transaction.reference || "-"}</td>
+                      <td className="px-5 py-4">
+                        <span className={`rounded-full border px-3 py-1 text-xs ${statusClass(transaction.status)}`}>{transaction.status}</span>
+                      </td>
+                      <td className="px-5 py-4 text-right text-white">{money(transaction.grandTotal)}</td>
+                      <td className="px-5 py-4 text-right">
+                        <div className="flex justify-end gap-2">
+                          <Link href={`${DETAIL_PATH}/${transaction.id}`} className="rounded-xl border border-white/15 px-4 py-2 text-xs text-white/80 transition hover:bg-white/10">View</Link>
+                          <Link href={`${DETAIL_PATH}?edit=${transaction.id}`} className={`rounded-xl border border-white/15 px-4 py-2 text-xs text-white/80 transition hover:bg-white/10 ${transaction.status === "CANCELLED" ? "pointer-events-none opacity-50" : ""}`}>Edit</Link>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={7} className="px-5 py-14 text-center text-white/45">No {TITLE.toLowerCase()} records found.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="card-rk p-5 md:p-8">
@@ -370,8 +440,6 @@ export function AdminPurchaseOrderClient(props: Props) {
 
         <div className="mt-8 flex justify-end gap-3 border-t border-white/10 pt-5"><Link href={DETAIL_PATH} className="rounded-xl border border-white/15 px-5 py-3 text-sm text-white/80 transition hover:bg-white/10">Close</Link><button type="submit" disabled={isSubmitting} className="rounded-xl bg-red-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-50">{isSubmitting ? "Saving..." : `Save ${TITLE}`}</button></div>
       </form>
-
-      {props.initialTransactions.length > 0 ? <div className="mt-8 rounded-2xl border border-white/10"><div className="border-b border-white/10 px-5 py-4 text-sm font-semibold text-white/70">Recent {TITLE} Records</div><div className="overflow-x-auto"><table className="min-w-full text-left text-sm"><thead className="bg-black/30 text-white/45"><tr><th className="px-5 py-3">Doc No.</th><th className="px-5 py-3">Date</th><th className="px-5 py-3">Supplier</th><th className="px-5 py-3">Status</th><th className="px-5 py-3 text-right">Amount</th></tr></thead><tbody>{props.initialTransactions.map((transaction) => (<tr key={transaction.id} className="border-t border-white/10 hover:bg-white/[0.03]"><td className="px-5 py-4"><Link href={`${DETAIL_PATH}/${transaction.id}`} className="font-semibold text-white underline-offset-4 hover:underline">{transaction.docNo}</Link></td><td className="px-5 py-4 text-white/60">{formatDate(transaction.docDate)}</td><td className="px-5 py-4 text-white/75">{transaction.supplierName}</td><td className="px-5 py-4"><span className={`rounded-full border px-3 py-1 text-xs ${statusClass(transaction.status)}`}>{transaction.status}</span></td><td className="px-5 py-4 text-right text-white">{money(transaction.grandTotal)}</td></tr>))}</tbody></table></div></div> : null}
     </div>
   );
 }
