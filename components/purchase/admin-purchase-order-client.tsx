@@ -493,6 +493,8 @@ export function AdminPurchaseOrderClient(props: Props) {
 
   useEffect(() => {
     if (editId || sourceId) {
+      setMessage("");
+      setError("");
       setIsCreateOpen(true);
     }
   }, [editId, sourceId]);
@@ -603,7 +605,7 @@ export function AdminPurchaseOrderClient(props: Props) {
             <h2 className="mt-4 text-2xl font-bold">Existing {TITLE} Records</h2>
             <p className="mt-4 max-w-3xl text-sm leading-6 text-white/70">Manage {TITLE.toLowerCase()} transaction records.</p>
           </div>
-          <button type="button" onClick={() => { setIsCreateOpen(true); setActiveTab("HEADER"); }} className="inline-flex items-center justify-center rounded-xl bg-red-500 px-5 py-3 font-semibold text-white transition hover:bg-red-400">
+          <button type="button" onClick={() => { setMessage(""); setError(""); setIsCreateOpen(true); setActiveTab("HEADER"); }} className="inline-flex items-center justify-center rounded-xl bg-red-500 px-5 py-3 font-semibold text-white transition hover:bg-red-400">
             Create {TITLE}
           </button>
         </div>
@@ -635,7 +637,15 @@ export function AdminPurchaseOrderClient(props: Props) {
                   <tr key={item.id} onClick={() => router.push(`${DETAIL_PATH}/${item.id}`)} className="cursor-pointer text-white/80 transition hover:bg-white/[0.04]">
                     <td className="px-4 py-4">
                       <div className="font-semibold text-white">{item.docNo}</div>
-                      {item.revisedFrom?.docNo ? <div className="mt-2 text-xs text-white/40">↳ Revision of {item.revisedFrom.docNo}</div> : null}
+                      {item.revisedFrom?.docNo ? (
+                        <Link
+                          href={`${DETAIL_PATH}/${item.revisedFrom.id}`}
+                          onClick={(event) => event.stopPropagation()}
+                          className="mt-2 inline-flex rounded-md text-xs text-white/40 transition hover:bg-white/5 hover:px-1 hover:py-0.5 hover:text-white/80"
+                        >
+                          ↳ Revision of {item.revisedFrom.docNo}
+                        </Link>
+                      ) : null}
                     </td>
                     <td className="px-4 py-4">{formatDate(item.docDate)}</td>
                     <td className="px-4 py-4">
@@ -647,8 +657,8 @@ export function AdminPurchaseOrderClient(props: Props) {
                     <td className="px-4 py-4 text-right">
                       {item.status !== "CANCELLED" ? (
                         <div className="flex flex-wrap justify-end gap-2">
-                          <button type="button" onClick={(event) => { event.stopPropagation(); router.push(`${DETAIL_PATH}?edit=${item.id}`); }} className="rounded-xl border border-white/15 px-3 py-2 text-xs text-white/75 transition hover:bg-white/10">Edit</button>
-                          <button type="button" onClick={(event) => { event.stopPropagation(); router.push(`${DETAIL_PATH}?edit=${item.id}`); }} className="rounded-xl border border-sky-500/30 px-3 py-2 text-xs text-sky-200 transition hover:bg-sky-500/10">Edit Revise</button>
+                          <button type="button" onClick={(event) => { event.stopPropagation(); setMessage(""); setError(""); router.push(`${DETAIL_PATH}?edit=${item.id}`); }} className="rounded-xl border border-white/15 px-3 py-2 text-xs text-white/75 transition hover:bg-white/10">Edit</button>
+                          <button type="button" onClick={(event) => { event.stopPropagation(); setMessage(""); setError(""); router.push(`${DETAIL_PATH}?edit=${item.id}`); }} className="rounded-xl border border-sky-500/30 px-3 py-2 text-xs text-sky-200 transition hover:bg-sky-500/10">Edit Revise</button>
                         </div>
                       ) : <span className="text-xs text-white/35">Cancelled</span>}
                     </td>
@@ -680,7 +690,6 @@ export function AdminPurchaseOrderClient(props: Props) {
           ) : null}
         </div>
 
-        {message ? <div className="mt-5 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">{message}</div> : null}
         {error ? <div className="mt-5 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</div> : null}
 
         <div className="mt-6 flex flex-wrap gap-2 border-b border-white/10 pb-4">
@@ -782,7 +791,7 @@ export function AdminPurchaseOrderClient(props: Props) {
           ) : null}
         </div>
 
-        <div className="mt-8 flex justify-end gap-3 border-t border-white/10 pt-5"><button type="button" onClick={() => { setIsCreateOpen(false); router.push(DETAIL_PATH); }} className="rounded-xl border border-white/15 px-5 py-3 text-sm text-white/80 transition hover:bg-white/10">Close</button><button type="submit" disabled={!canSubmit} className="rounded-xl bg-red-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-50">{isSubmitting ? "Saving..." : `Save ${TITLE}`}</button></div>
+        <div className="mt-8 flex justify-end gap-3 border-t border-white/10 pt-5"><button type="button" onClick={() => { setMessage(""); setError(""); setIsCreateOpen(false); router.push(DETAIL_PATH); }} className="rounded-xl border border-white/15 px-5 py-3 text-sm text-white/80 transition hover:bg-white/10">Close</button><button type="submit" disabled={!canSubmit} className="rounded-xl bg-red-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-50">{isSubmitting ? "Saving..." : `Save ${TITLE}`}</button></div>
       </form>
           </div>
         </div>
