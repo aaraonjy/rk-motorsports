@@ -241,7 +241,7 @@ export function AdminPurchaseOrderClient(props: Props) {
       productDescription: line.productDescription || "",
       itemType: line.itemType || "STOCK_ITEM",
       uom: line.uom || "",
-      qty: formatDecimalInput((line as any).remainingQty ?? (DOC_TYPE === "GRN" ? (line as any).remainingReceiveQty : (line as any).remainingInvoiceQty) ?? line.qty ?? 1, qtyDecimalPlaces),
+      qty: formatDecimalInput((line as any).remainingQty ?? line.qty ?? 1, qtyDecimalPlaces),
       unitCost: formatDecimalInput(line.unitCost ?? 0, unitCostDecimalPlaces),
       discountRate: formatDecimalInput(line.discountRate ?? 0, 2),
       discountType: line.discountType === "AMOUNT" ? "AMOUNT" : "PERCENT",
