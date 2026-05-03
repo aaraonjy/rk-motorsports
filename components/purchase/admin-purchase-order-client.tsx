@@ -363,7 +363,7 @@ export function AdminPurchaseOrderClient(props: Props) {
   const qtyDecimalPlaces = getDecimalPlaces(props.stockNumberFormat.qtyDecimalPlaces, 2);
   const unitCostDecimalPlaces = getDecimalPlaces(props.stockNumberFormat.unitCostDecimalPlaces, 2);
   const taxMode = normalizeTaxCalculationMode(props.taxConfig.taxCalculationMode);
-  const defaultTaxCodeId = taxMode === "LINE_ITEM" ? props.taxConfig.defaultAdminTaxCodeId || "" : "";
+  const defaultTaxCodeId = "";
   const editId = searchParams.get("edit");
   const sourceId = searchParams.get("source");
   const editingTransaction = props.initialTransactions.find((item) => item.id === editId) || null;
@@ -526,7 +526,7 @@ export function AdminPurchaseOrderClient(props: Props) {
       const discountRate = Number(line.discountRate || 0);
       const discount = line.discountType === "AMOUNT" ? discountRate : roundMoney(subtotal * (discountRate / 100));
       const total = Math.max(0, roundMoney(subtotal - discount));
-      const lineTaxCode = props.taxConfig.taxCodes.find((item) => item.id === line.taxCodeId) || (taxMode === "LINE_ITEM" ? props.taxConfig.taxCodes.find((item) => item.id === props.taxConfig.defaultAdminTaxCodeId) : null);
+      const lineTaxCode = props.taxConfig.taxCodes.find((item) => item.id === line.taxCodeId) || null;
       const tax = calculateLineItemTaxBreakdown({ lineTotal: total, taxRate: lineTaxCode?.rate || 0, calculationMethod: lineTaxCode?.calculationMethod || null, taxEnabled: props.taxConfig.taxModuleEnabled && Boolean(lineTaxCode) });
       return { subtotal, discount, tax: tax.taxAmount, total: tax.lineGrandTotalAfterTax };
     });
@@ -567,8 +567,12 @@ export function AdminPurchaseOrderClient(props: Props) {
       const data = await response.json();
       if (!response.ok || !data.ok) { setError(data.error || `Unable to save ${TITLE}.`); return; }
       const savedId = data.transaction?.id || editingTransaction?.id;
-      if (savedId) router.push(`${DETAIL_PATH}/${savedId}?success=${encodeURIComponent(`${TITLE} saved successfully.`)}`);
-      else { setMessage(`${TITLE} saved successfully.`); router.refresh(); }
+      if (savedId) {
+        setMessage(`${TITLE} saved successfully.`);
+        setIsCreateOpen(false);
+        router.push(DETAIL_PATH);
+        router.refresh();
+      } else { setMessage(`${TITLE} saved successfully.`); router.refresh(); }
     } catch { setError(`Unable to save ${TITLE}.`); }
     finally { setIsSubmitting(false); }
   }
@@ -722,7 +726,7 @@ export function AdminPurchaseOrderClient(props: Props) {
               {lines.map((line, index) => {
                 const product = props.initialProducts.find((item) => item.id === line.inventoryProductId) || null;
                 const grossAmount = lineAmount(line);
-                const selectedLineTaxCode = props.taxConfig.taxCodes.find((item) => item.id === line.taxCodeId) || (taxMode === "LINE_ITEM" ? props.taxConfig.taxCodes.find((item) => item.id === props.taxConfig.defaultAdminTaxCodeId) : null);
+                const selectedLineTaxCode = props.taxConfig.taxCodes.find((item) => item.id === line.taxCodeId) || null;
                 const lineTax = calculateLineItemTaxBreakdown({
                   lineTotal: grossAmount,
                   taxRate: selectedLineTaxCode?.rate || 0,
