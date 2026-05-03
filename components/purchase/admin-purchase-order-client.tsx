@@ -695,7 +695,7 @@ export function AdminPurchaseOrderClient(props: Props) {
               ) : null}
               <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
                 <div><label className="label-rk">Doc Date</label><input type="date" value={form.docDate} onChange={(e) => setForm((prev) => ({ ...prev, docDate: e.target.value }))} className="input-rk" /></div>
-                <div className="xl:col-span-3"><label className="label-rk">System Doc No</label><div className="flex overflow-hidden rounded-xl border border-white/10 bg-black/40"><input value={docNoPreview} readOnly placeholder="Auto-generated" className="min-h-[52px] flex-1 bg-transparent px-4 text-white outline-none disabled:text-white/60" /><button type="button" disabled={Boolean(editingTransaction)} onClick={() => { setDocNoDraft(normalizeDocNoInput(manualDocNoEnabled ? docNo : docNoPreview)); setShowDocNoOverride(true); }} className="px-4 text-xs text-white/45 hover:text-white disabled:opacity-40">Click to override</button></div></div>
+                <div className="xl:col-span-3"><label className="label-rk">System Doc No</label><div className="flex overflow-hidden rounded-xl border border-white/10 bg-black/40"><input value={docNoPreview} readOnly placeholder="Auto-generated" className="min-h-[52px] flex-1 bg-transparent px-4 text-white outline-none disabled:text-white/60" /><button type="button" disabled={Boolean(editingTransaction)} onClick={() => { setDocNoDraft(docNo); setShowDocNoOverride(true); }} className="px-4 text-xs text-white/45 hover:text-white disabled:opacity-40">Click to override</button></div></div>
                 <SearchableSelect label="A/C No" placeholder="Search or select supplier" options={supplierOptions} value={form.supplierId} onChange={(option) => applySupplier(option?.id || "")} />
                 <div><label className="label-rk">Supplier Name</label><input value={form.supplierName} onChange={(e) => setForm((prev) => ({ ...prev, supplierName: e.target.value }))} className="input-rk" /></div>
                 <div><label className="label-rk">Email</label><input value={form.email} onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))} className="input-rk" /></div>
@@ -785,17 +785,31 @@ export function AdminPurchaseOrderClient(props: Props) {
       ) : null}
 
       {showDocNoOverride ? (
-        <div className="fixed inset-0 z-[140] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
-          <div className="w-full max-w-lg rounded-3xl border border-white/10 bg-zinc-950 p-6 shadow-2xl">
-            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-red-400/80">{TITLE}</p>
+        <div className="fixed inset-0 z-[160] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-[2rem] border border-white/10 bg-[#0b0b0f] p-6 shadow-2xl">
+            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-white/40">Manual Document No</p>
             <h3 className="mt-3 text-2xl font-bold">Override Document No</h3>
-            <p className="mt-2 text-sm text-white/60">Enter the document number manually. Leave blank to continue using auto-generated numbering.</p>
-            <div className="mt-5">
-              <label className="label-rk">Document No</label>
-              <input value={docNoDraft} onChange={(event) => setDocNoDraft(normalizeDocNoInput(event.target.value))} className="input-rk" placeholder={`${DOC_TYPE}-${docDateCompact}-0001`} autoFocus />
+            <p className="mt-3 text-sm leading-6 text-white/65">Leave empty to use the auto generated document number. Maximum 30 characters.</p>
+
+            <div className="mt-6 space-y-5">
+              <div>
+                <label className="label-rk">Auto Generated Preview</label>
+                <div className="input-rk flex items-center text-white">{autoDocNoPreview}</div>
+              </div>
+              <div>
+                <label className="label-rk">Custom Document No</label>
+                <input
+                  className="input-rk"
+                  value={docNoDraft}
+                  onChange={(event) => setDocNoDraft(normalizeDocNoInput(event.target.value))}
+                  placeholder="Enter custom document no"
+                  autoFocus
+                />
+              </div>
             </div>
+
             <div className="mt-6 flex justify-end gap-3">
-              <button type="button" onClick={() => setShowDocNoOverride(false)} className="rounded-xl border border-white/15 px-5 py-3 text-sm text-white/80 transition hover:bg-white/10">Cancel</button>
+              <button type="button" onClick={() => setShowDocNoOverride(false)} className="rounded-xl border border-white/15 px-4 py-3 text-white/75 transition hover:bg-white/10">Cancel</button>
               <button type="button" onClick={() => { const normalized = normalizeDocNoInput(docNoDraft); setDocNo(normalized); setManualDocNoEnabled(Boolean(normalized)); setShowDocNoOverride(false); }} className="rounded-xl bg-red-500 px-5 py-3 font-semibold text-white transition hover:bg-red-400">OK</button>
             </div>
           </div>

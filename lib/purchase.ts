@@ -120,11 +120,11 @@ function getMalaysiaDateParts(date: Date) {
 }
 
 function assertValidManualDocNo(docType: PurchaseDocType, value: unknown) {
-  const docNo = normalizeText(value)?.toUpperCase() || null;
-  if (!docNo) return null;
-  const prefix = DOC_PREFIX[docType];
-  if (!new RegExp(`^${prefix}-\\d{8}-\\d{4}$`).test(docNo)) {
-    throw new Error(`${DOC_LABEL[docType]} No must use ${prefix}-YYYYMMDD-0001 format.`);
+  const raw = typeof value === "string" ? value.trim() : "";
+  if (!raw) return null;
+  const docNo = raw.toUpperCase().replace(/\s+/g, "");
+  if (docNo.length > 30) {
+    throw new Error(`${DOC_LABEL[docType]} No cannot exceed 30 characters.`);
   }
   return docNo;
 }
