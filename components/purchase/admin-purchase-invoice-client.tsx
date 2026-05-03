@@ -595,7 +595,6 @@ export function AdminPurchaseInvoiceClient(props: Props) {
   const sourceTransaction =
     props.sourceDocuments.find((item) => item.id === sourceId) || null;
   const isGeneratedFromSource = Boolean(sourceTransaction && !editingTransaction);
-  const isBodyLocked = Boolean(isGeneratedFromSource || generatedSourceLabel);
   const [activeTab, setActiveTab] = useState<ActiveTab>("HEADER");
   const [docNo, setDocNo] = useState("");
   const [manualDocNoEnabled, setManualDocNoEnabled] = useState(false);
@@ -637,6 +636,7 @@ export function AdminPurchaseInvoiceClient(props: Props) {
   const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>([]);
   const [sourceLineQty, setSourceLineQty] = useState<Record<string, string>>({});
   const [generatedSourceLabel, setGeneratedSourceLabel] = useState("");
+  const isBodyLocked = Boolean(isGeneratedFromSource || generatedSourceLabel);
   const [generateFromError, setGenerateFromError] = useState("");
   const [cancelTarget, setCancelTarget] = useState<PurchaseTransactionRecord | null>(null);
   const [cancelReason, setCancelReason] = useState("");
