@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   calculateLineItemTaxBreakdown,
@@ -191,6 +191,161 @@ function normalizeDocNoInput(value: string) { return value.toUpperCase().replace
 function lineAmount(line: LineForm) { const qty = Math.max(0, Number(line.qty || 0)); const unitCost = Math.max(0, Number(line.unitCost || 0)); const subtotal = roundMoney(qty * unitCost); const discountRate = Math.max(0, Number(line.discountRate || 0)); const discount = line.discountType === "AMOUNT" ? discountRate : roundMoney(subtotal * (discountRate / 100)); return Math.max(0, roundMoney(subtotal - discount)); }
 function emptyLine(defaultLocationId = "", defaultTaxCodeId = "", qtyDecimalPlaces = 2, unitCostDecimalPlaces = 2): LineForm { return { sourceLineId: "", sourceTransactionId: "", inventoryProductId: "", productCode: "", productDescription: "", itemType: "STOCK_ITEM", uom: "", qty: formatDecimalInput(1, qtyDecimalPlaces), unitCost: formatDecimalInput(0, unitCostDecimalPlaces), discountRate: "0", discountType: "PERCENT", locationId: defaultLocationId, batchNo: "", taxCodeId: defaultTaxCodeId, remarks: "" }; }
 function statusClass(status: string) { if (status === "CANCELLED") return "border-red-500/25 bg-red-500/10 text-red-200"; if (status === "COMPLETED") return "border-sky-500/25 bg-sky-500/10 text-sky-200"; if (status === "PARTIAL") return "border-indigo-500/25 bg-indigo-500/10 text-indigo-200"; return "border-amber-500/25 bg-amber-500/10 text-amber-200"; }
+
+
+type SearchableSelectOption = {
+  id: string;
+  label: string;
+  searchText: string;
+};
+
+function SearchableSelect({
+  label,
+  placeholder,
+  options,
+  value,
+  disabled = false,
+  onChange,
+}: {
+  label: string;
+  placeholder: string;
+  options: SearchableSelectOption[];
+  value: string;
+  disabled?: boolean;
+  onChange: (option: SearchableSelectOption | null) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  const selectedOption = useMemo(() => options.find((item) => item.id === value) || null, [options, value]);
+
+  useEffect(() => {
+    setSearch(selectedOption?.label || "");
+  }, [selectedOption?.label]);
+
+  useEffect(() => {
+    function handleOutsideClick(event: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, []);
+
+  const filteredOptions = useMemo(() => {
+    const keyword = search.trim().toLowerCase();
+    if (!keyword) return options;
+    return options.filter((item) => item.searchText.includes(keyword));
+  }, [options, search]);
+
+  return (
+    <div ref={containerRef} className="relative">
+      <label className="label-rk">{label}</label>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => {
+          if (disabled) return;
+          setIsOpen((prev) => !prev);
+          setSearch("");
+        }}
+        className={`input-rk flex items-center justify-between gap-3 pr-20 text-left ${disabled ? "cursor-not-allowed opacity-60" : ""}`}
+      >
+        <span className={selectedOption ? "truncate text-white" : "truncate text-white/45"}>{selectedOption ? selectedOption.label : placeholder}</span>
+        <span className="shrink-0 pr-5 text-white/60">▾</span>
+      </button>
+
+      {isOpen ? (
+        <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-[140] overflow-hidden rounded-2xl border border-white/10 bg-[#0b0b0f] shadow-2xl">
+          <div className="border-b border-white/10 p-3">
+            <input autoFocus className="input-rk" value={search} onChange={(e) => setSearch(e.target.value)} placeholder={`Search ${label.toLowerCase()}`} />
+          </div>
+          <div className="max-h-56 overflow-y-auto p-2">
+            {filteredOptions.length === 0 ? (
+              <div className="rounded-xl px-3 py-3 text-sm text-white/45">No matching {label.toLowerCase()} found.</div>
+            ) : (
+              filteredOptions.map((option) => {
+                const isSelected = selectedOption?.id === option.id;
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => {
+                      onChange(option);
+                      setSearch(option.label);
+                      setIsOpen(false);
+                    }}
+                    className={`flex w-full items-center rounded-xl px-3 py-3 text-left text-sm transition ${isSelected ? "bg-white/10 text-white" : "text-white/85 hover:bg-white/10 hover:text-white"}`}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function CompactSelect({
+  options,
+  value,
+  onChange,
+  className = "",
+}: {
+  options: SearchableSelectOption[];
+  value: string;
+  onChange: (value: string) => void;
+  className?: string;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const selectedOption = useMemo(() => options.find((item) => item.id === value) || null, [options, value]);
+
+  useEffect(() => {
+    function handleOutsideClick(event: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, []);
+
+  return (
+    <div ref={containerRef} className={`relative ${className}`}>
+      <button type="button" onClick={() => setIsOpen((prev) => !prev)} className="input-rk flex items-center justify-between gap-3 pr-20 text-left">
+        <span className={selectedOption ? "truncate text-white" : "truncate text-white/45"}>{selectedOption?.label || ""}</span>
+        <span className="shrink-0 pr-5 text-white/60">▾</span>
+      </button>
+      {isOpen ? (
+        <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-[140] overflow-hidden rounded-2xl border border-white/10 bg-[#0b0b0f] p-2 shadow-2xl">
+          {options.map((option) => {
+            const isSelected = option.id === value;
+            return (
+              <button
+                key={option.id}
+                type="button"
+                onClick={() => {
+                  onChange(option.id);
+                  setIsOpen(false);
+                }}
+                className={`flex w-full items-center rounded-xl px-3 py-3 text-left text-sm transition ${isSelected ? "bg-white/10 text-white" : "text-white/85 hover:bg-white/10 hover:text-white"}`}
+              >
+                {option.label}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function getProductUomOptions(product: ProductOption | null | undefined) { if (!product) return []; const seen = new Set<string>(); const result: Array<{ id: string; label: string }> = []; const add = (uomCode: string, label: string) => { const normalized = String(uomCode || "").trim().toUpperCase(); if (!normalized || seen.has(normalized)) return; seen.add(normalized); result.push({ id: normalized, label }); }; add(product.baseUom, `${product.baseUom} (Base UOM)`); for (const item of product.uomConversions || []) { if (Number(item.conversionRate) > 0) add(item.uomCode, `${item.uomCode} (1 = ${item.conversionRate} ${product.baseUom})`); } return result; }
 
 export function AdminPurchaseInvoiceClient(props: Props) {
@@ -216,6 +371,65 @@ export function AdminPurchaseInvoiceClient(props: Props) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showGenerateFrom, setShowGenerateFrom] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(Boolean(editId || sourceId));
+
+  const [listingStatus, setListingStatus] = useState("ALL");
+
+  const statusOptions = useMemo<SearchableSelectOption[]>(() => [
+    { id: "ALL", label: "All Status", searchText: "all status" },
+    { id: "OPEN", label: "Open", searchText: "open" },
+    { id: "PARTIAL", label: "Partial", searchText: "partial" },
+    { id: "COMPLETED", label: "Completed", searchText: "completed" },
+    { id: "CANCELLED", label: "Cancelled", searchText: "cancelled" },
+  ], []);
+
+  const discountTypeOptions = useMemo<SearchableSelectOption[]>(() => [
+    { id: "PERCENT", label: "%", searchText: "% percent" },
+    { id: "AMOUNT", label: "Amount", searchText: "amount" },
+  ], []);
+
+  const supplierOptions = useMemo<SearchableSelectOption[]>(() => props.initialSuppliers.map((supplier) => {
+    const label = `${supplier.supplierAccountNo ? `${supplier.supplierAccountNo} — ` : ""}${supplier.name}`;
+    return { id: supplier.id, label, searchText: `${label} ${supplier.email || ""} ${supplier.phone || ""}`.toLowerCase() };
+  }), [props.initialSuppliers]);
+
+  const agentOptions = useMemo<SearchableSelectOption[]>(() => [
+    { id: "", label: "No Agent", searchText: "no agent" },
+    ...props.initialAgents.map((item) => ({ id: item.id, label: `${item.code} — ${item.name}`, searchText: `${item.code} ${item.name}`.toLowerCase() })),
+  ], [props.initialAgents]);
+
+  const projectOptions = useMemo<SearchableSelectOption[]>(() => [
+    { id: "", label: "No Project", searchText: "no project" },
+    ...props.initialProjects.map((item) => ({ id: item.id, label: `${item.code} — ${item.name}`, searchText: `${item.code} ${item.name}`.toLowerCase() })),
+  ], [props.initialProjects]);
+
+  const departmentOptions = useMemo<SearchableSelectOption[]>(() => [
+    { id: "", label: form.projectId ? "No Department" : "Select project first", searchText: "no department select project first" },
+    ...props.initialDepartments
+      .filter((item) => !form.projectId || item.projectId === form.projectId)
+      .map((item) => ({ id: item.id, label: `${item.code} — ${item.name}`, searchText: `${item.code} ${item.name}`.toLowerCase() })),
+  ], [props.initialDepartments, form.projectId]);
+
+  const productOptions = useMemo<SearchableSelectOption[]>(() => props.initialProducts.map((item) => ({
+    id: item.id,
+    label: `${item.code} — ${item.description}`,
+    searchText: `${item.code} ${item.description}`.toLowerCase(),
+  })), [props.initialProducts]);
+
+  const locationOptions = useMemo<SearchableSelectOption[]>(() => [
+    { id: "", label: "No Location", searchText: "no location" },
+    ...props.initialLocations.map((item) => ({ id: item.id, label: `${item.code} — ${item.name}`, searchText: `${item.code} ${item.name}`.toLowerCase() })),
+  ], [props.initialLocations]);
+
+  const taxCodeOptions = useMemo<SearchableSelectOption[]>(() => [
+    { id: "", label: "No Tax", searchText: "no tax" },
+    ...props.taxConfig.taxCodes.map((tax) => ({ id: tax.id, label: tax.code, searchText: `${tax.code} ${tax.description}`.toLowerCase() })),
+  ], [props.taxConfig.taxCodes]);
+
+  const sourceDocumentOptions = useMemo<SearchableSelectOption[]>(() => [
+    { id: "", label: "Direct Create", searchText: "direct create" },
+    ...props.sourceDocuments.map((source) => ({ id: source.id, label: `${source.docNo} — ${source.supplierName} (${source.docType})`, searchText: `${source.docNo} ${source.supplierName} ${source.docType}`.toLowerCase() })),
+  ], [props.sourceDocuments]);
+
 
   useEffect(() => {
     const source = editingTransaction || sourceTransaction;
@@ -351,13 +565,7 @@ export function AdminPurchaseInvoiceClient(props: Props) {
         <div className="mt-8 rounded-2xl border border-white/10 bg-black/20 p-4">
           <div className="grid gap-4 md:grid-cols-3">
             <input className="input-rk" placeholder={`Search ${TITLE.toLowerCase()} no / supplier`} readOnly />
-            <select className={SELECT_RK} defaultValue="ALL" style={SELECT_STYLE}>
-              <option value="ALL">All Status</option>
-              <option value="OPEN">Open</option>
-              <option value="PARTIAL">Partial</option>
-              <option value="COMPLETED">Completed</option>
-              <option value="CANCELLED">Cancelled</option>
-            </select>
+            <CompactSelect options={statusOptions} value={listingStatus} onChange={setListingStatus} />
           </div>
         </div>
 
@@ -440,17 +648,13 @@ export function AdminPurchaseInvoiceClient(props: Props) {
             <div className="mt-6 space-y-6">
               {showGenerateFrom && !editingTransaction ? (
                 <div className="rounded-2xl border border-white/10 bg-black/20 p-5">
-                  <label className="label-rk">Generate From</label>
-                  <select value={sourceTransaction?.id || ""} onChange={(event) => router.push(event.target.value ? `${DETAIL_PATH}?source=${event.target.value}` : DETAIL_PATH)} className={SELECT_RK} style={SELECT_STYLE}>
-                    <option value="">Direct Create</option>
-                    {props.sourceDocuments.map((source) => (<option key={source.id} value={source.id}>{source.docNo} — {source.supplierName} ({source.docType})</option>))}
-                  </select>
+                  <SearchableSelect label="Generate From" placeholder="Direct Create" options={sourceDocumentOptions} value={sourceTransaction?.id || ""} onChange={(option) => router.push(option?.id ? `${DETAIL_PATH}?source=${option.id}` : DETAIL_PATH)} />
                 </div>
               ) : null}
               <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
                 <div><label className="label-rk">Doc Date</label><input type="date" value={form.docDate} onChange={(e) => setForm((prev) => ({ ...prev, docDate: e.target.value }))} className="input-rk" /></div>
                 <div className="xl:col-span-3"><label className="label-rk">System Doc No</label><div className="flex overflow-hidden rounded-xl border border-white/10 bg-black/40"><input value={manualDocNoEnabled ? docNo : editingTransaction?.docNo || ""} onChange={(e) => setDocNo(normalizeDocNoInput(e.target.value))} readOnly={!manualDocNoEnabled || Boolean(editingTransaction)} placeholder="Auto-generated" className="min-h-[52px] flex-1 bg-transparent px-4 text-white outline-none disabled:text-white/60" /><button type="button" disabled={Boolean(editingTransaction)} onClick={() => setManualDocNoEnabled((prev) => !prev)} className="px-4 text-xs text-white/45 hover:text-white disabled:opacity-40">{manualDocNoEnabled ? "Auto" : "Click to override"}</button></div></div>
-                <div><label className="label-rk">A/C No</label><select value={form.supplierId} onChange={(e) => applySupplier(e.target.value)} required className={SELECT_RK} style={SELECT_STYLE}><option value="">Search or select supplier</option>{props.initialSuppliers.map((supplier) => (<option key={supplier.id} value={supplier.id}>{supplier.supplierAccountNo ? `${supplier.supplierAccountNo} — ` : ""}{supplier.name}</option>))}</select></div>
+                <SearchableSelect label="A/C No" placeholder="Search or select supplier" options={supplierOptions} value={form.supplierId} onChange={(option) => applySupplier(option?.id || "")} />
                 <div><label className="label-rk">Supplier Name</label><input value={form.supplierName} onChange={(e) => setForm((prev) => ({ ...prev, supplierName: e.target.value }))} className="input-rk" /></div>
                 <div><label className="label-rk">Email</label><input value={form.email} onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))} className="input-rk" /></div>
                 <div className="xl:col-span-2"><label className="label-rk">Document Description</label><input value={form.docDesc} onChange={(e) => setForm((prev) => ({ ...prev, docDesc: e.target.value }))} placeholder="Optional description" className="input-rk" /></div>
@@ -459,15 +663,15 @@ export function AdminPurchaseInvoiceClient(props: Props) {
               <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
                 <div><label className="label-rk">Attention</label><input value={form.attention} onChange={(e) => setForm((prev) => ({ ...prev, attention: e.target.value }))} className="input-rk" /></div>
                 <div><label className="label-rk">Contact No</label><input value={form.contactNo} onChange={(e) => setForm((prev) => ({ ...prev, contactNo: e.target.value }))} className="input-rk" /></div>
-                <div><label className="label-rk">Agent</label><select value={form.agentId} onChange={(e) => setForm((prev) => ({ ...prev, agentId: e.target.value }))} className={SELECT_RK} style={SELECT_STYLE}><option value="">No Agent</option>{props.initialAgents.map((item) => (<option key={item.id} value={item.id}>{item.code} — {item.name}</option>))}</select></div>
-                {props.projectFeatureEnabled ? <div><label className="label-rk">Project</label><select value={form.projectId} onChange={(e) => setForm((prev) => ({ ...prev, projectId: e.target.value }))} className={SELECT_RK} style={SELECT_STYLE}><option value="">No Project</option>{props.initialProjects.map((item) => (<option key={item.id} value={item.id}>{item.code} — {item.name}</option>))}</select></div> : null}
-                {props.departmentFeatureEnabled ? <div><label className="label-rk">Department</label><select value={form.departmentId} onChange={(e) => setForm((prev) => ({ ...prev, departmentId: e.target.value }))} className={SELECT_RK} style={SELECT_STYLE}><option value="">No Department</option>{props.initialDepartments.map((item) => (<option key={item.id} value={item.id}>{item.code} — {item.name}</option>))}</select></div> : null}
+                <SearchableSelect label="Agent" placeholder="No Agent" options={agentOptions} value={form.agentId} onChange={(option) => setForm((prev) => ({ ...prev, agentId: option?.id || "" }))} />
+                {props.projectFeatureEnabled ? <SearchableSelect label="Project" placeholder="No Project" options={projectOptions} value={form.projectId} onChange={(option) => setForm((prev) => ({ ...prev, projectId: option?.id || "", departmentId: "" }))} /> : null}
+                {props.departmentFeatureEnabled ? <SearchableSelect label="Department" placeholder={form.projectId ? "No Department" : "Select project first"} options={departmentOptions} value={form.departmentId} disabled={!form.projectId} onChange={(option) => setForm((prev) => ({ ...prev, departmentId: option?.id || "" }))} /> : null}
               </div>
+              <div className="rounded-[1.75rem] border border-white/10 p-5"><h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-white/45">Billing Address</h3><div className="mt-5 grid gap-4 md:grid-cols-2"><div><label className="label-rk">Address Line 1</label><input className="input-rk" value={form.supplierId ? props.initialSuppliers.find((item) => item.id === form.supplierId)?.billingAddressLine1 || "" : ""} readOnly /></div><div><label className="label-rk">Address Line 2</label><input className="input-rk" value={form.supplierId ? props.initialSuppliers.find((item) => item.id === form.supplierId)?.billingAddressLine2 || "" : ""} readOnly /></div><div><label className="label-rk">Address Line 3</label><input className="input-rk" value={form.supplierId ? props.initialSuppliers.find((item) => item.id === form.supplierId)?.billingAddressLine3 || "" : ""} readOnly /></div><div><label className="label-rk">Address Line 4</label><input className="input-rk" value={form.supplierId ? props.initialSuppliers.find((item) => item.id === form.supplierId)?.billingAddressLine4 || "" : ""} readOnly /></div><div><label className="label-rk">City</label><input className="input-rk" value={form.supplierId ? props.initialSuppliers.find((item) => item.id === form.supplierId)?.billingCity || "" : ""} readOnly /></div><div><label className="label-rk">Post Code</label><input className="input-rk" value={form.supplierId ? props.initialSuppliers.find((item) => item.id === form.supplierId)?.billingPostCode || "" : ""} readOnly /></div></div></div>
               <div>
                 <label className="label-rk">Remarks</label>
                 <textarea value={form.remarks} onChange={(e) => setForm((prev) => ({ ...prev, remarks: e.target.value }))} className="input-rk min-h-[90px]" />
               </div>
-              <div className="rounded-[1.75rem] border border-white/10 p-5"><h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-white/45">Billing Address</h3><div className="mt-5 grid gap-4 md:grid-cols-2"><div><label className="label-rk">Address Line 1</label><input className="input-rk" value={form.supplierId ? props.initialSuppliers.find((item) => item.id === form.supplierId)?.billingAddressLine1 || "" : ""} readOnly /></div><div><label className="label-rk">Address Line 2</label><input className="input-rk" value={form.supplierId ? props.initialSuppliers.find((item) => item.id === form.supplierId)?.billingAddressLine2 || "" : ""} readOnly /></div><div><label className="label-rk">Address Line 3</label><input className="input-rk" value={form.supplierId ? props.initialSuppliers.find((item) => item.id === form.supplierId)?.billingAddressLine3 || "" : ""} readOnly /></div><div><label className="label-rk">Address Line 4</label><input className="input-rk" value={form.supplierId ? props.initialSuppliers.find((item) => item.id === form.supplierId)?.billingAddressLine4 || "" : ""} readOnly /></div><div><label className="label-rk">City</label><input className="input-rk" value={form.supplierId ? props.initialSuppliers.find((item) => item.id === form.supplierId)?.billingCity || "" : ""} readOnly /></div><div><label className="label-rk">Post Code</label><input className="input-rk" value={form.supplierId ? props.initialSuppliers.find((item) => item.id === form.supplierId)?.billingPostCode || "" : ""} readOnly /></div></div></div>
             </div>
           ) : null}
 
@@ -475,7 +679,7 @@ export function AdminPurchaseInvoiceClient(props: Props) {
             <div className="space-y-5">
               {lines.map((line, index) => {
                 const product = props.initialProducts.find((item) => item.id === line.inventoryProductId) || null;
-                return <div key={index} className="rounded-[1.75rem] border border-white/10 p-5"><div className="mb-5 flex items-center justify-between"><h3 className="text-lg font-semibold text-white">Product {index + 1}</h3>{lines.length > 1 ? <button type="button" onClick={() => removeLine(index)} className="rounded-xl border border-red-500/30 px-4 py-2 text-sm text-red-300 transition hover:bg-red-500/10">Remove</button> : null}</div><div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4"><div className="md:col-span-2"><label className="label-rk">Product</label><select value={line.inventoryProductId} onChange={(e) => applyProduct(index, e.target.value)} className={SELECT_RK} style={SELECT_STYLE}><option value="">Search or select product</option>{props.initialProducts.map((item) => (<option key={item.id} value={item.id}>{item.code} — {item.description}</option>))}</select></div><div><label className="label-rk">UOM</label><select value={line.uom} onChange={(e) => updateLine(index, "uom", e.target.value)} className={SELECT_RK} style={SELECT_STYLE}><option value="">Select UOM</option>{getProductUomOptions(product).map((option) => (<option key={option.id} value={option.id}>{option.label}</option>))}</select></div><div><label className="label-rk">Qty</label><input value={line.qty} onChange={(e) => updateLine(index, "qty", e.target.value)} className="input-rk" /></div><div><label className="label-rk">Purchase Unit Cost</label><input value={line.unitCost} onChange={(e) => updateLine(index, "unitCost", e.target.value)} className="input-rk" /></div><div><label className="label-rk">Discount</label><div className="grid grid-cols-[1fr_120px] gap-3"><input value={line.discountRate} onChange={(e) => updateLine(index, "discountRate", e.target.value)} className="input-rk" /><select value={line.discountType} onChange={(e) => updateLine(index, "discountType", e.target.value)} className={SELECT_RK} style={SELECT_STYLE}><option value="PERCENT">%</option><option value="AMOUNT">Amount</option></select></div></div><div className="md:col-span-2"><label className="label-rk">Location</label><select value={line.locationId} onChange={(e) => updateLine(index, "locationId", e.target.value)} className={SELECT_RK} style={SELECT_STYLE}><option value="">No Location</option>{props.initialLocations.map((item) => (<option key={item.id} value={item.id}>{item.code} — {item.name}</option>))}</select><p className="mt-2 text-xs text-white/40">Purchase stock will be received into this location where applicable.</p></div><div><label className="label-rk">Batch No</label><input value={line.batchNo} onChange={(e) => updateLine(index, "batchNo", e.target.value.toUpperCase())} className="input-rk" /></div>{props.taxConfig.taxModuleEnabled && taxMode === "LINE_ITEM" ? <div><label className="label-rk">Tax Code</label><select value={line.taxCodeId} onChange={(e) => updateLine(index, "taxCodeId", e.target.value)} className={SELECT_RK} style={SELECT_STYLE}><option value="">No Tax</option>{props.taxConfig.taxCodes.map((tax) => (<option key={tax.id} value={tax.id}>{tax.code}</option>))}</select></div> : null}<div className="md:col-span-2 xl:col-span-4"><label className="label-rk">Product Remarks</label><textarea value={line.remarks} onChange={(e) => updateLine(index, "remarks", e.target.value)} className="input-rk min-h-[80px]" /></div><div><label className="label-rk">Gross Amount</label><input value={money(lineAmount(line))} readOnly className="input-rk" /></div></div></div>;
+                return <div key={index} className="rounded-[1.75rem] border border-white/10 p-5"><div className="mb-5 flex items-center justify-between"><h3 className="text-lg font-semibold text-white">Product {index + 1}</h3>{lines.length > 1 ? <button type="button" onClick={() => removeLine(index)} className="rounded-xl border border-red-500/30 px-4 py-2 text-sm text-red-300 transition hover:bg-red-500/10">Remove</button> : null}</div><div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4"><div className="md:col-span-2"><SearchableSelect label="Product" placeholder="Search or select product" options={productOptions} value={line.inventoryProductId} onChange={(option) => applyProduct(index, option?.id || "")} /></div><SearchableSelect label="UOM" placeholder="Select UOM" options={getProductUomOptions(product).map((option) => ({ id: option.id, label: option.label, searchText: option.label.toLowerCase() }))} value={line.uom} disabled={!product} onChange={(option) => updateLine(index, "uom", option?.id || product?.baseUom || "")} /><div><label className="label-rk">Qty</label><input value={line.qty} onChange={(e) => updateLine(index, "qty", e.target.value)} className="input-rk" /></div><div><label className="label-rk">Purchase Unit Cost</label><input value={line.unitCost} onChange={(e) => updateLine(index, "unitCost", e.target.value)} className="input-rk" /></div><div><label className="label-rk">Discount</label><div className="grid grid-cols-[1fr_120px] gap-3"><input value={line.discountRate} onChange={(e) => updateLine(index, "discountRate", e.target.value)} className="input-rk" /><CompactSelect options={discountTypeOptions} value={line.discountType} onChange={(value) => updateLine(index, "discountType", value)} /></div></div><div className="md:col-span-2"><SearchableSelect label="Location" placeholder="Search or select location" options={locationOptions} value={line.locationId} onChange={(option) => updateLine(index, "locationId", option?.id || "")} /><p className="mt-2 text-xs text-white/40">Purchase stock will be received into this location where applicable.</p></div><div><label className="label-rk">Batch No</label><input value={line.batchNo} onChange={(e) => updateLine(index, "batchNo", e.target.value.toUpperCase())} className="input-rk" /></div>{props.taxConfig.taxModuleEnabled && taxMode === "LINE_ITEM" ? <SearchableSelect label="Tax Code" placeholder="No Tax" options={taxCodeOptions} value={line.taxCodeId} onChange={(option) => updateLine(index, "taxCodeId", option?.id || "")} /> : null}<div className="md:col-span-2 xl:col-span-4"><label className="label-rk">Product Remarks</label><textarea value={line.remarks} onChange={(e) => updateLine(index, "remarks", e.target.value)} className="input-rk min-h-[80px]" /></div><div><label className="label-rk">Gross Amount</label><input value={money(lineAmount(line))} readOnly className="input-rk" /></div></div></div>;
               })}
               <button type="button" onClick={addLine} className="rounded-xl border border-white/15 px-4 py-3 text-sm text-white/75 transition hover:bg-white/10 hover:text-white">+ Add Product</button>
             </div>
