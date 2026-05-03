@@ -207,6 +207,7 @@ export function AdminPurchaseOrderClient(props: Props) {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCreateOpen, setIsCreateOpen] = useState(Boolean(editId || sourceId));
 
   useEffect(() => {
     const source = editingTransaction || sourceTransaction;
@@ -251,6 +252,13 @@ export function AdminPurchaseOrderClient(props: Props) {
       remarks: line.remarks || "",
     })));
   // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editId, sourceId]);
+
+
+  useEffect(() => {
+    if (editId || sourceId) {
+      setIsCreateOpen(true);
+    }
   }, [editId, sourceId]);
 
   const headerTaxCode = props.taxConfig.taxCodes.find((item) => item.id === form.taxCodeId) || null;
@@ -301,80 +309,99 @@ export function AdminPurchaseOrderClient(props: Props) {
     finally { setIsSubmitting(false); }
   }
 
-  const pageTitle = editingTransaction ? `Edit ${TITLE}` : `Create ${TITLE}`;
-  const isFormMode = Boolean(searchParams.get("create") === "1" || editingTransaction || sourceTransaction);
-
-  if (!isFormMode) {
-    return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-4xl font-bold text-white">{TITLE}</h1>
-          <p className="mt-3 text-white/65">{SUBTITLE}</p>
-        </div>
-
-        <div className="card-rk overflow-hidden">
-          <div className="flex flex-wrap items-start justify-between gap-4 border-b border-white/10 px-5 py-5 md:px-8">
-            <div>
-              <h2 className="text-xl font-semibold text-white">{TITLE} Records</h2>
-              <p className="mt-2 text-sm text-white/50">Manage {TITLE.toLowerCase()} transaction records.</p>
-            </div>
-            <Link href={`${DETAIL_PATH}?create=1`} className="rounded-xl border border-white/15 bg-black/30 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10">
-              Add {TITLE}
-            </Link>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-left text-sm">
-              <thead className="bg-black/30 text-white/45">
-                <tr>
-                  <th className="px-5 py-4">Doc No.</th>
-                  <th className="px-5 py-4">Date</th>
-                  <th className="px-5 py-4">Supplier</th>
-                  <th className="px-5 py-4">Reference</th>
-                  <th className="px-5 py-4">Status</th>
-                  <th className="px-5 py-4 text-right">Amount</th>
-                  <th className="px-5 py-4 text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {props.initialTransactions.length > 0 ? (
-                  props.initialTransactions.map((transaction) => (
-                    <tr key={transaction.id} className="border-t border-white/10 hover:bg-white/[0.03]">
-                      <td className="px-5 py-4">
-                        <Link href={`${DETAIL_PATH}/${transaction.id}`} className="font-semibold text-white underline-offset-4 hover:underline">
-                          {transaction.docNo}
-                        </Link>
-                      </td>
-                      <td className="px-5 py-4 text-white/60">{formatDate(transaction.docDate)}</td>
-                      <td className="px-5 py-4 text-white/75">{transaction.supplierName || "-"}</td>
-                      <td className="px-5 py-4 text-white/60">{transaction.reference || "-"}</td>
-                      <td className="px-5 py-4">
-                        <span className={`rounded-full border px-3 py-1 text-xs ${statusClass(transaction.status)}`}>{transaction.status}</span>
-                      </td>
-                      <td className="px-5 py-4 text-right text-white">{money(transaction.grandTotal)}</td>
-                      <td className="px-5 py-4 text-right">
-                        <div className="flex justify-end gap-2">
-                          <Link href={`${DETAIL_PATH}/${transaction.id}`} className="rounded-xl border border-white/15 px-4 py-2 text-xs text-white/80 transition hover:bg-white/10">View</Link>
-                          <Link href={`${DETAIL_PATH}?edit=${transaction.id}`} className={`rounded-xl border border-white/15 px-4 py-2 text-xs text-white/80 transition hover:bg-white/10 ${transaction.status === "CANCELLED" ? "pointer-events-none opacity-50" : ""}`}>Edit</Link>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={7} className="px-5 py-14 text-center text-white/45">No {TITLE.toLowerCase()} records found.</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    );
-  }
+    const pageTitle = editingTransaction ? `Edit ${TITLE}` : `Create ${TITLE}`;
 
   return (
-    <div className="card-rk p-5 md:p-8">
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="mt-3 text-4xl font-bold">{TITLE}</h1>
+          <p className="mt-4 max-w-3xl text-white/70">{SUBTITLE}</p>
+        </div>
+      </div>
+
+      {message && !isCreateOpen ? (
+        <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">{message}</div>
+      ) : null}
+
+      {error && !isCreateOpen ? (
+        <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</div>
+      ) : null}
+
+      <div className="rounded-[2rem] border border-white/10 bg-black/45 p-5 backdrop-blur-md md:p-8">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-red-400/80">{TITLE}</p>
+            <h2 className="mt-4 text-2xl font-bold">Existing {TITLE} Records</h2>
+            <p className="mt-4 max-w-3xl text-sm leading-6 text-white/70">Manage {TITLE.toLowerCase()} transaction records.</p>
+          </div>
+          <button type="button" onClick={() => { setIsCreateOpen(true); setActiveTab("HEADER"); }} className="inline-flex items-center justify-center rounded-xl bg-red-500 px-5 py-3 font-semibold text-white transition hover:bg-red-400">
+            Create {TITLE}
+          </button>
+        </div>
+
+        <div className="mt-8 rounded-2xl border border-white/10 bg-black/20 p-4">
+          <div className="grid gap-4 md:grid-cols-3">
+            <input className="input-rk" placeholder={`Search ${TITLE.toLowerCase()} no / supplier`} readOnly />
+            <select className="input-rk" defaultValue="ALL">
+              <option value="ALL">All Status</option>
+              <option value="OPEN">Open</option>
+              <option value="PARTIAL">Partial</option>
+              <option value="COMPLETED">Completed</option>
+              <option value="CANCELLED">Cancelled</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="mt-6 overflow-x-auto">
+          <table className="min-w-full divide-y divide-white/10 text-sm">
+            <thead className="text-left text-white/45">
+              <tr>
+                <th className="px-4 py-3">Doc No</th>
+                <th className="px-4 py-3">Date</th>
+                <th className="px-4 py-3">Supplier</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3 text-right">Grand Total</th>
+                <th className="px-4 py-3 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/10">
+              {props.initialTransactions.length === 0 ? (
+                <tr><td colSpan={6} className="px-4 py-8 text-center text-white/50">No {TITLE.toLowerCase()} found.</td></tr>
+              ) : (
+                props.initialTransactions.map((item) => (
+                  <tr key={item.id} onClick={() => router.push(`${DETAIL_PATH}/${item.id}`)} className="cursor-pointer text-white/80 transition hover:bg-white/[0.04]">
+                    <td className="px-4 py-4">
+                      <div className="font-semibold text-white">{item.docNo}</div>
+                      {item.revisedFrom?.docNo ? <div className="mt-2 text-xs text-white/40">↳ Revision of {item.revisedFrom.docNo}</div> : null}
+                    </td>
+                    <td className="px-4 py-4">{formatDate(item.docDate)}</td>
+                    <td className="px-4 py-4">
+                      <div className="font-medium text-white/90">{item.supplierName}</div>
+                      <div className="text-xs text-white/45">{item.supplierAccountNo || "-"}</div>
+                    </td>
+                    <td className="px-4 py-4"><span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${statusClass(item.status)}`}>{item.status}</span></td>
+                    <td className="px-4 py-4 text-right">{`${item.currency || "MYR"} ${money(item.grandTotal)}`}</td>
+                    <td className="px-4 py-4 text-right">
+                      {item.status !== "CANCELLED" ? (
+                        <div className="flex flex-wrap justify-end gap-2">
+                          <button type="button" onClick={(event) => { event.stopPropagation(); router.push(`${DETAIL_PATH}?edit=${item.id}`); }} className="rounded-xl border border-white/15 px-3 py-2 text-xs text-white/75 transition hover:bg-white/10">Edit</button>
+                          <button type="button" onClick={(event) => { event.stopPropagation(); router.push(`${DETAIL_PATH}?edit=${item.id}`); }} className="rounded-xl border border-sky-500/30 px-3 py-2 text-xs text-sky-200 transition hover:bg-sky-500/10">Edit Revise</button>
+                        </div>
+                      ) : <span className="text-xs text-white/35">Cancelled</span>}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {isCreateOpen ? (
+        <div className="fixed inset-0 z-[120] overflow-y-auto bg-black/75 px-4 py-8 backdrop-blur-sm">
+          <div className="mx-auto max-w-7xl rounded-[2rem] border border-white/10 bg-[#08080c] p-6 shadow-2xl">
+            <div className="card-rk p-5 md:p-8">
       {message ? <div className="mb-5 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">{message}</div> : null}
       {error ? <div className="mb-5 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</div> : null}
 
@@ -438,8 +465,12 @@ export function AdminPurchaseOrderClient(props: Props) {
           ) : null}
         </div>
 
-        <div className="mt-8 flex justify-end gap-3 border-t border-white/10 pt-5"><Link href={DETAIL_PATH} className="rounded-xl border border-white/15 px-5 py-3 text-sm text-white/80 transition hover:bg-white/10">Close</Link><button type="submit" disabled={isSubmitting} className="rounded-xl bg-red-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-50">{isSubmitting ? "Saving..." : `Save ${TITLE}`}</button></div>
+        <div className="mt-8 flex justify-end gap-3 border-t border-white/10 pt-5"><button type="button" onClick={() => { setIsCreateOpen(false); router.push(DETAIL_PATH); }} className="rounded-xl border border-white/15 px-5 py-3 text-sm text-white/80 transition hover:bg-white/10">Close</button><button type="submit" disabled={isSubmitting} className="rounded-xl bg-red-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-50">{isSubmitting ? "Saving..." : `Save ${TITLE}`}</button></div>
       </form>
+    </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
