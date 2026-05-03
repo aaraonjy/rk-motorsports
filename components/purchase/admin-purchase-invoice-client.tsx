@@ -365,12 +365,8 @@ export function AdminPurchaseInvoiceClient(props: Props) {
   const taxMode = normalizeTaxCalculationMode(props.taxConfig.taxCalculationMode);
   const defaultTaxCodeId = "";
   const editId = searchParams.get("edit");
-  const reviseId = searchParams.get("revise");
   const sourceId = searchParams.get("source");
   const editingTransaction = props.initialTransactions.find((item) => item.id === editId) || null;
-  const reviseTransaction = props.initialTransactions.find((item) => item.id === reviseId) || null;
-  const isRevisionMode = Boolean(reviseTransaction && !editingTransaction);
-  const activeTransaction = editingTransaction || reviseTransaction;
   const sourceTransaction = props.sourceDocuments.find((item) => item.id === sourceId) || null;
   const [activeTab, setActiveTab] = useState<ActiveTab>("HEADER");
   const [docNo, setDocNo] = useState("");
@@ -383,7 +379,7 @@ export function AdminPurchaseInvoiceClient(props: Props) {
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showGenerateFrom, setShowGenerateFrom] = useState(false);
-  const [isCreateOpen, setIsCreateOpen] = useState(Boolean(editId || reviseId || sourceId));
+  const [isCreateOpen, setIsCreateOpen] = useState(Boolean(editId || sourceId));
   const [showDocNoOverride, setShowDocNoOverride] = useState(false);
   const [docNoDraft, setDocNoDraft] = useState("");
   const [balances, setBalances] = useState<Record<string, number>>({});
@@ -447,27 +443,14 @@ export function AdminPurchaseInvoiceClient(props: Props) {
     ...props.sourceDocuments.map((source) => ({ id: source.id, label: `${source.docNo} — ${source.supplierName} (${source.docType})`, searchText: `${source.docNo} ${source.supplierName} ${source.docType}`.toLowerCase() })),
   ], [props.sourceDocuments]);
 
-  function buildRevisionDocNo(transaction: PurchaseTransactionRecord) {
-    const baseDocNo = transaction.revisedFrom?.docNo || transaction.docNo;
-    const revisionNumbers = (transaction.revisions || [])
-      .map((revision) => String(revision.docNo || "").match(new RegExp(`^${baseDocNo.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}-([0-9]+)$`))?.[1])
-      .map((value) => Number(value || 0))
-      .filter((value) => Number.isFinite(value) && value > 0);
-    const currentMatch = transaction.docNo.match(new RegExp(`^${baseDocNo.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}-([0-9]+)$`));
-    if (currentMatch) revisionNumbers.push(Number(currentMatch[1]));
-    const nextRevisionNo = Math.max(0, ...revisionNumbers) + 1;
-    return `${baseDocNo}-${nextRevisionNo}`;
-  }
-
 
   useEffect(() => {
-    const source = activeTransaction || sourceTransaction;
+    const source = editingTransaction || sourceTransaction;
     if (!source) return;
-    const revisionDocNo = isRevisionMode && reviseTransaction ? buildRevisionDocNo(reviseTransaction) : "";
-    setDocNo(isRevisionMode ? revisionDocNo : editingTransaction?.docNo || "");
-    setManualDocNoEnabled(isRevisionMode);
+    setDocNo(editingTransaction?.docNo || "");
+    setManualDocNoEnabled(false);
     setForm({
-      docDate: activeTransaction ? formatDateInput(source.docDate) : todayInput(),
+      docDate: editingTransaction ? formatDateInput(source.docDate) : todayInput(),
       docDesc: source.docDesc || TITLE,
       supplierId: source.supplierId || "",
       supplierName: source.supplierName || "",
@@ -475,7 +458,7 @@ export function AdminPurchaseInvoiceClient(props: Props) {
       contactNo: source.contactNo || "",
       email: source.email || "",
       currency: source.currency || "MYR",
-      reference: activeTransaction ? source.reference || "" : source.docNo || "",
+      reference: editingTransaction ? source.reference || "" : source.docNo || "",
       remarks: source.remarks || "",
       attention: source.attention || "",
       agentId: source.agentId || "",
@@ -487,8 +470,8 @@ export function AdminPurchaseInvoiceClient(props: Props) {
       footerRemarks: source.footerRemarks || "",
     });
     setLines((source.lines || []).map((line) => ({
-      sourceLineId: activeTransaction ? "" : line.id || "",
-      sourceTransactionId: activeTransaction ? "" : source.id,
+      sourceLineId: editingTransaction ? "" : line.id || "",
+      sourceTransactionId: editingTransaction ? "" : source.id,
       inventoryProductId: line.inventoryProductId || "",
       productCode: line.productCode || "",
       productDescription: line.productDescription || "",
@@ -505,14 +488,14 @@ export function AdminPurchaseInvoiceClient(props: Props) {
       remarks: line.remarks || "",
     })));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editId, reviseId, sourceId]);
+  }, [editId, sourceId]);
 
 
   useEffect(() => {
-    if (editId || reviseId || sourceId) {
+    if (editId || sourceId) {
       setIsCreateOpen(true);
     }
-  }, [editId, reviseId, sourceId]);
+  }, [editId, sourceId]);
 
   useEffect(() => {
     for (const line of lines) {
@@ -556,7 +539,7 @@ export function AdminPurchaseInvoiceClient(props: Props) {
 
   const docDateCompact = form.docDate ? form.docDate.replace(/-/g, "") : todayInput().replace(/-/g, "");
   const autoDocNoPreview = `${DOC_TYPE}-${docDateCompact}-0001`;
-  const docNoPreview = isRevisionMode ? docNo : editingTransaction?.docNo || (manualDocNoEnabled ? docNo : autoDocNoPreview);
+  const docNoPreview = editingTransaction?.docNo || (manualDocNoEnabled ? docNo : autoDocNoPreview);
   const hasRequiredLine = lines.some((line) => line.inventoryProductId && line.uom && Number(line.qty || 0) > 0);
   const canSubmit = Boolean(form.supplierId && hasRequiredLine) && !isSubmitting;
 
@@ -572,57 +555,29 @@ export function AdminPurchaseInvoiceClient(props: Props) {
   function addLine() { setLines((prev) => [...prev, emptyLine(props.defaultLocationId, defaultTaxCodeId, qtyDecimalPlaces, unitCostDecimalPlaces)]); }
   function removeLine(index: number) { setLines((prev) => prev.length <= 1 ? prev : prev.filter((_, lineIndex) => lineIndex !== index)); }
 
-  async function cancelTransaction(transaction: PurchaseTransactionRecord) {
-    const activeDownstream = (transaction.sourceLinks || []).some((link) => String(link.targetTransaction?.status || "").toUpperCase() !== "CANCELLED");
-    if (activeDownstream) { setError("Please cancel downstream generated document first."); return; }
-    if (!window.confirm(`Cancel ${transaction.docNo}?`)) return;
-    setError(""); setMessage("");
-    try {
-      const response = await fetch(`${API_PATH}/${transaction.id}`, {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reason: "Cancelled by admin" }),
-      });
-      const data = await response.json();
-      if (!response.ok || !data.ok) { setError(data.error || `Unable to cancel ${TITLE}.`); return; }
-      setMessage(`${TITLE} cancelled successfully.`);
-      router.refresh();
-    } catch { setError(`Unable to cancel ${TITLE}.`); }
-  }
-
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(""); setMessage(""); setIsSubmitting(true);
     try {
-      const updateTransactionId = !isRevisionMode ? editingTransaction?.id || "" : "";
-      const isUpdate = Boolean(updateTransactionId);
-      const response = await fetch(isUpdate ? `${API_PATH}/${updateTransactionId}` : API_PATH, {
-        method: isUpdate ? "PATCH" : "POST",
+      const response = await fetch(editingTransaction ? `${API_PATH}/${editingTransaction.id}` : API_PATH, {
+        method: editingTransaction ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...form,
-          docNo: manualDocNoEnabled || isRevisionMode ? docNo : undefined,
-          revisedFromId: isRevisionMode ? reviseTransaction?.id || null : null,
-          sourceTransactionId: isRevisionMode ? null : sourceTransaction?.id || null,
-          sourceDocType: isRevisionMode ? null : sourceTransaction?.docType || null,
-          lines,
-        }),
+        body: JSON.stringify({ ...form, docNo: manualDocNoEnabled ? docNo : undefined, sourceTransactionId: sourceTransaction?.id || null, sourceDocType: sourceTransaction?.docType || null, lines }),
       });
       const data = await response.json();
       if (!response.ok || !data.ok) { setError(data.error || `Unable to save ${TITLE}.`); return; }
       const savedId = data.transaction?.id || editingTransaction?.id;
-      const successText = isRevisionMode ? `${TITLE} revised successfully.` : editingTransaction ? `${TITLE} updated successfully.` : `${TITLE} saved successfully.`;
       if (savedId) {
-        setMessage(successText);
+        setMessage(`${TITLE} saved successfully.`);
         setIsCreateOpen(false);
         router.push(DETAIL_PATH);
         router.refresh();
-      } else { setMessage(successText); router.refresh(); }
+      } else { setMessage(`${TITLE} saved successfully.`); router.refresh(); }
     } catch { setError(`Unable to save ${TITLE}.`); }
     finally { setIsSubmitting(false); }
   }
 
-    const pageTitle = isRevisionMode ? `Revise ${TITLE}` : editingTransaction ? `Edit ${TITLE}` : `Create ${TITLE}`;
+    const pageTitle = editingTransaction ? `Edit ${TITLE}` : `Create ${TITLE}`;
 
   return (
     <div className="space-y-6">
@@ -680,7 +635,15 @@ export function AdminPurchaseInvoiceClient(props: Props) {
                   <tr key={item.id} onClick={() => router.push(`${DETAIL_PATH}/${item.id}`)} className="cursor-pointer text-white/80 transition hover:bg-white/[0.04]">
                     <td className="px-4 py-4">
                       <div className="font-semibold text-white">{item.docNo}</div>
-                      {item.revisedFrom?.docNo ? <div className="mt-2 text-xs text-white/40">↳ Revision of {item.revisedFrom.docNo}</div> : null}
+                      {item.revisedFrom?.docNo ? (
+                        <Link
+                          href={`${DETAIL_PATH}/${item.revisedFrom.id}`}
+                          onClick={(event) => event.stopPropagation()}
+                          className="mt-2 block w-fit text-xs text-white/40 underline-offset-4 transition hover:text-white/70 hover:underline"
+                        >
+                          ↳ Revision of {item.revisedFrom.docNo}
+                        </Link>
+                      ) : null}
                     </td>
                     <td className="px-4 py-4">{formatDate(item.docDate)}</td>
                     <td className="px-4 py-4">
@@ -693,8 +656,7 @@ export function AdminPurchaseInvoiceClient(props: Props) {
                       {item.status !== "CANCELLED" ? (
                         <div className="flex flex-wrap justify-end gap-2">
                           <button type="button" onClick={(event) => { event.stopPropagation(); router.push(`${DETAIL_PATH}?edit=${item.id}`); }} className="rounded-xl border border-white/15 px-3 py-2 text-xs text-white/75 transition hover:bg-white/10">Edit</button>
-                          <button type="button" onClick={(event) => { event.stopPropagation(); router.push(`${DETAIL_PATH}?revise=${item.id}`); }} className="rounded-xl border border-sky-500/30 px-3 py-2 text-xs text-sky-200 transition hover:bg-sky-500/10">Edit Revise</button>
-                          <button type="button" onClick={(event) => { event.stopPropagation(); cancelTransaction(item); }} disabled={(item.sourceLinks || []).some((link) => String(link.targetTransaction?.status || "").toUpperCase() !== "CANCELLED")} title={(item.sourceLinks || []).some((link) => String(link.targetTransaction?.status || "").toUpperCase() !== "CANCELLED") ? "Cancel downstream generated document first." : "Cancel document"} className="rounded-xl border border-red-500/30 px-3 py-2 text-xs text-red-200 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-40">Cancel</button>
+                          <button type="button" onClick={(event) => { event.stopPropagation(); router.push(`${DETAIL_PATH}?edit=${item.id}`); }} className="rounded-xl border border-sky-500/30 px-3 py-2 text-xs text-sky-200 transition hover:bg-sky-500/10">Edit Revise</button>
                         </div>
                       ) : <span className="text-xs text-white/35">Cancelled</span>}
                     </td>
@@ -745,7 +707,7 @@ export function AdminPurchaseInvoiceClient(props: Props) {
               ) : null}
               <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
                 <div><label className="label-rk">Doc Date</label><input type="date" value={form.docDate} onChange={(e) => setForm((prev) => ({ ...prev, docDate: e.target.value }))} className="input-rk" /></div>
-                <div className="xl:col-span-3"><label className="label-rk">System Doc No</label><div className="flex overflow-hidden rounded-xl border border-white/10 bg-black/40"><input value={docNoPreview} readOnly placeholder="Auto-generated" className="min-h-[52px] flex-1 bg-transparent px-4 text-white outline-none disabled:text-white/60" /><button type="button" disabled={Boolean(editingTransaction) || isRevisionMode} onClick={() => { setDocNoDraft(docNo); setShowDocNoOverride(true); }} className="px-4 text-xs text-white/45 hover:text-white disabled:opacity-40">{isRevisionMode ? "Auto revision no" : "Click to override"}</button></div></div>
+                <div className="xl:col-span-3"><label className="label-rk">System Doc No</label><div className="flex overflow-hidden rounded-xl border border-white/10 bg-black/40"><input value={docNoPreview} readOnly placeholder="Auto-generated" className="min-h-[52px] flex-1 bg-transparent px-4 text-white outline-none disabled:text-white/60" /><button type="button" disabled={Boolean(editingTransaction)} onClick={() => { setDocNoDraft(docNo); setShowDocNoOverride(true); }} className="px-4 text-xs text-white/45 hover:text-white disabled:opacity-40">Click to override</button></div></div>
                 <SearchableSelect label="A/C No" placeholder="Search or select supplier" options={supplierOptions} value={form.supplierId} onChange={(option) => applySupplier(option?.id || "")} />
                 <div><label className="label-rk">Supplier Name</label><input value={form.supplierName} onChange={(e) => setForm((prev) => ({ ...prev, supplierName: e.target.value }))} className="input-rk" /></div>
                 <div><label className="label-rk">Email</label><input value={form.email} onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))} className="input-rk" /></div>
@@ -833,7 +795,7 @@ export function AdminPurchaseInvoiceClient(props: Props) {
           ) : null}
         </div>
 
-        <div className="mt-8 flex justify-end gap-3 border-t border-white/10 pt-5"><button type="button" onClick={() => { setIsCreateOpen(false); router.push(DETAIL_PATH); }} className="rounded-xl border border-white/15 px-5 py-3 text-sm text-white/80 transition hover:bg-white/10">Close</button><button type="submit" disabled={!canSubmit} className="rounded-xl bg-red-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-50">{isSubmitting ? "Saving..." : isRevisionMode ? `Save Revised ${TITLE}` : editingTransaction ? `Update ${TITLE}` : `Save ${TITLE}`}</button></div>
+        <div className="mt-8 flex justify-end gap-3 border-t border-white/10 pt-5"><button type="button" onClick={() => { setIsCreateOpen(false); router.push(DETAIL_PATH); }} className="rounded-xl border border-white/15 px-5 py-3 text-sm text-white/80 transition hover:bg-white/10">Close</button><button type="submit" disabled={!canSubmit} className="rounded-xl bg-red-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-50">{isSubmitting ? "Saving..." : `Save ${TITLE}`}</button></div>
       </form>
           </div>
         </div>

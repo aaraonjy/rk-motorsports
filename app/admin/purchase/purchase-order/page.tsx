@@ -159,7 +159,9 @@ async function loadSharedData(docType: PurchaseDocType) {
       defaultAdminTaxCodeId: taxConfig?.defaultAdminTaxCodeId || null,
       taxCodes: taxCodes.map((tax) => ({ ...tax, rate: toNumber(tax.rate) })),
     },
-    transactions: transactions.map((transaction) => ({
+    transactions: transactions
+      .filter((transaction) => !transaction.revisions.some((revision) => String(revision.status || "").toUpperCase() !== "CANCELLED"))
+      .map((transaction) => ({
       id: transaction.id,
       docNo: transaction.docNo,
       docDate: transaction.docDate.toISOString(),

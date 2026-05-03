@@ -63,7 +63,6 @@ type PurchasePayload = {
   footerRemarks?: string | null;
   sourceTransactionId?: string | null;
   sourceDocType?: PurchaseDocType | null;
-  revisedFromId?: string | null;
   lines?: PurchaseLinePayload[];
 };
 
@@ -375,7 +374,7 @@ export async function createPurchaseTransaction(docType: PurchaseDocType, body: 
     const supplier = await assertActiveSupplier(tx, supplierId);
     const taxSettings = await loadTaxSettings(tx);
     const headerTaxCode = await snapshotTaxCode(tx, normalizeText(body.taxCodeId));
-    const lines = await mapLines(tx, body.lines, taxSettings.taxModuleEnabled, taxSettings.taxCalculationMode === "LINE_ITEM" ? taxSettings.defaultAdminTaxCodeId : null);
+    const lines = await mapLines(tx, body.lines, taxSettings.taxModuleEnabled, null);
     const totals = calculateTotals(lines, taxSettings.taxCalculationMode, taxSettings.taxModuleEnabled, headerTaxCode);
 
     const sourceTransactionId = normalizeText(body.sourceTransactionId);
@@ -386,13 +385,6 @@ export async function createPurchaseTransaction(docType: PurchaseDocType, body: 
       sourceDocType = source.docType;
     }
 
-    const revisedFromId = normalizeText(body.revisedFromId);
-    if (revisedFromId) {
-      const original = await tx.purchaseTransaction.findUnique({ where: { id: revisedFromId }, select: { id: true, docType: true, status: true } });
-      if (!original || original.docType !== docType) throw new Error("Original document for revision is not available.");
-      if (original.status === "CANCELLED") throw new Error("Cancelled document cannot be revised.");
-    }
-
     const transaction = await tx.purchaseTransaction.create({
       data: {
         docType,
@@ -400,7 +392,6 @@ export async function createPurchaseTransaction(docType: PurchaseDocType, body: 
         docDate,
         docDesc: normalizeText(body.docDesc) || DOC_LABEL[docType],
         status: "OPEN",
-        revisedFromId,
         supplierId: supplier.id,
         supplierAccountNo: supplier.supplierAccountNo,
         supplierName: normalizeText(body.supplierName) || supplier.name,
@@ -499,7 +490,7 @@ export async function createPurchaseTransaction(docType: PurchaseDocType, body: 
       await refreshSourceStatus(tx, sourceTransactionId);
     }
 
-    if (!revisedFromId && shouldPostStock(docType, sourceDocType)) {
+    if (shouldPostStock(docType, sourceDocType)) {
       await createStockReceive(tx, transaction, lines);
     }
 
@@ -519,7 +510,7 @@ export async function updatePurchaseTransaction(docType: PurchaseDocType, id: st
     const supplier = await assertActiveSupplier(tx, supplierId);
     const taxSettings = await loadTaxSettings(tx);
     const headerTaxCode = await snapshotTaxCode(tx, normalizeText(body.taxCodeId));
-    const lines = await mapLines(tx, body.lines, taxSettings.taxModuleEnabled, taxSettings.taxCalculationMode === "LINE_ITEM" ? taxSettings.defaultAdminTaxCodeId : null);
+    const lines = await mapLines(tx, body.lines, taxSettings.taxModuleEnabled, null);
     const totals = calculateTotals(lines, taxSettings.taxCalculationMode, taxSettings.taxModuleEnabled, headerTaxCode);
     const updated = await tx.purchaseTransaction.update({
       where: { id },
