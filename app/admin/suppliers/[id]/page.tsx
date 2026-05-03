@@ -455,18 +455,6 @@ export default async function AdminSupplierDetailPage({
                 value={supplier.taxIdentificationNo || "-"}
               />
               <DetailField
-                label="Account Source"
-                value={
-                  supplier.accountSource === "ADMIN"
-                    ? "Admin Created"
-                    : "Self Registered"
-                }
-              />
-              <DetailField
-                label="Portal Access"
-                value={supplier.portalAccess ? "Enabled" : "Disabled"}
-              />
-              <DetailField
                 label="Created Date"
                 value={formatDateTime(supplier.createdAt)}
               />
