@@ -174,6 +174,13 @@ export default async function PurchaseDetailPage({ params, searchParams }: Param
     select: { name: true, email: true },
   });
   const createdByName = createdAdmin?.name || createdAdmin?.email || "-";
+  const cancelledAdmin = transaction.cancelledByAdminId
+    ? await db.user.findUnique({
+        where: { id: transaction.cancelledByAdminId },
+        select: { name: true, email: true },
+      })
+    : null;
+  const cancelledByName = cancelledAdmin?.name || cancelledAdmin?.email || "-";
   const currency = transaction.currency || "MYR";
   const activeGeneratedFromDocuments = transaction.targetLinks
     .map((link) => link.sourceTransaction)
@@ -277,7 +284,7 @@ export default async function PurchaseDetailPage({ params, searchParams }: Param
           <div className="rounded-2xl border border-red-500/25 bg-red-500/10 p-5 text-sm text-red-100">
             <div className="font-semibold">This {TITLE_LOWER} has been cancelled.</div>
             <div className="mt-2">Cancelled At: {formatDate(transaction.cancelledAt)}</div>
-            <div className="mt-1">Cancelled By: {transaction.cancelledByAdminId || "-"}</div>
+            <div className="mt-1">Cancelled By: {cancelledByName}</div>
             <div className="mt-1">Reason: {transaction.cancelReason || "-"}</div>
           </div>
         ) : null}
