@@ -223,6 +223,7 @@ export function AdminPurchaseInvoiceClient(props: Props) {
       currency: source.currency || "MYR",
       reference: editingTransaction ? source.reference || "" : source.docNo || "",
       remarks: source.remarks || "",
+      attention: source.attention || "",
       agentId: source.agentId || "",
       projectId: source.projectId || "",
       departmentId: source.departmentId || "",
