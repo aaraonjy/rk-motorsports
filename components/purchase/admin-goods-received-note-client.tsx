@@ -192,6 +192,13 @@ function formatDecimalInput(value: unknown, decimalPlaces: number) { const numer
 function normalizeDocNoInput(value: string) { return value.toUpperCase().replace(/\s+/g, "").slice(0, 30); }
 function lineAmount(line: LineForm) { const qty = Math.max(0, Number(line.qty || 0)); const unitCost = Math.max(0, Number(line.unitCost || 0)); const subtotal = roundMoney(qty * unitCost); const discountRate = Math.max(0, Number(line.discountRate || 0)); const discount = line.discountType === "AMOUNT" ? discountRate : roundMoney(subtotal * (discountRate / 100)); return Math.max(0, roundMoney(subtotal - discount)); }
 function emptyLine(defaultLocationId = "", defaultTaxCodeId = "", qtyDecimalPlaces = 2, unitCostDecimalPlaces = 2): LineForm { return { sourceLineId: "", sourceTransactionId: "", inventoryProductId: "", productCode: "", productDescription: "", itemType: "STOCK_ITEM", uom: "", qty: formatDecimalInput(1, qtyDecimalPlaces), unitCost: formatDecimalInput(0, unitCostDecimalPlaces), discountRate: "0", discountType: "PERCENT", locationId: defaultLocationId, batchNo: "", serialNos: [], taxCodeId: defaultTaxCodeId, remarks: "" }; }
+type BalanceResponse = { ok?: boolean; balance?: number; error?: string };
+function balanceKey(productId: string, locationId: string, batchNo = "") { return `${productId}__${locationId}__${batchNo || ""}`; }
+function formatQtyBalance(value: number | undefined, isLoading: boolean, qtyDecimalPlaces: number) {
+  if (isLoading) return "Loading balance...";
+  if (typeof value !== "number") return "Select product and location to view balance.";
+  return `Qty Balance: ${value.toLocaleString("en-MY", { minimumFractionDigits: qtyDecimalPlaces, maximumFractionDigits: qtyDecimalPlaces })}`;
+}
 function statusClass(status: string) { if (status === "CANCELLED") return "border-red-500/25 bg-red-500/10 text-red-200"; if (status === "COMPLETED") return "border-sky-500/25 bg-sky-500/10 text-sky-200"; if (status === "PARTIAL") return "border-indigo-500/25 bg-indigo-500/10 text-indigo-200"; return "border-amber-500/25 bg-amber-500/10 text-amber-200"; }
 
 
@@ -373,6 +380,10 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showGenerateFrom, setShowGenerateFrom] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(Boolean(editId || sourceId));
+  const [showDocNoOverride, setShowDocNoOverride] = useState(false);
+  const [docNoDraft, setDocNoDraft] = useState("");
+  const [balances, setBalances] = useState<Record<string, number>>({});
+  const [loadingBalances, setLoadingBalances] = useState<Record<string, boolean>>({});
 
   const [listingStatus, setListingStatus] = useState("ALL");
 
@@ -485,6 +496,28 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
       setIsCreateOpen(true);
     }
   }, [editId, sourceId]);
+
+  useEffect(() => {
+    for (const line of lines) {
+      if (!line.inventoryProductId || !line.locationId) continue;
+      const product = props.initialProducts.find((item) => item.id === line.inventoryProductId);
+      const batchNo = product?.batchTracking ? line.batchNo : "";
+      if (product?.batchTracking && !batchNo) continue;
+      const key = balanceKey(line.inventoryProductId, line.locationId, batchNo);
+      if (balances[key] !== undefined || loadingBalances[key]) continue;
+      setLoadingBalances((prev) => ({ ...prev, [key]: true }));
+      const params = new URLSearchParams({ inventoryProductId: line.inventoryProductId, locationId: line.locationId });
+      if (batchNo) params.set("batchNo", batchNo);
+      fetch(`/api/admin/stock/balance?${params.toString()}`, { cache: "no-store" })
+        .then((response) => response.json() as Promise<BalanceResponse>)
+        .then((data) => {
+          if (data?.ok && typeof data.balance === "number") {
+            setBalances((prev) => ({ ...prev, [key]: Number(data.balance) }));
+          }
+        })
+        .finally(() => setLoadingBalances((prev) => ({ ...prev, [key]: false })));
+    }
+  }, [balances, props.initialProducts, lines, loadingBalances]);
 
   const headerTaxCode = props.taxConfig.taxCodes.find((item) => item.id === form.taxCodeId) || null;
   const totals = useMemo(() => {
@@ -662,7 +695,7 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
               ) : null}
               <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
                 <div><label className="label-rk">Doc Date</label><input type="date" value={form.docDate} onChange={(e) => setForm((prev) => ({ ...prev, docDate: e.target.value }))} className="input-rk" /></div>
-                <div className="xl:col-span-3"><label className="label-rk">System Doc No</label><div className="flex overflow-hidden rounded-xl border border-white/10 bg-black/40"><input value={docNoPreview} onChange={(e) => setDocNo(normalizeDocNoInput(e.target.value))} readOnly={!manualDocNoEnabled || Boolean(editingTransaction)} placeholder="Auto-generated" className="min-h-[52px] flex-1 bg-transparent px-4 text-white outline-none disabled:text-white/60" /><button type="button" disabled={Boolean(editingTransaction)} onClick={() => { if (!manualDocNoEnabled) setDocNo(normalizeDocNoInput(docNoPreview)); setManualDocNoEnabled((prev) => !prev); }} className="px-4 text-xs text-white/45 hover:text-white disabled:opacity-40">{manualDocNoEnabled ? "Auto" : "Click to override"}</button></div></div>
+                <div className="xl:col-span-3"><label className="label-rk">System Doc No</label><div className="flex overflow-hidden rounded-xl border border-white/10 bg-black/40"><input value={docNoPreview} readOnly placeholder="Auto-generated" className="min-h-[52px] flex-1 bg-transparent px-4 text-white outline-none disabled:text-white/60" /><button type="button" disabled={Boolean(editingTransaction)} onClick={() => { setDocNoDraft(normalizeDocNoInput(manualDocNoEnabled ? docNo : docNoPreview)); setShowDocNoOverride(true); }} className="px-4 text-xs text-white/45 hover:text-white disabled:opacity-40">Click to override</button></div></div>
                 <SearchableSelect label="A/C No" placeholder="Search or select supplier" options={supplierOptions} value={form.supplierId} onChange={(option) => applySupplier(option?.id || "")} />
                 <div><label className="label-rk">Supplier Name</label><input value={form.supplierName} onChange={(e) => setForm((prev) => ({ ...prev, supplierName: e.target.value }))} className="input-rk" /></div>
                 <div><label className="label-rk">Email</label><input value={form.email} onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))} className="input-rk" /></div>
@@ -696,7 +729,12 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
                   calculationMethod: selectedLineTaxCode?.calculationMethod || null,
                   taxEnabled: props.taxConfig.taxModuleEnabled && Boolean(selectedLineTaxCode),
                 });
-                const balanceText = product ? "Qty Balance: -" : "Select product and location to view balance.";
+                const balanceKeyValue = line.inventoryProductId && line.locationId ? balanceKey(line.inventoryProductId, line.locationId, product?.batchTracking ? line.batchNo : "") : "";
+                const balanceText = line.inventoryProductId && line.locationId
+                  ? product?.batchTracking && !line.batchNo
+                    ? "Select Batch No to view batch balance."
+                    : formatQtyBalance(balances[balanceKeyValue], Boolean(loadingBalances[balanceKeyValue]), qtyDecimalPlaces)
+                  : "Select product and location to view balance.";
                 return (
                   <div key={index} className="rounded-[1.75rem] border border-white/10 p-5">
                     <div className="mb-5 flex items-center justify-between">
@@ -750,6 +788,25 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
           </div>
         </div>
       ) : null}
+
+      {showDocNoOverride ? (
+        <div className="fixed inset-0 z-[140] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-3xl border border-white/10 bg-zinc-950 p-6 shadow-2xl">
+            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-red-400/80">{TITLE}</p>
+            <h3 className="mt-3 text-2xl font-bold">Override Document No</h3>
+            <p className="mt-2 text-sm text-white/60">Enter the document number manually. Leave blank to continue using auto-generated numbering.</p>
+            <div className="mt-5">
+              <label className="label-rk">Document No</label>
+              <input value={docNoDraft} onChange={(event) => setDocNoDraft(normalizeDocNoInput(event.target.value))} className="input-rk" placeholder={`${DOC_TYPE}-${docDateCompact}-0001`} autoFocus />
+            </div>
+            <div className="mt-6 flex justify-end gap-3">
+              <button type="button" onClick={() => setShowDocNoOverride(false)} className="rounded-xl border border-white/15 px-5 py-3 text-sm text-white/80 transition hover:bg-white/10">Cancel</button>
+              <button type="button" onClick={() => { const normalized = normalizeDocNoInput(docNoDraft); setDocNo(normalized); setManualDocNoEnabled(Boolean(normalized)); setShowDocNoOverride(false); }} className="rounded-xl bg-red-500 px-5 py-3 font-semibold text-white transition hover:bg-red-400">OK</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
     </div>
   );
 }
