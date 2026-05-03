@@ -207,6 +207,8 @@ const TITLE = "Purchase Invoice";
 const SUBTITLE =
   "Record purchase amount. Direct PI stocks in; PI generated from GRN does not stock in again.";
 const API_PATH = "/api/admin/purchase/purchase-invoice";
+const SOURCE_MODAL_TITLE = "Select Source Document";
+const SOURCE_MODAL_DESCRIPTION = "Select one pending Purchase Order or Goods Received Note for the selected supplier, then import it into this Purchase Invoice.";
 const DETAIL_PATH = "/admin/purchase/purchase-invoice";
 const SELECT_RK = "input-rk appearance-none pr-12";
 const SELECT_STYLE = {
@@ -239,6 +241,21 @@ function formatDate(value: string | Date | null | undefined) {
     year: "numeric",
   });
 }
+function formatDateTime(value: string | Date | null | undefined) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleString("en-MY", {
+    timeZone: "Asia/Kuala_Lumpur",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).replace(/am|pm/i, (value) => value.toLowerCase());
+}
+
 function formatDateInput(value: string | Date | null | undefined) {
   if (!value) return todayInput();
   const date = new Date(value);
@@ -615,9 +632,11 @@ export function AdminPurchaseInvoiceClient(props: Props) {
   const [showGenerateFrom, setShowGenerateFrom] = useState(false);
   const [isGenerateFromOpen, setIsGenerateFromOpen] = useState(false);
   const [sourceSearch, setSourceSearch] = useState("");
+  const [selectedSourceId, setSelectedSourceId] = useState("");
   const [generateFromError, setGenerateFromError] = useState("");
   const [cancelTarget, setCancelTarget] = useState<PurchaseTransactionRecord | null>(null);
   const [cancelReason, setCancelReason] = useState("");
+  const [cancelNotice, setCancelNotice] = useState<{ docNo: string; cancelledAt: Date; reason: string } | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(Boolean(editId || sourceId));
   const [showDocNoOverride, setShowDocNoOverride] = useState(false);
   const [docNoDraft, setDocNoDraft] = useState("");
@@ -956,6 +975,7 @@ export function AdminPurchaseInvoiceClient(props: Props) {
       return;
     }
     setSourceSearch("");
+    setSelectedSourceId("");
     setIsGenerateFromOpen(true);
   }
 
@@ -1061,7 +1081,8 @@ export function AdminPurchaseInvoiceClient(props: Props) {
       }
       setCancelTarget(null);
       setCancelReason("");
-      setMessage(`${TITLE} cancelled successfully.`);
+      setMessage("");
+      setCancelNotice({ docNo: cancelTarget.docNo, cancelledAt: new Date(), reason: cancelReason.trim() || "Cancelled by admin" });
       router.refresh();
     } catch {
       setError(`Unable to cancel ${TITLE}.`);
@@ -1152,6 +1173,15 @@ export function AdminPurchaseInvoiceClient(props: Props) {
       {message && !isCreateOpen ? (
         <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
           {message}
+        </div>
+      ) : null}
+
+      {cancelNotice && !isCreateOpen ? (
+        <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-4 text-sm text-red-100">
+          <div className="font-semibold">This {TITLE.toLowerCase()} has been cancelled.</div>
+          <div className="mt-2">Cancelled At: {formatDateTime(cancelNotice.cancelledAt)}</div>
+          <div className="mt-1">Cancelled By: -</div>
+          <div className="mt-1">Reason: {cancelNotice.reason}</div>
         </div>
       ) : null}
 
@@ -1272,6 +1302,7 @@ export function AdminPurchaseInvoiceClient(props: Props) {
                               event.stopPropagation();
                               setMessage("");
                               setError("");
+                              setCancelNotice(null);
                               router.push(`${DETAIL_PATH}?edit=${item.id}`);
                             }}
                             className="rounded-xl border border-white/15 px-3 py-2 text-xs text-white/75 transition hover:bg-white/10"
@@ -1284,6 +1315,7 @@ export function AdminPurchaseInvoiceClient(props: Props) {
                               event.stopPropagation();
                               setMessage("");
                               setError("");
+                              setCancelNotice(null);
                               router.push(`${DETAIL_PATH}?edit=${item.id}`);
                             }}
                             className="rounded-xl border border-sky-500/30 px-3 py-2 text-xs text-sky-200 transition hover:bg-sky-500/10"
@@ -1653,7 +1685,12 @@ export function AdminPurchaseInvoiceClient(props: Props) {
 
                 {activeTab === "BODY" ? (
                   <div className="space-y-5">
-                    <div className={isGeneratedFromSource ? "pointer-events-none opacity-70" : ""}>
+                    {isGeneratedFromSource ? (
+                      <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white/45">
+                        Read-only body section. This {TITLE} was generated from source document, so product, qty, cost, discount, tax, and line pricing details are locked.
+                      </div>
+                    ) : null}
+                    <div className={isGeneratedFromSource ? "pointer-events-none opacity-55 grayscale" : ""}>
                     {lines.map((line, index) => {
                       const product =
                         props.initialProducts.find(
@@ -2012,8 +2049,8 @@ export function AdminPurchaseInvoiceClient(props: Props) {
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
                 <p className="text-sm font-semibold uppercase tracking-[0.24em] text-white/40">Generate From</p>
-                <h3 className="mt-3 text-2xl font-bold">Select Source Document</h3>
-                <p className="mt-3 text-sm leading-6 text-white/60">Select one pending purchase document for the selected supplier, then import it into this {TITLE}.</p>
+                <h3 className="mt-3 text-2xl font-bold">{SOURCE_MODAL_TITLE}</h3>
+                <p className="mt-3 text-sm leading-6 text-white/60">{SOURCE_MODAL_DESCRIPTION}</p>
               </div>
               <button type="button" onClick={() => setIsGenerateFromOpen(false)} className="rounded-xl border border-white/15 px-4 py-2.5 text-sm text-white/75 transition hover:bg-white/10">Close</button>
             </div>
@@ -2026,13 +2063,16 @@ export function AdminPurchaseInvoiceClient(props: Props) {
               {filteredSourceDocuments.length === 0 ? (
                 <div className="px-4 py-8 text-center text-sm text-white/50">No pending source document found for this supplier.</div>
               ) : (
-                filteredSourceDocuments.map((source) => (
+                filteredSourceDocuments.map((source) => {
+                  const isSelected = selectedSourceId === source.id;
+                  return (
                   <button
                     key={source.id}
                     type="button"
-                    onClick={() => applySourceDocument(source)}
-                    className="flex w-full items-center gap-4 border-b border-white/10 px-4 py-4 text-left transition last:border-b-0 hover:bg-white/[0.04]"
+                    onClick={() => setSelectedSourceId(source.id)}
+                    className={`flex w-full items-center gap-4 border-b border-white/10 px-4 py-4 text-left transition last:border-b-0 ${isSelected ? "bg-white/[0.08]" : "hover:bg-white/[0.04]"}`}
                   >
+                    <span className={`mt-1 h-4 w-4 rounded border ${isSelected ? "border-red-400 bg-red-500" : "border-white/30"}`} />
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-3">
                         <span className="font-semibold text-white">{source.docNo}</span>
@@ -2042,8 +2082,23 @@ export function AdminPurchaseInvoiceClient(props: Props) {
                       <div className="mt-1 text-xs text-white/45">{source.supplierAccountNo || "-"} • {formatDate(source.docDate)} • {source.currency || "MYR"} {money(Number(source.grandTotal || 0))}</div>
                     </div>
                   </button>
-                ))
+                  );
+                })
               )}
+            </div>
+            <div className="mt-6 flex justify-end gap-3">
+              <button type="button" onClick={() => setIsGenerateFromOpen(false)} className="rounded-xl border border-white/15 px-5 py-3 text-sm text-white/75 transition hover:bg-white/10">Close</button>
+              <button
+                type="button"
+                disabled={!selectedSourceId}
+                onClick={() => {
+                  const source = props.sourceDocuments.find((item) => item.id === selectedSourceId);
+                  if (source) applySourceDocument(source);
+                }}
+                className="rounded-xl bg-red-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-red-400 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Import Selected
+              </button>
             </div>
           </div>
         </div>
