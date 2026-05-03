@@ -163,7 +163,6 @@ export default async function PurchaseDetailPage({ params, searchParams }: Param
       lines: {
         orderBy: { lineNo: "asc" },
         include: {
-          inventoryProduct: { select: { id: true, itemType: true } },
           sourceLineLinks: {
             include: { targetTransaction: { select: { id: true, docType: true, docNo: true, status: true } } },
           },
@@ -374,7 +373,7 @@ export default async function PurchaseDetailPage({ params, searchParams }: Param
                     <tr><td colSpan={DOC_TYPE === "PI" ? 8 : DOC_TYPE === "PO" ? 12 : 10} className="px-4 py-8 text-center text-white/50">No product line found.</td></tr>
                   ) : (
                     transaction.lines.map((line) => {
-                      const isServiceItem = line.inventoryProduct?.itemType === "SERVICE_ITEM";
+                      const isServiceItem = line.itemType === "SERVICE_ITEM";
                       const receivedQty = getLinkedQty(line, "RECEIVED_TO");
                       const receivedAmount = getLinkedAmount(line, "RECEIVED_TO");
                       const invoicedQty = getLinkedQty(line, "INVOICED_TO");
