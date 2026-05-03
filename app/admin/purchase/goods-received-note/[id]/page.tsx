@@ -6,12 +6,12 @@ import type { PurchaseDocType } from "@prisma/client";
 
 type Params = { params: Promise<{ id: string }>; searchParams?: Promise<{ success?: string; error?: string }> };
 
-const DOC_TYPE = "PI" as PurchaseDocType;
-const TITLE = "Purchase Invoice";
-const TITLE_LOWER = "purchase invoice";
-const LIST_PATH = "/admin/purchase/purchase-invoice";
-const SUMMARY_TITLE = "Purchase Invoice Summary";
-const PRODUCT_NOTE = "Purchase invoice lines are shown below for review and checking.";
+const DOC_TYPE = "GRN" as PurchaseDocType;
+const TITLE = "Goods Received Note";
+const TITLE_LOWER = "goods received note";
+const LIST_PATH = "/admin/purchase/goods-received-note";
+const SUMMARY_TITLE = "Goods Received Note Summary";
+const PRODUCT_NOTE = "Invoice progress will be updated by future Purchase Invoice documents using line-level links.";
 
 function money(value: unknown) {
   const numeric = Number(value ?? 0);
@@ -169,18 +169,11 @@ export default async function PurchaseDetailPage({ params, searchParams }: Param
     );
   }
 
-  const [createdByAdmin, cancelledByAdmin] = await Promise.all([
-    transaction.createdByAdminId
-      ? db.user.findUnique({ where: { id: transaction.createdByAdminId }, select: { name: true, email: true } })
-      : null,
-    transaction.cancelledByAdminId
-      ? db.user.findUnique({ where: { id: transaction.cancelledByAdminId }, select: { name: true, email: true } })
-      : null,
-  ]);
-
-  const createdByName = createdByAdmin?.name || createdByAdmin?.email || "-";
-  const cancelledByName = cancelledByAdmin?.name || cancelledByAdmin?.email || transaction.cancelledByAdminId || "-";
-
+  const createdAdmin = await db.user.findUnique({
+    where: { id: transaction.createdByAdminId },
+    select: { name: true, email: true },
+  });
+  const createdByName = createdAdmin?.name || createdAdmin?.email || "-";
   const currency = transaction.currency || "MYR";
   const activeGeneratedFromDocuments = transaction.targetLinks
     .map((link) => link.sourceTransaction)
@@ -284,7 +277,7 @@ export default async function PurchaseDetailPage({ params, searchParams }: Param
           <div className="rounded-2xl border border-red-500/25 bg-red-500/10 p-5 text-sm text-red-100">
             <div className="font-semibold">This {TITLE_LOWER} has been cancelled.</div>
             <div className="mt-2">Cancelled At: {formatDate(transaction.cancelledAt)}</div>
-            <div className="mt-1">Cancelled By: {cancelledByName}</div>
+            <div className="mt-1">Cancelled By: {transaction.cancelledByAdminId || "-"}</div>
             <div className="mt-1">Reason: {transaction.cancelReason || "-"}</div>
           </div>
         ) : null}
