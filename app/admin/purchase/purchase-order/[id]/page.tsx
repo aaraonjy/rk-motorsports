@@ -1,18 +1,17 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getSessionUser, requireAdmin } from "@/lib/auth";
+import { getSessionUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { cancelPurchaseTransaction } from "@/lib/purchase";
 import type { PurchaseDocType } from "@prisma/client";
 
 type Params = { params: Promise<{ id: string }>; searchParams?: Promise<{ success?: string; error?: string }> };
 
-const DOC_TYPE = "PO" as PurchaseDocType;
-const TITLE = "Purchase Order";
-const TITLE_LOWER = "purchase order";
-const LIST_PATH = "/admin/purchase/purchase-order";
-const SUMMARY_TITLE = "Purchase Order Summary";
-const PRODUCT_NOTE = "Delivery and invoice progress will be updated by future GRN / Purchase Invoice documents using line-level links.";
+const DOC_TYPE = "GRN" as PurchaseDocType;
+const TITLE = "Goods Received Note";
+const TITLE_LOWER = "goods received note";
+const LIST_PATH = "/admin/purchase/goods-received-note";
+const SUMMARY_TITLE = "Goods Received Note Summary";
+const PRODUCT_NOTE = "Invoice progress will be updated by future Purchase Invoice documents using line-level links.";
 
 function money(value: unknown) {
   const numeric = Number(value ?? 0);
@@ -125,17 +124,6 @@ function AddressPanel({
   );
 }
 
-async function cancelPurchaseAction(formData: FormData) {
-  "use server";
-  const admin = await requireAdmin();
-  const id = String(formData.get("id") || "");
-  const docType = String(formData.get("docType") || "") as PurchaseDocType;
-  const listPath = String(formData.get("listPath") || "/admin/purchase");
-  const reason = String(formData.get("reason") || "Cancelled by admin");
-  await cancelPurchaseTransaction(docType, id, admin.id, reason);
-  redirect(`${listPath}?success=${encodeURIComponent("Document cancelled successfully.")}`);
-}
-
 export default async function PurchaseDetailPage({ params, searchParams }: Params) {
   const user = await getSessionUser();
   if (!user) redirect("/login");
@@ -181,6 +169,18 @@ export default async function PurchaseDetailPage({ params, searchParams }: Param
     );
   }
 
+  const [createdByAdmin, cancelledByAdmin] = await Promise.all([
+    transaction.createdByAdminId
+      ? db.user.findUnique({ where: { id: transaction.createdByAdminId }, select: { name: true, email: true } })
+      : null,
+    transaction.cancelledByAdminId
+      ? db.user.findUnique({ where: { id: transaction.cancelledByAdminId }, select: { name: true, email: true } })
+      : null,
+  ]);
+
+  const createdByName = createdByAdmin?.name || createdByAdmin?.email || "-";
+  const cancelledByName = cancelledByAdmin?.name || cancelledByAdmin?.email || transaction.cancelledByAdminId || "-";
+
   const currency = transaction.currency || "MYR";
   const activeGeneratedFromDocuments = transaction.targetLinks
     .map((link) => link.sourceTransaction)
@@ -188,7 +188,6 @@ export default async function PurchaseDetailPage({ params, searchParams }: Param
   const activeGeneratedToDocuments = transaction.sourceLinks
     .map((link) => link.targetTransaction)
     .filter((item) => item && isActivePurchaseTrace(item.status));
-  const canCancel = transaction.status !== "CANCELLED" && activeGeneratedToDocuments.length === 0;
 
   const billingAddress = {
     addressLine1: transaction.billingAddressLine1,
@@ -278,24 +277,6 @@ export default async function PurchaseDetailPage({ params, searchParams }: Param
             >
               Edit
             </Link>
-            {transaction.status !== "CANCELLED" ? (
-              <form action={cancelPurchaseAction}>
-                <input type="hidden" name="id" value={transaction.id} />
-                <input type="hidden" name="docType" value={DOC_TYPE} />
-                <input type="hidden" name="listPath" value={LIST_PATH} />
-                <input type="hidden" name="reason" value="Cancelled by admin" />
-                <button
-                  type="submit"
-                  disabled={!canCancel}
-                  title={!canCancel ? "Cancel downstream generated document first." : "Cancel document"}
-                  className={`rounded-xl px-5 py-3 text-sm font-semibold text-white transition ${
-                    canCancel ? "border border-red-500/30 bg-red-600/80 hover:bg-red-500" : "cursor-not-allowed border border-white/10 bg-white/5 opacity-50"
-                  }`}
-                >
-                  Cancel
-                </button>
-              </form>
-            ) : null}
           </div>
         </div>
 
@@ -303,7 +284,7 @@ export default async function PurchaseDetailPage({ params, searchParams }: Param
           <div className="rounded-2xl border border-red-500/25 bg-red-500/10 p-5 text-sm text-red-100">
             <div className="font-semibold">This {TITLE_LOWER} has been cancelled.</div>
             <div className="mt-2">Cancelled At: {formatDate(transaction.cancelledAt)}</div>
-            <div className="mt-1">Cancelled By: {transaction.cancelledByAdminId || "-"}</div>
+            <div className="mt-1">Cancelled By: {cancelledByName}</div>
             <div className="mt-1">Reason: {transaction.cancelReason || "-"}</div>
           </div>
         ) : null}
@@ -317,7 +298,7 @@ export default async function PurchaseDetailPage({ params, searchParams }: Param
             </div>
             <div className="grid min-w-[250px] grid-cols-[110px_1fr] gap-x-3 gap-y-2 text-xs text-white/55">
               <div className="text-right">Created By:</div>
-              <div className="text-left font-semibold text-white/75">{transaction.createdByAdminId || "-"}</div>
+              <div className="text-left font-semibold text-white/75">{createdByName}</div>
               <div className="text-right">Created Date:</div>
               <div className="text-left font-semibold text-white/75">{formatDateTime(transaction.createdAt)}</div>
             </div>

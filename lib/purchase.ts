@@ -63,6 +63,7 @@ type PurchasePayload = {
   footerRemarks?: string | null;
   sourceTransactionId?: string | null;
   sourceDocType?: PurchaseDocType | null;
+  revisedFromId?: string | null;
   lines?: PurchaseLinePayload[];
 };
 
@@ -385,6 +386,13 @@ export async function createPurchaseTransaction(docType: PurchaseDocType, body: 
       sourceDocType = source.docType;
     }
 
+    const revisedFromId = normalizeText(body.revisedFromId);
+    if (revisedFromId) {
+      const original = await tx.purchaseTransaction.findUnique({ where: { id: revisedFromId }, select: { id: true, docType: true, status: true } });
+      if (!original || original.docType !== docType) throw new Error("Original document for revision is not available.");
+      if (original.status === "CANCELLED") throw new Error("Cancelled document cannot be revised.");
+    }
+
     const transaction = await tx.purchaseTransaction.create({
       data: {
         docType,
@@ -392,6 +400,7 @@ export async function createPurchaseTransaction(docType: PurchaseDocType, body: 
         docDate,
         docDesc: normalizeText(body.docDesc) || DOC_LABEL[docType],
         status: "OPEN",
+        revisedFromId,
         supplierId: supplier.id,
         supplierAccountNo: supplier.supplierAccountNo,
         supplierName: normalizeText(body.supplierName) || supplier.name,
@@ -490,7 +499,7 @@ export async function createPurchaseTransaction(docType: PurchaseDocType, body: 
       await refreshSourceStatus(tx, sourceTransactionId);
     }
 
-    if (shouldPostStock(docType, sourceDocType)) {
+    if (!revisedFromId && shouldPostStock(docType, sourceDocType)) {
       await createStockReceive(tx, transaction, lines);
     }
 
