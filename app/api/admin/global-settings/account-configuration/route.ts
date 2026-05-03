@@ -8,6 +8,13 @@ import {
   normalizeCustomerAccountPrefix,
   validateCustomerAccountConfiguration,
 } from "@/lib/customer-account";
+import {
+  DEFAULT_SUPPLIER_ACCOUNT_FORMAT,
+  DEFAULT_SUPPLIER_ACCOUNT_PREFIX,
+  normalizeSupplierAccountFormat,
+  normalizeSupplierAccountPrefix,
+  validateSupplierAccountConfiguration,
+} from "@/lib/supplier-account";
 
 export async function GET() {
   await requireAdmin();
@@ -23,6 +30,10 @@ export async function GET() {
         config?.customerAccountPrefix || DEFAULT_CUSTOMER_ACCOUNT_PREFIX,
       customerAccountNoFormat:
         config?.customerAccountNoFormat || DEFAULT_CUSTOMER_ACCOUNT_FORMAT,
+      supplierAccountPrefix:
+        config?.supplierAccountPrefix || DEFAULT_SUPPLIER_ACCOUNT_PREFIX,
+      supplierAccountNoFormat:
+        config?.supplierAccountNoFormat || DEFAULT_SUPPLIER_ACCOUNT_FORMAT,
     },
   });
 }
@@ -33,14 +44,25 @@ export async function PATCH(req: Request) {
   const body = await req.json();
   const customerAccountPrefix = normalizeCustomerAccountPrefix(body?.customerAccountPrefix);
   const customerAccountNoFormat = normalizeCustomerAccountFormat(body?.customerAccountNoFormat);
+  const supplierAccountPrefix = normalizeSupplierAccountPrefix(body?.supplierAccountPrefix);
+  const supplierAccountNoFormat = normalizeSupplierAccountFormat(body?.supplierAccountNoFormat);
 
-  const validationError = validateCustomerAccountConfiguration({
+  const customerValidationError = validateCustomerAccountConfiguration({
     customerAccountPrefix,
     customerAccountNoFormat,
   });
 
-  if (validationError) {
-    return Response.json({ ok: false, error: validationError }, { status: 400 });
+  if (customerValidationError) {
+    return Response.json({ ok: false, error: customerValidationError }, { status: 400 });
+  }
+
+  const supplierValidationError = validateSupplierAccountConfiguration({
+    supplierAccountPrefix,
+    supplierAccountNoFormat,
+  });
+
+  if (supplierValidationError) {
+    return Response.json({ ok: false, error: supplierValidationError }, { status: 400 });
   }
 
   const config = await db.accountConfiguration.upsert({
@@ -48,11 +70,15 @@ export async function PATCH(req: Request) {
     update: {
       customerAccountPrefix,
       customerAccountNoFormat,
+      supplierAccountPrefix,
+      supplierAccountNoFormat,
     },
     create: {
       id: DEFAULT_ACCOUNT_CONFIGURATION_ID,
       customerAccountPrefix,
       customerAccountNoFormat,
+      supplierAccountPrefix,
+      supplierAccountNoFormat,
     },
   });
 

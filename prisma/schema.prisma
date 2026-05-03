@@ -320,6 +320,8 @@ model AccountConfiguration {
   id                       String                  @id
   customerAccountPrefix    String                  @default("3000")
   customerAccountNoFormat  CustomerAccountNoFormat @default(XXXX_XXXX)
+  supplierAccountPrefix    String                  @default("4000")
+  supplierAccountNoFormat  CustomerAccountNoFormat @default(XXXX_XXXX)
   createdAt                DateTime                @default(now())
   updatedAt                DateTime                @updatedAt
 }
@@ -554,6 +556,7 @@ model Agent {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   customers User[]
+  suppliers Supplier[]
   salesTransactions SalesTransaction[]
 
   @@index([isActive, code])
@@ -583,6 +586,70 @@ model Currency {
 
   @@index([isActive, code])
   @@index([name])
+}
+
+
+model Supplier {
+  id                     String                    @id @default(cuid())
+  name                   String
+  supplierAccountNo      String?                   @unique
+  email                  String                    @unique
+  phone                  String?                   @unique
+  phone2                 String?
+  fax                    String?
+  billingAddressLine1    String?
+  billingAddressLine2    String?
+  billingAddressLine3    String?
+  billingAddressLine4    String?
+  billingCity            String?
+  billingPostCode        String?
+  billingCountryCode     String?
+  deliveryAddressLine1   String?
+  deliveryAddressLine2   String?
+  deliveryAddressLine3   String?
+  deliveryAddressLine4   String?
+  deliveryCity           String?
+  deliveryPostCode       String?
+  deliveryCountryCode    String?
+  area                   String?
+  attention              String?
+  contactPerson          String?
+  emailCc                String?
+  currency               String                    @default("MYR")
+  agentId                String?
+  natureOfBusiness       String?
+  registrationIdType     CustomerRegistrationIdType?
+  registrationNo         String?
+  taxIdentificationNo    String?
+  creditTermsDays        Int                       @default(0)
+  creditLimitAmount      Decimal                   @default(0) @db.Decimal(14, 2)
+  isActive               Boolean                   @default(true)
+  createdAt              DateTime                  @default(now())
+  updatedAt              DateTime                  @updatedAt
+  agent                  Agent?                    @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  deliveryAddresses      SupplierDeliveryAddress[]
+
+  @@index([agentId])
+  @@index([isActive])
+  @@index([name])
+}
+
+model SupplierDeliveryAddress {
+  id           String   @id @default(cuid())
+  supplierId   String
+  label        String?
+  addressLine1 String
+  addressLine2 String?
+  addressLine3 String?
+  addressLine4 String?
+  city         String?
+  postCode     String?
+  countryCode  String?  @default("MY")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  supplier     Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@index([supplierId])
 }
 
 model CustomerDeliveryAddress {

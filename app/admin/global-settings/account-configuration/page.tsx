@@ -7,6 +7,10 @@ import {
   DEFAULT_CUSTOMER_ACCOUNT_FORMAT,
   DEFAULT_CUSTOMER_ACCOUNT_PREFIX,
 } from "@/lib/customer-account";
+import {
+  DEFAULT_SUPPLIER_ACCOUNT_FORMAT,
+  DEFAULT_SUPPLIER_ACCOUNT_PREFIX,
+} from "@/lib/supplier-account";
 
 export default async function AdminAccountConfigurationPage() {
   const user = await getSessionUser();
@@ -23,14 +27,14 @@ export default async function AdminAccountConfigurationPage() {
         <div>
           <h1 className="text-4xl font-bold">Account Configuration</h1>
           <p className="mt-4 text-white/70">
-            Configure customer account numbering for admin-created customer profiles.
+            Configure customer and supplier account numbering for master profiles.
           </p>
         </div>
 
         <div className="mt-8 card-rk p-6 text-white/75">
           <p>
-            Customer A/C No. will be generated automatically when a new customer is created.
-            The first letter is based on the customer name.
+            Customer and Supplier A/C No. will be generated automatically when a new profile is created.
+            The first letter is based on the customer or supplier name.
           </p>
         </div>
 
@@ -40,6 +44,12 @@ export default async function AdminAccountConfigurationPage() {
           }
           initialCustomerAccountNoFormat={
             config?.customerAccountNoFormat || DEFAULT_CUSTOMER_ACCOUNT_FORMAT
+          }
+          initialSupplierAccountPrefix={
+            config?.supplierAccountPrefix || DEFAULT_SUPPLIER_ACCOUNT_PREFIX
+          }
+          initialSupplierAccountNoFormat={
+            config?.supplierAccountNoFormat || DEFAULT_SUPPLIER_ACCOUNT_FORMAT
           }
         />
       </div>

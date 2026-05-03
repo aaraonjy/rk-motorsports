@@ -1194,7 +1194,7 @@ export async function getCustomerByIdWithIntelligence(
     ...customer,
     customerSalesTransactions: undefined,
     orders: transactionHistory,
-    salesTransactionPagination: {
+    purchaseTransactionPagination: {
       currentPage: transactionPage,
       pageSize: transactionPageSize,
       totalCount: transactionHistoryCount,
@@ -1209,6 +1209,226 @@ export async function getCustomerByIdWithIntelligence(
       totalSpent,
       averageOrderValue,
       lastOrderDate,
+    },
+  };
+}
+
+type SuppliersOptions = {
+  search?: string;
+  source?: string;
+  portalAccess?: string;
+  status?: string;
+  page?: number;
+  pageSize?: number;
+};
+
+function buildSupplierCreditControl(supplier: {
+  creditTermsDays?: number | null;
+  creditLimitAmount?: Prisma.Decimal | number | string | null;
+}) {
+  const creditTermsDays = Math.max(0, Number(supplier.creditTermsDays ?? 0) || 0);
+  const creditLimitAmount = Math.max(0, toCreditNumber(supplier.creditLimitAmount));
+
+  return {
+    creditTermsDays,
+    creditLimitAmount,
+    creditOutstandingAmount: 0,
+    creditOverdueAmount: 0,
+    creditOldestOverdueDays: 0,
+    creditLimitExceeded: false,
+    creditOverdue: false,
+  };
+}
+
+export async function getSuppliers(filters?: SuppliersOptions) {
+  const page = Math.max(1, filters?.page ?? 1);
+  const pageSize = Math.max(1, filters?.pageSize ?? 10);
+  const skip = (page - 1) * pageSize;
+
+  const where: Prisma.SupplierWhereInput = {
+    ...(filters?.status === "INACTIVE"
+      ? { isActive: false }
+      : filters?.status === "ALL"
+        ? {}
+        : { isActive: true }),
+    ...(filters?.search
+      ? {
+          OR: [
+            { name: { contains: filters.search, mode: "insensitive" } },
+            { supplierAccountNo: { contains: filters.search, mode: "insensitive" } },
+            { phone: { contains: filters.search, mode: "insensitive" } },
+            { email: { contains: filters.search, mode: "insensitive" } },
+          ],
+        }
+      : {}),
+  };
+
+  const [suppliers, totalCount] = await Promise.all([
+    db.supplier.findMany({
+      where,
+      select: {
+        id: true,
+        name: true,
+        supplierAccountNo: true,
+        email: true,
+        phone: true,
+        phone2: true,
+        fax: true,
+        billingAddressLine1: true,
+        billingAddressLine2: true,
+        billingAddressLine3: true,
+        billingAddressLine4: true,
+        billingCity: true,
+        billingPostCode: true,
+        billingCountryCode: true,
+        deliveryAddressLine1: true,
+        deliveryAddressLine2: true,
+        deliveryAddressLine3: true,
+        deliveryAddressLine4: true,
+        deliveryCity: true,
+        deliveryPostCode: true,
+        deliveryCountryCode: true,
+        area: true,
+        attention: true,
+        contactPerson: true,
+        emailCc: true,
+        currency: true,
+        agentId: true,
+        natureOfBusiness: true,
+        registrationIdType: true,
+        registrationNo: true,
+        taxIdentificationNo: true,
+        creditTermsDays: true,
+        creditLimitAmount: true,
+        agent: { select: { id: true, code: true, name: true } },
+        deliveryAddresses: {
+          orderBy: { createdAt: "asc" },
+          select: {
+            id: true,
+            label: true,
+            addressLine1: true,
+            addressLine2: true,
+            addressLine3: true,
+            addressLine4: true,
+            city: true,
+            postCode: true,
+            countryCode: true,
+          },
+        },
+        isActive: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: "desc" },
+      skip,
+      take: pageSize,
+    }),
+    db.supplier.count({ where }),
+  ]);
+
+  return {
+    suppliers: suppliers.map((supplier) => ({
+      ...supplier,
+      ...buildSupplierCreditControl(supplier),
+      accountSource: "ADMIN" as const,
+      portalAccess: false,
+      salesTransactionOrderCount: 0,
+      supplierProfileTransactionCount: 0,
+      _count: {
+        orders: 0,
+        supplierSalesTransactions: 0,
+        creditNotes: 0,
+      },
+    })),
+    totalCount,
+    currentPage: page,
+    pageSize,
+    totalPages: Math.max(1, Math.ceil(totalCount / pageSize)),
+  };
+}
+
+export async function getSupplierByIdWithIntelligence(
+  supplierId: string,
+  options?: { transactionPage?: number; transactionPageSize?: number },
+) {
+  const transactionPage = Math.max(1, Number(options?.transactionPage ?? 1) || 1);
+  const transactionPageSize = Math.max(1, Number(options?.transactionPageSize ?? 10) || 10);
+
+  const supplier = await db.supplier.findFirst({
+    where: { id: supplierId },
+    select: {
+      id: true,
+      name: true,
+      supplierAccountNo: true,
+      email: true,
+      phone: true,
+      phone2: true,
+      fax: true,
+      billingAddressLine1: true,
+      billingAddressLine2: true,
+      billingAddressLine3: true,
+      billingAddressLine4: true,
+      billingCity: true,
+      billingPostCode: true,
+      billingCountryCode: true,
+      deliveryAddressLine1: true,
+      deliveryAddressLine2: true,
+      deliveryAddressLine3: true,
+      deliveryAddressLine4: true,
+      deliveryCity: true,
+      deliveryPostCode: true,
+      deliveryCountryCode: true,
+      area: true,
+      attention: true,
+      contactPerson: true,
+      emailCc: true,
+      currency: true,
+      agentId: true,
+      natureOfBusiness: true,
+      registrationIdType: true,
+      registrationNo: true,
+      taxIdentificationNo: true,
+      creditTermsDays: true,
+      creditLimitAmount: true,
+      agent: { select: { id: true, code: true, name: true } },
+      deliveryAddresses: {
+        orderBy: { createdAt: "asc" },
+        select: {
+          id: true,
+          label: true,
+          addressLine1: true,
+          addressLine2: true,
+          addressLine3: true,
+          addressLine4: true,
+          city: true,
+          postCode: true,
+          countryCode: true,
+        },
+      },
+      isActive: true,
+      createdAt: true,
+    },
+  });
+
+  if (!supplier) return null;
+
+  return {
+    ...supplier,
+    accountSource: "ADMIN" as const,
+    portalAccess: false,
+    orders: [],
+    purchaseTransactionPagination: {
+      currentPage: transactionPage,
+      pageSize: transactionPageSize,
+      totalCount: 0,
+      totalPages: 1,
+    },
+    creditControl: buildSupplierCreditControl(supplier),
+    intelligence: {
+      totalOrders: 0,
+      totalPurchases: 0,
+      totalSpent: 0,
+      averageOrderValue: 0,
+      lastOrderDate: null,
     },
   };
 }

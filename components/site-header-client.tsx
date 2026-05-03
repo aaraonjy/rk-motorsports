@@ -134,7 +134,10 @@ const adminMobileSections: HeaderLinkSection[] = [
   },
   {
     title: "Master Data",
-    items: [{ label: "Customer Profile", href: "/admin/customers" }],
+    items: [
+      { label: "Customer Profile", href: "/admin/customers" },
+      { label: "Supplier Profile", href: "/admin/suppliers" },
+    ],
   },
   {
     title: "Settings",
@@ -464,7 +467,10 @@ export function AdminDesktopNavigation() {
     sections: [
       {
         title: "Customer Master",
-        items: [{ label: "Customer Profile", href: "/admin/customers" }],
+        items: [
+      { label: "Customer Profile", href: "/admin/customers" },
+      { label: "Supplier Profile", href: "/admin/suppliers" },
+    ],
       },
     ],
   };

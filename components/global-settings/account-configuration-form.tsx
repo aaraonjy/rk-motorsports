@@ -7,6 +7,8 @@ import { CUSTOMER_ACCOUNT_FORMAT_OPTIONS } from "@/lib/customer-account";
 type Props = {
   initialCustomerAccountPrefix: string;
   initialCustomerAccountNoFormat: CustomerAccountNoFormat;
+  initialSupplierAccountPrefix: string;
+  initialSupplierAccountNoFormat: CustomerAccountNoFormat;
 };
 
 type ApiResponse = {
@@ -14,9 +16,19 @@ type ApiResponse = {
   error?: string;
 };
 
+function buildPreview(prefix: string, format: CustomerAccountNoFormat, fallbackPrefix: string) {
+  const selectedFormat =
+    CUSTOMER_ACCOUNT_FORMAT_OPTIONS.find((option) => option.value === format) ||
+    CUSTOMER_ACCOUNT_FORMAT_OPTIONS[0];
+
+  return `${prefix || fallbackPrefix}/A${"0".repeat(Math.max(1, selectedFormat.suffixLength - 2))}1`;
+}
+
 export function AccountConfigurationForm({
   initialCustomerAccountPrefix,
   initialCustomerAccountNoFormat,
+  initialSupplierAccountPrefix,
+  initialSupplierAccountNoFormat,
 }: Props) {
   const [customerAccountPrefix, setCustomerAccountPrefix] = useState(
     initialCustomerAccountPrefix
@@ -24,16 +36,24 @@ export function AccountConfigurationForm({
   const [customerAccountNoFormat, setCustomerAccountNoFormat] = useState<CustomerAccountNoFormat>(
     initialCustomerAccountNoFormat
   );
+  const [supplierAccountPrefix, setSupplierAccountPrefix] = useState(
+    initialSupplierAccountPrefix
+  );
+  const [supplierAccountNoFormat, setSupplierAccountNoFormat] = useState<CustomerAccountNoFormat>(
+    initialSupplierAccountNoFormat
+  );
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const selectedFormat = useMemo(
-    () =>
-      CUSTOMER_ACCOUNT_FORMAT_OPTIONS.find(
-        (option) => option.value === customerAccountNoFormat
-      ) || CUSTOMER_ACCOUNT_FORMAT_OPTIONS[0],
-    [customerAccountNoFormat]
+  const customerPreview = useMemo(
+    () => buildPreview(customerAccountPrefix, customerAccountNoFormat, "3000"),
+    [customerAccountNoFormat, customerAccountPrefix]
+  );
+
+  const supplierPreview = useMemo(
+    () => buildPreview(supplierAccountPrefix, supplierAccountNoFormat, "4000"),
+    [supplierAccountNoFormat, supplierAccountPrefix]
   );
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -49,6 +69,8 @@ export function AccountConfigurationForm({
         body: JSON.stringify({
           customerAccountPrefix,
           customerAccountNoFormat,
+          supplierAccountPrefix,
+          supplierAccountNoFormat,
         }),
       });
 
@@ -68,58 +90,100 @@ export function AccountConfigurationForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="mt-6 card-rk space-y-6 p-6">
-      <div className="grid gap-5 md:grid-cols-2">
-        <div>
-          <label className="mb-2 block text-sm text-white/65">
-            Customer A/C Prefix
-          </label>
-          <input
-            type="text"
-            value={customerAccountPrefix}
-            onChange={(e) => setCustomerAccountPrefix(e.target.value.toUpperCase())}
-            placeholder="3000"
-            className="w-full rounded-xl border border-white/15 bg-black/50 px-4 py-3 text-white outline-none placeholder:text-white/35"
-          />
-          <p className="mt-2 text-xs leading-5 text-white/45">
-            Current preview: {customerAccountPrefix || "3000"}/A
-            {"0".repeat(Math.max(1, selectedFormat.suffixLength - 2))}1
-          </p>
+    <form onSubmit={handleSubmit} className="mt-6 card-rk space-y-8 p-6">
+      <div>
+        <div className="text-sm font-semibold uppercase tracking-[0.18em] text-white/45">
+          Customer Account
         </div>
+        <div className="mt-4 grid gap-5 md:grid-cols-2">
+          <div>
+            <label className="mb-2 block text-sm text-white/65">
+              Customer A/C Prefix
+            </label>
+            <input
+              type="text"
+              value={customerAccountPrefix}
+              onChange={(e) => setCustomerAccountPrefix(e.target.value.toUpperCase())}
+              placeholder="3000"
+              className="w-full rounded-xl border border-white/15 bg-black/50 px-4 py-3 text-white outline-none placeholder:text-white/35"
+            />
+            <p className="mt-2 text-xs leading-5 text-white/45">
+              Current preview: {customerPreview}
+            </p>
+          </div>
 
-        <div>
-          <label className="mb-2 block text-sm text-white/65">
-            Customer A/C Format
-          </label>
-          <div className="relative">
-            <select
-              value={customerAccountNoFormat}
-              onChange={(e) =>
-                setCustomerAccountNoFormat(e.target.value as CustomerAccountNoFormat)
-              }
-              className="w-full appearance-none rounded-xl border border-white/15 bg-black/50 px-4 py-3 pr-12 text-white outline-none"
-            >
-              {CUSTOMER_ACCOUNT_FORMAT_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-
-            <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/60">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-                className="h-5 w-5"
-                aria-hidden="true"
+          <div>
+            <label className="mb-2 block text-sm text-white/65">
+              Customer A/C Format
+            </label>
+            <div className="relative">
+              <select
+                value={customerAccountNoFormat}
+                onChange={(e) =>
+                  setCustomerAccountNoFormat(e.target.value as CustomerAccountNoFormat)
+                }
+                className="w-full appearance-none rounded-xl border border-white/15 bg-black/50 px-4 py-3 pr-12 text-white outline-none"
               >
-                <path
-                  fillRule="evenodd"
-                  d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.51a.75.75 0 0 1-1.08 0l-4.25-4.51a.75.75 0 0 1 .02-1.06Z"
-                  clipRule="evenodd"
-                />
-              </svg>
+                {CUSTOMER_ACCOUNT_FORMAT_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/60">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-5 w-5" aria-hidden="true">
+                  <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.51a.75.75 0 0 1-1.08 0l-4.25-4.51a.75.75 0 0 1 .02-1.06Z" clipRule="evenodd" />
+                </svg>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="border-t border-white/10 pt-8">
+        <div className="text-sm font-semibold uppercase tracking-[0.18em] text-white/45">
+          Supplier Account
+        </div>
+        <div className="mt-4 grid gap-5 md:grid-cols-2">
+          <div>
+            <label className="mb-2 block text-sm text-white/65">
+              Supplier A/C Prefix
+            </label>
+            <input
+              type="text"
+              value={supplierAccountPrefix}
+              onChange={(e) => setSupplierAccountPrefix(e.target.value.toUpperCase())}
+              placeholder="4000"
+              className="w-full rounded-xl border border-white/15 bg-black/50 px-4 py-3 text-white outline-none placeholder:text-white/35"
+            />
+            <p className="mt-2 text-xs leading-5 text-white/45">
+              Current preview: {supplierPreview}
+            </p>
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm text-white/65">
+              Supplier A/C Format
+            </label>
+            <div className="relative">
+              <select
+                value={supplierAccountNoFormat}
+                onChange={(e) =>
+                  setSupplierAccountNoFormat(e.target.value as CustomerAccountNoFormat)
+                }
+                className="w-full appearance-none rounded-xl border border-white/15 bg-black/50 px-4 py-3 pr-12 text-white outline-none"
+              >
+                {CUSTOMER_ACCOUNT_FORMAT_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-white/60">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-5 w-5" aria-hidden="true">
+                  <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.51a.75.75 0 0 1-1.08 0l-4.25-4.51a.75.75 0 0 1 .02-1.06Z" clipRule="evenodd" />
+                </svg>
+              </div>
             </div>
           </div>
         </div>
