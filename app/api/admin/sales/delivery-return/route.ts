@@ -139,6 +139,25 @@ function sumReturnedAmount(line: {
     .reduce((sum, link) => sum + toNumber(link.claimAmount), 0);
 }
 
+
+function sumInvoicedQty(line: {
+  sourceLineLinks?: Array<{ linkType?: string | null; qty?: Prisma.Decimal | number | string | null; targetTransaction?: { status?: string | null } | null }>;
+}) {
+  return (line.sourceLineLinks || [])
+    .filter((link) => link.linkType === "INVOICED_TO")
+    .filter((link) => link.targetTransaction?.status !== "CANCELLED")
+    .reduce((sum, link) => sum + toNumber(link.qty), 0);
+}
+
+function sumInvoicedAmount(line: {
+  sourceLineLinks?: Array<{ linkType?: string | null; claimAmount?: Prisma.Decimal | number | string | null; targetTransaction?: { status?: string | null } | null }>;
+}) {
+  return (line.sourceLineLinks || [])
+    .filter((link) => link.linkType === "INVOICED_TO")
+    .filter((link) => link.targetTransaction?.status !== "CANCELLED")
+    .reduce((sum, link) => sum + toNumber(link.claimAmount), 0);
+}
+
 function withCancellationDetails<T extends Record<string, any>>(transaction: T) {
   return {
     ...transaction,
@@ -153,7 +172,7 @@ function withCancellationDetails<T extends Record<string, any>>(transaction: T) 
 async function getSourceDeliveryOrders(tx: Prisma.TransactionClient) {
   const deliveryOrders = await tx.salesTransaction.findMany({
     where: { docType: "DO", status: { not: "CANCELLED" }, customer: { isActive: true } },
-    orderBy: [{ docDate: "desc" }, { docNo: "desc" }],
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     include: {
       sourceLinks: {
         include: { targetTransaction: { select: { id: true, docType: true, docNo: true, status: true } } },
@@ -199,8 +218,10 @@ async function getSourceDeliveryOrders(tx: Prisma.TransactionClient) {
       lines: order.lines.map((line) => {
         const qty = toNumber(line.qty);
         const returnedQty = sumReturnedQty(line);
+        const invoicedQty = sumInvoicedQty(line);
         const lineTotal = toNumber(line.lineTotal);
         const returnedAmount = sumReturnedAmount(line);
+        const invoicedAmount = sumInvoicedAmount(line);
         const stock = stockMap.get(`${order.id}__${line.inventoryProductId || ""}__${line.locationId || ""}`);
         return {
           ...line,
@@ -209,8 +230,10 @@ async function getSourceDeliveryOrders(tx: Prisma.TransactionClient) {
           serialNumberTracking: Boolean(line.inventoryProduct?.serialNumberTracking),
           returnedQty,
           returnedAmount,
-          remainingReturnQty: Math.max(0, qty - returnedQty),
-          remainingReturnAmount: Math.max(0, lineTotal - returnedAmount),
+          invoicedQty,
+          invoicedAmount,
+          remainingReturnQty: Math.max(0, qty - returnedQty - invoicedQty),
+          remainingReturnAmount: Math.max(0, lineTotal - returnedAmount - invoicedAmount),
           batchNo: stock?.batchNo || null,
           serialNos: stock?.serialNos || [],
         };
@@ -411,7 +434,8 @@ export async function POST(req: Request) {
         if (!sourceLine) throw new Error(`Return line ${index + 1} has invalid source line.`);
         const qty = qtyDecimal(line.qty);
         const returnedQty = sumReturnedQty(sourceLine);
-        const remainingQty = Math.max(0, toNumber(sourceLine.qty) - returnedQty);
+        const invoicedQty = sumInvoicedQty(sourceLine);
+        const remainingQty = Math.max(0, toNumber(sourceLine.qty) - returnedQty - invoicedQty);
         if (toNumber(qty) > remainingQty) throw new Error(`${sourceLine.productCode} return quantity cannot exceed remaining returnable qty (${remainingQty}).`);
 
         const itemType = sourceLine.inventoryProduct?.itemType || "STOCK_ITEM";
