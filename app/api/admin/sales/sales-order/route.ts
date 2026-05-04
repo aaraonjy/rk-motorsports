@@ -357,7 +357,7 @@ export async function GET(req: Request) {
 
     const rows = await db.salesTransaction.findMany({
       where,
-      orderBy: [{ docNo: "desc" }],
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       skip: (page - 1) * pageSize,
       take: pageSize,
       include: {
