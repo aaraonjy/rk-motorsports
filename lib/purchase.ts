@@ -12,6 +12,7 @@ import {
   acquireAdvisoryLock,
   acquireStockMutationLocks,
   buildLedgerValues,
+  buildTransactionNumberLockKey,
   createStoredQtyDecimal,
   generateStockTransactionNumber,
 } from "@/lib/stock";
@@ -427,6 +428,10 @@ async function createStockReceive(
       batchNo: line.batchNo,
     })),
   );
+  await acquireAdvisoryLock(
+    tx,
+    buildTransactionNumberLockKey(StockTransactionType.SR, transaction.docDate),
+  );
   const stockTransactionNo = await generateStockTransactionNumber(
     tx,
     StockTransactionType.SR,
@@ -498,6 +503,7 @@ async function refreshSourceStatus(
   tx: Prisma.TransactionClient,
   sourceTransactionId: string,
 ) {
+  await acquirePurchaseTransactionLocks(tx, [sourceTransactionId]);
   const source = await tx.purchaseTransaction.findUnique({
     where: { id: sourceTransactionId },
     include: {
@@ -603,6 +609,156 @@ function getStockReverseLinesFromPurchaseLines(
   );
 }
 
+
+function purchaseTransactionLockKey(id: string) {
+  return `purchase-transaction:${id}`;
+}
+
+async function acquirePurchaseTransactionLocks(
+  tx: Prisma.TransactionClient,
+  ids: Array<string | null | undefined>,
+) {
+  const uniqueIds = Array.from(
+    new Set(ids.map((id) => normalizeText(id)).filter(Boolean) as string[]),
+  ).sort();
+
+  for (const id of uniqueIds) {
+    await acquireAdvisoryLock(tx, purchaseTransactionLockKey(id));
+  }
+}
+
+function getPurchaseLinkTypeForTarget(docType: PurchaseDocType): PurchaseLineLinkType {
+  return docType === "GRN" ? "RECEIVED_TO" : "INVOICED_TO";
+}
+
+async function validatePurchaseSourceAvailability(
+  tx: Prisma.TransactionClient,
+  docType: PurchaseDocType,
+  supplierId: string,
+  requestedLines: Array<{
+    sourceLineId?: string | null;
+    sourceTransactionId?: string | null;
+    qty?: Prisma.Decimal | number | string | null;
+  }>,
+) {
+  const sourceLineRequests = requestedLines
+    .map((line) => ({
+      sourceLineId: normalizeText(line.sourceLineId),
+      sourceTransactionId: normalizeText(line.sourceTransactionId),
+      qty: toNumber(line.qty),
+    }))
+    .filter((line) => line.sourceLineId && line.sourceTransactionId);
+
+  if (sourceLineRequests.length === 0) return;
+
+  const sourceTransactionIds = Array.from(
+    new Set(sourceLineRequests.map((line) => line.sourceTransactionId!)),
+  );
+  const sourceLineIds = Array.from(
+    new Set(sourceLineRequests.map((line) => line.sourceLineId!)),
+  );
+
+  const sources: Array<any> = await tx.purchaseTransaction.findMany({
+    where: { id: { in: sourceTransactionIds } },
+    select: {
+      id: true,
+      docType: true,
+      status: true,
+      supplierId: true,
+      revisions: { select: { id: true, status: true } },
+    },
+  });
+
+  if (sources.length !== sourceTransactionIds.length) {
+    throw new Error("Source document is not available.");
+  }
+
+  const allowedSourceDocTypes: PurchaseDocType[] =
+    docType === "GRN" ? ["PO"] : ["PO", "GRN"];
+  const sourceMap = new Map<string, any>(sources.map((source) => [source.id, source]));
+
+  for (const source of sources) {
+    if (source.status === "CANCELLED") {
+      throw new Error("Source document is not available.");
+    }
+    if (!allowedSourceDocTypes.includes(source.docType)) {
+      throw new Error("Selected source document type is not valid for this transaction.");
+    }
+    if (source.supplierId !== supplierId) {
+      throw new Error("All source documents must belong to the selected supplier.");
+    }
+    const hasActiveRevision = source.revisions.some(
+      (revision) => revision.status !== "CANCELLED",
+    );
+    if (hasActiveRevision) {
+      throw new Error("Source document has been revised. Please generate from the latest revision document.");
+    }
+  }
+
+  const distinctSourceDocTypes = Array.from(
+    new Set(sources.map((source) => source.docType)),
+  );
+  if (docType === "PI" && distinctSourceDocTypes.length > 1) {
+    throw new Error(
+      "Please generate Purchase Invoice from either Purchase Order or Goods Received Note only.",
+    );
+  }
+
+  const sourceLines: Array<any> = await tx.purchaseTransactionLine.findMany({
+    where: { id: { in: sourceLineIds } },
+    include: {
+      transaction: { select: { id: true, docType: true, status: true } },
+      sourceLineLinks: { include: { targetTransaction: true } },
+    },
+  });
+
+  if (sourceLines.length !== sourceLineIds.length) {
+    throw new Error("Source document line is not available.");
+  }
+
+  const sourceLineMap = new Map<string, any>(sourceLines.map((line) => [line.id, line]));
+  const requestedQtyByLine = new Map<string, number>();
+
+  for (const request of sourceLineRequests) {
+    if (!request.sourceLineId || !request.sourceTransactionId) continue;
+    if (request.qty <= 0) {
+      throw new Error("Generated quantity must be greater than zero.");
+    }
+    const sourceLine = sourceLineMap.get(request.sourceLineId);
+    const source = sourceMap.get(request.sourceTransactionId);
+    if (!sourceLine || !source) {
+      throw new Error("Source document line is not available.");
+    }
+    if (sourceLine.transactionId !== request.sourceTransactionId) {
+      throw new Error("Source document line does not belong to the selected source document.");
+    }
+    if (sourceLine.transaction.status === "CANCELLED") {
+      throw new Error("Source document is not available.");
+    }
+    requestedQtyByLine.set(
+      request.sourceLineId,
+      (requestedQtyByLine.get(request.sourceLineId) || 0) + request.qty,
+    );
+  }
+
+  const linkType = getPurchaseLinkTypeForTarget(docType);
+
+  for (const [sourceLineId, requestedQty] of requestedQtyByLine.entries()) {
+    const sourceLine = sourceLineMap.get(sourceLineId);
+    if (!sourceLine) continue;
+    const fulfilledQty = sourceLine.sourceLineLinks
+      .filter((link) => link.targetTransaction.status !== "CANCELLED")
+      .filter((link) => link.linkType === linkType)
+      .reduce((sum, link) => sum + toNumber(link.qty), 0);
+    const remainingQty = Math.max(0, toNumber(sourceLine.qty) - fulfilledQty);
+    if (requestedQty > remainingQty + 0.0001) {
+      throw new Error(
+        `Line ${sourceLine.lineNo}: Quantity exceeds remaining source quantity. Remaining qty is ${remainingQty}.`,
+      );
+    }
+  }
+}
+
 export async function createPurchaseTransaction(
   docType: PurchaseDocType,
   body: PurchasePayload,
@@ -662,6 +818,29 @@ export async function createPurchaseTransaction(
         ].filter(Boolean) as string[],
       ),
     );
+
+    await acquirePurchaseTransactionLocks(tx, [revisedFromId, ...sourceTransactionIds]);
+
+    if (revisedFromId) {
+      const latestRevisedFrom = await tx.purchaseTransaction.findUnique({
+        where: { id: revisedFromId },
+        include: { revisions: { select: { id: true, status: true } } },
+      });
+      if (
+        !latestRevisedFrom ||
+        latestRevisedFrom.docType !== docType ||
+        latestRevisedFrom.status === "CANCELLED"
+      ) {
+        throw new Error("Original document for revision was not found.");
+      }
+      const hasActiveRevision = latestRevisedFrom.revisions.some(
+        (revision) => revision.status !== "CANCELLED",
+      );
+      if (hasActiveRevision) {
+        throw new Error("This document has already been revised. Please edit the latest revision document instead.");
+      }
+    }
+
     const sourceTransactions = sourceTransactionIds.length
       ? await tx.purchaseTransaction.findMany({
           where: { id: { in: sourceTransactionIds } },
@@ -675,6 +854,16 @@ export async function createPurchaseTransaction(
       throw new Error("Source document is not available.");
     }
     const firstSourceTransactionId = sourceTransactionIds[0] || null;
+    await validatePurchaseSourceAvailability(
+      tx,
+      docType,
+      supplier.id,
+      lines.map((line) => ({
+        sourceLineId: line.sourceLineId,
+        sourceTransactionId: line.sourceTransactionId || firstSourceTransactionId,
+        qty: line.qty,
+      })),
+    );
     const firstSource = firstSourceTransactionId
       ? sourceTransactions.find(
           (source) => source.id === firstSourceTransactionId,
@@ -848,6 +1037,7 @@ export async function updatePurchaseTransaction(
   adminId: string,
 ) {
   return db.$transaction(async (tx) => {
+    await acquirePurchaseTransactionLocks(tx, [id]);
     const current = await tx.purchaseTransaction.findUnique({
       where: { id },
       include: {
@@ -981,6 +1171,7 @@ export async function cancelPurchaseTransaction(
   reason?: string | null,
 ) {
   return db.$transaction(async (tx) => {
+    await acquirePurchaseTransactionLocks(tx, [id]);
     const current = await tx.purchaseTransaction.findUnique({
       where: { id },
       include: {
