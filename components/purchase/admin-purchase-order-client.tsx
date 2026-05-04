@@ -352,10 +352,12 @@ function formatQtyBalance(
   return `Qty Balance: ${value.toLocaleString("en-MY", { minimumFractionDigits: qtyDecimalPlaces, maximumFractionDigits: qtyDecimalPlaces })}`;
 }
 function statusClass(status: string) {
+  if (status === "LOCKED")
+    return "border-white/15 bg-white/5 text-white/50";
   if (status === "CANCELLED")
     return "border-red-500/25 bg-red-500/10 text-red-200";
   if (status === "COMPLETED")
-    return "border-emerald-500/25 bg-emerald-500/10 text-emerald-200";
+    return "border-sky-500/25 bg-sky-500/10 text-sky-200";
   if (status === "PARTIAL")
     return "border-indigo-500/25 bg-indigo-500/10 text-indigo-200";
   return "border-amber-500/25 bg-amber-500/10 text-amber-200";
@@ -633,14 +635,10 @@ export function AdminPurchaseOrderClient(props: Props) {
   const [isGenerateFromOpen, setIsGenerateFromOpen] = useState(false);
   const [sourceSearch, setSourceSearch] = useState("");
   const [selectedSourceId, setSelectedSourceId] = useState("");
-  const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>([]);
-  const [sourceLineQty, setSourceLineQty] = useState<Record<string, string>>({});
-  const [generatedSourceLabel, setGeneratedSourceLabel] = useState("");
-  const isBodyLocked = Boolean(isGeneratedFromSource || generatedSourceLabel);
   const [generateFromError, setGenerateFromError] = useState("");
   const [cancelTarget, setCancelTarget] = useState<PurchaseTransactionRecord | null>(null);
   const [cancelReason, setCancelReason] = useState("");
-  const [cancelNotice, setCancelNotice] = useState<{ docNo: string; cancelledAt: Date; reason: string; cancelledByName?: string } | null>(null);
+  const [cancelNotice, setCancelNotice] = useState<{ docNo: string; cancelledAt: Date; reason: string } | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(Boolean(editId || sourceId));
   const [showDocNoOverride, setShowDocNoOverride] = useState(false);
   const [docNoDraft, setDocNoDraft] = useState("");
@@ -976,8 +974,6 @@ export function AdminPurchaseOrderClient(props: Props) {
     }
     setSourceSearch("");
     setSelectedSourceId("");
-    setSelectedSourceIds([]);
-    setSourceLineQty({});
     setIsGenerateFromOpen(true);
   }
 
@@ -985,91 +981,6 @@ export function AdminPurchaseOrderClient(props: Props) {
     setIsGenerateFromOpen(false);
     setGenerateFromError("");
     router.push(`${DETAIL_PATH}?source=${source.id}`);
-  }
-
-  function getSourceLineRemainingQty(line: NonNullable<PurchaseTransactionRecord["lines"]>[number]) {
-    const value = (line as any).remainingQty ?? (line as any).remainingReceiveQty ?? (line as any).remainingInvoiceQty ?? line.qty ?? 0;
-    const numeric = Number(value ?? 0);
-    return Number.isFinite(numeric) ? Math.max(0, numeric) : 0;
-  }
-
-  const selectedSourceDocuments = useMemo(
-    () => props.sourceDocuments.filter((source) => selectedSourceIds.includes(source.id)),
-    [props.sourceDocuments, selectedSourceIds],
-  );
-
-  const selectedSourceLines = useMemo(() => {
-    return selectedSourceDocuments.flatMap((source) =>
-      (source.lines || []).map((line) => {
-        const key = `${source.id}::${line.id || line.productCode || Math.random().toString(36).slice(2)}`;
-        return { source, line, key, remainingQty: getSourceLineRemainingQty(line) };
-      }).filter((entry) => entry.remainingQty > 0),
-    );
-  }, [selectedSourceDocuments]);
-
-  function toggleSourceDocument(source: PurchaseTransactionRecord) {
-    setSelectedSourceIds((prev) => {
-      const exists = prev.includes(source.id);
-      const next = exists ? prev.filter((id) => id !== source.id) : [...prev, source.id];
-      setSourceLineQty((current) => {
-        const updated = { ...current };
-        if (exists) {
-          for (const line of source.lines || []) delete updated[`${source.id}::${line.id || line.productCode || ""}`];
-        } else {
-          for (const line of source.lines || []) {
-            const key = `${source.id}::${line.id || line.productCode || ""}`;
-            updated[key] = formatDecimalInput(getSourceLineRemainingQty(line), qtyDecimalPlaces);
-          }
-        }
-        return updated;
-      });
-      return next;
-    });
-  }
-
-  function importSelectedSourceDocuments() {
-    if (selectedSourceDocuments.length === 0) return;
-    const first = selectedSourceDocuments[0];
-    setForm((prev) => ({
-      ...prev,
-      supplierId: first.supplierId || prev.supplierId,
-      supplierName: first.supplierName || prev.supplierName,
-      supplierAccountNo: first.supplierAccountNo || prev.supplierAccountNo,
-      contactNo: first.contactNo || prev.contactNo,
-      email: first.email || prev.email,
-      currency: first.currency || prev.currency || "MYR",
-      reference: selectedSourceDocuments.map((source) => source.docNo).join(", "),
-      docDesc: `Generated from ${selectedSourceDocuments.map((source) => source.docNo).join(", ")}`,
-      remarks: first.remarks || prev.remarks,
-      attention: first.attention || prev.attention,
-      agentId: first.agentId || prev.agentId,
-      projectId: first.projectId || prev.projectId,
-      departmentId: first.departmentId || prev.departmentId,
-      termsAndConditions: first.termsAndConditions || prev.termsAndConditions,
-      bankAccount: first.bankAccount || prev.bankAccount,
-      footerRemarks: first.footerRemarks || prev.footerRemarks,
-    }));
-    setLines(selectedSourceLines.map(({ source, line, key, remainingQty }) => ({
-      sourceLineId: line.id || "",
-      sourceTransactionId: source.id,
-      inventoryProductId: line.inventoryProductId || "",
-      productCode: line.productCode || "",
-      productDescription: line.productDescription || "",
-      itemType: line.itemType || "STOCK_ITEM",
-      uom: line.uom || "",
-      qty: formatDecimalInput(Math.min(Math.max(0, Number(sourceLineQty[key] || remainingQty)), remainingQty), qtyDecimalPlaces),
-      unitCost: formatDecimalInput(line.unitCost ?? 0, unitCostDecimalPlaces),
-      discountRate: formatDecimalInput(line.discountRate ?? 0, 2),
-      discountType: line.discountType === "AMOUNT" ? "AMOUNT" : "PERCENT",
-      locationId: line.locationId || props.defaultLocationId,
-      batchNo: line.batchNo || "",
-      serialNos: Array.isArray(line.serialNos) ? line.serialNos : [],
-      taxCodeId: line.taxCodeId || defaultTaxCodeId,
-      remarks: line.remarks || "",
-    })));
-    setGeneratedSourceLabel(selectedSourceDocuments.map((source) => source.docNo).join(", "));
-    setIsGenerateFromOpen(false);
-    setActiveTab("BODY");
   }
 
   function applySupplier(supplierId: string) {
@@ -1140,6 +1051,10 @@ export function AdminPurchaseOrderClient(props: Props) {
     return (item.sourceLinks || []).some((link) => link.targetTransaction && link.targetTransaction.status !== "CANCELLED");
   }
 
+  function getDisplayStatus(item: PurchaseTransactionRecord) {
+    return item.status !== "CANCELLED" && hasActiveDownstream(item) ? "LOCKED" : item.status;
+  }
+
   function openCancelDialog(item: PurchaseTransactionRecord) {
     if (hasActiveDownstream(item)) {
       setError(`Please cancel downstream generated document first before cancelling this ${TITLE}.`);
@@ -1169,7 +1084,7 @@ export function AdminPurchaseOrderClient(props: Props) {
       setCancelTarget(null);
       setCancelReason("");
       setMessage("");
-      setCancelNotice({ docNo: cancelTarget.docNo, cancelledAt: new Date(), reason: cancelReason.trim() || "Cancelled by admin", cancelledByName: data.transaction?.cancelledByAdmin?.name || data.transaction?.cancelledByAdminName || data.transaction?.cancelledByName || "RK Admin" });
+      setCancelNotice({ docNo: cancelTarget.docNo, cancelledAt: new Date(), reason: cancelReason.trim() || "Cancelled by admin" });
       router.refresh();
     } catch {
       setError(`Unable to cancel ${TITLE}.`);
@@ -1201,14 +1116,12 @@ export function AdminPurchaseOrderClient(props: Props) {
     });
     setLines([emptyLine(props.defaultLocationId, defaultTaxCodeId, qtyDecimalPlaces, unitCostDecimalPlaces)]);
     setActiveTab("HEADER");
-    setGeneratedSourceLabel("");
   }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     setMessage("");
-    setCancelNotice(null);
     setIsSubmitting(true);
     const wasEditing = Boolean(editingTransaction);
     try {
@@ -1220,8 +1133,8 @@ export function AdminPurchaseOrderClient(props: Props) {
           body: JSON.stringify({
             ...form,
             docNo: manualDocNoEnabled ? docNo : undefined,
-            sourceTransactionId: sourceTransaction?.id || lines.find((line) => line.sourceTransactionId)?.sourceTransactionId || null,
-            sourceDocType: sourceTransaction?.docType || props.sourceDocuments.find((source) => source.id === lines.find((line) => line.sourceTransactionId)?.sourceTransactionId)?.docType || null,
+            sourceTransactionId: sourceTransaction?.id || null,
+            sourceDocType: sourceTransaction?.docType || null,
             lines,
           }),
         },
@@ -1269,7 +1182,7 @@ export function AdminPurchaseOrderClient(props: Props) {
         <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-4 text-sm text-red-100">
           <div className="font-semibold">This {TITLE.toLowerCase()} has been cancelled.</div>
           <div className="mt-2">Cancelled At: {formatDateTime(cancelNotice.cancelledAt)}</div>
-          <div className="mt-1">Cancelled By: {cancelNotice.cancelledByName || "-"}</div>
+          <div className="mt-1">Cancelled By: -</div>
           <div className="mt-1">Reason: {cancelNotice.reason}</div>
         </div>
       ) : null}
@@ -1298,7 +1211,6 @@ export function AdminPurchaseOrderClient(props: Props) {
             onClick={() => {
               setMessage("");
               setError("");
-              setCancelNotice(null);
               resetPurchaseForm();
               setIsCreateOpen(true);
             }}
@@ -1377,14 +1289,16 @@ export function AdminPurchaseOrderClient(props: Props) {
                     </td>
                     <td className="px-4 py-4">
                       <span
-                        className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${statusClass(item.status)}`}
+                        className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${statusClass(getDisplayStatus(item))}`}
                       >
-                        {item.status}
+                        {getDisplayStatus(item)}
                       </span>
                     </td>
                     <td className="px-4 py-4 text-right">{`${item.currency || "MYR"} ${money(item.grandTotal)}`}</td>
                     <td className="px-4 py-4 text-right">
-                      {item.status !== "CANCELLED" ? (
+                      {getDisplayStatus(item) === "LOCKED" ? (
+                        <span className="rounded-xl border border-white/10 px-3 py-2 text-xs font-semibold tracking-[0.18em] text-white/45">LOCKED</span>
+                      ) : item.status !== "CANCELLED" ? (
                         <div className="flex flex-wrap justify-end gap-2">
                           <button
                             type="button"
@@ -1490,14 +1404,14 @@ export function AdminPurchaseOrderClient(props: Props) {
                 ))}
               </div>
 
-              {isBodyLocked ? (
+              {isGeneratedFromSource ? (
                 <div className="mt-5 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm leading-6 text-amber-100">
-                  This {TITLE} is generated from {generatedSourceLabel || sourceTransaction?.docNo}. Body pricing and product details are locked. To change product, qty, cost, discount, tax, or footer pricing details, cancel this {TITLE} and generate a new one.
+                  This {TITLE} is generated from {sourceTransaction?.docNo}. Body pricing and product details are locked. To change product, qty, cost, discount, tax, or footer pricing details, cancel this {TITLE} and generate a new one.
                 </div>
               ) : null}
-              {isBodyLocked ? (
+              {isGeneratedFromSource ? (
                 <div className="mt-5 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
-                  Imported from {generatedSourceLabel || sourceTransaction?.docNo}. Body pricing is locked because this {TITLE} is generated from source document.
+                  Imported from {sourceTransaction?.docNo}. Body pricing is locked because this {TITLE} is generated from source document.
                 </div>
               ) : null}
 
@@ -1778,12 +1692,12 @@ export function AdminPurchaseOrderClient(props: Props) {
 
                 {activeTab === "BODY" ? (
                   <div className="space-y-5">
-                    {isBodyLocked ? (
+                    {isGeneratedFromSource ? (
                       <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white/45">
                         Read-only body section. This {TITLE} was generated from source document, so product, qty, cost, discount, tax, and line pricing details are locked.
                       </div>
                     ) : null}
-                    <div className={isBodyLocked ? "pointer-events-none opacity-55 grayscale" : ""}>
+                    <div className={isGeneratedFromSource ? "pointer-events-none opacity-55 grayscale" : ""}>
                     {lines.map((line, index) => {
                       const product =
                         props.initialProducts.find(
@@ -1985,7 +1899,7 @@ export function AdminPurchaseOrderClient(props: Props) {
                       );
                     })}
                     </div>
-                    {!isBodyLocked ? (
+                    {!isGeneratedFromSource ? (
                     <button
                       type="button"
                       onClick={addLine}
