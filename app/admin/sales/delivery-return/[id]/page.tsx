@@ -160,6 +160,8 @@ export default async function AdminDeliveryReturnDetailPage({ params }: Params) 
   }
 
   const currency = transaction.currency || "MYR";
+  const reasonText = transaction.reason || (!transaction.reason && transaction.remarks ? transaction.remarks : "");
+  const remarksText = transaction.reason ? transaction.remarks || "" : "";
   const generatedFrom = transaction.targetLinks.map((link) => link.sourceTransaction).filter(Boolean);
   const generatedTo = transaction.sourceLinks.map((link) => link.targetTransaction).filter((item) => item && item.status !== "CANCELLED");
 
@@ -265,8 +267,9 @@ export default async function AdminDeliveryReturnDetailPage({ params }: Params) 
           </div>
 
           <div className="mt-6 grid gap-5 md:grid-cols-2">
-            <ReadonlyTextArea label="Remarks" value={transaction.remarks || ""} />
-            <ReadonlyTextArea label="Footer Remarks" value={transaction.footerRemarks || ""} />
+            <ReadonlyTextArea label="Reason" value={reasonText} />
+            <ReadonlyTextArea label="Remarks" value={remarksText} />
+            <ReadonlyTextArea label="Footer Remarks" value={transaction.footerRemarks || ""} className="md:col-span-2" />
           </div>
 
           <div className="mt-8 rounded-[1.5rem] border border-white/10 p-4">

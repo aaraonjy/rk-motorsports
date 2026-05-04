@@ -341,6 +341,7 @@ async function buildDebitNoteData(body: any, tx: Prisma.TransactionClient) {
 
   return {
     sourceInvoice,
+    reason,
     docDate,
     requestedDocNo: assertValidManualDocNo(body.docNo),
     docDesc: `Debit Note for ${sourceInvoice.docNo}`,
@@ -618,6 +619,7 @@ export async function POST(req: Request) {
           email: data.email,
           currency: data.currency,
           reference: data.reference,
+          reason: data.reason,
           remarks: data.remarks,
           agentId: data.agentId,
           projectId: data.projectId,

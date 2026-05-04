@@ -375,8 +375,10 @@ export async function POST(req: Request) {
     const docDate = normalizeDate(body.docDate);
     const manualDocNo = assertValidManualDocNo(body.docNo);
     const sourceTransactionId = normalizeText(body.sourceTransactionId);
+    const reason = normalizeText(body.reason) || normalizeText(body.remarks);
     const rawLines = Array.isArray(body.lines) ? (body.lines as DeliveryReturnLinePayload[]) : [];
     if (!sourceTransactionId) throw new Error("Please select a Delivery Order.");
+    if (!reason) throw new Error("Delivery Return reason is required.");
     if (rawLines.length === 0) throw new Error("Please add at least one return line.");
 
     const created = await db.$transaction(async (tx) => {
@@ -494,6 +496,7 @@ export async function POST(req: Request) {
           email: source.email,
           currency: source.currency,
           reference: source.docNo,
+          reason,
           remarks: normalizeText(body.remarks),
           agentId: source.agentId,
           projectId: source.projectId,

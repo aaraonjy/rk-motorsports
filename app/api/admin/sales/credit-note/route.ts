@@ -674,6 +674,7 @@ export async function POST(req: Request) {
           email: data.email,
           currency: data.currency,
           reference: data.reference,
+          reason: data.reason,
           remarks: data.remarks,
           agentId: data.agentId,
           projectId: data.projectId,

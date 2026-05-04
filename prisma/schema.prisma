@@ -705,6 +705,7 @@ model PurchaseTransaction {
   email                String?
   currency             String                    @default("MYR")
   reference            String?
+  reason               String?
   remarks              String?
   agentId              String?
   projectId            String?
@@ -888,6 +889,7 @@ model SalesTransaction {
   email                String?
   currency             String                 @default("MYR")
   reference            String?
+  reason               String?
   remarks              String?
   agentId              String?
   projectId            String?

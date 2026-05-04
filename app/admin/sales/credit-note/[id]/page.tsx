@@ -130,6 +130,8 @@ export default async function AdminCreditNoteDetailPage({ params }: Params) {
   }
 
   const currency = transaction.currency || "MYR";
+  const reasonText = transaction.reason || (!transaction.reason && transaction.remarks ? transaction.remarks : "");
+  const remarksText = transaction.reason ? transaction.remarks || "" : "";
   const sourceInvoices = transaction.targetLinks.map((link) => link.sourceTransaction).filter((source) => source && source.docType === "INV");
   const primarySourceInvoice = sourceInvoices[0] || null;
 
@@ -226,8 +228,9 @@ export default async function AdminCreditNoteDetailPage({ params }: Params) {
           </div>
 
           <div className="mt-6 grid gap-5 md:grid-cols-2">
-            <ReadonlyTextArea label="Remarks" value={transaction.remarks || ""} />
-            <ReadonlyTextArea label="Footer Remarks" value={transaction.footerRemarks || ""} />
+            <ReadonlyTextArea label="Reason" value={reasonText} />
+            <ReadonlyTextArea label="Remarks" value={remarksText} />
+            <ReadonlyTextArea label="Footer Remarks" value={transaction.footerRemarks || ""} className="md:col-span-2" />
           </div>
 
           <div className="mt-8 rounded-[1.5rem] border border-white/10 p-4">
