@@ -2062,13 +2062,10 @@ export function AdminSalesOrderClient({
       {isGenerateFromOpen ? (
         <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm">
           <div className="w-full max-w-4xl rounded-[2rem] border border-white/10 bg-[#08080c] p-6 shadow-2xl">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.24em] text-white/40">Generate From</p>
-                <h3 className="mt-3 text-2xl font-bold">Select Quotation</h3>
-                <p className="mt-3 text-sm leading-6 text-white/60">Select one or more pending quotations for the selected customer, then import them into this Sales Order.</p>
-              </div>
-              <button type="button" onClick={() => setIsGenerateFromOpen(false)} className="rounded-xl border border-white/15 px-4 py-2.5 text-sm text-white/75 transition hover:bg-white/10">Close</button>
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.24em] text-white/40">Generate From</p>
+              <h3 className="mt-3 text-2xl font-bold">Select Quotation</h3>
+              <p className="mt-3 text-sm leading-6 text-white/60">Select one or more pending quotations for the selected customer, then import them into this Sales Order.</p>
             </div>
 
             <div className="mt-5">
@@ -2106,7 +2103,7 @@ export function AdminSalesOrderClient({
             <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
               <p className="text-sm text-white/55">{sourceQuotationIds.length} quotation(s) selected</p>
               <div className="flex gap-3">
-                <button type="button" onClick={() => setSourceQuotationIds([])} className="rounded-xl border border-white/15 px-4 py-2.5 text-sm text-white/75 transition hover:bg-white/10">Clear</button>
+                <button type="button" onClick={() => setIsGenerateFromOpen(false)} className="rounded-xl border border-white/15 px-4 py-2.5 text-sm text-white/75 transition hover:bg-white/10">Close</button>
                 <button type="button" onClick={importSelectedQuotations} className="rounded-xl bg-red-500 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-red-400">Import Selected</button>
               </div>
             </div>
