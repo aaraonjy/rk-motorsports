@@ -622,7 +622,17 @@ export async function createPurchaseTransaction(
           (source) => source.id === firstSourceTransactionId,
         )
       : null;
-    let sourceDocType: PurchaseDocType | null = firstSource?.docType || null;
+    const distinctSourceDocTypes = Array.from(
+      new Set(sourceTransactions.map((source) => source.docType)),
+    );
+    if (docType === "PI" && distinctSourceDocTypes.length > 1) {
+      throw new Error("Please generate Purchase Invoice from either Purchase Order or Goods Received Note only.");
+    }
+    let sourceDocType: PurchaseDocType | null = sourceTransactions.some(
+      (source) => source.docType === "GRN",
+    )
+      ? "GRN"
+      : firstSource?.docType || null;
 
     const transaction = await tx.purchaseTransaction.create({
       data: {
