@@ -387,7 +387,7 @@ function statusClass(status: string) {
   if (status === "CANCELLED")
     return "border-red-500/25 bg-red-500/10 text-red-200";
   if (status === "COMPLETED")
-    return "border-sky-500/25 bg-sky-500/10 text-sky-200";
+    return "border-emerald-500/25 bg-emerald-500/10 text-emerald-200";
   if (status === "PARTIAL")
     return "border-indigo-500/25 bg-indigo-500/10 text-indigo-200";
   return "border-amber-500/25 bg-amber-500/10 text-amber-200";
@@ -1412,8 +1412,8 @@ export function AdminPurchaseOrderClient(props: Props) {
                     <td className="px-4 py-4 text-right">{`${item.currency || "MYR"} ${money(item.grandTotal)}`}</td>
                     <td className="px-4 py-4 text-right">
                       {isActionLocked(item) ? (
-                        <span className="rounded-xl border border-white/10 px-3 py-2 text-xs font-semibold tracking-[0.18em] text-white/45">
-                          LOCKED
+                        <span className="rounded-xl border border-white/15 px-4 py-2 text-xs text-white/45">
+                          Locked
                         </span>
                       ) : item.status !== "CANCELLED" ? (
                         <div className="flex flex-wrap justify-end gap-2">

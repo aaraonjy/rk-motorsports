@@ -1638,10 +1638,14 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
                     </td>
                     <td className="px-4 py-4 text-right">{`${item.currency || "MYR"} ${money(item.grandTotal)}`}</td>
                     <td className="px-4 py-4 text-right">
-                      {item.status !== "CANCELLED" ? (
+                      {item.status !== "CANCELLED" &&
+                      (hasActiveSourceDocument(item) || hasActiveDownstream(item)) ? (
+                        <span className="rounded-xl border border-white/15 px-4 py-2 text-xs text-white/45">
+                          Locked
+                        </span>
+                      ) : item.status !== "CANCELLED" ? (
                         <div className="flex flex-wrap justify-end gap-2">
-                          {!hasActiveSourceDocument(item) ? (
-                            <>
+                          <>
                               <button
                                 type="button"
                                 onClick={(event) => {
@@ -1671,7 +1675,6 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
                                 Edit Revise
                               </button>
                             </>
-                          ) : null}
                           <button
                             type="button"
                             onClick={(event) => {

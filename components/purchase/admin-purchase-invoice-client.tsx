@@ -201,6 +201,7 @@ type LineForm = {
 };
 
 type ActiveTab = "HEADER" | "BODY" | "FOOTER";
+type PurchaseSourceDocumentType = "PO" | "GRN";
 
 const DOC_TYPE = "PI";
 const TITLE = "Purchase Invoice";
@@ -671,6 +672,8 @@ export function AdminPurchaseInvoiceClient(props: Props) {
   const [sourceSearch, setSourceSearch] = useState("");
   const [selectedSourceId, setSelectedSourceId] = useState("");
   const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>([]);
+  const [selectedSourceType, setSelectedSourceType] =
+    useState<PurchaseSourceDocumentType | null>(null);
   const [sourceProductsLoaded, setSourceProductsLoaded] = useState(false);
   const [sourceLineQty, setSourceLineQty] = useState<Record<string, string>>(
     {},
@@ -825,9 +828,20 @@ export function AdminPurchaseInvoiceClient(props: Props) {
     [props.sourceDocuments],
   );
 
+  const selectedSourceTypeLabel =
+    selectedSourceType === "PO"
+      ? "Purchase Order"
+      : selectedSourceType === "GRN"
+        ? "Goods Received Note"
+        : "Document Source";
+
   const filteredSourceDocuments = useMemo(() => {
     const keyword = sourceSearch.trim().toLowerCase();
     return props.sourceDocuments.filter((source) => {
+      const sourceType = String(source.docType || source.docNo || "")
+        .toUpperCase()
+        .replace(/[^A-Z].*$/, "");
+      if (selectedSourceType && sourceType !== selectedSourceType) return false;
       if (
         form.supplierId &&
         source.supplierId &&
@@ -839,7 +853,7 @@ export function AdminPurchaseInvoiceClient(props: Props) {
         .toLowerCase()
         .includes(keyword);
     });
-  }, [props.sourceDocuments, sourceSearch, form.supplierId]);
+  }, [props.sourceDocuments, sourceSearch, form.supplierId, selectedSourceType]);
 
   const visibleTransactions = useMemo(
     () =>
@@ -1046,6 +1060,7 @@ export function AdminPurchaseInvoiceClient(props: Props) {
       return;
     }
     setSourceSearch("");
+    setSelectedSourceType(null);
     setSelectedSourceId("");
     setSelectedSourceIds([]);
     setSourceProductsLoaded(false);
@@ -1319,6 +1334,29 @@ export function AdminPurchaseInvoiceClient(props: Props) {
     );
   }
 
+  function getGeneratedFromLabel(item: PurchaseTransactionRecord) {
+    const sourceDocNos = (item.targetLinks || [])
+      .map((link) => link.sourceTransaction)
+      .filter(
+        (source): source is NonNullable<typeof source> =>
+          Boolean(source?.docNo) && source?.status !== "CANCELLED",
+      )
+      .map((source) => String(source.docNo));
+    return sourceDocNos.length > 0
+      ? Array.from(new Set(sourceDocNos)).join(", ")
+      : "-";
+  }
+
+  function chooseSourceType(nextSourceType: PurchaseSourceDocumentType) {
+    setSelectedSourceType(nextSourceType);
+    setSourceSearch("");
+    setSelectedSourceId("");
+    setSelectedSourceIds([]);
+    setSourceProductsLoaded(false);
+    setSourceLineQty({});
+    setGenerateFromError("");
+  }
+
   function openCancelDialog(item: PurchaseTransactionRecord) {
     if (hasActiveDownstream(item)) {
       setError(
@@ -1570,6 +1608,7 @@ export function AdminPurchaseInvoiceClient(props: Props) {
                 <th className="px-4 py-3">Doc No</th>
                 <th className="px-4 py-3">Date</th>
                 <th className="px-4 py-3">Supplier</th>
+                <th className="px-4 py-3">Generated From</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3 text-right">Grand Total</th>
                 <th className="px-4 py-3 text-right">Action</th>
@@ -1579,7 +1618,7 @@ export function AdminPurchaseInvoiceClient(props: Props) {
               {visibleTransactions.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={6}
+                    colSpan={7}
                     className="px-4 py-8 text-center text-white/50"
                   >
                     No {TITLE.toLowerCase()} found.
@@ -1615,6 +1654,9 @@ export function AdminPurchaseInvoiceClient(props: Props) {
                         {item.supplierAccountNo || "-"}
                       </div>
                     </td>
+                    <td className="px-4 py-4 text-white/65">
+                      {getGeneratedFromLabel(item)}
+                    </td>
                     <td className="px-4 py-4">
                       <span
                         className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${statusClass(item.status)}`}
@@ -1624,10 +1666,14 @@ export function AdminPurchaseInvoiceClient(props: Props) {
                     </td>
                     <td className="px-4 py-4 text-right">{`${item.currency || "MYR"} ${money(item.grandTotal)}`}</td>
                     <td className="px-4 py-4 text-right">
-                      {item.status !== "CANCELLED" ? (
+                      {item.status !== "CANCELLED" &&
+                      (hasActiveSourceDocument(item) || hasActiveDownstream(item)) ? (
+                        <span className="rounded-xl border border-white/15 px-4 py-2 text-xs text-white/45">
+                          Locked
+                        </span>
+                      ) : item.status !== "CANCELLED" ? (
                         <div className="flex flex-wrap justify-end gap-2">
-                          {!hasActiveSourceDocument(item) ? (
-                            <>
+                          <>
                               <button
                                 type="button"
                                 onClick={(event) => {
@@ -1657,7 +1703,6 @@ export function AdminPurchaseInvoiceClient(props: Props) {
                                 Edit Revise
                               </button>
                             </>
-                          ) : null}
                           <button
                             type="button"
                             onClick={(event) => {
@@ -1758,7 +1803,74 @@ export function AdminPurchaseInvoiceClient(props: Props) {
               <div>
                 {activeTab === "HEADER" ? (
                   <div className="mt-6 space-y-6">
-                    {generateFromError ? (
+                    {!selectedSourceType ? (
+              <div className="mt-6 grid gap-4 md:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => chooseSourceType("PO")}
+                  className="rounded-2xl border border-white/10 bg-black/30 p-5 text-left transition hover:border-sky-400/40 hover:bg-sky-500/10"
+                >
+                  <div className="text-lg font-bold text-white">
+                    Purchase Order
+                  </div>
+                  <div className="mt-2 text-sm leading-6 text-white/55">
+                    Generate Purchase Invoice from Purchase Order balance.
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => chooseSourceType("GRN")}
+                  className="rounded-2xl border border-white/10 bg-black/30 p-5 text-left transition hover:border-sky-400/40 hover:bg-sky-500/10"
+                >
+                  <div className="text-lg font-bold text-white">
+                    Goods Received Note
+                  </div>
+                  <div className="mt-2 text-sm leading-6 text-white/55">
+                    Generate Purchase Invoice from received stock.
+                  </div>
+                </button>
+              </div>
+            ) : null}
+
+            {selectedSourceType ? (
+              <div className="mt-6 flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => chooseSourceType("PO")}
+                  className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
+                    selectedSourceType === "PO"
+                      ? "border border-sky-500/30 bg-sky-500/20 text-sky-100"
+                      : "border border-white/10 text-white/60 hover:bg-white/10 hover:text-white"
+                  }`}
+                >
+                  Purchase Order
+                </button>
+                <button
+                  type="button"
+                  onClick={() => chooseSourceType("GRN")}
+                  className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
+                    selectedSourceType === "GRN"
+                      ? "border border-sky-500/30 bg-sky-500/20 text-sky-100"
+                      : "border border-white/10 text-white/60 hover:bg-white/10 hover:text-white"
+                  }`}
+                >
+                  Goods Received Note
+                </button>
+              </div>
+            ) : null}
+
+            {selectedSourceType ? (
+              <div className="mt-6">
+                <input
+                  className="input-rk"
+                  value={sourceSearch}
+                  onChange={(event) => setSourceSearch(event.target.value)}
+                  placeholder={`Search ${selectedSourceTypeLabel.toLowerCase()}`}
+                />
+              </div>
+            ) : null}
+
+            {generateFromError ? (
                       <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
                         {generateFromError}
                       </div>
@@ -2409,19 +2521,83 @@ export function AdminPurchaseInvoiceClient(props: Props) {
             <p className="text-sm font-semibold uppercase tracking-[0.24em] text-sky-300/80">
               Generate From
             </p>
-            <h3 className="mt-3 text-3xl font-bold">{SOURCE_MODAL_TITLE}</h3>
+            <h3 className="mt-3 text-3xl font-bold">
+              {selectedSourceType
+                ? `Pick From ${selectedSourceTypeLabel}`
+                : "Pick Document Source"}
+            </h3>
             <p className="mt-3 text-sm leading-6 text-white/60">
-              {SOURCE_MODAL_DESCRIPTION}
+              {selectedSourceType
+                ? `Only ${selectedSourceTypeLabel} documents with remaining invoice qty are shown.`
+                : "Choose whether this Purchase Invoice should be generated from a Purchase Order or Goods Received Note."}
             </p>
 
-            <div className="mt-5">
-              <input
-                className="input-rk"
-                value={sourceSearch}
-                onChange={(event) => setSourceSearch(event.target.value)}
-                placeholder="Search document no / supplier"
-              />
-            </div>
+            {!selectedSourceType ? (
+              <div className="mt-6 grid gap-4 md:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => chooseSourceType("PO")}
+                  className="rounded-2xl border border-white/10 bg-black/30 p-5 text-left transition hover:border-sky-400/40 hover:bg-sky-500/10"
+                >
+                  <div className="text-lg font-bold text-white">
+                    Purchase Order
+                  </div>
+                  <div className="mt-2 text-sm leading-6 text-white/55">
+                    Generate Purchase Invoice from Purchase Order balance.
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => chooseSourceType("GRN")}
+                  className="rounded-2xl border border-white/10 bg-black/30 p-5 text-left transition hover:border-sky-400/40 hover:bg-sky-500/10"
+                >
+                  <div className="text-lg font-bold text-white">
+                    Goods Received Note
+                  </div>
+                  <div className="mt-2 text-sm leading-6 text-white/55">
+                    Generate Purchase Invoice from received stock.
+                  </div>
+                </button>
+              </div>
+            ) : null}
+
+            {selectedSourceType ? (
+              <div className="mt-6 flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => chooseSourceType("PO")}
+                  className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
+                    selectedSourceType === "PO"
+                      ? "border border-sky-500/30 bg-sky-500/20 text-sky-100"
+                      : "border border-white/10 text-white/60 hover:bg-white/10 hover:text-white"
+                  }`}
+                >
+                  Purchase Order
+                </button>
+                <button
+                  type="button"
+                  onClick={() => chooseSourceType("GRN")}
+                  className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
+                    selectedSourceType === "GRN"
+                      ? "border border-sky-500/30 bg-sky-500/20 text-sky-100"
+                      : "border border-white/10 text-white/60 hover:bg-white/10 hover:text-white"
+                  }`}
+                >
+                  Goods Received Note
+                </button>
+              </div>
+            ) : null}
+
+            {selectedSourceType ? (
+              <div className="mt-6">
+                <input
+                  className="input-rk"
+                  value={sourceSearch}
+                  onChange={(event) => setSourceSearch(event.target.value)}
+                  placeholder={`Search ${selectedSourceTypeLabel.toLowerCase()}`}
+                />
+              </div>
+            ) : null}
 
             {generateFromError ? (
               <div className="mt-5 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
@@ -2429,8 +2605,9 @@ export function AdminPurchaseInvoiceClient(props: Props) {
               </div>
             ) : null}
 
-            <div className="mt-5 max-h-64 overflow-y-auto rounded-2xl border border-white/10">
-              {filteredSourceDocuments.length === 0 ? (
+            {selectedSourceType ? (
+              <div className="mt-5 max-h-64 overflow-y-auto rounded-2xl border border-white/10">
+                {filteredSourceDocuments.length === 0 ? (
                 <div className="px-4 py-8 text-center text-sm text-white/50">
                   No pending source document found for this supplier.
                 </div>
@@ -2473,10 +2650,11 @@ export function AdminPurchaseInvoiceClient(props: Props) {
                     </button>
                   );
                 })
-              )}
-            </div>
+                )}
+              </div>
+            ) : null}
 
-            {sourceProductsLoaded && selectedSourceLines.length > 0 ? (
+            {selectedSourceType && sourceProductsLoaded && selectedSourceLines.length > 0 ? (
               <div className="mt-6 overflow-hidden rounded-2xl border border-white/10">
                 <div className="grid grid-cols-[1.2fr_1.8fr_0.8fr_0.8fr_1fr] gap-4 border-b border-white/10 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-white/45">
                   <div>Document</div>
@@ -2545,7 +2723,7 @@ export function AdminPurchaseInvoiceClient(props: Props) {
               {!sourceProductsLoaded ? (
                 <button
                   type="button"
-                  disabled={selectedSourceDocuments.length === 0}
+                  disabled={!selectedSourceType || selectedSourceDocuments.length === 0}
                   onClick={loadSelectedSourceProducts}
                   className="rounded-xl border border-sky-500/40 bg-sky-500/10 px-6 py-3 text-sm font-semibold text-sky-100 transition hover:bg-sky-500/20 disabled:cursor-not-allowed disabled:opacity-50"
                 >
@@ -2554,7 +2732,7 @@ export function AdminPurchaseInvoiceClient(props: Props) {
               ) : (
                 <button
                   type="button"
-                  disabled={selectedSourceLines.length === 0}
+                  disabled={!selectedSourceType || selectedSourceLines.length === 0}
                   onClick={importSelectedSourceDocuments}
                   className="rounded-xl bg-red-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-red-400 disabled:cursor-not-allowed disabled:opacity-50"
                 >
