@@ -41,6 +41,7 @@ type SourceInvoice = {
   id: string;
   docNo: string;
   docDate: string;
+  createdAt?: string | Date | null;
   customerId: string;
   customerName: string;
   customerAccountNo?: string | null;
@@ -66,6 +67,7 @@ type CreditNoteRecord = {
   id: string;
   docNo: string;
   docDate: string;
+  createdAt?: string | Date | null;
   docDesc?: string | null;
   customerName: string;
   customerAccountNo?: string | null;
@@ -266,6 +268,23 @@ function isValidManualDocNo(value: string) {
 }
 
 
+function getSortTimestamp(item: { createdAt?: string | Date | null; docDate?: string | Date | null }) {
+  const value = item.createdAt || item.docDate;
+  if (!value) return 0;
+  const timestamp = new Date(value).getTime();
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function sortSourceDocumentsByLatestFirst<T extends { createdAt?: string | Date | null; docDate?: string | Date | null; docNo?: string | null; id?: string | null }>(items: T[]) {
+  return [...items].sort((a, b) => {
+    const createdDiff = getSortTimestamp(b) - getSortTimestamp(a);
+    if (createdDiff !== 0) return createdDiff;
+    const docNoDiff = String(b.docNo || "").localeCompare(String(a.docNo || ""));
+    if (docNoDiff !== 0) return docNoDiff;
+    return String(b.id || "").localeCompare(String(a.id || ""));
+  });
+}
+
 export function AdminCreditNoteClient({ initialTaxCodes, initialAgents, initialProjects, initialDepartments }: Props) {
   const router = useRouter();
   const [transactions, setTransactions] = useState<CreditNoteRecord[]>([]);
@@ -351,7 +370,7 @@ export function AdminCreditNoteClient({ initialTaxCodes, initialAgents, initialP
   const filteredInvoices = useMemo(() => {
     if (!selectedCustomerId) return [];
     const keyword = sourceSearch.trim().toLowerCase();
-    const customerInvoices = sourceInvoices.filter((invoice) => invoice.customerId === selectedCustomerId);
+    const customerInvoices = sortSourceDocumentsByLatestFirst(sourceInvoices.filter((invoice) => invoice.customerId === selectedCustomerId));
     if (!keyword) return customerInvoices;
     return customerInvoices.filter((invoice) =>
       `${invoice.docNo} ${invoice.customerName} ${invoice.customerAccountNo || ""}`.toLowerCase().includes(keyword)

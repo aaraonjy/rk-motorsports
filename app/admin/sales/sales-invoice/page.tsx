@@ -192,7 +192,7 @@ export default async function AdminSalesInvoicePage() {
     }),
     db.salesTransaction.findMany({
       where: { docType: { in: ["DO", "SO"] }, status: { not: "CANCELLED" } },
-      orderBy: [{ docDate: "desc" }, { docNo: "desc" }],
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       include: {
         lines: {
           orderBy: { lineNo: "asc" },
@@ -300,6 +300,7 @@ export default async function AdminSalesInvoicePage() {
             id: order.id,
             docNo: order.docNo,
             docDate: order.docDate.toISOString(),
+            createdAt: order.createdAt.toISOString(),
             docDesc: order.docDesc,
             customerId: order.customerId,
             customerName: order.customerName,

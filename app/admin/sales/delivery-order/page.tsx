@@ -116,7 +116,7 @@ export default async function AdminDeliveryOrderPage() {
     }),
     db.salesTransaction.findMany({
       where: { docType: "SO", status: { not: "CANCELLED" } },
-      orderBy: [{ docDate: "desc" }, { docNo: "desc" }],
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       include: {
         lines: {
           orderBy: { lineNo: "asc" },
@@ -141,6 +141,7 @@ export default async function AdminDeliveryOrderPage() {
             id: order.id,
             docNo: order.docNo,
             docDate: order.docDate.toISOString(),
+            createdAt: order.createdAt.toISOString(),
             docDesc: order.docDesc,
             customerId: order.customerId,
             customerName: order.customerName,

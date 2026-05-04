@@ -75,7 +75,7 @@ export default async function AdminSalesOrderPage() {
     }),
     db.salesTransaction.findMany({
       where: { docType: "QO" },
-      orderBy: [{ docDate: "desc" }, { docNo: "desc" }],
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       include: {
         revisedFrom: { select: { id: true, docNo: true } },
         revisions: { select: { id: true, docNo: true, status: true } },
@@ -97,6 +97,7 @@ export default async function AdminSalesOrderPage() {
             id: quotation.id,
             docNo: quotation.docNo,
             docDate: quotation.docDate.toISOString(),
+            createdAt: quotation.createdAt.toISOString(),
             docDesc: quotation.docDesc,
             customerId: quotation.customerId,
             customerName: quotation.customerName,

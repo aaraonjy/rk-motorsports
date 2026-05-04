@@ -74,6 +74,7 @@ type SourceQuotationRecord = {
   id: string;
   docNo: string;
   docDate: string;
+  createdAt?: string | Date | null;
   docDesc?: string | null;
   customerId?: string | null;
   customerName: string;
@@ -131,6 +132,7 @@ type SalesOrderRecord = {
   id: string;
   docNo: string;
   docDate: string;
+  createdAt?: string | Date | null;
   docDesc?: string | null;
   customerId?: string | null;
   customerName: string;
@@ -699,6 +701,23 @@ function hasActiveDownstreamTransaction(transaction: SalesOrderRecord) {
   return hasActiveTargetLink || transaction.status === "PARTIAL" || transaction.status === "COMPLETED";
 }
 
+function getSortTimestamp(item: { createdAt?: string | Date | null; docDate?: string | Date | null }) {
+  const value = item.createdAt || item.docDate;
+  if (!value) return 0;
+  const timestamp = new Date(value).getTime();
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function sortSourceDocumentsByLatestFirst<T extends { createdAt?: string | Date | null; docDate?: string | Date | null; docNo?: string | null; id?: string | null }>(items: T[]) {
+  return [...items].sort((a, b) => {
+    const createdDiff = getSortTimestamp(b) - getSortTimestamp(a);
+    if (createdDiff !== 0) return createdDiff;
+    const docNoDiff = String(b.docNo || "").localeCompare(String(a.docNo || ""));
+    if (docNoDiff !== 0) return docNoDiff;
+    return String(b.id || "").localeCompare(String(a.id || ""));
+  });
+}
+
 export function AdminSalesOrderClient({
   initialQuotations,
   initialCustomers,
@@ -911,7 +930,7 @@ export function AdminSalesOrderClient({
   );
 
   const availableSourceQuotations = useMemo(() => {
-    return initialQuotations.filter((quotation) => {
+    return sortSourceDocumentsByLatestFirst(initialQuotations.filter((quotation) => {
       if (!customerId) return false;
       if (quotation.customerId !== customerId) return false;
       if (quotation.status !== "PENDING") return false;
@@ -924,7 +943,7 @@ export function AdminSalesOrderClient({
       if (hasActiveDownstreamSalesDocument) return false;
 
       return true;
-    });
+    }));
   }, [customerId, initialQuotations]);
 
   const filteredSourceQuotations = useMemo(() => {

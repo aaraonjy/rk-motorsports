@@ -77,6 +77,7 @@ type SourceSalesOrderRecord = {
   id: string;
   docNo: string;
   docDate: string;
+  createdAt?: string | Date | null;
   docDesc?: string | null;
   customerId?: string | null;
   customerName: string;
@@ -135,6 +136,7 @@ type DeliveryOrderRecord = {
   id: string;
   docNo: string;
   docDate: string;
+  createdAt?: string | Date | null;
   docDesc?: string | null;
   customerId?: string | null;
   customerName: string;
@@ -855,6 +857,23 @@ function isDeliveryOrderLockedByReturn(transaction: DeliveryOrderRecord) {
   return hasActiveDeliveryReturnTransaction(transaction) || getDisplayStatus(transaction) === "RETURNED" || getDisplayStatus(transaction) === "PARTIAL_RETURN";
 }
 
+function getSortTimestamp(item: { createdAt?: string | Date | null; docDate?: string | Date | null }) {
+  const value = item.createdAt || item.docDate;
+  if (!value) return 0;
+  const timestamp = new Date(value).getTime();
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function sortSourceDocumentsByLatestFirst<T extends { createdAt?: string | Date | null; docDate?: string | Date | null; docNo?: string | null; id?: string | null }>(items: T[]) {
+  return [...items].sort((a, b) => {
+    const createdDiff = getSortTimestamp(b) - getSortTimestamp(a);
+    if (createdDiff !== 0) return createdDiff;
+    const docNoDiff = String(b.docNo || "").localeCompare(String(a.docNo || ""));
+    if (docNoDiff !== 0) return docNoDiff;
+    return String(b.id || "").localeCompare(String(a.id || ""));
+  });
+}
+
 export function AdminDeliveryOrderClient({
   initialSalesOrders,
   initialCustomers,
@@ -1045,12 +1064,12 @@ export function AdminDeliveryOrderClient({
   );
 
   const availableSourceOrders = useMemo(() => {
-    return initialSalesOrders.filter((order) => {
+    return sortSourceDocumentsByLatestFirst(initialSalesOrders.filter((order) => {
       if (!customerId) return false;
       if (order.customerId !== customerId) return false;
       if (order.status === "CANCELLED" || order.status === "COMPLETED") return false;
       return (order.lines || []).some((line) => Number(line.remainingDeliveryQty || 0) > 0);
-    });
+    }));
   }, [customerId, initialSalesOrders]);
 
   const filteredSourceOrders = useMemo(() => {

@@ -84,6 +84,7 @@ type SourceSalesOrderRecord = {
   id: string;
   docNo: string;
   docDate: string;
+  createdAt?: string | Date | null;
   docDesc?: string | null;
   customerId?: string | null;
   customerName: string;
@@ -146,6 +147,7 @@ type SalesInvoiceRecord = {
   id: string;
   docNo: string;
   docDate: string;
+  createdAt?: string | Date | null;
   docDesc?: string | null;
   customerId?: string | null;
   customerName: string;
@@ -970,6 +972,23 @@ function SummaryRow({ label, value, strong = false }: { label: string; value: st
   );
 }
 
+function getSortTimestamp(item: { createdAt?: string | Date | null; docDate?: string | Date | null }) {
+  const value = item.createdAt || item.docDate;
+  if (!value) return 0;
+  const timestamp = new Date(value).getTime();
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function sortSourceDocumentsByLatestFirst<T extends { createdAt?: string | Date | null; docDate?: string | Date | null; docNo?: string | null; id?: string | null }>(items: T[]) {
+  return [...items].sort((a, b) => {
+    const createdDiff = getSortTimestamp(b) - getSortTimestamp(a);
+    if (createdDiff !== 0) return createdDiff;
+    const docNoDiff = String(b.docNo || "").localeCompare(String(a.docNo || ""));
+    if (docNoDiff !== 0) return docNoDiff;
+    return String(b.id || "").localeCompare(String(a.id || ""));
+  });
+}
+
 export function AdminSalesInvoiceClient({
   initialSalesOrders,
   initialCustomers,
@@ -1181,7 +1200,7 @@ export function AdminSalesInvoiceClient({
   const selectedSourceTypeLabel = selectedSourceType === "DO" ? "Delivery Order" : selectedSourceType === "SO" ? "Sales Order" : "Document Source";
 
   const availableSourceOrders = useMemo(() => {
-    return initialSalesOrders.filter((order) => {
+    return sortSourceDocumentsByLatestFirst(initialSalesOrders.filter((order) => {
       if (!customerId) return false;
       if (order.customerId !== customerId) return false;
       if (order.status === "CANCELLED" || order.status === "COMPLETED") return false;
@@ -1190,7 +1209,7 @@ export function AdminSalesInvoiceClient({
         const itemType = line.itemType === "SERVICE_ITEM" || line.itemType === "NON_STOCK_ITEM" ? line.itemType : "STOCK_ITEM";
         return itemType === "SERVICE_ITEM" ? Number(line.remainingInvoiceAmount || 0) > 0 : Number(line.remainingInvoiceQty || 0) > 0;
       });
-    });
+    }));
   }, [customerId, initialSalesOrders, selectedSourceType]);
 
   const filteredSourceOrders = useMemo(() => {

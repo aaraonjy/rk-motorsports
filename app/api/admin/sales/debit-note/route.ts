@@ -192,7 +192,7 @@ function calculateInvoiceOutstanding(invoice: InvoiceOutstandingInput) {
 async function getSourceInvoices(tx: Prisma.TransactionClient) {
   const invoices = await tx.salesTransaction.findMany({
     where: { docType: "INV", status: { not: "CANCELLED" }, customer: { isActive: true } },
-    orderBy: [{ docDate: "desc" }, { docNo: "desc" }],
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     include: {
       payments: true,
       sourceLinks: {
