@@ -545,6 +545,16 @@ function shouldPostStock(
   return false;
 }
 
+function hasGrnSourceLink(transaction: {
+  targetLinks?: Array<{
+    sourceTransaction?: { docType?: PurchaseDocType | string | null } | null;
+  }>;
+}) {
+  return (transaction.targetLinks || []).some(
+    (link) => link.sourceTransaction?.docType === "GRN",
+  );
+}
+
 function shouldReverseStockOnCancel(transaction: {
   docType: PurchaseDocType;
   revisedFromId?: string | null;
@@ -552,16 +562,24 @@ function shouldReverseStockOnCancel(transaction: {
   targetLinks?: Array<{
     sourceTransaction?: { docType?: PurchaseDocType | string | null } | null;
   }>;
+  revisedFrom?: {
+    stockTransactionId?: string | null;
+    targetLinks?: Array<{
+      sourceTransaction?: { docType?: PurchaseDocType | string | null } | null;
+    }>;
+  } | null;
 }) {
   if (transaction.stockTransactionId) return true;
-  if (transaction.revisedFromId) return false;
+
   if (transaction.docType === "GRN") return true;
+
   if (transaction.docType === "PI") {
-    const generatedFromGrn = (transaction.targetLinks || []).some(
-      (link) => link.sourceTransaction?.docType === "GRN",
-    );
+    const generatedFromGrn =
+      hasGrnSourceLink(transaction) ||
+      Boolean(transaction.revisedFrom && hasGrnSourceLink(transaction.revisedFrom));
     return !generatedFromGrn;
   }
+
   return false;
 }
 
@@ -969,6 +987,9 @@ export async function cancelPurchaseTransaction(
         lines: true,
         sourceLinks: { include: { targetTransaction: true } },
         targetLinks: { include: { sourceTransaction: true } },
+        revisedFrom: {
+          include: { targetLinks: { include: { sourceTransaction: true } } },
+        },
       },
     });
     if (!current || current.docType !== docType)
