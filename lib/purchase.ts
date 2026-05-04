@@ -790,16 +790,38 @@ export async function updatePurchaseTransaction(
   return db.$transaction(async (tx) => {
     const current = await tx.purchaseTransaction.findUnique({
       where: { id },
-      include: { targetLinks: true, lines: true },
+      include: {
+        lines: true,
+        sourceLinks: { include: { targetTransaction: true } },
+        revisions: { select: { id: true, status: true } },
+      },
     });
     if (!current || current.docType !== docType)
       throw new Error("Document not found.");
     if (current.status === "CANCELLED")
       throw new Error("Cancelled document cannot be edited.");
-    if (current.targetLinks.length > 0 || current.stockTransactionId)
+
+    const hasActiveRevision = current.revisions.some(
+      (revision) => revision.status !== "CANCELLED",
+    );
+    if (hasActiveRevision) {
       throw new Error(
-        "This document has generated/stock records. Please create a revised document instead.",
+        "This document has been revised. Please edit the latest revision document instead.",
       );
+    }
+
+    const activeDownstream = current.sourceLinks.filter(
+      (link) => link.targetTransaction.status !== "CANCELLED",
+    );
+    if (activeDownstream.length > 0) {
+      const generatedDocs = activeDownstream
+        .map((link) => link.targetTransaction.docNo)
+        .filter(Boolean)
+        .join(", ");
+      throw new Error(
+        `This document has active generated document${activeDownstream.length > 1 ? "s" : ""}${generatedDocs ? `: ${generatedDocs}` : ""}. Please revise or cancel the downstream document first.`,
+      );
+    }
     await tx.purchaseTransactionLine.deleteMany({
       where: { transactionId: id },
     });
