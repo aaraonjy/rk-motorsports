@@ -773,7 +773,7 @@ export async function createPurchaseTransaction(
         await refreshSourceStatus(tx, sourceTransactionId);
     }
 
-    if (shouldPostStock(docType, sourceDocType)) {
+    if (!revisedFrom && shouldPostStock(docType, sourceDocType)) {
       await createStockReceive(tx, transaction, lines);
     }
 
