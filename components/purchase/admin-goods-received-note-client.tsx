@@ -208,7 +208,8 @@ const SUBTITLE =
   "Receive stock from supplier, with optional generation from Purchase Order.";
 const API_PATH = "/api/admin/purchase/goods-received-note";
 const SOURCE_MODAL_TITLE = "Pick From Purchase Order";
-const SOURCE_MODAL_DESCRIPTION = "Only Purchase Orders with remaining receive qty are shown.";
+const SOURCE_MODAL_DESCRIPTION =
+  "Only Purchase Orders with remaining receive qty are shown.";
 const DETAIL_PATH = "/admin/purchase/goods-received-note";
 const SELECT_RK = "input-rk appearance-none pr-12";
 const SELECT_STYLE = {
@@ -245,15 +246,17 @@ function formatDateTime(value: string | Date | null | undefined) {
   if (!value) return "-";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "-";
-  return date.toLocaleString("en-MY", {
-    timeZone: "Asia/Kuala_Lumpur",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  }).replace(/am|pm/i, (value) => value.toLowerCase());
+  return date
+    .toLocaleString("en-MY", {
+      timeZone: "Asia/Kuala_Lumpur",
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    })
+    .replace(/am|pm/i, (value) => value.toLowerCase());
 }
 
 function formatDateInput(value: string | Date | null | undefined) {
@@ -589,12 +592,18 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
   );
   const defaultTaxCodeId = "";
   const editId = searchParams.get("edit");
+  const reviseId = searchParams.get("revise");
   const sourceId = searchParams.get("source");
   const editingTransaction =
     props.initialTransactions.find((item) => item.id === editId) || null;
+  const reviseTransaction =
+    props.initialTransactions.find((item) => item.id === reviseId) || null;
   const sourceTransaction =
     props.sourceDocuments.find((item) => item.id === sourceId) || null;
-  const isGeneratedFromSource = Boolean(sourceTransaction && !editingTransaction);
+  const isRevisionMode = Boolean(reviseTransaction && !editingTransaction);
+  const isGeneratedFromSource = Boolean(
+    sourceTransaction && !editingTransaction && !isRevisionMode,
+  );
   const [activeTab, setActiveTab] = useState<ActiveTab>("HEADER");
   const [docNo, setDocNo] = useState("");
   const [manualDocNoEnabled, setManualDocNoEnabled] = useState(false);
@@ -635,14 +644,24 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
   const [selectedSourceId, setSelectedSourceId] = useState("");
   const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>([]);
   const [sourceProductsLoaded, setSourceProductsLoaded] = useState(false);
-  const [sourceLineQty, setSourceLineQty] = useState<Record<string, string>>({});
+  const [sourceLineQty, setSourceLineQty] = useState<Record<string, string>>(
+    {},
+  );
   const [generatedSourceLabel, setGeneratedSourceLabel] = useState("");
   const isBodyLocked = Boolean(isGeneratedFromSource || generatedSourceLabel);
   const [generateFromError, setGenerateFromError] = useState("");
-  const [cancelTarget, setCancelTarget] = useState<PurchaseTransactionRecord | null>(null);
+  const [cancelTarget, setCancelTarget] =
+    useState<PurchaseTransactionRecord | null>(null);
   const [cancelReason, setCancelReason] = useState("");
-  const [cancelNotice, setCancelNotice] = useState<{ docNo: string; cancelledAt: Date; reason: string; cancelledByName?: string } | null>(null);
-  const [isCreateOpen, setIsCreateOpen] = useState(Boolean(editId || sourceId));
+  const [cancelNotice, setCancelNotice] = useState<{
+    docNo: string;
+    cancelledAt: Date;
+    reason: string;
+    cancelledByName?: string;
+  } | null>(null);
+  const [isCreateOpen, setIsCreateOpen] = useState(
+    Boolean(editId || reviseId || sourceId),
+  );
   const [showDocNoOverride, setShowDocNoOverride] = useState(false);
   const [docNoDraft, setDocNoDraft] = useState("");
   const [balances, setBalances] = useState<Record<string, number>>({});
@@ -781,9 +800,16 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
   const filteredSourceDocuments = useMemo(() => {
     const keyword = sourceSearch.trim().toLowerCase();
     return props.sourceDocuments.filter((source) => {
-      if (form.supplierId && source.supplierId && source.supplierId !== form.supplierId) return false;
+      if (
+        form.supplierId &&
+        source.supplierId &&
+        source.supplierId !== form.supplierId
+      )
+        return false;
       if (!keyword) return true;
-      return `${source.docNo} ${source.supplierName} ${source.supplierAccountNo || ""}`.toLowerCase().includes(keyword);
+      return `${source.docNo} ${source.supplierName} ${source.supplierAccountNo || ""}`
+        .toLowerCase()
+        .includes(keyword);
     });
   }, [props.sourceDocuments, sourceSearch, form.supplierId]);
 
@@ -803,7 +829,7 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
   );
 
   useEffect(() => {
-    const source = editingTransaction || sourceTransaction;
+    const source = editingTransaction || reviseTransaction || sourceTransaction;
     if (!source) return;
     setDocNo(editingTransaction?.docNo || "");
     setManualDocNoEnabled(false);
@@ -820,7 +846,9 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
       currency: source.currency || "MYR",
       reference: editingTransaction
         ? source.reference || ""
-        : source.docNo || "",
+        : isRevisionMode
+          ? source.reference || ""
+          : source.docNo || "",
       remarks: source.remarks || "",
       attention: source.attention || "",
       agentId: source.agentId || "",
@@ -833,8 +861,9 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
     });
     setLines(
       (source.lines || []).map((line) => ({
-        sourceLineId: editingTransaction ? "" : line.id || "",
-        sourceTransactionId: editingTransaction ? "" : source.id,
+        sourceLineId: editingTransaction || isRevisionMode ? "" : line.id || "",
+        sourceTransactionId:
+          editingTransaction || isRevisionMode ? "" : source.id,
         inventoryProductId: line.inventoryProductId || "",
         productCode: line.productCode || "",
         productDescription: line.productDescription || "",
@@ -858,13 +887,13 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
       })),
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editId, sourceId]);
+  }, [editId, reviseId, sourceId]);
 
   useEffect(() => {
-    if (editId || sourceId) {
+    if (editId || reviseId || sourceId) {
       setIsCreateOpen(true);
     }
-  }, [editId, sourceId]);
+  }, [editId, reviseId, sourceId]);
 
   useEffect(() => {
     for (const line of lines) {
@@ -974,7 +1003,9 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
     setGenerateFromError("");
     setError("");
     if (!form.supplierId) {
-      setGenerateFromError("Please select supplier profile first before using Generate From.");
+      setGenerateFromError(
+        "Please select supplier profile first before using Generate From.",
+      );
       setActiveTab("HEADER");
       return;
     }
@@ -992,18 +1023,32 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
     router.push(`${DETAIL_PATH}?source=${source.id}`);
   }
 
-  function getSourceLineRemainingQty(line: NonNullable<PurchaseTransactionRecord["lines"]>[number]) {
-    const value = (line as any).remainingQty ?? (line as any).remainingReceiveQty ?? (line as any).remainingInvoiceQty ?? line.qty ?? 0;
+  function getSourceLineRemainingQty(
+    line: NonNullable<PurchaseTransactionRecord["lines"]>[number],
+  ) {
+    const value =
+      (line as any).remainingQty ??
+      (line as any).remainingReceiveQty ??
+      (line as any).remainingInvoiceQty ??
+      line.qty ??
+      0;
     const numeric = Number(value ?? 0);
     return Number.isFinite(numeric) ? Math.max(0, numeric) : 0;
   }
 
   const selectedSourceDocuments = useMemo(
-    () => props.sourceDocuments.filter((source) => selectedSourceIds.includes(source.id)),
+    () =>
+      props.sourceDocuments.filter((source) =>
+        selectedSourceIds.includes(source.id),
+      ),
     [props.sourceDocuments, selectedSourceIds],
   );
 
-  function getSourceLineKey(source: PurchaseTransactionRecord, line: NonNullable<PurchaseTransactionRecord["lines"]>[number], index = 0) {
+  function getSourceLineKey(
+    source: PurchaseTransactionRecord,
+    line: NonNullable<PurchaseTransactionRecord["lines"]>[number],
+    index = 0,
+  ) {
     return `${source.id}::${line.id || line.productCode || index}`;
   }
 
@@ -1012,7 +1057,12 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
       (source.lines || [])
         .map((line, index) => {
           const key = getSourceLineKey(source, line, index);
-          return { source, line, key, remainingQty: getSourceLineRemainingQty(line) };
+          return {
+            source,
+            line,
+            key,
+            remainingQty: getSourceLineRemainingQty(line),
+          };
         })
         .filter((entry) => entry.remainingQty > 0),
     );
@@ -1027,11 +1077,14 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
     setSourceProductsLoaded(false);
     setSelectedSourceIds((prev) => {
       const exists = prev.includes(source.id);
-      const next = exists ? prev.filter((id) => id !== source.id) : [...prev, source.id];
+      const next = exists
+        ? prev.filter((id) => id !== source.id)
+        : [...prev, source.id];
       setSourceLineQty((current) => {
         const updated = { ...current };
         if (exists) {
-          for (const [index, line] of (source.lines || []).entries()) delete updated[getSourceLineKey(source, line, index)];
+          for (const [index, line] of (source.lines || []).entries())
+            delete updated[getSourceLineKey(source, line, index)];
         }
         return updated;
       });
@@ -1050,17 +1103,31 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
       for (const [index, line] of (source.lines || []).entries()) {
         const remainingQty = getSourceLineRemainingQty(line);
         if (remainingQty <= 0) continue;
-        nextQty[getSourceLineKey(source, line, index)] = formatDecimalInput(remainingQty, qtyDecimalPlaces);
+        nextQty[getSourceLineKey(source, line, index)] = formatDecimalInput(
+          remainingQty,
+          qtyDecimalPlaces,
+        );
       }
     }
     setSourceLineQty(nextQty);
     setSourceProductsLoaded(true);
   }
 
-  function updateSourceLineQty(key: string, value: string, remainingQty: number) {
+  function updateSourceLineQty(
+    key: string,
+    value: string,
+    remainingQty: number,
+  ) {
     const numeric = Number(value || 0);
-    const safeValue = Number.isFinite(numeric) ? Math.min(Math.max(0, numeric), remainingQty) : 0;
-    setSourceLineQty((prev) => ({ ...prev, [key]: String(value).endsWith(".") ? value : formatDecimalInput(safeValue, qtyDecimalPlaces) }));
+    const safeValue = Number.isFinite(numeric)
+      ? Math.min(Math.max(0, numeric), remainingQty)
+      : 0;
+    setSourceLineQty((prev) => ({
+      ...prev,
+      [key]: String(value).endsWith(".")
+        ? value
+        : formatDecimalInput(safeValue, qtyDecimalPlaces),
+    }));
   }
 
   function importSelectedSourceDocuments() {
@@ -1068,12 +1135,19 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
       setGenerateFromError("Please click Load Product before importing.");
       return;
     }
-    const selectedImportLines = selectedSourceLines.filter(({ key, remainingQty }) => {
-      const qty = Number(sourceLineQty[key] || 0);
-      return qty > 0 && qty <= remainingQty;
-    });
-    if (selectedSourceDocuments.length === 0 || selectedImportLines.length === 0) {
-      setGenerateFromError("Please enter a valid quantity for at least one product line.");
+    const selectedImportLines = selectedSourceLines.filter(
+      ({ key, remainingQty }) => {
+        const qty = Number(sourceLineQty[key] || 0);
+        return qty > 0 && qty <= remainingQty;
+      },
+    );
+    if (
+      selectedSourceDocuments.length === 0 ||
+      selectedImportLines.length === 0
+    ) {
+      setGenerateFromError(
+        "Please enter a valid quantity for at least one product line.",
+      );
       return;
     }
     const first = selectedSourceDocuments[0];
@@ -1085,7 +1159,9 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
       contactNo: first.contactNo || prev.contactNo,
       email: first.email || prev.email,
       currency: first.currency || prev.currency || "MYR",
-      reference: selectedSourceDocuments.map((source) => source.docNo).join(", "),
+      reference: selectedSourceDocuments
+        .map((source) => source.docNo)
+        .join(", "),
       docDesc: `Generated from ${selectedSourceDocuments.map((source) => source.docNo).join(", ")}`,
       remarks: first.remarks || prev.remarks,
       attention: first.attention || prev.attention,
@@ -1096,25 +1172,35 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
       bankAccount: first.bankAccount || prev.bankAccount,
       footerRemarks: first.footerRemarks || prev.footerRemarks,
     }));
-    setLines(selectedImportLines.map(({ source, line, key, remainingQty }) => ({
-      sourceLineId: line.id || "",
-      sourceTransactionId: source.id,
-      inventoryProductId: line.inventoryProductId || "",
-      productCode: line.productCode || "",
-      productDescription: line.productDescription || "",
-      itemType: line.itemType || "STOCK_ITEM",
-      uom: line.uom || "",
-      qty: formatDecimalInput(Math.min(Math.max(0, Number(sourceLineQty[key] || remainingQty)), remainingQty), qtyDecimalPlaces),
-      unitCost: formatDecimalInput(line.unitCost ?? 0, unitCostDecimalPlaces),
-      discountRate: formatDecimalInput(line.discountRate ?? 0, 2),
-      discountType: line.discountType === "AMOUNT" ? "AMOUNT" : "PERCENT",
-      locationId: line.locationId || props.defaultLocationId,
-      batchNo: line.batchNo || "",
-      serialNos: Array.isArray(line.serialNos) ? line.serialNos : [],
-      taxCodeId: line.taxCodeId || defaultTaxCodeId,
-      remarks: line.remarks || "",
-    })));
-    setGeneratedSourceLabel(selectedSourceDocuments.map((source) => source.docNo).join(", "));
+    setLines(
+      selectedImportLines.map(({ source, line, key, remainingQty }) => ({
+        sourceLineId: line.id || "",
+        sourceTransactionId: source.id,
+        inventoryProductId: line.inventoryProductId || "",
+        productCode: line.productCode || "",
+        productDescription: line.productDescription || "",
+        itemType: line.itemType || "STOCK_ITEM",
+        uom: line.uom || "",
+        qty: formatDecimalInput(
+          Math.min(
+            Math.max(0, Number(sourceLineQty[key] || remainingQty)),
+            remainingQty,
+          ),
+          qtyDecimalPlaces,
+        ),
+        unitCost: formatDecimalInput(line.unitCost ?? 0, unitCostDecimalPlaces),
+        discountRate: formatDecimalInput(line.discountRate ?? 0, 2),
+        discountType: line.discountType === "AMOUNT" ? "AMOUNT" : "PERCENT",
+        locationId: line.locationId || props.defaultLocationId,
+        batchNo: line.batchNo || "",
+        serialNos: Array.isArray(line.serialNos) ? line.serialNos : [],
+        taxCodeId: line.taxCodeId || defaultTaxCodeId,
+        remarks: line.remarks || "",
+      })),
+    );
+    setGeneratedSourceLabel(
+      selectedSourceDocuments.map((source) => source.docNo).join(", "),
+    );
     setIsGenerateFromOpen(false);
     setActiveTab("BODY");
   }
@@ -1184,16 +1270,24 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
   }
 
   function hasActiveDownstream(item: PurchaseTransactionRecord) {
-    return (item.sourceLinks || []).some((link) => link.targetTransaction && link.targetTransaction.status !== "CANCELLED");
+    return (item.sourceLinks || []).some(
+      (link) =>
+        link.targetTransaction && link.targetTransaction.status !== "CANCELLED",
+    );
   }
 
   function hasActiveSourceDocument(item: PurchaseTransactionRecord) {
-    return (item.targetLinks || []).some((link) => link.sourceTransaction && link.sourceTransaction.status !== "CANCELLED");
+    return (item.targetLinks || []).some(
+      (link) =>
+        link.sourceTransaction && link.sourceTransaction.status !== "CANCELLED",
+    );
   }
 
   function openCancelDialog(item: PurchaseTransactionRecord) {
     if (hasActiveDownstream(item)) {
-      setError(`Please cancel downstream generated document first before cancelling this ${TITLE}.`);
+      setError(
+        `Please cancel downstream generated document first before cancelling this ${TITLE}.`,
+      );
       return;
     }
     setError("");
@@ -1210,7 +1304,9 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
       const response = await fetch(`${API_PATH}/${cancelTarget.id}`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reason: cancelReason.trim() || "Cancelled by admin" }),
+        body: JSON.stringify({
+          reason: cancelReason.trim() || "Cancelled by admin",
+        }),
       });
       const data = await response.json();
       if (!response.ok || !data.ok) {
@@ -1220,7 +1316,16 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
       setCancelTarget(null);
       setCancelReason("");
       setMessage("");
-      setCancelNotice({ docNo: cancelTarget.docNo, cancelledAt: new Date(), reason: cancelReason.trim() || "Cancelled by admin", cancelledByName: data.transaction?.cancelledByAdmin?.name || data.transaction?.cancelledByAdminName || data.transaction?.cancelledByName || "RK Admin" });
+      setCancelNotice({
+        docNo: cancelTarget.docNo,
+        cancelledAt: new Date(),
+        reason: cancelReason.trim() || "Cancelled by admin",
+        cancelledByName:
+          data.transaction?.cancelledByAdmin?.name ||
+          data.transaction?.cancelledByAdminName ||
+          data.transaction?.cancelledByName ||
+          "RK Admin",
+      });
       router.refresh();
     } catch {
       setError(`Unable to cancel ${TITLE}.`);
@@ -1250,7 +1355,14 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
       bankAccount: "",
       footerRemarks: "",
     });
-    setLines([emptyLine(props.defaultLocationId, defaultTaxCodeId, qtyDecimalPlaces, unitCostDecimalPlaces)]);
+    setLines([
+      emptyLine(
+        props.defaultLocationId,
+        defaultTaxCodeId,
+        qtyDecimalPlaces,
+        unitCostDecimalPlaces,
+      ),
+    ]);
     setActiveTab("HEADER");
     setGeneratedSourceLabel("");
   }
@@ -1262,6 +1374,7 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
     setCancelNotice(null);
     setIsSubmitting(true);
     const wasEditing = Boolean(editingTransaction);
+    const wasRevising = Boolean(reviseTransaction && !editingTransaction);
     try {
       const response = await fetch(
         editingTransaction ? `${API_PATH}/${editingTransaction.id}` : API_PATH,
@@ -1271,8 +1384,25 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
           body: JSON.stringify({
             ...form,
             docNo: manualDocNoEnabled ? docNo : undefined,
-            sourceTransactionId: sourceTransaction?.id || lines.find((line) => line.sourceTransactionId)?.sourceTransactionId || null,
-            sourceDocType: sourceTransaction?.docType || props.sourceDocuments.find((source) => source.id === lines.find((line) => line.sourceTransactionId)?.sourceTransactionId)?.docType || null,
+            sourceTransactionId: isRevisionMode
+              ? null
+              : sourceTransaction?.id ||
+                lines.find((line) => line.sourceTransactionId)
+                  ?.sourceTransactionId ||
+                null,
+            sourceDocType: isRevisionMode
+              ? null
+              : sourceTransaction?.docType ||
+                props.sourceDocuments.find(
+                  (source) =>
+                    source.id ===
+                    lines.find((line) => line.sourceTransactionId)
+                      ?.sourceTransactionId,
+                )?.docType ||
+                null,
+            revisedFromId: isRevisionMode
+              ? reviseTransaction?.id || null
+              : null,
             lines,
           }),
         },
@@ -1284,12 +1414,24 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
       }
       const savedId = data.transaction?.id || editingTransaction?.id;
       if (savedId) {
-        setMessage(wasEditing ? `${TITLE} updated successfully.` : `${TITLE} saved successfully.`);
+        setMessage(
+          wasRevising
+            ? `${TITLE} revised successfully.`
+            : wasEditing
+              ? `${TITLE} updated successfully.`
+              : `${TITLE} saved successfully.`,
+        );
         setIsCreateOpen(false);
         router.push(DETAIL_PATH);
         router.refresh();
       } else {
-        setMessage(wasEditing ? `${TITLE} updated successfully.` : `${TITLE} saved successfully.`);
+        setMessage(
+          wasRevising
+            ? `${TITLE} revised successfully.`
+            : wasEditing
+              ? `${TITLE} updated successfully.`
+              : `${TITLE} saved successfully.`,
+        );
         router.refresh();
       }
     } catch {
@@ -1299,7 +1441,11 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
     }
   }
 
-  const pageTitle = editingTransaction ? `Edit ${TITLE}` : `Create ${TITLE}`;
+  const pageTitle = editingTransaction
+    ? `Edit ${TITLE}`
+    : isRevisionMode
+      ? `Revise ${TITLE}`
+      : `Create ${TITLE}`;
 
   return (
     <div className="space-y-6">
@@ -1318,9 +1464,15 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
 
       {cancelNotice && !isCreateOpen ? (
         <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-4 text-sm text-red-100">
-          <div className="font-semibold">This {TITLE.toLowerCase()} has been cancelled.</div>
-          <div className="mt-2">Cancelled At: {formatDateTime(cancelNotice.cancelledAt)}</div>
-          <div className="mt-1">Cancelled By: {cancelNotice.cancelledByName || "-"}</div>
+          <div className="font-semibold">
+            This {TITLE.toLowerCase()} has been cancelled.
+          </div>
+          <div className="mt-2">
+            Cancelled At: {formatDateTime(cancelNotice.cancelledAt)}
+          </div>
+          <div className="mt-1">
+            Cancelled By: {cancelNotice.cancelledByName || "-"}
+          </div>
           <div className="mt-1">Reason: {cancelNotice.reason}</div>
         </div>
       ) : null}
@@ -1459,7 +1611,9 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
                                   setMessage("");
                                   setError("");
                                   setCancelNotice(null);
-                                  router.push(`${DETAIL_PATH}?edit=${item.id}`);
+                                  router.push(
+                                    `${DETAIL_PATH}?revise=${item.id}`,
+                                  );
                                 }}
                                 className="rounded-xl border border-sky-500/30 px-3 py-2 text-xs text-sky-200 transition hover:bg-sky-500/10"
                               >
@@ -1474,7 +1628,11 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
                               openCancelDialog(item);
                             }}
                             disabled={hasActiveDownstream(item)}
-                            title={hasActiveDownstream(item) ? "Cancel downstream generated document first." : "Cancel document"}
+                            title={
+                              hasActiveDownstream(item)
+                                ? "Cancel downstream generated document first."
+                                : "Cancel document"
+                            }
                             className={`rounded-xl border px-3 py-2 text-xs transition ${hasActiveDownstream(item) ? "cursor-not-allowed border-white/10 text-white/30" : "border-red-500/30 text-red-200 hover:bg-red-500/10"}`}
                           >
                             Cancel
@@ -1544,12 +1702,19 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
 
               {isBodyLocked ? (
                 <div className="mt-5 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm leading-6 text-amber-100">
-                  This {TITLE} is generated from {generatedSourceLabel || sourceTransaction?.docNo}. Body pricing and product details are locked. To change product, qty, cost, discount, tax, or footer pricing details, cancel this {TITLE} and generate a new one.
+                  This {TITLE} is generated from{" "}
+                  {generatedSourceLabel || sourceTransaction?.docNo}. Body
+                  pricing and product details are locked. To change product,
+                  qty, cost, discount, tax, or footer pricing details, cancel
+                  this {TITLE} and generate a new one.
                 </div>
               ) : null}
               {isBodyLocked ? (
                 <div className="mt-5 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
-                  Imported from {generatedSourceLabel || sourceTransaction?.docNo}. Body pricing is locked because this {TITLE} is generated from source document.
+                  Imported from{" "}
+                  {generatedSourceLabel || sourceTransaction?.docNo}. Body
+                  pricing is locked because this {TITLE} is generated from
+                  source document.
                 </div>
               ) : null}
 
@@ -1832,259 +1997,273 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
                   <div className="space-y-5">
                     {isBodyLocked ? (
                       <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white/45">
-                        Read-only body section. This {TITLE} was generated from source document, so product, qty, cost, discount, tax, and line pricing details are locked.
+                        Read-only body section. This {TITLE} was generated from
+                        source document, so product, qty, cost, discount, tax,
+                        and line pricing details are locked.
                       </div>
                     ) : null}
-                    <div className={isBodyLocked ? "pointer-events-none opacity-55 grayscale" : ""}>
-                    {lines.map((line, index) => {
-                      const product =
-                        props.initialProducts.find(
-                          (item) => item.id === line.inventoryProductId,
-                        ) || null;
-                      const grossAmount = lineAmount(line);
-                      const selectedLineTaxCode =
-                        props.taxConfig.taxCodes.find(
-                          (item) => item.id === line.taxCodeId,
-                        ) || null;
-                      const lineTax = calculateLineItemTaxBreakdown({
-                        lineTotal: grossAmount,
-                        taxRate: selectedLineTaxCode?.rate || 0,
-                        calculationMethod:
-                          selectedLineTaxCode?.calculationMethod || null,
-                        taxEnabled:
-                          props.taxConfig.taxModuleEnabled &&
-                          Boolean(selectedLineTaxCode),
-                      });
-                      const balanceKeyValue =
-                        line.inventoryProductId && line.locationId
-                          ? balanceKey(
-                              line.inventoryProductId,
-                              line.locationId,
-                              product?.batchTracking ? line.batchNo : "",
-                            )
-                          : "";
-                      const balanceText =
-                        line.inventoryProductId && line.locationId
-                          ? product?.batchTracking && !line.batchNo
-                            ? "Select Batch No to view batch balance."
-                            : formatQtyBalance(
-                                balances[balanceKeyValue],
-                                Boolean(loadingBalances[balanceKeyValue]),
-                                qtyDecimalPlaces,
+                    <div
+                      className={
+                        isBodyLocked
+                          ? "pointer-events-none opacity-55 grayscale"
+                          : ""
+                      }
+                    >
+                      {lines.map((line, index) => {
+                        const product =
+                          props.initialProducts.find(
+                            (item) => item.id === line.inventoryProductId,
+                          ) || null;
+                        const grossAmount = lineAmount(line);
+                        const selectedLineTaxCode =
+                          props.taxConfig.taxCodes.find(
+                            (item) => item.id === line.taxCodeId,
+                          ) || null;
+                        const lineTax = calculateLineItemTaxBreakdown({
+                          lineTotal: grossAmount,
+                          taxRate: selectedLineTaxCode?.rate || 0,
+                          calculationMethod:
+                            selectedLineTaxCode?.calculationMethod || null,
+                          taxEnabled:
+                            props.taxConfig.taxModuleEnabled &&
+                            Boolean(selectedLineTaxCode),
+                        });
+                        const balanceKeyValue =
+                          line.inventoryProductId && line.locationId
+                            ? balanceKey(
+                                line.inventoryProductId,
+                                line.locationId,
+                                product?.batchTracking ? line.batchNo : "",
                               )
-                          : "Select product and location to view balance.";
-                      return (
-                        <div
-                          key={index}
-                          className="rounded-[1.75rem] border border-white/10 p-5"
-                        >
-                          <div className="mb-5 flex items-center justify-between">
-                            <h3 className="text-lg font-semibold text-white">
-                              Product {index + 1}
-                            </h3>
-                            {lines.length > 1 ? (
-                              <button
-                                type="button"
-                                onClick={() => removeLine(index)}
-                                className="rounded-xl border border-red-500/30 px-4 py-2 text-sm text-red-300 transition hover:bg-red-500/10"
-                              >
-                                Remove
-                              </button>
-                            ) : null}
-                          </div>
-                          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-                            <div className="md:col-span-2">
-                              <SearchableSelect
-                                label="Product"
-                                placeholder="Search or select product"
-                                options={productOptions}
-                                value={line.inventoryProductId}
-                                onChange={(option) =>
-                                  applyProduct(index, option?.id || "")
-                                }
-                              />
-                            </div>
-                            <SearchableSelect
-                              label="UOM"
-                              placeholder="Select UOM"
-                              options={getProductUomOptions(product).map(
-                                (option) => ({
-                                  id: option.id,
-                                  label: option.label,
-                                  searchText: option.label.toLowerCase(),
-                                }),
-                              )}
-                              value={line.uom}
-                              disabled={!product}
-                              onChange={(option) =>
-                                updateLine(
-                                  index,
-                                  "uom",
-                                  option?.id || product?.baseUom || "",
+                            : "";
+                        const balanceText =
+                          line.inventoryProductId && line.locationId
+                            ? product?.batchTracking && !line.batchNo
+                              ? "Select Batch No to view batch balance."
+                              : formatQtyBalance(
+                                  balances[balanceKeyValue],
+                                  Boolean(loadingBalances[balanceKeyValue]),
+                                  qtyDecimalPlaces,
                                 )
-                              }
-                            />
-                            <div>
-                              <label className="label-rk">Qty</label>
-                              <input
-                                value={line.qty}
-                                onChange={(e) =>
-                                  updateLine(index, "qty", e.target.value)
-                                }
-                                className="input-rk"
-                              />
+                            : "Select product and location to view balance.";
+                        return (
+                          <div
+                            key={index}
+                            className="rounded-[1.75rem] border border-white/10 p-5"
+                          >
+                            <div className="mb-5 flex items-center justify-between">
+                              <h3 className="text-lg font-semibold text-white">
+                                Product {index + 1}
+                              </h3>
+                              {lines.length > 1 ? (
+                                <button
+                                  type="button"
+                                  onClick={() => removeLine(index)}
+                                  className="rounded-xl border border-red-500/30 px-4 py-2 text-sm text-red-300 transition hover:bg-red-500/10"
+                                >
+                                  Remove
+                                </button>
+                              ) : null}
                             </div>
-                            <div>
-                              <label className="label-rk">
-                                Purchase Unit Cost
-                              </label>
-                              <input
-                                value={line.unitCost}
-                                onChange={(e) =>
-                                  updateLine(index, "unitCost", e.target.value)
+                            <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+                              <div className="md:col-span-2">
+                                <SearchableSelect
+                                  label="Product"
+                                  placeholder="Search or select product"
+                                  options={productOptions}
+                                  value={line.inventoryProductId}
+                                  onChange={(option) =>
+                                    applyProduct(index, option?.id || "")
+                                  }
+                                />
+                              </div>
+                              <SearchableSelect
+                                label="UOM"
+                                placeholder="Select UOM"
+                                options={getProductUomOptions(product).map(
+                                  (option) => ({
+                                    id: option.id,
+                                    label: option.label,
+                                    searchText: option.label.toLowerCase(),
+                                  }),
+                                )}
+                                value={line.uom}
+                                disabled={!product}
+                                onChange={(option) =>
+                                  updateLine(
+                                    index,
+                                    "uom",
+                                    option?.id || product?.baseUom || "",
+                                  )
                                 }
-                                className="input-rk"
                               />
-                            </div>
-                            <div>
-                              <label className="label-rk">Discount</label>
-                              <div className="grid grid-cols-[1fr_120px] gap-3">
+                              <div>
+                                <label className="label-rk">Qty</label>
                                 <input
-                                  value={line.discountRate}
+                                  value={line.qty}
+                                  onChange={(e) =>
+                                    updateLine(index, "qty", e.target.value)
+                                  }
+                                  className="input-rk"
+                                />
+                              </div>
+                              <div>
+                                <label className="label-rk">
+                                  Purchase Unit Cost
+                                </label>
+                                <input
+                                  value={line.unitCost}
                                   onChange={(e) =>
                                     updateLine(
                                       index,
-                                      "discountRate",
+                                      "unitCost",
                                       e.target.value,
                                     )
                                   }
                                   className="input-rk"
                                 />
-                                <CompactSelect
-                                  options={discountTypeOptions}
-                                  value={line.discountType}
-                                  onChange={(value) =>
-                                    updateLine(index, "discountType", value)
-                                  }
-                                />
                               </div>
-                            </div>
-                            <div className="md:col-span-2">
-                              <SearchableSelect
-                                label="Location"
-                                placeholder="Search or select location"
-                                options={locationOptions}
-                                value={line.locationId}
-                                onChange={(option) =>
-                                  updateLine(
-                                    index,
-                                    "locationId",
-                                    option?.id || "",
-                                  )
-                                }
-                              />
-                              <p className="mt-2 text-xs text-white/40">
-                                {balanceText}
-                              </p>
-                            </div>
-                            {product?.batchTracking ? (
                               <div>
-                                <label className="label-rk">Batch No</label>
-                                <input
-                                  value={line.batchNo}
-                                  onChange={(e) =>
+                                <label className="label-rk">Discount</label>
+                                <div className="grid grid-cols-[1fr_120px] gap-3">
+                                  <input
+                                    value={line.discountRate}
+                                    onChange={(e) =>
+                                      updateLine(
+                                        index,
+                                        "discountRate",
+                                        e.target.value,
+                                      )
+                                    }
+                                    className="input-rk"
+                                  />
+                                  <CompactSelect
+                                    options={discountTypeOptions}
+                                    value={line.discountType}
+                                    onChange={(value) =>
+                                      updateLine(index, "discountType", value)
+                                    }
+                                  />
+                                </div>
+                              </div>
+                              <div className="md:col-span-2">
+                                <SearchableSelect
+                                  label="Location"
+                                  placeholder="Search or select location"
+                                  options={locationOptions}
+                                  value={line.locationId}
+                                  onChange={(option) =>
                                     updateLine(
                                       index,
-                                      "batchNo",
-                                      e.target.value.toUpperCase(),
+                                      "locationId",
+                                      option?.id || "",
                                     )
                                   }
+                                />
+                                <p className="mt-2 text-xs text-white/40">
+                                  {balanceText}
+                                </p>
+                              </div>
+                              {product?.batchTracking ? (
+                                <div>
+                                  <label className="label-rk">Batch No</label>
+                                  <input
+                                    value={line.batchNo}
+                                    onChange={(e) =>
+                                      updateLine(
+                                        index,
+                                        "batchNo",
+                                        e.target.value.toUpperCase(),
+                                      )
+                                    }
+                                    className="input-rk"
+                                  />
+                                </div>
+                              ) : null}
+                              {product?.serialNumberTracking ? (
+                                <div>
+                                  <label className="label-rk">Serial No</label>
+                                  <textarea
+                                    value={line.serialNos.join("\n")}
+                                    onChange={(e) =>
+                                      setLines((prev) =>
+                                        prev.map((item, itemIndex) =>
+                                          itemIndex === index
+                                            ? {
+                                                ...item,
+                                                serialNos: e.target.value
+                                                  .split(/\r?\n/)
+                                                  .map((serial) =>
+                                                    serial.trim(),
+                                                  )
+                                                  .filter(Boolean),
+                                              }
+                                            : item,
+                                        ),
+                                      )
+                                    }
+                                    className="input-rk min-h-[52px]"
+                                    placeholder="One serial number per line"
+                                  />
+                                </div>
+                              ) : null}
+                              {props.taxConfig.taxModuleEnabled &&
+                              taxMode === "LINE_ITEM" ? (
+                                <SearchableSelect
+                                  label="Tax Code"
+                                  placeholder="No Tax"
+                                  options={taxCodeOptions}
+                                  value={line.taxCodeId}
+                                  onChange={(option) =>
+                                    updateLine(
+                                      index,
+                                      "taxCodeId",
+                                      option?.id || "",
+                                    )
+                                  }
+                                />
+                              ) : null}
+                              <div>
+                                <label className="label-rk">Tax Amount</label>
+                                <input
+                                  value={money(lineTax.taxAmount)}
+                                  readOnly
                                   className="input-rk"
                                 />
                               </div>
-                            ) : null}
-                            {product?.serialNumberTracking ? (
                               <div>
-                                <label className="label-rk">Serial No</label>
-                                <textarea
-                                  value={line.serialNos.join("\n")}
-                                  onChange={(e) =>
-                                    setLines((prev) =>
-                                      prev.map((item, itemIndex) =>
-                                        itemIndex === index
-                                          ? {
-                                              ...item,
-                                              serialNos: e.target.value
-                                                .split(/\r?\n/)
-                                                .map((serial) => serial.trim())
-                                                .filter(Boolean),
-                                            }
-                                          : item,
-                                      ),
-                                    )
-                                  }
-                                  className="input-rk min-h-[52px]"
-                                  placeholder="One serial number per line"
+                                <label className="label-rk">Gross Amount</label>
+                                <input
+                                  value={money(grossAmount)}
+                                  readOnly
+                                  className="input-rk"
                                 />
                               </div>
-                            ) : null}
-                            {props.taxConfig.taxModuleEnabled &&
-                            taxMode === "LINE_ITEM" ? (
-                              <SearchableSelect
-                                label="Tax Code"
-                                placeholder="No Tax"
-                                options={taxCodeOptions}
-                                value={line.taxCodeId}
-                                onChange={(option) =>
-                                  updateLine(
-                                    index,
-                                    "taxCodeId",
-                                    option?.id || "",
-                                  )
-                                }
-                              />
-                            ) : null}
-                            <div>
-                              <label className="label-rk">Tax Amount</label>
-                              <input
-                                value={money(lineTax.taxAmount)}
-                                readOnly
-                                className="input-rk"
-                              />
-                            </div>
-                            <div>
-                              <label className="label-rk">Gross Amount</label>
-                              <input
-                                value={money(grossAmount)}
-                                readOnly
-                                className="input-rk"
-                              />
-                            </div>
-                            <div className="md:col-span-2 xl:col-span-4">
-                              <label className="label-rk">
-                                Product Remarks
-                              </label>
-                              <textarea
-                                value={line.remarks}
-                                onChange={(e) =>
-                                  updateLine(index, "remarks", e.target.value)
-                                }
-                                className="input-rk min-h-[80px]"
-                              />
+                              <div className="md:col-span-2 xl:col-span-4">
+                                <label className="label-rk">
+                                  Product Remarks
+                                </label>
+                                <textarea
+                                  value={line.remarks}
+                                  onChange={(e) =>
+                                    updateLine(index, "remarks", e.target.value)
+                                  }
+                                  className="input-rk min-h-[80px]"
+                                />
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
                     </div>
                     {!isBodyLocked ? (
-                    <button
-                      type="button"
-                      onClick={addLine}
-                      className="rounded-xl border border-white/15 px-4 py-3 text-sm text-white/75 transition hover:bg-white/10 hover:text-white"
-                    >
-                      + Add Product
-                    </button>
+                      <button
+                        type="button"
+                        onClick={addLine}
+                        className="rounded-xl border border-white/15 px-4 py-3 text-sm text-white/75 transition hover:bg-white/10 hover:text-white"
+                      >
+                        + Add Product
+                      </button>
                     ) : null}
                   </div>
                 ) : null}
@@ -2187,16 +2366,24 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
         </div>
       ) : null}
 
-
       {isGenerateFromOpen ? (
         <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm">
           <div className="w-full max-w-5xl rounded-[2rem] border border-white/10 bg-[#08080c] p-6 shadow-2xl">
-            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-sky-300/80">Generate From</p>
+            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-sky-300/80">
+              Generate From
+            </p>
             <h3 className="mt-3 text-3xl font-bold">{SOURCE_MODAL_TITLE}</h3>
-            <p className="mt-3 text-sm leading-6 text-white/60">{SOURCE_MODAL_DESCRIPTION}</p>
+            <p className="mt-3 text-sm leading-6 text-white/60">
+              {SOURCE_MODAL_DESCRIPTION}
+            </p>
 
             <div className="mt-5">
-              <input className="input-rk" value={sourceSearch} onChange={(event) => setSourceSearch(event.target.value)} placeholder="Search document no / supplier" />
+              <input
+                className="input-rk"
+                value={sourceSearch}
+                onChange={(event) => setSourceSearch(event.target.value)}
+                placeholder="Search document no / supplier"
+              />
             </div>
 
             {generateFromError ? (
@@ -2207,7 +2394,9 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
 
             <div className="mt-5 max-h-64 overflow-y-auto rounded-2xl border border-white/10">
               {filteredSourceDocuments.length === 0 ? (
-                <div className="px-4 py-8 text-center text-sm text-white/50">No pending source document found for this supplier.</div>
+                <div className="px-4 py-8 text-center text-sm text-white/50">
+                  No pending source document found for this supplier.
+                </div>
               ) : (
                 filteredSourceDocuments.map((source) => {
                   const isSelected = selectedSourceIds.includes(source.id);
@@ -2218,14 +2407,31 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
                       onClick={() => toggleSourceDocument(source)}
                       className={`flex w-full items-start gap-4 border-b border-white/10 px-4 py-4 text-left transition last:border-b-0 ${isSelected ? "bg-white/[0.08]" : "hover:bg-white/[0.04]"}`}
                     >
-                      <span className={`mt-1 flex h-4 w-4 items-center justify-center rounded border text-[10px] ${isSelected ? "border-red-400 bg-red-500 text-white" : "border-white/30"}`}>{isSelected ? "✓" : ""}</span>
+                      <span
+                        className={`mt-1 flex h-4 w-4 items-center justify-center rounded border text-[10px] ${isSelected ? "border-red-400 bg-red-500 text-white" : "border-white/30"}`}
+                      >
+                        {isSelected ? "✓" : ""}
+                      </span>
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-3">
-                          <span className="font-semibold text-white">{source.docNo}</span>
-                          <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${statusClass(source.status)}`}>{source.status}</span>
+                          <span className="font-semibold text-white">
+                            {source.docNo}
+                          </span>
+                          <span
+                            className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${statusClass(source.status)}`}
+                          >
+                            {source.status}
+                          </span>
                         </div>
-                        <div className="mt-1 text-sm text-white/70">{source.supplierName}</div>
-                        <div className="mt-1 text-xs text-white/45">{source.supplierAccountNo || "-"} • {formatDate(source.docDate)} • {source.currency || "MYR"} {money(Number(source.grandTotal || 0))}</div>
+                        <div className="mt-1 text-sm text-white/70">
+                          {source.supplierName}
+                        </div>
+                        <div className="mt-1 text-xs text-white/45">
+                          {source.supplierAccountNo || "-"} •{" "}
+                          {formatDate(source.docDate)} •{" "}
+                          {source.currency || "MYR"}{" "}
+                          {money(Number(source.grandTotal || 0))}
+                        </div>
                       </div>
                     </button>
                   );
@@ -2242,33 +2448,63 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
                   <div className="text-right">Remaining</div>
                   <div className="text-right">Receive / Claim</div>
                 </div>
-                {selectedSourceLines.map(({ source, line, key, remainingQty }) => (
-                  <div key={key} className="grid grid-cols-[1.2fr_1.8fr_0.8fr_0.8fr_1fr] items-center gap-4 border-b border-white/10 px-4 py-3 text-sm last:border-b-0">
-                    <div className="font-semibold text-white">{source.docNo}</div>
-                    <div>
-                      <div className="font-semibold text-white">{line.productCode || "-"}</div>
-                      <div className="text-xs text-white/45">{line.productDescription || ""}</div>
+                {selectedSourceLines.map(
+                  ({ source, line, key, remainingQty }) => (
+                    <div
+                      key={key}
+                      className="grid grid-cols-[1.2fr_1.8fr_0.8fr_0.8fr_1fr] items-center gap-4 border-b border-white/10 px-4 py-3 text-sm last:border-b-0"
+                    >
+                      <div className="font-semibold text-white">
+                        {source.docNo}
+                      </div>
+                      <div>
+                        <div className="font-semibold text-white">
+                          {line.productCode || "-"}
+                        </div>
+                        <div className="text-xs text-white/45">
+                          {line.productDescription || ""}
+                        </div>
+                      </div>
+                      <div className="text-right text-white/75">
+                        {money(line.qty)}
+                      </div>
+                      <div className="text-right text-white/75">
+                        {money(remainingQty)}
+                      </div>
+                      <div>
+                        <input
+                          className="input-rk text-right"
+                          type="number"
+                          min="0"
+                          max={remainingQty}
+                          step="0.001"
+                          value={
+                            sourceLineQty[key] ??
+                            formatDecimalInput(remainingQty, qtyDecimalPlaces)
+                          }
+                          onChange={(event) =>
+                            updateSourceLineQty(
+                              key,
+                              event.target.value,
+                              remainingQty,
+                            )
+                          }
+                        />
+                      </div>
                     </div>
-                    <div className="text-right text-white/75">{money(line.qty)}</div>
-                    <div className="text-right text-white/75">{money(remainingQty)}</div>
-                    <div>
-                      <input
-                        className="input-rk text-right"
-                        type="number"
-                        min="0"
-                        max={remainingQty}
-                        step="0.001"
-                        value={sourceLineQty[key] ?? formatDecimalInput(remainingQty, qtyDecimalPlaces)}
-                        onChange={(event) => updateSourceLineQty(key, event.target.value, remainingQty)}
-                      />
-                    </div>
-                  </div>
-                ))}
+                  ),
+                )}
               </div>
             ) : null}
 
             <div className="mt-6 flex justify-end gap-3">
-              <button type="button" onClick={() => setIsGenerateFromOpen(false)} className="rounded-xl border border-white/15 px-5 py-3 text-sm text-white/75 transition hover:bg-white/10">Close</button>
+              <button
+                type="button"
+                onClick={() => setIsGenerateFromOpen(false)}
+                className="rounded-xl border border-white/15 px-5 py-3 text-sm text-white/75 transition hover:bg-white/10"
+              >
+                Close
+              </button>
               {!sourceProductsLoaded ? (
                 <button
                   type="button"
@@ -2297,11 +2533,30 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
         <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/75 px-4 backdrop-blur-sm">
           <div className="w-full max-w-lg rounded-[2rem] border border-white/10 bg-[#08080c] p-6 shadow-2xl">
             <h3 className="text-2xl font-bold text-white">Cancel {TITLE}</h3>
-            <p className="mt-3 text-sm text-white/60">Please enter a reason to cancel {cancelTarget.docNo}.</p>
-            <textarea className="input-rk mt-5 min-h-[120px]" value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} placeholder="Cancellation reason" />
+            <p className="mt-3 text-sm text-white/60">
+              Please enter a reason to cancel {cancelTarget.docNo}.
+            </p>
+            <textarea
+              className="input-rk mt-5 min-h-[120px]"
+              value={cancelReason}
+              onChange={(event) => setCancelReason(event.target.value)}
+              placeholder="Cancellation reason"
+            />
             <div className="mt-6 flex justify-end gap-3">
-              <button type="button" onClick={() => setCancelTarget(null)} className="rounded-xl border border-white/15 px-4 py-2.5 text-sm text-white/75 transition hover:bg-white/10">Close</button>
-              <button type="button" onClick={confirmCancelTransaction} className="rounded-xl bg-red-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-400">Confirm Cancel</button>
+              <button
+                type="button"
+                onClick={() => setCancelTarget(null)}
+                className="rounded-xl border border-white/15 px-4 py-2.5 text-sm text-white/75 transition hover:bg-white/10"
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                onClick={confirmCancelTransaction}
+                className="rounded-xl bg-red-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-400"
+              >
+                Confirm Cancel
+              </button>
             </div>
           </div>
         </div>
