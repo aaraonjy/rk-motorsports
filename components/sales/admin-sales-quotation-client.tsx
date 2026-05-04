@@ -324,9 +324,14 @@ function getSalesDocumentLabel(_transaction: QuotationRecord) {
 }
 
 function getStatusClass(status: string) {
+  if (status === "LOCKED") return "border-white/10 bg-white/5 text-white/35";
   if (status === "CANCELLED") return "border-red-500/25 bg-red-500/10 text-red-200";
   if (status === "CONFIRMED") return "border-emerald-500/25 bg-emerald-500/10 text-emerald-200";
   return "border-amber-500/25 bg-amber-500/10 text-amber-200";
+}
+
+function getQuotationDisplayStatus(transaction: QuotationRecord) {
+  return hasActiveDownstreamTransaction(transaction) ? "LOCKED" : transaction.status;
 }
 
 function formatTaxOptionLabel(taxCode: TaxCodeOption) {
@@ -1413,7 +1418,16 @@ export function AdminSalesQuotationClient({
                       <div className="font-medium text-white/90">{item.customerName}</div>
                       <div className="text-xs text-white/45">{item.customerAccountNo || "-"}</div>
                     </td>
-                    <td className="px-4 py-4"><span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getStatusClass(item.status)}`}>{item.status}</span></td>
+                    <td className="px-4 py-4">
+                      {(() => {
+                        const displayStatus = getQuotationDisplayStatus(item);
+                        return (
+                          <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getStatusClass(displayStatus)}`}>
+                            {displayStatus}
+                          </span>
+                        );
+                      })()}
+                    </td>
                     <td className="px-4 py-4 text-right">{`${item.currency || "MYR"} ${moneyWithPlaces(Number(item.grandTotal || 0), priceDecimalPlaces)}`}</td>
                     <td className="px-4 py-4 text-right">
                       {item.status !== "CANCELLED" ? (
