@@ -366,7 +366,7 @@ async function buildDebitNoteData(body: any, tx: Prisma.TransactionClient) {
     email: sourceInvoice.email,
     currency: sourceInvoice.currency,
     reference: sourceInvoice.docNo,
-    remarks: reason,
+    remarks: normalizeText(body.remarks),
     agentId: normalizeText(body.agentId) || sourceInvoice.agentId || null,
     projectId: normalizeText(body.projectId) || sourceInvoice.projectId || null,
     departmentId: normalizeText(body.departmentId) || sourceInvoice.departmentId || null,

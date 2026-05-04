@@ -284,6 +284,7 @@ export function AdminCreditNoteClient({ initialTaxCodes, initialAgents, initialP
   const [isDocNoModalOpen, setIsDocNoModalOpen] = useState(false);
   const [docNoDraft, setDocNoDraft] = useState("");
   const [reason, setReason] = useState("");
+  const [remarks, setRemarks] = useState("");
   const [footerRemarks, setFooterRemarks] = useState("");
   const [agentId, setAgentId] = useState("");
   const [projectId, setProjectId] = useState("");
@@ -414,6 +415,7 @@ export function AdminCreditNoteClient({ initialTaxCodes, initialAgents, initialP
     setDocNo("");
     setDocNoPreview("Auto Generated");
     setReason("");
+    setRemarks("");
     setFooterRemarks("");
     setAgentId("");
     setProjectId("");
@@ -436,6 +438,7 @@ export function AdminCreditNoteClient({ initialTaxCodes, initialAgents, initialP
     setSelectedInvoiceId("");
     setPickLines([]);
     setReason("");
+    setRemarks("");
     setFooterRemarks("");
     setAgentId("");
     setProjectId("");
@@ -592,7 +595,7 @@ export function AdminCreditNoteClient({ initialTaxCodes, initialAgents, initialP
           docNo: docNo.trim() || undefined,
           sourceTransactionId: selectedInvoice.id,
           reason,
-          remarks: reason,
+          remarks,
           footerRemarks,
           agentId,
           projectId,
@@ -860,6 +863,11 @@ export function AdminCreditNoteClient({ initialTaxCodes, initialAgents, initialP
                     <label className="label-rk">Reason <span className="text-rk-red">*</span></label>
                     <input className="input-rk" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Customer cancelled item / goods returned" />
                   </div>
+                </div>
+
+                <div>
+                  <label className="label-rk">Remarks</label>
+                  <textarea className="input-rk min-h-[90px]" value={remarks} onChange={(e) => setRemarks(e.target.value)} />
                 </div>
 
                 <div className="grid gap-5 md:grid-cols-4">

@@ -256,6 +256,7 @@ export function AdminDeliveryReturnClient({ initialAgents, initialProjects, init
   const [isSourcePickerOpen, setIsSourcePickerOpen] = useState(false);
   const [sourceSearch, setSourceSearch] = useState("");
   const [reason, setReason] = useState("");
+  const [remarks, setRemarks] = useState("");
   const [footerRemarks, setFooterRemarks] = useState("");
   const [agentId, setAgentId] = useState("");
   const [projectId, setProjectId] = useState("");
@@ -367,6 +368,7 @@ export function AdminDeliveryReturnClient({ initialAgents, initialProjects, init
     setIsSourcePickerOpen(false);
     setSourceSearch("");
     setReason("");
+    setRemarks("");
     setFooterRemarks("");
     setAgentId("");
     setProjectId("");
@@ -501,7 +503,8 @@ export function AdminDeliveryReturnClient({ initialAgents, initialProjects, init
           docNo: docNo.trim() || undefined,
           docDesc: selectedSource ? `Delivery Return from ${selectedSource.docNo}` : "",
           sourceTransactionId: selectedSource.id,
-          remarks: reason,
+          reason,
+          remarks,
           footerRemarks,
           lines: selectedLines.map((line) => ({
             sourceLineId: line.sourceLineId,
@@ -759,6 +762,11 @@ export function AdminDeliveryReturnClient({ initialAgents, initialProjects, init
                     <label className="label-rk">Reason <span className="text-rk-red">*</span></label>
                     <input className="input-rk" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Customer returned goods / spoiled item" />
                   </div>
+                </div>
+
+                <div>
+                  <label className="label-rk">Remarks</label>
+                  <textarea className="input-rk min-h-[90px]" value={remarks} onChange={(e) => setRemarks(e.target.value)} />
                 </div>
 
                 <div className="grid gap-5 md:grid-cols-4">

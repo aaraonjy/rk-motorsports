@@ -2197,6 +2197,11 @@ export function AdminCashSalesClient({
                     <div><label className="label-rk">Country Code</label><input className="input-rk" value={deliveryCountryCode} onChange={(e) => setDeliveryCountryCode(e.target.value.toUpperCase())} /></div>
                   </div>
                 </div>
+
+                <div>
+                  <label className="label-rk">Remarks</label>
+                  <textarea className="input-rk min-h-[90px]" value={remarks} onChange={(e) => setRemarks(e.target.value)} />
+                </div>
               </div>
             ) : null}
 

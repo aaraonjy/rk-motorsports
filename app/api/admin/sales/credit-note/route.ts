@@ -443,7 +443,7 @@ async function buildCreditNoteData(body: any, tx: Prisma.TransactionClient) {
     email: sourceInvoice.email,
     currency: sourceInvoice.currency,
     reference: sourceInvoice.docNo,
-    remarks: reason,
+    remarks: normalizeText(body.remarks),
     agentId: sourceInvoice.agentId,
     projectId: sourceInvoice.projectId,
     departmentId: sourceInvoice.departmentId,

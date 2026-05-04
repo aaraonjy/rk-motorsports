@@ -258,6 +258,7 @@ export function AdminDebitNoteClient({ initialProducts, initialLocations, defaul
   const [isDocNoModalOpen, setIsDocNoModalOpen] = useState(false);
   const [docNoDraft, setDocNoDraft] = useState("");
   const [reason, setReason] = useState("");
+  const [remarks, setRemarks] = useState("");
   const [footerRemarks, setFooterRemarks] = useState("");
   const [agentId, setAgentId] = useState("");
   const [projectId, setProjectId] = useState("");
@@ -358,6 +359,7 @@ export function AdminDebitNoteClient({ initialProducts, initialLocations, defaul
     setDocNo("");
     setDocNoPreview("Auto Generated");
     setReason("");
+    setRemarks("");
     setFooterRemarks("");
     setAgentId("");
     setProjectId("");
@@ -380,6 +382,7 @@ export function AdminDebitNoteClient({ initialProducts, initialLocations, defaul
     setSelectedInvoiceId("");
     setLines([]);
     setReason("");
+    setRemarks("");
     setFooterRemarks("");
     setAgentId("");
     setProjectId("");
@@ -491,7 +494,7 @@ export function AdminDebitNoteClient({ initialProducts, initialLocations, defaul
           docNo: docNo.trim() || undefined,
           sourceTransactionId: selectedInvoice.id,
           reason,
-          remarks: reason,
+          remarks,
           footerRemarks,
           agentId,
           projectId,
@@ -741,6 +744,11 @@ export function AdminDebitNoteClient({ initialProducts, initialLocations, defaul
                     <label className="label-rk">Reason <span className="text-rk-red">*</span></label>
                     <input className="input-rk" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Additional charge / undercharged item" />
                   </div>
+                </div>
+
+                <div>
+                  <label className="label-rk">Remarks</label>
+                  <textarea className="input-rk min-h-[90px]" value={remarks} onChange={(e) => setRemarks(e.target.value)} />
                 </div>
 
                 <div className="rounded-[1.75rem] border border-white/10 p-5">
