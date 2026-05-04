@@ -900,7 +900,7 @@ export function AdminPurchaseOrderClient(props: Props) {
         locationId: line.locationId || props.defaultLocationId,
         batchNo: line.batchNo || "",
         serialNos: Array.isArray(line.serialNos) ? line.serialNos : [],
-        taxCodeId: line.taxCodeId || "",
+        taxCodeId: editingTransaction || isRevisionMode ? "" : line.taxCodeId || "",
         remarks: line.remarks || "",
       })),
     );
@@ -1198,12 +1198,14 @@ export function AdminPurchaseOrderClient(props: Props) {
       ),
     ]);
     setActiveTab("HEADER");
+    setCancelNotice(null);
   }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     setMessage("");
+    setCancelNotice(null);
     setIsSubmitting(true);
     const wasEditing = Boolean(editingTransaction);
     const wasRevising = Boolean(reviseTransaction && !editingTransaction);
@@ -1321,6 +1323,7 @@ export function AdminPurchaseOrderClient(props: Props) {
             onClick={() => {
               setMessage("");
               setError("");
+              setCancelNotice(null);
               resetPurchaseForm();
               setIsCreateOpen(true);
             }}

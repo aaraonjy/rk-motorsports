@@ -911,7 +911,7 @@ export function AdminPurchaseInvoiceClient(props: Props) {
         locationId: line.locationId || props.defaultLocationId,
         batchNo: line.batchNo || "",
         serialNos: Array.isArray(line.serialNos) ? line.serialNos : [],
-        taxCodeId: line.taxCodeId || "",
+        taxCodeId: editingTransaction || isRevisionMode ? "" : line.taxCodeId || "",
         remarks: line.remarks || "",
       })),
     );
@@ -1230,7 +1230,7 @@ export function AdminPurchaseInvoiceClient(props: Props) {
         locationId: line.locationId || props.defaultLocationId,
         batchNo: line.batchNo || "",
         serialNos: Array.isArray(line.serialNos) ? line.serialNos : [],
-        taxCodeId: line.taxCodeId || "",
+        taxCodeId: editingTransaction || isRevisionMode ? "" : line.taxCodeId || "",
         remarks: line.remarks || "",
       })),
     );
@@ -1400,6 +1400,7 @@ export function AdminPurchaseInvoiceClient(props: Props) {
       ),
     ]);
     setActiveTab("HEADER");
+    setCancelNotice(null);
     setGeneratedSourceLabel("");
   }
 
