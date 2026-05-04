@@ -226,7 +226,7 @@ export default async function AdminCreditNoteDetailPage({ params }: Params) {
           </div>
 
           <div className="mt-6 grid gap-5 md:grid-cols-2">
-            <ReadonlyTextArea label="Reason / Remarks" value={transaction.remarks || ""} />
+            <ReadonlyTextArea label="Remarks" value={transaction.remarks || ""} />
             <ReadonlyTextArea label="Footer Remarks" value={transaction.footerRemarks || ""} />
           </div>
 
