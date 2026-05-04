@@ -625,6 +625,8 @@ function getBalanceDisplay(value: number | undefined, isLoading: boolean, decima
 }
 
 function hasActiveDownstreamTransaction(transaction: QuotationRecord) {
+  if (transaction.status === "CONFIRMED") return true;
+
   const targetLinks = Array.isArray(transaction.targetLinks) ? transaction.targetLinks : [];
 
   return targetLinks.some((link: any) => {
