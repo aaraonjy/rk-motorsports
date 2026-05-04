@@ -1116,10 +1116,12 @@ export function AdminPurchaseOrderClient(props: Props) {
     );
   }
 
+  function isActionLocked(item: PurchaseTransactionRecord) {
+    return item.status !== "CANCELLED" && hasActiveDownstream(item);
+  }
+
   function getDisplayStatus(item: PurchaseTransactionRecord) {
-    return item.status !== "CANCELLED" && hasActiveDownstream(item)
-      ? "LOCKED"
-      : item.status;
+    return item.status;
   }
 
   function openCancelDialog(item: PurchaseTransactionRecord) {
@@ -1409,7 +1411,7 @@ export function AdminPurchaseOrderClient(props: Props) {
                     </td>
                     <td className="px-4 py-4 text-right">{`${item.currency || "MYR"} ${money(item.grandTotal)}`}</td>
                     <td className="px-4 py-4 text-right">
-                      {getDisplayStatus(item) === "LOCKED" ? (
+                      {isActionLocked(item) ? (
                         <span className="rounded-xl border border-white/10 px-3 py-2 text-xs font-semibold tracking-[0.18em] text-white/45">
                           LOCKED
                         </span>

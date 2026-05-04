@@ -1318,6 +1318,17 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
     );
   }
 
+  function getGeneratedFromLabel(item: PurchaseTransactionRecord) {
+    const sourceDocNos = (item.targetLinks || [])
+      .map((link) => link.sourceTransaction)
+      .filter(
+        (source): source is NonNullable<typeof source> =>
+          Boolean(source?.docNo) && source?.status !== "CANCELLED",
+      )
+      .map((source) => String(source.docNo));
+    return sourceDocNos.length > 0 ? Array.from(new Set(sourceDocNos)).join(", ") : "-";
+  }
+
   function openCancelDialog(item: PurchaseTransactionRecord) {
     if (hasActiveDownstream(item)) {
       setError(
@@ -1569,6 +1580,7 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
                 <th className="px-4 py-3">Doc No</th>
                 <th className="px-4 py-3">Date</th>
                 <th className="px-4 py-3">Supplier</th>
+                <th className="px-4 py-3">Generated From</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3 text-right">Grand Total</th>
                 <th className="px-4 py-3 text-right">Action</th>
@@ -1578,7 +1590,7 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
               {visibleTransactions.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={6}
+                    colSpan={7}
                     className="px-4 py-8 text-center text-white/50"
                   >
                     No {TITLE.toLowerCase()} found.
@@ -1613,6 +1625,9 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
                       <div className="text-xs text-white/45">
                         {item.supplierAccountNo || "-"}
                       </div>
+                    </td>
+                    <td className="px-4 py-4 text-white/65">
+                      {getGeneratedFromLabel(item)}
                     </td>
                     <td className="px-4 py-4">
                       <span
