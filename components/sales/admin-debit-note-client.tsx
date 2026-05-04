@@ -409,7 +409,11 @@ export function AdminDebitNoteClient({ initialProducts, initialLocations, defaul
     setDepartmentId(invoice.departmentId || "");
   }
 
-  function openDocNoModal() { setDocNoDraft(""); setIsDocNoModalOpen(true); }
+  function openDocNoModal() {
+    setDocNoDraft("");
+    setSubmitError("");
+    setIsDocNoModalOpen(true);
+  }
   function applyDocNoOverride() { setDocNo(normalizeDocNoInput(docNoDraft)); setIsDocNoModalOpen(false); }
   function clearDocNoOverride() { setDocNo(""); setDocNoDraft(""); setIsDocNoModalOpen(false); }
 

@@ -1420,7 +1420,13 @@ export function AdminCashSalesClient({
   }, [balances, products, lines, loadingBalances]);
 
   function saveDocNoOverride() {
-    setDocNo(normalizeDocNoInput(docNoDraft));
+    const nextDocNo = normalizeDocNoInput(docNoDraft);
+    if (nextDocNo && !/^CS-\d{8}-\d{4}$/.test(nextDocNo)) {
+      setSubmitError("Cash Sales No must use CS-YYYYMMDD-0001 format.");
+      return;
+    }
+    setSubmitError("");
+    setDocNo(nextDocNo);
     setIsDocNoModalOpen(false);
   }
 
@@ -2149,7 +2155,7 @@ export function AdminCashSalesClient({
                   </div>
                   <div className="xl:col-span-3">
                     <label className="label-rk">System Doc No</label>
-                    <button type="button" onClick={() => { setDocNoDraft(""); setIsDocNoModalOpen(true); }} className="input-rk flex w-full items-center justify-between gap-3 pr-6 text-left">
+                    <button type="button" onClick={() => { setDocNoDraft(""); setSubmitError(""); setIsDocNoModalOpen(true); }} className="input-rk flex w-full items-center justify-between gap-3 pr-6 text-left">
                       <span className="truncate text-white">{systemDocNoPreview}</span>
                       <span className="shrink-0 text-xs text-white/50">Click to override</span>
                     </button>

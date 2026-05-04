@@ -948,11 +948,18 @@ export function AdminSalesOrderClient({
 
   function openDocNoModal() {
     setDocNoDraft("");
+    setSubmitError("");
     setIsDocNoModalOpen(true);
   }
 
   function saveDocNoOverride() {
-    setDocNo(normalizeDocNoInput(docNoDraft));
+    const nextDocNo = normalizeDocNoInput(docNoDraft);
+    if (nextDocNo && !/^SO-\d{8}-\d{4}$/.test(nextDocNo)) {
+      setSubmitError("Sales Order No must use SO-YYYYMMDD-0001 format.");
+      return;
+    }
+    setSubmitError("");
+    setDocNo(nextDocNo);
     setIsDocNoModalOpen(false);
   }
 

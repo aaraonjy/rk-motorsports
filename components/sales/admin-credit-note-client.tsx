@@ -449,6 +449,7 @@ export function AdminCreditNoteClient({ initialTaxCodes, initialAgents, initialP
 
   function openDocNoModal() {
     setDocNoDraft("");
+    setSubmitError("");
     setIsDocNoModalOpen(true);
   }
 

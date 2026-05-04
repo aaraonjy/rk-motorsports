@@ -829,11 +829,18 @@ export function AdminSalesQuotationClient({
 
   function openDocNoModal() {
     setDocNoDraft("");
+    setSubmitError("");
     setIsDocNoModalOpen(true);
   }
 
   function saveDocNoOverride() {
-    setDocNo(normalizeDocNoInput(docNoDraft));
+    const nextDocNo = normalizeDocNoInput(docNoDraft);
+    if (nextDocNo && !/^QO-\d{8}-\d{4}$/.test(nextDocNo)) {
+      setSubmitError("Quotation No must use QO-YYYYMMDD-0001 format.");
+      return;
+    }
+    setSubmitError("");
+    setDocNo(nextDocNo);
     setIsDocNoModalOpen(false);
   }
 

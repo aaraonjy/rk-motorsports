@@ -390,6 +390,7 @@ export function AdminDeliveryReturnClient({ initialAgents, initialProjects, init
 
   function openDocNoModal() {
     setDocNoDraft("");
+    setSubmitError("");
     setIsDocNoModalOpen(true);
   }
 
