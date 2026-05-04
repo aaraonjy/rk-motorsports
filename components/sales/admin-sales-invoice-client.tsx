@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   calculateLineItemTaxBreakdown,
   calculateTaxBreakdown,
@@ -1004,6 +1004,9 @@ export function AdminSalesInvoiceClient({
   taxConfig,
 }: Props) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const editQueryId = searchParams.get("edit") || "";
+  const autoOpenedEditIdRef = useRef<string | null>(null);
   const qtyDecimalPlaces = getDecimalPlaces(stockNumberFormat.qtyDecimalPlaces, 2);
   const priceDecimalPlaces = getDecimalPlaces(stockNumberFormat.priceDecimalPlaces, 2);
   const qtyInputStep = decimalStep(qtyDecimalPlaces);
@@ -1442,6 +1445,39 @@ export function AdminSalesInvoiceClient({
   useEffect(() => {
     void loadTransactions();
   }, [searchKeyword, statusFilter, currentPage]);
+  useEffect(() => {
+    if (!editQueryId || autoOpenedEditIdRef.current === editQueryId) return;
+
+    let isCancelled = false;
+
+    async function openEditFromQuery() {
+      const existingTransaction = transactions.find((item) => item.id === editQueryId);
+
+      if (existingTransaction) {
+        autoOpenedEditIdRef.current = editQueryId;
+        openEdit(existingTransaction);
+        router.replace("/admin/sales/sales-invoice", { scroll: false });
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/admin/sales/sales-invoice/${editQueryId}`, { cache: "no-store" });
+        const payload = await response.json().catch(() => ({}));
+        if (isCancelled || !response.ok || !payload.ok || !payload.transaction) return;
+
+        autoOpenedEditIdRef.current = editQueryId;
+        openEdit(payload.transaction);
+        router.replace("/admin/sales/sales-invoice", { scroll: false });
+      } catch {}
+    }
+
+    void openEditFromQuery();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [editQueryId, router, transactions]);
+
 
   useEffect(() => {
     if (isCreateOpen && formMode === "create" && !docNo) void loadNextDocNo(docDate);
