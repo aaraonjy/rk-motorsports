@@ -688,7 +688,7 @@ async function validatePurchaseSourceAvailability(
       throw new Error("All source documents must belong to the selected supplier.");
     }
     const hasActiveRevision = source.revisions.some(
-      (revision) => revision.status !== "CANCELLED",
+      (revision: { status?: string | null }) => revision.status !== "CANCELLED",
     );
     if (hasActiveRevision) {
       throw new Error("Source document has been revised. Please generate from the latest revision document.");
@@ -834,7 +834,7 @@ export async function createPurchaseTransaction(
         throw new Error("Original document for revision was not found.");
       }
       const hasActiveRevision = latestRevisedFrom.revisions.some(
-        (revision) => revision.status !== "CANCELLED",
+        (revision: { status?: string | null }) => revision.status !== "CANCELLED",
       );
       if (hasActiveRevision) {
         throw new Error("This document has already been revised. Please edit the latest revision document instead.");
@@ -1052,7 +1052,7 @@ export async function updatePurchaseTransaction(
       throw new Error("Cancelled document cannot be edited.");
 
     const hasActiveRevision = current.revisions.some(
-      (revision) => revision.status !== "CANCELLED",
+      (revision: { status?: string | null }) => revision.status !== "CANCELLED",
     );
     if (hasActiveRevision) {
       throw new Error(
