@@ -2421,8 +2421,8 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
       ) : null}
 
       {isGenerateFromOpen ? (
-        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-5xl rounded-[2rem] border border-white/10 bg-[#08080c] p-6 shadow-2xl">
+        <div className="fixed inset-0 z-[150] overflow-y-auto bg-black/75 px-4 py-8 backdrop-blur-sm">
+          <div className="mx-auto w-full max-w-5xl rounded-[2rem] border border-white/10 bg-[#08080c] p-6 shadow-2xl">
             <p className="text-sm font-semibold uppercase tracking-[0.24em] text-sky-300/80">
               Generate From
             </p>
