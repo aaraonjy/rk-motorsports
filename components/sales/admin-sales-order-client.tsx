@@ -1156,14 +1156,20 @@ export function AdminSalesOrderClient({
         if (quotation.customerId !== customerId) return false;
         if (quotation.status !== "PENDING") return false;
 
+        const hasActiveRevision =
+          Array.isArray(quotation.revisions) &&
+          quotation.revisions.some((revision) => revision.status !== "CANCELLED");
+        if (hasActiveRevision) return false;
+
         const hasActiveDownstreamSalesDocument = (
           quotation.targetLinks || []
         ).some((link) => {
           const target = link.targetTransaction;
           if (!target || target.status === "CANCELLED") return false;
-          return ["SO", "DO", "INV", "CS"].includes(
-            String(target.docType || "").toUpperCase(),
-          );
+
+          const targetDocType = String(target.docType || "").toUpperCase();
+          if (targetDocType === "QO") return true;
+          return ["SO", "DO", "INV", "CS"].includes(targetDocType);
         });
         if (hasActiveDownstreamSalesDocument) return false;
 
