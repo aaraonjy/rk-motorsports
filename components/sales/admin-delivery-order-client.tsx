@@ -110,6 +110,8 @@ type SourceSalesOrderRecord = {
   footerRemarks?: string | null;
   status: string;
   grandTotal: string | number;
+  revisedFrom?: { id: string; docNo?: string | null } | null;
+  revisions?: Array<{ id: string; docNo?: string | null; status?: string | null }>;
   lines?: Array<{
     id: string;
     inventoryProductId?: string | null;
@@ -1071,6 +1073,12 @@ export function AdminDeliveryOrderClient({
       if (!customerId) return false;
       if (order.customerId !== customerId) return false;
       if (order.status === "CANCELLED" || order.status === "COMPLETED") return false;
+
+      const hasActiveRevision =
+        Array.isArray(order.revisions) &&
+        order.revisions.some((revision) => revision.status !== "CANCELLED");
+      if (hasActiveRevision) return false;
+
       return (order.lines || []).some((line) => Number(line.remainingDeliveryQty || 0) > 0);
     }));
   }, [customerId, initialSalesOrders]);

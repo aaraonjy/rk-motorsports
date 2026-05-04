@@ -1168,7 +1168,7 @@ export function AdminSalesOrderClient({
           if (!target || target.status === "CANCELLED") return false;
 
           const targetDocType = String(target.docType || "").toUpperCase();
-          if (targetDocType === "QO") return true;
+          if (targetDocType === "QO") return false;
           return ["SO", "DO", "INV", "CS"].includes(targetDocType);
         });
         if (hasActiveDownstreamSalesDocument) return false;

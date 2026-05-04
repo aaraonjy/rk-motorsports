@@ -194,6 +194,8 @@ export default async function AdminSalesInvoicePage() {
       where: { docType: { in: ["DO", "SO"] }, status: { not: "CANCELLED" } },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       include: {
+        revisedFrom: { select: { id: true, docNo: true } },
+        revisions: { select: { id: true, docNo: true, status: true } },
         lines: {
           orderBy: { lineNo: "asc" },
           include: {
@@ -333,6 +335,12 @@ export default async function AdminSalesInvoicePage() {
             footerRemarks: order.footerRemarks,
             status: order.status,
             grandTotal: Number(order.grandTotal ?? 0),
+            revisedFrom: order.revisedFrom ? { id: order.revisedFrom.id, docNo: order.revisedFrom.docNo } : null,
+            revisions: order.revisions.map((revision) => ({
+              id: revision.id,
+              docNo: revision.docNo,
+              status: revision.status,
+            })),
             lines: order.lines.map((line) => {
               const itemType = line.inventoryProduct?.itemType || "STOCK_ITEM";
               const invoicedQty = sumLinkedQty(line, "INVOICED_TO");

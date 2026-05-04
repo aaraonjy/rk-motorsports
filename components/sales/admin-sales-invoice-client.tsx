@@ -117,6 +117,8 @@ type SourceSalesOrderRecord = {
   footerRemarks?: string | null;
   status: string;
   grandTotal: string | number;
+  revisedFrom?: { id: string; docNo?: string | null } | null;
+  revisions?: Array<{ id: string; docNo?: string | null; status?: string | null }>;
   lines?: Array<{
     id: string;
     inventoryProductId?: string | null;
@@ -1208,6 +1210,12 @@ export function AdminSalesInvoiceClient({
       if (order.customerId !== customerId) return false;
       if (order.status === "CANCELLED" || order.status === "COMPLETED") return false;
       if (selectedSourceType && !String(order.docNo || "").toUpperCase().startsWith(`${selectedSourceType}-`)) return false;
+
+      const hasActiveRevision =
+        Array.isArray(order.revisions) &&
+        order.revisions.some((revision) => revision.status !== "CANCELLED");
+      if (hasActiveRevision) return false;
+
       return (order.lines || []).some((line) => {
         const itemType = line.itemType === "SERVICE_ITEM" || line.itemType === "NON_STOCK_ITEM" ? line.itemType : "STOCK_ITEM";
         return itemType === "SERVICE_ITEM" ? Number(line.remainingInvoiceAmount || 0) > 0 : Number(line.remainingInvoiceQty || 0) > 0;
