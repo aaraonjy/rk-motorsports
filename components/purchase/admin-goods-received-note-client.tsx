@@ -207,8 +207,8 @@ const TITLE = "Goods Received Note";
 const SUBTITLE =
   "Receive stock from supplier, with optional generation from Purchase Order.";
 const API_PATH = "/api/admin/purchase/goods-received-note";
-const SOURCE_MODAL_TITLE = "Select Purchase Order";
-const SOURCE_MODAL_DESCRIPTION = "Select one pending Purchase Order for the selected supplier, then import it into this Goods Received Note.";
+const SOURCE_MODAL_TITLE = "Pick From Purchase Order";
+const SOURCE_MODAL_DESCRIPTION = "Only Purchase Orders with remaining receive qty are shown.";
 const DETAIL_PATH = "/admin/purchase/goods-received-note";
 const SELECT_RK = "input-rk appearance-none pr-12";
 const SELECT_STYLE = {
@@ -634,6 +634,7 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
   const [sourceSearch, setSourceSearch] = useState("");
   const [selectedSourceId, setSelectedSourceId] = useState("");
   const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>([]);
+  const [sourceProductsLoaded, setSourceProductsLoaded] = useState(false);
   const [sourceLineQty, setSourceLineQty] = useState<Record<string, string>>({});
   const [generatedSourceLabel, setGeneratedSourceLabel] = useState("");
   const isBodyLocked = Boolean(isGeneratedFromSource || generatedSourceLabel);
@@ -980,6 +981,7 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
     setSourceSearch("");
     setSelectedSourceId("");
     setSelectedSourceIds([]);
+    setSourceProductsLoaded(false);
     setSourceLineQty({});
     setIsGenerateFromOpen(true);
   }
@@ -1001,28 +1003,35 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
     [props.sourceDocuments, selectedSourceIds],
   );
 
-  const selectedSourceLines = useMemo(() => {
+  function getSourceLineKey(source: PurchaseTransactionRecord, line: NonNullable<PurchaseTransactionRecord["lines"]>[number], index = 0) {
+    return `${source.id}::${line.id || line.productCode || index}`;
+  }
+
+  const selectedSourceLinesRaw = useMemo(() => {
     return selectedSourceDocuments.flatMap((source) =>
-      (source.lines || []).map((line) => {
-        const key = `${source.id}::${line.id || line.productCode || Math.random().toString(36).slice(2)}`;
-        return { source, line, key, remainingQty: getSourceLineRemainingQty(line) };
-      }).filter((entry) => entry.remainingQty > 0),
+      (source.lines || [])
+        .map((line, index) => {
+          const key = getSourceLineKey(source, line, index);
+          return { source, line, key, remainingQty: getSourceLineRemainingQty(line) };
+        })
+        .filter((entry) => entry.remainingQty > 0),
     );
   }, [selectedSourceDocuments]);
 
+  const selectedSourceLines = useMemo(
+    () => (sourceProductsLoaded ? selectedSourceLinesRaw : []),
+    [sourceProductsLoaded, selectedSourceLinesRaw],
+  );
+
   function toggleSourceDocument(source: PurchaseTransactionRecord) {
+    setSourceProductsLoaded(false);
     setSelectedSourceIds((prev) => {
       const exists = prev.includes(source.id);
       const next = exists ? prev.filter((id) => id !== source.id) : [...prev, source.id];
       setSourceLineQty((current) => {
         const updated = { ...current };
         if (exists) {
-          for (const line of source.lines || []) delete updated[`${source.id}::${line.id || line.productCode || ""}`];
-        } else {
-          for (const line of source.lines || []) {
-            const key = `${source.id}::${line.id || line.productCode || ""}`;
-            updated[key] = formatDecimalInput(getSourceLineRemainingQty(line), qtyDecimalPlaces);
-          }
+          for (const [index, line] of (source.lines || []).entries()) delete updated[getSourceLineKey(source, line, index)];
         }
         return updated;
       });
@@ -1030,8 +1039,43 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
     });
   }
 
+  function loadSelectedSourceProducts() {
+    setGenerateFromError("");
+    if (selectedSourceDocuments.length === 0) {
+      setGenerateFromError("Please select at least one source document first.");
+      return;
+    }
+    const nextQty: Record<string, string> = {};
+    for (const source of selectedSourceDocuments) {
+      for (const [index, line] of (source.lines || []).entries()) {
+        const remainingQty = getSourceLineRemainingQty(line);
+        if (remainingQty <= 0) continue;
+        nextQty[getSourceLineKey(source, line, index)] = formatDecimalInput(remainingQty, qtyDecimalPlaces);
+      }
+    }
+    setSourceLineQty(nextQty);
+    setSourceProductsLoaded(true);
+  }
+
+  function updateSourceLineQty(key: string, value: string, remainingQty: number) {
+    const numeric = Number(value || 0);
+    const safeValue = Number.isFinite(numeric) ? Math.min(Math.max(0, numeric), remainingQty) : 0;
+    setSourceLineQty((prev) => ({ ...prev, [key]: String(value).endsWith(".") ? value : formatDecimalInput(safeValue, qtyDecimalPlaces) }));
+  }
+
   function importSelectedSourceDocuments() {
-    if (selectedSourceDocuments.length === 0) return;
+    if (!sourceProductsLoaded) {
+      setGenerateFromError("Please click Load Product before importing.");
+      return;
+    }
+    const selectedImportLines = selectedSourceLines.filter(({ key, remainingQty }) => {
+      const qty = Number(sourceLineQty[key] || 0);
+      return qty > 0 && qty <= remainingQty;
+    });
+    if (selectedSourceDocuments.length === 0 || selectedImportLines.length === 0) {
+      setGenerateFromError("Please enter a valid quantity for at least one product line.");
+      return;
+    }
     const first = selectedSourceDocuments[0];
     setForm((prev) => ({
       ...prev,
@@ -1052,7 +1096,7 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
       bankAccount: first.bankAccount || prev.bankAccount,
       footerRemarks: first.footerRemarks || prev.footerRemarks,
     }));
-    setLines(selectedSourceLines.map(({ source, line, key, remainingQty }) => ({
+    setLines(selectedImportLines.map(({ source, line, key, remainingQty }) => ({
       sourceLineId: line.id || "",
       sourceTransactionId: source.id,
       inventoryProductId: line.inventoryProductId || "",
@@ -2155,6 +2199,12 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
               <input className="input-rk" value={sourceSearch} onChange={(event) => setSourceSearch(event.target.value)} placeholder="Search document no / supplier" />
             </div>
 
+            {generateFromError ? (
+              <div className="mt-5 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+                {generateFromError}
+              </div>
+            ) : null}
+
             <div className="mt-5 max-h-64 overflow-y-auto rounded-2xl border border-white/10">
               {filteredSourceDocuments.length === 0 ? (
                 <div className="px-4 py-8 text-center text-sm text-white/50">No pending source document found for this supplier.</div>
@@ -2183,7 +2233,7 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
               )}
             </div>
 
-            {selectedSourceLines.length > 0 ? (
+            {sourceProductsLoaded && selectedSourceLines.length > 0 ? (
               <div className="mt-6 overflow-hidden rounded-2xl border border-white/10">
                 <div className="grid grid-cols-[1.2fr_1.8fr_0.8fr_0.8fr_1fr] gap-4 border-b border-white/10 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-white/45">
                   <div>Document</div>
@@ -2209,7 +2259,7 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
                         max={remainingQty}
                         step="0.001"
                         value={sourceLineQty[key] ?? formatDecimalInput(remainingQty, qtyDecimalPlaces)}
-                        onChange={(event) => setSourceLineQty((prev) => ({ ...prev, [key]: event.target.value }))}
+                        onChange={(event) => updateSourceLineQty(key, event.target.value, remainingQty)}
                       />
                     </div>
                   </div>
@@ -2219,14 +2269,25 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
 
             <div className="mt-6 flex justify-end gap-3">
               <button type="button" onClick={() => setIsGenerateFromOpen(false)} className="rounded-xl border border-white/15 px-5 py-3 text-sm text-white/75 transition hover:bg-white/10">Close</button>
-              <button
-                type="button"
-                disabled={selectedSourceLines.length === 0}
-                onClick={importSelectedSourceDocuments}
-                className="rounded-xl bg-red-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-red-400 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Import Selected
-              </button>
+              {!sourceProductsLoaded ? (
+                <button
+                  type="button"
+                  disabled={selectedSourceDocuments.length === 0}
+                  onClick={loadSelectedSourceProducts}
+                  className="rounded-xl border border-sky-500/40 bg-sky-500/10 px-6 py-3 text-sm font-semibold text-sky-100 transition hover:bg-sky-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Load Product
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  disabled={selectedSourceLines.length === 0}
+                  onClick={importSelectedSourceDocuments}
+                  className="rounded-xl bg-red-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-red-400 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Import Selected
+                </button>
+              )}
             </div>
           </div>
         </div>

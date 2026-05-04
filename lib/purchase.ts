@@ -364,6 +364,49 @@ function shouldPostStock(docType: PurchaseDocType, sourceDocType?: PurchaseDocTy
   return false;
 }
 
+
+async function assertSourceLineQuantitiesAvailable(
+  tx: Prisma.TransactionClient,
+  docType: PurchaseDocType,
+  sourceTransactions: Array<{ id: string; docType: PurchaseDocType; status: PurchaseTransactionStatus }>,
+  lines: Awaited<ReturnType<typeof mapLines>>,
+  firstSourceTransactionId: string | null,
+) {
+  if (sourceTransactions.length === 0) return;
+  const sourceLineIds = Array.from(new Set(lines.map((line) => line.sourceLineId).filter(Boolean) as string[]));
+  if (sourceLineIds.length === 0) return;
+
+  const sourceLines = await tx.purchaseTransactionLine.findMany({
+    where: { id: { in: sourceLineIds } },
+    include: { sourceLineLinks: { include: { targetTransaction: true } } },
+  });
+  const sourceLineMap = new Map(sourceLines.map((line) => [line.id, line]));
+
+  for (const line of lines) {
+    const sourceLineId = line.sourceLineId;
+    if (!sourceLineId) continue;
+    const sourceLine = sourceLineMap.get(sourceLineId);
+    if (!sourceLine) throw new Error("Selected source line is not available.");
+
+    const lineSourceTransactionId = line.sourceTransactionId || firstSourceTransactionId;
+    const sourceTransaction = sourceTransactions.find((source) => source.id === lineSourceTransactionId);
+    if (!sourceTransaction) throw new Error("Selected source document is not available.");
+
+    const linkType: PurchaseLineLinkType = docType === "GRN" ? "RECEIVED_TO" : "INVOICED_TO";
+    const usedQty = sourceLine.sourceLineLinks
+      .filter((link) => link.targetTransaction.status !== "CANCELLED")
+      .filter((link) => link.linkType === linkType)
+      .reduce((sum, link) => sum + toNumber(link.qty), 0);
+    const remainingQty = Math.max(0, toNumber(sourceLine.qty) - usedQty);
+    const requestedQty = toNumber(line.qty);
+
+    if (requestedQty <= 0) throw new Error("Selected source quantity must be greater than zero.");
+    if (requestedQty > remainingQty + 0.0001) {
+      throw new Error(`Line ${line.lineNo}: quantity cannot exceed remaining source quantity.`);
+    }
+  }
+}
+
 export async function createPurchaseTransaction(docType: PurchaseDocType, body: PurchasePayload, adminId: string) {
   return db.$transaction(async (tx) => {
     const docDate = normalizeDate(body.docDate);
@@ -390,6 +433,8 @@ export async function createPurchaseTransaction(docType: PurchaseDocType, body: 
     const firstSourceTransactionId = sourceTransactionIds[0] || null;
     const firstSource = firstSourceTransactionId ? sourceTransactions.find((source) => source.id === firstSourceTransactionId) : null;
     let sourceDocType: PurchaseDocType | null = firstSource?.docType || null;
+
+    await assertSourceLineQuantitiesAvailable(tx, docType, sourceTransactions as Array<{ id: string; docType: PurchaseDocType; status: PurchaseTransactionStatus }>, lines, firstSourceTransactionId);
 
     const transaction = await tx.purchaseTransaction.create({
       data: {
