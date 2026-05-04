@@ -42,6 +42,39 @@ type PurchaseLinePayload = {
   remarks?: string | null;
 };
 
+
+type PurchaseSourceRevisionRecord = {
+  id: string;
+  status?: string | null;
+};
+
+type PurchaseSourceRecord = {
+  id: string;
+  docType: PurchaseDocType;
+  status?: string | null;
+  supplierId?: string | null;
+  revisions: PurchaseSourceRevisionRecord[];
+};
+
+type PurchaseSourceLineLinkRecord = {
+  linkType: PurchaseLineLinkType;
+  qty: Prisma.Decimal | number | string | null;
+  targetTransaction: { status?: string | null };
+};
+
+type PurchaseSourceLineRecord = {
+  id: string;
+  transactionId: string;
+  lineNo: number;
+  qty: Prisma.Decimal | number | string | null;
+  transaction: {
+    id: string;
+    docType: PurchaseDocType;
+    status?: string | null;
+  };
+  sourceLineLinks: PurchaseSourceLineLinkRecord[];
+};
+
 type PurchasePayload = {
   docNo?: string | null;
   docDate?: string | null;
@@ -521,13 +554,13 @@ async function refreshSourceStatus(
   let all = true;
   for (const line of source.lines) {
     const fulfilled = line.sourceLineLinks
-      .filter((link) => link.targetTransaction.status !== "CANCELLED")
+      .filter((link: PurchaseSourceLineLinkRecord) => link.targetTransaction.status !== "CANCELLED")
       .filter(
-        (link) =>
+        (link: PurchaseSourceLineLinkRecord) =>
           link.linkType === linkType ||
           (source.docType === "PO" && link.linkType === altLinkType),
       )
-      .reduce((sum, link) => sum + toNumber(link.qty), 0);
+      .reduce((sum: number, link: PurchaseSourceLineLinkRecord) => sum + toNumber(link.qty), 0);
     if (fulfilled > 0) any = true;
     if (fulfilled + 0.0001 < toNumber(line.qty)) all = false;
   }
@@ -658,7 +691,7 @@ async function validatePurchaseSourceAvailability(
     new Set(sourceLineRequests.map((line) => line.sourceLineId!)),
   );
 
-  const sources: Array<any> = await tx.purchaseTransaction.findMany({
+  const sources: PurchaseSourceRecord[] = await tx.purchaseTransaction.findMany({
     where: { id: { in: sourceTransactionIds } },
     select: {
       id: true,
@@ -675,7 +708,7 @@ async function validatePurchaseSourceAvailability(
 
   const allowedSourceDocTypes: PurchaseDocType[] =
     docType === "GRN" ? ["PO"] : ["PO", "GRN"];
-  const sourceMap = new Map<string, any>(sources.map((source) => [source.id, source]));
+  const sourceMap = new Map<string, PurchaseSourceRecord>(sources.map((source) => [source.id, source]));
 
   for (const source of sources) {
     if (source.status === "CANCELLED") {
@@ -688,7 +721,7 @@ async function validatePurchaseSourceAvailability(
       throw new Error("All source documents must belong to the selected supplier.");
     }
     const hasActiveRevision = source.revisions.some(
-      (revision: { status?: string | null }) => revision.status !== "CANCELLED",
+      (revision: PurchaseSourceRevisionRecord) => revision.status !== "CANCELLED",
     );
     if (hasActiveRevision) {
       throw new Error("Source document has been revised. Please generate from the latest revision document.");
@@ -704,7 +737,7 @@ async function validatePurchaseSourceAvailability(
     );
   }
 
-  const sourceLines: Array<any> = await tx.purchaseTransactionLine.findMany({
+  const sourceLines: PurchaseSourceLineRecord[] = await tx.purchaseTransactionLine.findMany({
     where: { id: { in: sourceLineIds } },
     include: {
       transaction: { select: { id: true, docType: true, status: true } },
@@ -716,7 +749,7 @@ async function validatePurchaseSourceAvailability(
     throw new Error("Source document line is not available.");
   }
 
-  const sourceLineMap = new Map<string, any>(sourceLines.map((line) => [line.id, line]));
+  const sourceLineMap = new Map<string, PurchaseSourceLineRecord>(sourceLines.map((line) => [line.id, line]));
   const requestedQtyByLine = new Map<string, number>();
 
   for (const request of sourceLineRequests) {
@@ -747,9 +780,9 @@ async function validatePurchaseSourceAvailability(
     const sourceLine = sourceLineMap.get(sourceLineId);
     if (!sourceLine) continue;
     const fulfilledQty = sourceLine.sourceLineLinks
-      .filter((link) => link.targetTransaction.status !== "CANCELLED")
-      .filter((link) => link.linkType === linkType)
-      .reduce((sum, link) => sum + toNumber(link.qty), 0);
+      .filter((link: PurchaseSourceLineLinkRecord) => link.targetTransaction.status !== "CANCELLED")
+      .filter((link: PurchaseSourceLineLinkRecord) => link.linkType === linkType)
+      .reduce((sum: number, link: PurchaseSourceLineLinkRecord) => sum + toNumber(link.qty), 0);
     const remainingQty = Math.max(0, toNumber(sourceLine.qty) - fulfilledQty);
     if (requestedQty > remainingQty + 0.0001) {
       throw new Error(
@@ -834,7 +867,7 @@ export async function createPurchaseTransaction(
         throw new Error("Original document for revision was not found.");
       }
       const hasActiveRevision = latestRevisedFrom.revisions.some(
-        (revision: { status?: string | null }) => revision.status !== "CANCELLED",
+        (revision: PurchaseSourceRevisionRecord) => revision.status !== "CANCELLED",
       );
       if (hasActiveRevision) {
         throw new Error("This document has already been revised. Please edit the latest revision document instead.");
@@ -1052,7 +1085,7 @@ export async function updatePurchaseTransaction(
       throw new Error("Cancelled document cannot be edited.");
 
     const hasActiveRevision = current.revisions.some(
-      (revision: { status?: string | null }) => revision.status !== "CANCELLED",
+      (revision: PurchaseSourceRevisionRecord) => revision.status !== "CANCELLED",
     );
     if (hasActiveRevision) {
       throw new Error(
@@ -1378,9 +1411,9 @@ export async function loadPurchaseSources(docType: PurchaseDocType) {
                 ? "RECEIVED_TO"
                 : "INVOICED_TO";
           const usedQty = line.sourceLineLinks
-            .filter((link) => link.targetTransaction.status !== "CANCELLED")
-            .filter((link) => link.linkType === linkType)
-            .reduce((sum, link) => sum + toNumber(link.qty), 0);
+            .filter((link: PurchaseSourceLineLinkRecord) => link.targetTransaction.status !== "CANCELLED")
+            .filter((link: PurchaseSourceLineLinkRecord) => link.linkType === linkType)
+            .reduce((sum: number, link: PurchaseSourceLineLinkRecord) => sum + toNumber(link.qty), 0);
           const remainingQty = Math.max(0, toNumber(line.qty) - usedQty);
           return { ...line, remainingQty };
         })
