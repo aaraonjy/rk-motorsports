@@ -592,7 +592,7 @@ export function AdminCreditNoteClient({ initialTaxCodes, initialAgents, initialP
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           docDate,
-          docNo: normalizeDocNoInput(docNo) && normalizeDocNoInput(docNo) !== normalizeDocNoInput(docNoPreview) ? normalizeDocNoInput(docNo) : undefined,
+          docNo: docNo.trim() || undefined,
           sourceTransactionId: selectedInvoice.id,
           reason,
           remarks,

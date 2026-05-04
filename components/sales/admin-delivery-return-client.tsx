@@ -500,7 +500,7 @@ export function AdminDeliveryReturnClient({ initialAgents, initialProjects, init
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           docDate,
-          docNo: normalizeDocNoInput(docNo) && normalizeDocNoInput(docNo) !== normalizeDocNoInput(docNoPreview) ? normalizeDocNoInput(docNo) : undefined,
+          docNo: docNo.trim() || undefined,
           docDesc: selectedSource ? `Delivery Return from ${selectedSource.docNo}` : "",
           sourceTransactionId: selectedSource.id,
           reason,
