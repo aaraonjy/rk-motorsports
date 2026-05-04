@@ -304,6 +304,34 @@ function getNextAutoDocNo(
   }
   return `${docType}-${compact}-${String(maxRunningNo + 1).padStart(4, "0")}`;
 }
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+function getRevisionBaseDocNo(docNo: string) {
+  const match = String(docNo || "").match(/^(.+-\d{4})(?:-\d+)?$/);
+  return match ? match[1] : String(docNo || "");
+}
+function getNextRevisionDocNo(
+  originalDocNo: string,
+  transactions: PurchaseTransactionRecord[],
+) {
+  const baseDocNo = getRevisionBaseDocNo(originalDocNo);
+  if (!baseDocNo) return "";
+  const pattern = new RegExp(`^${escapeRegExp(baseDocNo)}-(\\d+)$`);
+  let maxRevisionNo = 0;
+  for (const transaction of transactions) {
+    const currentDocNo = String(transaction.docNo || "");
+    const match = currentDocNo.match(pattern);
+    if (!match) continue;
+    const revisionNo = Number(match[1]);
+    if (Number.isFinite(revisionNo)) {
+      maxRevisionNo = Math.max(maxRevisionNo, revisionNo);
+    }
+  }
+  return `${baseDocNo}-${maxRevisionNo + 1}`;
+}
+
 function lineAmount(line: LineForm) {
   const qty = Math.max(0, Number(line.qty || 0));
   const unitCost = Math.max(0, Number(line.unitCost || 0));
@@ -980,9 +1008,16 @@ export function AdminPurchaseOrderClient(props: Props) {
     form.docDate,
     props.initialTransactions,
   );
+  const revisionDocNoPreview = reviseTransaction
+    ? getNextRevisionDocNo(reviseTransaction.docNo, props.initialTransactions)
+    : "";
   const docNoPreview =
     editingTransaction?.docNo ||
-    (manualDocNoEnabled ? docNo : autoDocNoPreview);
+    (isRevisionMode
+      ? revisionDocNoPreview
+      : manualDocNoEnabled
+        ? docNo
+        : autoDocNoPreview);
   const hasRequiredLine = lines.some(
     (line) => line.inventoryProductId && line.uom && Number(line.qty || 0) > 0,
   );
@@ -1534,7 +1569,7 @@ export function AdminPurchaseOrderClient(props: Props) {
                           />
                           <button
                             type="button"
-                            disabled={Boolean(editingTransaction)}
+                            disabled={Boolean(editingTransaction) || isRevisionMode}
                             onClick={() => {
                               setDocNoDraft(docNo);
                               setShowDocNoOverride(true);
