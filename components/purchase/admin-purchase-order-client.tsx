@@ -689,6 +689,13 @@ export function AdminPurchaseOrderClient(props: Props) {
   const [loadingBalances, setLoadingBalances] = useState<
     Record<string, boolean>
   >({});
+  const [balanceRefreshKey, setBalanceRefreshKey] = useState(0);
+
+  function refreshStockBalances() {
+    setBalances({});
+    setLoadingBalances({});
+    setBalanceRefreshKey((prev) => prev + 1);
+  }
 
   const [listingStatus, setListingStatus] = useState("ALL");
 
@@ -929,6 +936,7 @@ export function AdminPurchaseOrderClient(props: Props) {
         locationId: line.locationId,
       });
       if (batchNo) params.set("batchNo", batchNo);
+      params.set("_ts", `${Date.now()}-${balanceRefreshKey}`);
       fetch(`/api/admin/stock/balance?${params.toString()}`, {
         cache: "no-store",
       })
@@ -942,7 +950,7 @@ export function AdminPurchaseOrderClient(props: Props) {
           setLoadingBalances((prev) => ({ ...prev, [key]: false })),
         );
     }
-  }, [balances, props.initialProducts, lines, loadingBalances]);
+  }, [balances, props.initialProducts, lines, loadingBalances, balanceRefreshKey]);
 
   const headerTaxCode =
     props.taxConfig.taxCodes.find((item) => item.id === form.taxCodeId) || null;
@@ -1162,6 +1170,7 @@ export function AdminPurchaseOrderClient(props: Props) {
         cancelledAt: new Date(),
         reason: cancelReason.trim() || "Cancelled by admin",
       });
+      refreshStockBalances();
       router.refresh();
     } catch {
       setError(`Unable to cancel ${TITLE}.`);
@@ -1201,6 +1210,7 @@ export function AdminPurchaseOrderClient(props: Props) {
     ]);
     setActiveTab("HEADER");
     setCancelNotice(null);
+    refreshStockBalances();
   }
 
   async function submit(e: React.FormEvent) {
@@ -1248,6 +1258,7 @@ export function AdminPurchaseOrderClient(props: Props) {
               : `${TITLE} saved successfully.`,
         );
         setIsCreateOpen(false);
+        refreshStockBalances();
         router.push(DETAIL_PATH);
         router.refresh();
       } else {
@@ -1258,6 +1269,7 @@ export function AdminPurchaseOrderClient(props: Props) {
               ? `${TITLE} updated successfully.`
               : `${TITLE} saved successfully.`,
         );
+        refreshStockBalances();
         router.refresh();
       }
     } catch {

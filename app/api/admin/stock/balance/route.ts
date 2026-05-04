@@ -2,6 +2,12 @@ import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 
+const NO_STORE_HEADERS = {
+  "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+  Pragma: "no-cache",
+  Expires: "0",
+};
+
 export async function GET(req: Request) {
   try {
     await requireAdmin();
@@ -23,7 +29,7 @@ export async function GET(req: Request) {
       const qtyIn = Number(aggregate._sum.qtyIn ?? 0);
       const qtyOut = Number(aggregate._sum.qtyOut ?? 0);
       const balance = Math.round((qtyIn - qtyOut + Number.EPSILON) * 100) / 100;
-      return NextResponse.json({ ok: true, balance });
+      return NextResponse.json({ ok: true, balance }, { headers: NO_STORE_HEADERS });
     }
 
     const rows = await db.stockLedger.groupBy({
@@ -78,11 +84,11 @@ export async function GET(req: Request) {
       };
     });
 
-    return NextResponse.json({ ok: true, balances });
+    return NextResponse.json({ ok: true, balances }, { headers: NO_STORE_HEADERS });
   } catch (error) {
     return NextResponse.json(
       { ok: false, error: error instanceof Error ? error.message : "Unable to load stock balances." },
-      { status: error instanceof Error && error.message === "FORBIDDEN" ? 403 : 500 }
+      { status: error instanceof Error && error.message === "FORBIDDEN" ? 403 : 500, headers: NO_STORE_HEADERS }
     );
   }
 }
