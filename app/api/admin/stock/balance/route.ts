@@ -12,7 +12,8 @@ export async function GET(req: Request) {
   try {
     await requireAdmin();
     const { searchParams } = new URL(req.url);
-    const inventoryProductId = searchParams.get("inventoryProductId")?.trim() || undefined;
+    const inventoryProductId =
+      searchParams.get("inventoryProductId")?.trim() || undefined;
     const locationId = searchParams.get("locationId")?.trim() || undefined;
     const batchNo = searchParams.get("batchNo")?.trim() || undefined;
 
@@ -29,7 +30,10 @@ export async function GET(req: Request) {
       const qtyIn = Number(aggregate._sum.qtyIn ?? 0);
       const qtyOut = Number(aggregate._sum.qtyOut ?? 0);
       const balance = Math.round((qtyIn - qtyOut + Number.EPSILON) * 100) / 100;
-      return NextResponse.json({ ok: true, balance }, { headers: NO_STORE_HEADERS });
+      return NextResponse.json(
+        { ok: true, balance },
+        { headers: NO_STORE_HEADERS },
+      );
     }
 
     const rows = await db.stockLedger.groupBy({
@@ -45,7 +49,9 @@ export async function GET(req: Request) {
       },
     });
 
-    const productIds = Array.from(new Set(rows.map((row) => row.inventoryProductId)));
+    const productIds = Array.from(
+      new Set(rows.map((row) => row.inventoryProductId)),
+    );
     const locationIds = Array.from(new Set(rows.map((row) => row.locationId)));
 
     const [products, locations] = await Promise.all([
@@ -74,7 +80,8 @@ export async function GET(req: Request) {
         locationId: row.locationId,
         batchNo: row.batchNo ?? null,
         productCode: productMap.get(row.inventoryProductId)?.code ?? null,
-        productDescription: productMap.get(row.inventoryProductId)?.description ?? null,
+        productDescription:
+          productMap.get(row.inventoryProductId)?.description ?? null,
         baseUom: productMap.get(row.inventoryProductId)?.baseUom ?? null,
         locationCode: locationMap.get(row.locationId)?.code ?? null,
         locationName: locationMap.get(row.locationId)?.name ?? null,
@@ -84,11 +91,24 @@ export async function GET(req: Request) {
       };
     });
 
-    return NextResponse.json({ ok: true, balances }, { headers: NO_STORE_HEADERS });
+    return NextResponse.json(
+      { ok: true, balances },
+      { headers: NO_STORE_HEADERS },
+    );
   } catch (error) {
     return NextResponse.json(
-      { ok: false, error: error instanceof Error ? error.message : "Unable to load stock balances." },
-      { status: error instanceof Error && error.message === "FORBIDDEN" ? 403 : 500, headers: NO_STORE_HEADERS }
+      {
+        ok: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Unable to load stock balances.",
+      },
+      {
+        status:
+          error instanceof Error && error.message === "FORBIDDEN" ? 403 : 500,
+        headers: NO_STORE_HEADERS,
+      },
     );
   }
 }

@@ -545,6 +545,46 @@ function shouldPostStock(
   return false;
 }
 
+function shouldReverseStockOnCancel(transaction: {
+  docType: PurchaseDocType;
+  revisedFromId?: string | null;
+  stockTransactionId?: string | null;
+  targetLinks?: Array<{
+    sourceTransaction?: { docType?: PurchaseDocType | string | null } | null;
+  }>;
+}) {
+  if (transaction.stockTransactionId) return true;
+  if (transaction.revisedFromId) return false;
+  if (transaction.docType === "GRN") return true;
+  if (transaction.docType === "PI") {
+    const generatedFromGrn = (transaction.targetLinks || []).some(
+      (link) => link.sourceTransaction?.docType === "GRN",
+    );
+    return !generatedFromGrn;
+  }
+  return false;
+}
+
+function getStockReverseLinesFromPurchaseLines(
+  lines: Array<{
+    inventoryProductId?: string | null;
+    locationId?: string | null;
+    itemType?: string | null;
+    qty?: Prisma.Decimal | number | string | null;
+    unitCost?: Prisma.Decimal | number | string | null;
+    batchNo?: string | null;
+    remarks?: string | null;
+  }>,
+) {
+  return lines.filter(
+    (line) =>
+      line.inventoryProductId &&
+      line.locationId &&
+      line.itemType === "STOCK_ITEM" &&
+      toNumber(line.qty) > 0,
+  );
+}
+
 export async function createPurchaseTransaction(
   docType: PurchaseDocType,
   body: PurchasePayload,
@@ -626,7 +666,9 @@ export async function createPurchaseTransaction(
       new Set(sourceTransactions.map((source) => source.docType)),
     );
     if (docType === "PI" && distinctSourceDocTypes.length > 1) {
-      throw new Error("Please generate Purchase Invoice from either Purchase Order or Goods Received Note only.");
+      throw new Error(
+        "Please generate Purchase Invoice from either Purchase Order or Goods Received Note only.",
+      );
     }
     let sourceDocType: PurchaseDocType | null = sourceTransactions.some(
       (source) => source.docType === "GRN",
@@ -924,8 +966,9 @@ export async function cancelPurchaseTransaction(
     const current = await tx.purchaseTransaction.findUnique({
       where: { id },
       include: {
+        lines: true,
         sourceLinks: { include: { targetTransaction: true } },
-        targetLinks: true,
+        targetLinks: { include: { sourceTransaction: true } },
       },
     });
     if (!current || current.docType !== docType)
@@ -947,17 +990,90 @@ export async function cancelPurchaseTransaction(
       );
     }
 
-    if (current.stockTransactionId) {
-      const stockTransaction = await tx.stockTransaction.findUnique({
-        where: { id: current.stockTransactionId },
-        include: { lines: true },
-      });
+    const cancelSourceType = `PURCHASE_${current.docType}_CANCEL`;
+    const existingCancelLedger = await tx.stockLedger.findFirst({
+      where: { sourceType: cancelSourceType, sourceId: current.id },
+      select: { id: true },
+    });
 
-      if (stockTransaction) {
-        for (const stockLine of stockTransaction.lines) {
-          if (!stockLine.locationId) continue;
+    if (!existingCancelLedger && shouldReverseStockOnCancel(current)) {
+      if (current.stockTransactionId) {
+        const stockTransaction = await tx.stockTransaction.findUnique({
+          where: { id: current.stockTransactionId },
+          include: { lines: true },
+        });
+
+        if (stockTransaction && stockTransaction.lines.length > 0) {
+          const reverseLines = stockTransaction.lines.filter(
+            (line) =>
+              line.inventoryProductId &&
+              line.locationId &&
+              toNumber(line.qty) > 0,
+          );
+
+          await acquireStockMutationLocks(
+            tx,
+            reverseLines.map((line) => ({
+              inventoryProductId: line.inventoryProductId,
+              locationId: line.locationId,
+              batchNo: line.batchNo,
+            })),
+          );
+
+          for (const stockLine of reverseLines) {
+            const values = buildLedgerValues(
+              createStoredQtyDecimal(stockLine.qty),
+              "OUT",
+            );
+            await tx.stockLedger.create({
+              data: {
+                movementDate: new Date(),
+                movementType: stockTransaction.transactionType,
+                movementDirection: StockMovementDirection.OUT,
+                qty: values.qty,
+                qtyIn: values.qtyIn,
+                qtyOut: values.qtyOut,
+                batchNo: stockLine.batchNo,
+                inventoryProductId: stockLine.inventoryProductId,
+                locationId: stockLine.locationId!,
+                transactionId: stockTransaction.id,
+                transactionLineId: stockLine.id,
+                referenceNo: current.docNo,
+                referenceText: `Cancel ${current.docType} ${current.docNo}`,
+                sourceType: cancelSourceType,
+                sourceId: current.id,
+                remarks: normalizeText(reason) || "Cancelled by admin",
+              },
+            });
+          }
+
+          await tx.stockTransaction.updateMany({
+            where: { id: current.stockTransactionId },
+            data: {
+              status: StockTransactionStatus.CANCELLED,
+              cancelledByAdminId: adminId,
+              cancelledAt: new Date(),
+              cancelReason: normalizeText(reason) || "Cancelled by admin",
+            },
+          });
+        }
+      } else {
+        const reverseLines = getStockReverseLinesFromPurchaseLines(
+          current.lines,
+        );
+
+        await acquireStockMutationLocks(
+          tx,
+          reverseLines.map((line) => ({
+            inventoryProductId: line.inventoryProductId!,
+            locationId: line.locationId!,
+            batchNo: line.batchNo,
+          })),
+        );
+
+        for (const line of reverseLines) {
           const values = buildLedgerValues(
-            createStoredQtyDecimal(stockLine.qty),
+            createStoredQtyDecimal(line.qty),
             "OUT",
           );
           await tx.stockLedger.create({
@@ -968,30 +1084,18 @@ export async function cancelPurchaseTransaction(
               qty: values.qty,
               qtyIn: values.qtyIn,
               qtyOut: values.qtyOut,
-              batchNo: stockLine.batchNo,
-              inventoryProductId: stockLine.inventoryProductId,
-              locationId: stockLine.locationId,
-              transactionId: stockTransaction.id,
-              transactionLineId: stockLine.id,
+              batchNo: line.batchNo,
+              inventoryProductId: line.inventoryProductId!,
+              locationId: line.locationId!,
               referenceNo: current.docNo,
               referenceText: `Cancel ${current.docType} ${current.docNo}`,
-              sourceType: `PURCHASE_${current.docType}_CANCEL`,
+              sourceType: cancelSourceType,
               sourceId: current.id,
               remarks: normalizeText(reason) || "Cancelled by admin",
             },
           });
         }
       }
-
-      await tx.stockTransaction.updateMany({
-        where: { id: current.stockTransactionId },
-        data: {
-          status: StockTransactionStatus.CANCELLED,
-          cancelledByAdminId: adminId,
-          cancelledAt: new Date(),
-          cancelReason: normalizeText(reason) || "Cancelled by admin",
-        },
-      });
     }
 
     const updated = await tx.purchaseTransaction.update({
