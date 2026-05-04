@@ -939,14 +939,31 @@ export function AdminDeliveryReturnClient({ initialAgents, initialProjects, init
       ) : null}
 
       {isDocNoModalOpen ? (
-        <div className="fixed inset-0 z-[160] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-[2rem] border border-white/10 bg-[#08080c] p-6 shadow-2xl">
-            <h3 className="text-xl font-bold">Override Document No</h3>
-            <p className="mt-2 text-sm text-white/55">Format: DR-YYYYMMDD-0001</p>
-            <input className="input-rk mt-5" value={docNoDraft} onChange={(e) => setDocNoDraft(normalizeDocNoInput(e.target.value))} placeholder={docNoPreview} />
+        <div className="fixed inset-0 z-[160] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-[2rem] border border-white/10 bg-[#0b0b0f] p-6 shadow-2xl">
+            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-white/40">Manual Document No</p>
+            <h3 className="mt-3 text-2xl font-bold">Override Document No</h3>
+            <p className="mt-3 text-sm leading-6 text-white/65">Leave empty to use the auto generated document number. Maximum 30 characters.</p>
+
+            <div className="mt-6 space-y-5">
+              <div>
+                <label className="label-rk">Auto Generated Preview</label>
+                <div className="input-rk flex items-center text-white">{docNoPreview}</div>
+              </div>
+              <div>
+                <label className="label-rk">Custom Document No</label>
+                <input
+                  className="input-rk"
+                  value={docNoDraft}
+                  onChange={(e) => setDocNoDraft(normalizeDocNoInput(e.target.value))}
+                  placeholder="Enter custom document no"
+                />
+              </div>
+            </div>
+
             <div className="mt-6 flex justify-end gap-3">
-              <button type="button" onClick={() => setIsDocNoModalOpen(false)} className="rounded-xl border border-white/15 px-4 py-2 text-sm text-white/75">Cancel</button>
-              <button type="button" onClick={applyDocNoOverride} className="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white">Save</button>
+              <button type="button" onClick={() => setIsDocNoModalOpen(false)} className="rounded-xl border border-white/15 px-4 py-3 text-white/75 transition hover:bg-white/10">Cancel</button>
+              <button type="button" onClick={applyDocNoOverride} className="rounded-xl bg-red-500 px-5 py-3 font-semibold text-white transition hover:bg-red-400">OK</button>
             </div>
           </div>
         </div>
