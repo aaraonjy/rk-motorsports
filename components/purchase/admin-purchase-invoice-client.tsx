@@ -911,7 +911,7 @@ export function AdminPurchaseInvoiceClient(props: Props) {
         locationId: line.locationId || props.defaultLocationId,
         batchNo: line.batchNo || "",
         serialNos: Array.isArray(line.serialNos) ? line.serialNos : [],
-        taxCodeId: editingTransaction || isRevisionMode ? "" : line.taxCodeId || "",
+        taxCodeId: "",
         remarks: line.remarks || "",
       })),
     );
@@ -1230,7 +1230,7 @@ export function AdminPurchaseInvoiceClient(props: Props) {
         locationId: line.locationId || props.defaultLocationId,
         batchNo: line.batchNo || "",
         serialNos: Array.isArray(line.serialNos) ? line.serialNos : [],
-        taxCodeId: editingTransaction || isRevisionMode ? "" : line.taxCodeId || "",
+        taxCodeId: "",
         remarks: line.remarks || "",
       })),
     );
