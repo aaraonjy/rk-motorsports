@@ -448,8 +448,8 @@ async function generateCashSalesRevisionNoFromRequest(tx: Prisma.TransactionClie
 function assertValidManualDocNo(value: unknown) {
   const docNo = normalizeText(value)?.toUpperCase() || null;
   if (!docNo) return null;
-  if (!/^CS-\d{8}-\d{4}$/.test(docNo)) {
-    throw new Error("Cash Sales No must use CS-YYYYMMDD-0001 format.");
+  if (docNo.length > 30) {
+    throw new Error("Manual Document No must not exceed 30 characters.");
   }
   return docNo;
 }

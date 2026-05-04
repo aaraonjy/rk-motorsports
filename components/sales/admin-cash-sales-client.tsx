@@ -560,7 +560,8 @@ function normalizeDocNoInput(value: string) {
 }
 
 function isValidManualDocNo(value: string) {
-  return /^CS-\d{8}-\d{4}$/.test(value.trim().toUpperCase());
+  const normalized = value.trim();
+  return normalized.length > 0 && normalized.length <= 30;
 }
 
 
@@ -1444,7 +1445,7 @@ export function AdminCashSalesClient({
     }
 
     if (!isValidManualDocNo(normalized)) {
-      setDocNoOverrideError("Cash Sales No must use CS-YYYYMMDD-0001 format.");
+      setDocNoOverrideError("Manual Document No must not exceed 30 characters.");
       return;
     }
 

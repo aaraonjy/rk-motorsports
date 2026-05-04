@@ -84,8 +84,8 @@ function normalizeTaxCodeId(value: unknown) {
 function assertValidManualDocNo(value: unknown) {
   const docNo = normalizeText(value)?.toUpperCase() || null;
   if (!docNo) return null;
-  if (!/^QO-\d{8}-\d{4}$/.test(docNo)) {
-    throw new Error("Quotation No must use QO-YYYYMMDD-0001 format.");
+  if (docNo.length > 30) {
+    throw new Error("Manual Document No must not exceed 30 characters.");
   }
   return docNo;
 }

@@ -115,8 +115,8 @@ async function generateDeliveryReturnNo(tx: Prisma.TransactionClient, docDate: D
 function assertValidManualDocNo(value: unknown) {
   const docNo = normalizeText(value)?.toUpperCase() || null;
   if (!docNo) return null;
-  if (!/^DR-\d{8}-\d{4}$/.test(docNo)) {
-    throw new Error("Delivery Return No must use DR-YYYYMMDD-0001 format.");
+  if (docNo.length > 30) {
+    throw new Error("Manual Document No must not exceed 30 characters.");
   }
   return docNo;
 }

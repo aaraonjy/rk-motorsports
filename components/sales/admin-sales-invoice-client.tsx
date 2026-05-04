@@ -599,7 +599,8 @@ function normalizeDocNoInput(value: string) {
 }
 
 function isValidManualDocNo(value: string) {
-  return /^INV-\d{8}-\d{4}$/.test(value.trim().toUpperCase());
+  const normalized = value.trim();
+  return normalized.length > 0 && normalized.length <= 30;
 }
 
 
@@ -1288,7 +1289,7 @@ export function AdminSalesInvoiceClient({
     }
 
     if (!isValidManualDocNo(normalized)) {
-      setDocNoOverrideError("Sales Invoice No must use INV-YYYYMMDD-0001 format.");
+      setDocNoOverrideError("Manual Document No must not exceed 30 characters.");
       return;
     }
 
