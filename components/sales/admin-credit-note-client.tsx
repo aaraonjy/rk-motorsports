@@ -260,6 +260,11 @@ function normalizeDocNoInput(value: string) {
   return value.toUpperCase().replace(/\s+/g, "").slice(0, 30);
 }
 
+function isValidManualDocNo(value: string) {
+  return /^CN-\d{8}-\d{4}$/.test(value.trim().toUpperCase());
+}
+
+
 export function AdminCreditNoteClient({ initialTaxCodes, initialAgents, initialProjects, initialDepartments }: Props) {
   const router = useRouter();
   const [transactions, setTransactions] = useState<CreditNoteRecord[]>([]);
@@ -283,6 +288,7 @@ export function AdminCreditNoteClient({ initialTaxCodes, initialAgents, initialP
   const [docNoPreview, setDocNoPreview] = useState("Auto Generated");
   const [isDocNoModalOpen, setIsDocNoModalOpen] = useState(false);
   const [docNoDraft, setDocNoDraft] = useState("");
+  const [docNoOverrideError, setDocNoOverrideError] = useState("");
   const [reason, setReason] = useState("");
   const [remarks, setRemarks] = useState("");
   const [footerRemarks, setFooterRemarks] = useState("");
@@ -449,19 +455,37 @@ export function AdminCreditNoteClient({ initialTaxCodes, initialAgents, initialP
 
   function openDocNoModal() {
     setDocNoDraft("");
+    setDocNoOverrideError("");
     setSubmitError("");
     setIsDocNoModalOpen(true);
   }
 
   function applyDocNoOverride() {
     const normalized = normalizeDocNoInput(docNoDraft);
+
+    if (!normalized) {
+      setDocNo("");
+      setDocNoDraft("");
+      setDocNoOverrideError("");
+      setIsDocNoModalOpen(false);
+      return;
+    }
+
+    if (!isValidManualDocNo(normalized)) {
+      setDocNoOverrideError("Credit Note No must use CN-YYYYMMDD-0001 format.");
+      return;
+    }
+
     setDocNo(normalized);
+    setDocNoDraft("");
+    setDocNoOverrideError("");
     setIsDocNoModalOpen(false);
   }
 
   function clearDocNoOverride() {
     setDocNo("");
     setDocNoDraft("");
+    setDocNoOverrideError("");
     setIsDocNoModalOpen(false);
   }
 
@@ -1091,14 +1115,15 @@ export function AdminCreditNoteClient({ initialTaxCodes, initialAgents, initialP
                 <input
                   className="input-rk"
                   value={docNoDraft}
-                  onChange={(e) => setDocNoDraft(normalizeDocNoInput(e.target.value))}
+                  onChange={(e) => { setDocNoDraft(normalizeDocNoInput(e.target.value)); setDocNoOverrideError(""); }}
                   placeholder="Enter custom document no"
                 />
+                {docNoOverrideError ? <p className="mt-2 text-sm text-red-300">{docNoOverrideError}</p> : null}
               </div>
             </div>
 
             <div className="mt-6 flex justify-end gap-3">
-              <button type="button" onClick={() => setIsDocNoModalOpen(false)} className="rounded-xl border border-white/15 px-4 py-3 text-white/75 transition hover:bg-white/10">Cancel</button>
+              <button type="button" onClick={() => { setDocNoOverrideError(""); setIsDocNoModalOpen(false); }} className="rounded-xl border border-white/15 px-4 py-3 text-white/75 transition hover:bg-white/10">Cancel</button>
               <button type="button" onClick={applyDocNoOverride} className="rounded-xl bg-red-500 px-5 py-3 font-semibold text-white transition hover:bg-red-400">OK</button>
             </div>
           </div>

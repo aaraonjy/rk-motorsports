@@ -126,6 +126,11 @@ function normalizeDocNoInput(value: string) {
   return value.toUpperCase().replace(/\s+/g, "").slice(0, 30);
 }
 
+function isValidManualDocNo(value: string) {
+  return /^DR-\d{8}-\d{4}$/.test(value.trim().toUpperCase());
+}
+
+
 function roundMoney(value: number) {
   return Math.round((value + Number.EPSILON) * 100) / 100;
 }
@@ -250,6 +255,7 @@ export function AdminDeliveryReturnClient({ initialAgents, initialProjects, init
   const [docNoPreview, setDocNoPreview] = useState("");
   const [docNo, setDocNo] = useState("");
   const [docNoDraft, setDocNoDraft] = useState("");
+  const [docNoOverrideError, setDocNoOverrideError] = useState("");
   const [isDocNoModalOpen, setIsDocNoModalOpen] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState("");
   const [selectedSourceId, setSelectedSourceId] = useState("");
@@ -390,12 +396,30 @@ export function AdminDeliveryReturnClient({ initialAgents, initialProjects, init
 
   function openDocNoModal() {
     setDocNoDraft("");
+    setDocNoOverrideError("");
     setSubmitError("");
     setIsDocNoModalOpen(true);
   }
 
   function applyDocNoOverride() {
-    setDocNo(normalizeDocNoInput(docNoDraft));
+    const normalized = normalizeDocNoInput(docNoDraft);
+
+    if (!normalized) {
+      setDocNo("");
+      setDocNoDraft("");
+      setDocNoOverrideError("");
+      setIsDocNoModalOpen(false);
+      return;
+    }
+
+    if (!isValidManualDocNo(normalized)) {
+      setDocNoOverrideError("Delivery Return No must use DR-YYYYMMDD-0001 format.");
+      return;
+    }
+
+    setDocNo(normalized);
+    setDocNoDraft("");
+    setDocNoOverrideError("");
     setIsDocNoModalOpen(false);
   }
 
@@ -956,14 +980,15 @@ export function AdminDeliveryReturnClient({ initialAgents, initialProjects, init
                 <input
                   className="input-rk"
                   value={docNoDraft}
-                  onChange={(e) => setDocNoDraft(normalizeDocNoInput(e.target.value))}
+                  onChange={(e) => { setDocNoDraft(normalizeDocNoInput(e.target.value)); setDocNoOverrideError(""); }}
                   placeholder="Enter custom document no"
                 />
+                {docNoOverrideError ? <p className="mt-2 text-sm text-red-300">{docNoOverrideError}</p> : null}
               </div>
             </div>
 
             <div className="mt-6 flex justify-end gap-3">
-              <button type="button" onClick={() => setIsDocNoModalOpen(false)} className="rounded-xl border border-white/15 px-4 py-3 text-white/75 transition hover:bg-white/10">Cancel</button>
+              <button type="button" onClick={() => { setDocNoOverrideError(""); setIsDocNoModalOpen(false); }} className="rounded-xl border border-white/15 px-4 py-3 text-white/75 transition hover:bg-white/10">Cancel</button>
               <button type="button" onClick={applyDocNoOverride} className="rounded-xl bg-red-500 px-5 py-3 font-semibold text-white transition hover:bg-red-400">OK</button>
             </div>
           </div>
