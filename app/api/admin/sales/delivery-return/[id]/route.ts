@@ -170,7 +170,7 @@ export async function PATCH(req: Request, context: Params) {
     const admin = await requireAdmin();
     const { id } = await context.params;
     const body = await req.json().catch(() => ({}));
-    const action = typeof body.action === "string" ? body.action : "";
+    const action = typeof body.action === "string" ? body.action.toLowerCase() : "";
     const cancelReason = normalizeText(body.cancelReason);
 
     if (action !== "cancel") {
