@@ -2,6 +2,12 @@ import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 
+const NO_STORE_HEADERS = {
+  "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+  Pragma: "no-cache",
+  Expires: "0",
+};
+
 export async function GET(req: Request) {
   try {
     await requireAdmin();
@@ -18,7 +24,16 @@ export async function GET(req: Request) {
         ...(productId ? { inventoryProductId: productId } : {}),
         ...(locationId ? { currentLocationId: locationId } : {}),
         ...(status && status !== "ALL" ? { status: status as any } : {}),
-        ...(batchNo ? { inventoryBatch: { is: { batchNo: { contains: batchNo, mode: "insensitive" } } } } : {}),
+        ...(batchNo
+          ? {
+              inventoryBatch: {
+                is: {
+                  batchNo: { equals: batchNo, mode: "insensitive" },
+                  ...(productId ? { inventoryProductId: productId } : {}),
+                },
+              },
+            }
+          : {}),
       },
       orderBy: [{ updatedAt: "desc" }, { serialNo: "asc" }],
       include: {
@@ -29,33 +44,55 @@ export async function GET(req: Request) {
           orderBy: [{ createdAt: "desc" }],
           take: 1,
           include: {
-            transactionLine: { include: { transaction: { select: { transactionNo: true, transactionType: true, transactionDate: true } } } },
+            transactionLine: {
+              include: {
+                transaction: {
+                  select: {
+                    transactionNo: true,
+                    transactionType: true,
+                    transactionDate: true,
+                  },
+                },
+              },
+            },
           },
         },
       },
       take: 500,
     });
 
-    return NextResponse.json({
-      ok: true,
-      items: rows.map((item) => ({
-        id: item.id,
-        serialNo: item.serialNo,
-        inventoryProductId: item.inventoryProductId,
-        productCode: item.inventoryProduct.code,
-        productDescription: item.inventoryProduct.description,
-        batchNo: item.inventoryBatch?.batchNo ?? null,
-        currentLocationId: item.currentLocationId,
-        currentLocationLabel: item.currentLocation ? `${item.currentLocation.code} — ${item.currentLocation.name}` : "—",
-        status: item.status,
-        lastTransaction: item.transactionEntries[0]?.transactionLine.transaction.transactionNo ?? null,
-        lastTransactionType: item.transactionEntries[0]?.transactionLine.transaction.transactionType ?? null,
-        lastDate: item.transactionEntries[0]?.transactionLine.transaction.transactionDate?.toISOString() ?? null,
-        createdAt: item.createdAt.toISOString(),
-        updatedAt: item.updatedAt.toISOString(),
-      })),
-    });
+    return NextResponse.json(
+      {
+        ok: true,
+        items: rows.map((item) => ({
+          id: item.id,
+          serialNo: item.serialNo,
+          inventoryProductId: item.inventoryProductId,
+          productCode: item.inventoryProduct.code,
+          productDescription: item.inventoryProduct.description,
+          batchNo: item.inventoryBatch?.batchNo ?? null,
+          currentLocationId: item.currentLocationId,
+          currentLocationLabel: item.currentLocation ? `${item.currentLocation.code} — ${item.currentLocation.name}` : "—",
+          status: item.status,
+          lastTransaction: item.transactionEntries[0]?.transactionLine.transaction.transactionNo ?? null,
+          lastTransactionType: item.transactionEntries[0]?.transactionLine.transaction.transactionType ?? null,
+          lastDate: item.transactionEntries[0]?.transactionLine.transaction.transactionDate?.toISOString() ?? null,
+          createdAt: item.createdAt.toISOString(),
+          updatedAt: item.updatedAt.toISOString(),
+        })),
+      },
+      { headers: NO_STORE_HEADERS },
+    );
   } catch (error) {
-    return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : "Unable to load serial data." }, { status: error instanceof Error && error.message === "FORBIDDEN" ? 403 : 500 });
+    return NextResponse.json(
+      {
+        ok: false,
+        error: error instanceof Error ? error.message : "Unable to load serial data.",
+      },
+      {
+        status: error instanceof Error && error.message === "FORBIDDEN" ? 403 : 500,
+        headers: NO_STORE_HEADERS,
+      },
+    );
   }
 }
