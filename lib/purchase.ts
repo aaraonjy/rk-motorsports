@@ -38,6 +38,7 @@ type PurchaseLinePayload = {
   discountType?: string | null;
   locationId?: string | null;
   batchNo?: string | null;
+  serialNos?: string[] | null;
   taxCodeId?: string | null;
   remarks?: string | null;
 };
@@ -162,6 +163,23 @@ function qtyDecimal(value: number | string | null | undefined) {
   if (!Number.isFinite(numeric) || numeric <= 0)
     throw new Error("Quantity must be greater than zero.");
   return new Prisma.Decimal(numeric.toFixed(3));
+}
+
+function normalizeSerialNumbers(value: unknown) {
+  const items = Array.isArray(value) ? value : [];
+  const normalized = items
+    .map((item) => (typeof item === "string" ? item.trim() : ""))
+    .filter(Boolean);
+
+  const seen = new Set<string>();
+  const unique: string[] = [];
+  for (const serialNo of normalized) {
+    const key = serialNo.toUpperCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(serialNo);
+  }
+  return unique;
 }
 
 function getMalaysiaDateParts(date: Date) {
@@ -294,6 +312,8 @@ async function mapLine(
           baseUom: true,
           itemType: true,
           unitCost: true,
+          batchTracking: true,
+          serialNumberTracking: true,
         },
       })
     : null;
@@ -336,6 +356,16 @@ async function mapLine(
       })
     : null;
 
+  const serialNos = normalizeSerialNumbers(line.serialNos);
+  if (product?.serialNumberTracking) {
+    if (serialNos.length === 0) {
+      throw new Error(`Line ${index + 1}: Serial No is required for serial-tracked product.`);
+    }
+    if (serialNos.length !== toNumber(qty)) {
+      throw new Error(`Line ${index + 1}: Serial quantity must match the item quantity.`);
+    }
+  }
+
   return {
     lineNo: index + 1,
     inventoryProductId,
@@ -352,6 +382,7 @@ async function mapLine(
     locationCode: location?.code || null,
     locationName: location?.name || null,
     batchNo: normalizeText(line.batchNo)?.toUpperCase() || null,
+    serialNos,
     taxCodeId: taxCode?.id || null,
     taxCode: taxCode?.code || null,
     taxDescription: taxCode?.description || null,
@@ -488,12 +519,38 @@ async function createStockReceive(
           batchNo: line.batchNo,
           locationId: line.locationId,
           remarks: `${transaction.docType} ${transaction.docNo}`,
+          serialEntries: Array.isArray(line.serialNos) && line.serialNos.length
+            ? {
+                create: line.serialNos.map((serialNo: string) => ({
+                  inventoryProductId: line.inventoryProductId!,
+                  serialNo,
+                })),
+              }
+            : undefined,
         })),
       },
     },
-    include: { lines: true },
+    include: { lines: { include: { serialEntries: true } } },
   });
   for (const stockLine of stockTransaction.lines) {
+    let batchId: string | null = null;
+    if (stockLine.batchNo) {
+      const batch = await tx.inventoryBatch.upsert({
+        where: {
+          inventoryProductId_batchNo: {
+            inventoryProductId: stockLine.inventoryProductId,
+            batchNo: stockLine.batchNo,
+          },
+        },
+        update: {},
+        create: {
+          inventoryProductId: stockLine.inventoryProductId,
+          batchNo: stockLine.batchNo,
+        },
+      });
+      batchId = batch.id;
+    }
+
     const values = buildLedgerValues(
       createStoredQtyDecimal(stockLine.qty),
       "IN",
@@ -522,6 +579,50 @@ async function createStockReceive(
       await tx.inventoryProduct.update({
         where: { id: stockLine.inventoryProductId },
         data: { unitCost: stockLine.unitCost },
+      });
+    }
+
+    for (const serialEntry of stockLine.serialEntries || []) {
+      const existing = await tx.inventorySerial.findUnique({
+        where: {
+          inventoryProductId_serialNo: {
+            inventoryProductId: stockLine.inventoryProductId,
+            serialNo: serialEntry.serialNo,
+          },
+        },
+      });
+
+      let serialRecord;
+      if (existing) {
+        if (existing.status === "IN_STOCK") {
+          throw new Error(`Serial No ${serialEntry.serialNo} is already in stock for this product.`);
+        }
+        serialRecord = await tx.inventorySerial.update({
+          where: { id: existing.id },
+          data: {
+            inventoryBatchId: batchId,
+            currentLocationId: stockLine.locationId!,
+            status: "IN_STOCK",
+          },
+        });
+      } else {
+        serialRecord = await tx.inventorySerial.create({
+          data: {
+            inventoryProductId: stockLine.inventoryProductId,
+            inventoryBatchId: batchId,
+            serialNo: serialEntry.serialNo,
+            currentLocationId: stockLine.locationId!,
+            status: "IN_STOCK",
+          },
+        });
+      }
+
+      await tx.stockTransactionLineSerial.update({
+        where: { id: serialEntry.id },
+        data: {
+          inventorySerialId: serialRecord.id,
+          inventoryBatchId: batchId,
+        },
       });
     }
   }

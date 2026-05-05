@@ -2,6 +2,12 @@ import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 
+const NO_STORE_HEADERS = {
+  "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+  Pragma: "no-cache",
+  Expires: "0",
+};
+
 function formatDate(value: Date | null | undefined) {
   return value ? value.toISOString() : null;
 }
@@ -12,7 +18,7 @@ async function loadSerialList(req: Request) {
   const page = Number.isFinite(rawPage) && rawPage > 0 ? Math.floor(rawPage) : 1;
   const pageSize = 10;
   const q = searchParams.get("q")?.trim() || undefined;
-  const productId = searchParams.get("productId")?.trim() || "ALL";
+  const productId = searchParams.get("inventoryProductId")?.trim() || searchParams.get("productId")?.trim() || "ALL";
   const batchNo = searchParams.get("batchNo")?.trim() || undefined;
   const locationId = searchParams.get("locationId")?.trim() || "ALL";
   const status = searchParams.get("status")?.trim() || "ALL";
@@ -21,7 +27,7 @@ async function loadSerialList(req: Request) {
     ...(productId !== "ALL" ? { inventoryProductId: productId } : {}),
     ...(locationId !== "ALL" ? { currentLocationId: locationId } : {}),
     ...(status !== "ALL" ? { status } : {}),
-    ...(batchNo ? { inventoryBatch: { is: { batchNo: { contains: batchNo, mode: "insensitive" } } } } : {}),
+    ...(batchNo ? { inventoryBatch: { is: { batchNo: { equals: batchNo, mode: "insensitive" } } } } : {}),
     ...(q
       ? {
           OR: [
@@ -42,7 +48,7 @@ async function loadSerialList(req: Request) {
       take: pageSize,
       include: {
         inventoryProduct: { select: { id: true, code: true, description: true } },
-        inventoryBatch: { select: { id: true, batchNo: true } },
+        inventoryBatch: { select: { id: true, batchNo: true, expiryDate: true } },
         currentLocation: { select: { id: true, code: true, name: true } },
         transactionEntries: {
           orderBy: [{ createdAt: "desc" }],
@@ -62,6 +68,7 @@ async function loadSerialList(req: Request) {
       productCode: item.inventoryProduct.code,
       productDescription: item.inventoryProduct.description,
       batchNo: item.inventoryBatch?.batchNo ?? null,
+      expiryDate: item.inventoryBatch?.expiryDate?.toISOString() ?? null,
       currentLocationId: item.currentLocationId,
       currentLocationLabel: item.currentLocation ? `${item.currentLocation.code} — ${item.currentLocation.name}` : "—",
       status: item.status,
@@ -73,7 +80,10 @@ async function loadSerialList(req: Request) {
     };
   });
 
-  return NextResponse.json({ ok: true, rows, pagination: { page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)) } });
+  return NextResponse.json(
+    { ok: true, rows, items: rows, pagination: { page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)) } },
+    { headers: NO_STORE_HEADERS }
+  );
 }
 
 export async function GET(req: Request) {
@@ -83,20 +93,20 @@ export async function GET(req: Request) {
     const mode = searchParams.get("mode")?.trim();
     if (mode === "list") return loadSerialList(req);
 
-    const inventoryProductId = searchParams.get("inventoryProductId")?.trim();
+    const inventoryProductId = searchParams.get("inventoryProductId")?.trim() || searchParams.get("productId")?.trim();
     const locationId = searchParams.get("locationId")?.trim();
     const batchNo = searchParams.get("batchNo")?.trim() || undefined;
     const q = searchParams.get("q")?.trim() || undefined;
 
-    if (!inventoryProductId) return NextResponse.json({ ok: false, error: "inventoryProductId is required." }, { status: 400 });
-    if (!locationId) return NextResponse.json({ ok: false, error: "locationId is required." }, { status: 400 });
+    if (!inventoryProductId) return NextResponse.json({ ok: false, error: "inventoryProductId is required." }, { status: 400, headers: NO_STORE_HEADERS });
+    if (!locationId) return NextResponse.json({ ok: false, error: "locationId is required." }, { status: 400, headers: NO_STORE_HEADERS });
 
     const serials = await db.inventorySerial.findMany({
       where: {
         inventoryProductId,
         currentLocationId: locationId,
         status: "IN_STOCK",
-        ...(batchNo ? { inventoryBatch: { is: { batchNo } } } : {}),
+        ...(batchNo ? { inventoryBatch: { is: { batchNo: { equals: batchNo, mode: "insensitive" } } } } : {}),
         ...(q ? { serialNo: { contains: q, mode: "insensitive" } } : {}),
       },
       orderBy: [{ serialNo: "asc" }],
@@ -104,14 +114,18 @@ export async function GET(req: Request) {
       take: 200,
     });
 
-    return NextResponse.json({
-      ok: true,
-      serials: serials.map((item) => ({ id: item.id, serialNo: item.serialNo, batchNo: item.inventoryBatch?.batchNo ?? null, expiryDate: item.inventoryBatch?.expiryDate?.toISOString() ?? null })),
-    });
+    const items = serials.map((item) => ({
+      id: item.id,
+      serialNo: item.serialNo,
+      batchNo: item.inventoryBatch?.batchNo ?? null,
+      expiryDate: item.inventoryBatch?.expiryDate?.toISOString() ?? null,
+    }));
+
+    return NextResponse.json({ ok: true, serials: items, items }, { headers: NO_STORE_HEADERS });
   } catch (error) {
     return NextResponse.json(
       { ok: false, error: error instanceof Error ? error.message : "Unable to load available serials." },
-      { status: error instanceof Error && error.message === "FORBIDDEN" ? 403 : 500 }
+      { status: error instanceof Error && error.message === "FORBIDDEN" ? 403 : 500, headers: NO_STORE_HEADERS }
     );
   }
 }
