@@ -158,6 +158,17 @@ function sumInvoicedAmount(line: {
     .reduce((sum, link) => sum + toNumber(link.claimAmount), 0);
 }
 
+function hasActiveInvoiceLink(line: {
+  sourceLineLinks?: Array<{ linkType?: string | null; targetTransaction?: { status?: string | null; docType?: string | null } | null }>;
+}) {
+  return (line.sourceLineLinks || []).some((link) => {
+    if (link.linkType !== "INVOICED_TO") return false;
+    const target = link.targetTransaction;
+    if (!target || target.status === "CANCELLED") return false;
+    return ["INV", "SI"].includes(String(target.docType || "").toUpperCase());
+  });
+}
+
 function withCancellationDetails<T extends Record<string, any>>(transaction: T) {
   return {
     ...transaction,
@@ -180,7 +191,7 @@ async function getSourceDeliveryOrders(tx: Prisma.TransactionClient) {
       lines: {
         orderBy: { lineNo: "asc" },
         include: {
-          inventoryProduct: { select: { itemType: true, batchTracking: true, serialNumberTracking: true } },
+          inventoryProduct: { select: { itemType: true, trackInventory: true, batchTracking: true, serialNumberTracking: true } },
           sourceLineLinks: {
             include: { targetTransaction: { select: { id: true, status: true, docType: true, docNo: true } } },
           },
@@ -219,10 +230,13 @@ async function getSourceDeliveryOrders(tx: Prisma.TransactionClient) {
         const qty = toNumber(line.qty);
         const returnedQty = sumReturnedQty(line);
         const invoicedQty = sumInvoicedQty(line);
+        const hasActiveInvoice = hasActiveInvoiceLink(line);
         const lineTotal = toNumber(line.lineTotal);
         const returnedAmount = sumReturnedAmount(line);
         const invoicedAmount = sumInvoicedAmount(line);
         const stock = stockMap.get(`${order.id}__${line.inventoryProductId || ""}__${line.locationId || ""}`);
+        const remainingReturnQty = hasActiveInvoice ? 0 : Math.max(0, qty - returnedQty);
+        const remainingReturnAmount = hasActiveInvoice ? 0 : Math.max(0, lineTotal - returnedAmount);
         return {
           ...line,
           itemType: line.inventoryProduct?.itemType || "STOCK_ITEM",
@@ -232,22 +246,30 @@ async function getSourceDeliveryOrders(tx: Prisma.TransactionClient) {
           returnedAmount,
           invoicedQty,
           invoicedAmount,
-          remainingReturnQty: Math.max(0, qty - returnedQty - invoicedQty),
-          remainingReturnAmount: Math.max(0, lineTotal - returnedAmount - invoicedAmount),
+          hasActiveInvoice,
+          remainingReturnQty,
+          remainingReturnAmount,
           batchNo: stock?.batchNo || null,
           serialNos: stock?.serialNos || [],
         };
       }),
     }))
+    .filter((order) => !order.lines.some((line) => Boolean((line as any).hasActiveInvoice)))
     .filter((order) => order.lines.some((line) => toNumber((line as any).remainingReturnQty) > 0));
 }
 
 async function createDeliveryReturnStockIn(tx: Prisma.TransactionClient, deliveryReturn: any, lines: Array<any>, remarks: string | null) {
-  const stockLines = lines.filter((line) => line.itemType !== "SERVICE_ITEM");
+  const stockLines = lines.filter((line) => line.itemType === "STOCK_ITEM");
   if (stockLines.length === 0) return;
 
   const config = await tx.stockConfiguration.findUnique({ where: { id: "default" } });
   if (!config?.stockModuleEnabled) throw new Error("Stock module is disabled.");
+
+  for (const line of stockLines) {
+    if (!line.inventoryProductId) throw new Error(`${line.productCode || "Return line"} is missing product id for stock-in.`);
+    if (!line.locationId) throw new Error(`${line.productCode || "Return line"} is missing location for stock-in.`);
+    if (toNumber(line.qty) <= 0) throw new Error(`${line.productCode || "Return line"} return quantity must be greater than zero.`);
+  }
 
   await acquireStockMutationLocks(
     tx,
@@ -415,7 +437,7 @@ export async function POST(req: Request) {
           lines: {
             orderBy: { lineNo: "asc" },
             include: {
-              inventoryProduct: { select: { itemType: true, batchTracking: true, serialNumberTracking: true } },
+              inventoryProduct: { select: { itemType: true, trackInventory: true, batchTracking: true, serialNumberTracking: true } },
               sourceLineLinks: {
                 include: { targetTransaction: { select: { id: true, status: true, docType: true, docNo: true } } },
               },
@@ -426,7 +448,7 @@ export async function POST(req: Request) {
 
       if (!source || source.docType !== "DO" || source.status === "CANCELLED") throw new Error("Selected Delivery Order is invalid.");
       if (source.customer && !source.customer.isActive) throw new Error("Inactive customer cannot be used for Sales transactions.");
-      const sourceLineMap = new Map(source.lines.map((line) => [line.id, line]));
+      const sourceLineMap = new Map<string, any>(source.lines.map((line) => [line.id, line]));
 
       const preparedLines = rawLines.map((line, index) => {
         const sourceLineId = normalizeText(line.sourceLineId);
@@ -434,11 +456,16 @@ export async function POST(req: Request) {
         if (!sourceLine) throw new Error(`Return line ${index + 1} has invalid source line.`);
         const qty = qtyDecimal(line.qty);
         const returnedQty = sumReturnedQty(sourceLine);
-        const invoicedQty = sumInvoicedQty(sourceLine);
-        const remainingQty = Math.max(0, toNumber(sourceLine.qty) - returnedQty - invoicedQty);
+        if (hasActiveInvoiceLink(sourceLine)) {
+          throw new Error(`${sourceLine.productCode} belongs to a Delivery Order that has already been invoiced. Please use Credit Note flow instead of Delivery Return.`);
+        }
+        const remainingQty = Math.max(0, toNumber(sourceLine.qty) - returnedQty);
         if (toNumber(qty) > remainingQty) throw new Error(`${sourceLine.productCode} return quantity cannot exceed remaining returnable qty (${remainingQty}).`);
 
         const itemType = sourceLine.inventoryProduct?.itemType || "STOCK_ITEM";
+        if (itemType === "STOCK_ITEM" && sourceLine.inventoryProduct?.trackInventory === false) {
+          throw new Error(`${sourceLine.productCode} is not a tracked stock item and cannot be returned through DR stock-in.`);
+        }
         const serialNos = normalizeSerialNumbers(line.serialNos);
         const batchNo = normalizeText(line.batchNo)?.toUpperCase() || null;
 
