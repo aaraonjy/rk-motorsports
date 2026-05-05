@@ -544,11 +544,13 @@ function CompactSelect({
   value,
   onChange,
   className = "",
+  disabled = false,
 }: {
   options: SearchableSelectOption[];
   value: string;
   onChange: (value: string) => void;
   className?: string;
+  disabled?: boolean;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -574,8 +576,12 @@ function CompactSelect({
     <div ref={containerRef} className={`relative ${className}`}>
       <button
         type="button"
-        onClick={() => setIsOpen((prev) => !prev)}
-        className="input-rk flex items-center justify-between gap-3 pr-20 text-left"
+        disabled={disabled}
+        onClick={() => {
+          if (disabled) return;
+          setIsOpen((prev) => !prev);
+        }}
+        className={`input-rk flex items-center justify-between gap-3 pr-20 text-left ${disabled ? "cursor-not-allowed opacity-60" : ""}`}
       >
         <span
           className={
@@ -2240,18 +2246,12 @@ export function AdminPurchaseInvoiceClient(props: Props) {
                   <div className="space-y-5">
                     {isBodyLocked ? (
                       <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white/45">
-                        Read-only body section. This {TITLE} was generated from
+                        Partially locked body section. This {TITLE} was generated from
                         source document, so product, qty, cost, discount, tax,
-                        and line pricing details are locked.
+                        and line pricing details are locked. Batch No and S/N No remain selectable for tracked stock items.
                       </div>
                     ) : null}
-                    <div
-                      className={
-                        isBodyLocked
-                          ? "pointer-events-none opacity-55 grayscale"
-                          : ""
-                      }
-                    >
+                    <div className={isBodyLocked ? "opacity-70" : ""}>
                       {lines.map((line, index) => {
                         const product =
                           props.initialProducts.find(
@@ -2298,7 +2298,7 @@ export function AdminPurchaseInvoiceClient(props: Props) {
                               <h3 className="text-lg font-semibold text-white">
                                 Product {index + 1}
                               </h3>
-                              {lines.length > 1 ? (
+                              {lines.length > 1 && !isBodyLocked ? (
                                 <button
                                   type="button"
                                   onClick={() => removeLine(index)}
@@ -2315,6 +2315,7 @@ export function AdminPurchaseInvoiceClient(props: Props) {
                                   placeholder="Search or select product"
                                   options={productOptions}
                                   value={line.inventoryProductId}
+                                  disabled={isBodyLocked}
                                   onChange={(option) =>
                                     applyProduct(index, option?.id || "")
                                   }
@@ -2331,7 +2332,7 @@ export function AdminPurchaseInvoiceClient(props: Props) {
                                   }),
                                 )}
                                 value={line.uom}
-                                disabled={!product}
+                                disabled={isBodyLocked || !product}
                                 onChange={(option) =>
                                   updateLine(
                                     index,
@@ -2348,7 +2349,7 @@ export function AdminPurchaseInvoiceClient(props: Props) {
                                     updateLine(index, "qty", e.target.value)
                                   }
                                   className="input-rk"
-                                  disabled={Boolean(product?.serialNumberTracking)}
+                                  disabled={isBodyLocked || Boolean(product?.serialNumberTracking)}
                                 />
                               </div>
                               <div>
@@ -2365,6 +2366,7 @@ export function AdminPurchaseInvoiceClient(props: Props) {
                                     )
                                   }
                                   className="input-rk"
+                                  disabled={isBodyLocked}
                                 />
                               </div>
                               <div>
@@ -2380,10 +2382,12 @@ export function AdminPurchaseInvoiceClient(props: Props) {
                                       )
                                     }
                                     className="input-rk"
+                                    disabled={isBodyLocked}
                                   />
                                   <CompactSelect
                                     options={discountTypeOptions}
                                     value={line.discountType}
+                                    disabled={isBodyLocked}
                                     onChange={(value) =>
                                       updateLine(index, "discountType", value)
                                     }
@@ -2396,6 +2400,7 @@ export function AdminPurchaseInvoiceClient(props: Props) {
                                   placeholder="Search or select location"
                                   options={locationOptions}
                                   value={line.locationId}
+                                  disabled={isBodyLocked}
                                   onChange={(option) =>
                                     updateLine(
                                       index,
@@ -2543,6 +2548,7 @@ export function AdminPurchaseInvoiceClient(props: Props) {
                                   placeholder="No Tax"
                                   options={taxCodeOptions}
                                   value={line.taxCodeId}
+                                  disabled={isBodyLocked}
                                   onChange={(option) =>
                                     updateLine(
                                       index,
@@ -2578,6 +2584,7 @@ export function AdminPurchaseInvoiceClient(props: Props) {
                                     updateLine(index, "remarks", e.target.value)
                                   }
                                   className="input-rk min-h-[80px]"
+                                  disabled={isBodyLocked}
                                 />
                               </div>
                             </div>
