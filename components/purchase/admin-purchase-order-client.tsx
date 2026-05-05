@@ -380,7 +380,7 @@ function formatQtyBalance(
   if (isLoading) return "Loading balance...";
   if (typeof value !== "number")
     return "Select product and location to view balance.";
-  return `Qty Balance: ${value.toLocaleString("en-MY", { minimumFractionDigits: qtyDecimalPlaces, maximumFractionDigits: qtyDecimalPlaces })}`;
+  return `Current Balance: ${value.toLocaleString("en-MY", { minimumFractionDigits: qtyDecimalPlaces, maximumFractionDigits: qtyDecimalPlaces })}`;
 }
 function statusClass(status: string) {
   if (status === "LOCKED") return "border-white/15 bg-white/5 text-white/50";
@@ -926,16 +926,13 @@ export function AdminPurchaseOrderClient(props: Props) {
       const product = props.initialProducts.find(
         (item) => item.id === line.inventoryProductId,
       );
-      const batchNo = product?.batchTracking ? line.batchNo : "";
-      if (product?.batchTracking && !batchNo) continue;
-      const key = balanceKey(line.inventoryProductId, line.locationId, batchNo);
+      const key = balanceKey(line.inventoryProductId, line.locationId, "");
       if (balances[key] !== undefined || loadingBalances[key]) continue;
       setLoadingBalances((prev) => ({ ...prev, [key]: true }));
       const params = new URLSearchParams({
         inventoryProductId: line.inventoryProductId,
         locationId: line.locationId,
       });
-      if (batchNo) params.set("batchNo", batchNo);
       params.set("_ts", `${Date.now()}-${balanceRefreshKey}`);
       fetch(`/api/admin/stock/balance?${params.toString()}`, {
         cache: "no-store",
@@ -1864,21 +1861,15 @@ export function AdminPurchaseOrderClient(props: Props) {
                         });
                         const balanceKeyValue =
                           line.inventoryProductId && line.locationId
-                            ? balanceKey(
-                                line.inventoryProductId,
-                                line.locationId,
-                                product?.batchTracking ? line.batchNo : "",
-                              )
+                            ? balanceKey(line.inventoryProductId, line.locationId, "")
                             : "";
                         const balanceText =
                           line.inventoryProductId && line.locationId
-                            ? product?.batchTracking && !line.batchNo
-                              ? "Select Batch No to view batch balance."
-                              : formatQtyBalance(
-                                  balances[balanceKeyValue],
-                                  Boolean(loadingBalances[balanceKeyValue]),
-                                  qtyDecimalPlaces,
-                                )
+                            ? formatQtyBalance(
+                                balances[balanceKeyValue],
+                                Boolean(loadingBalances[balanceKeyValue]),
+                                qtyDecimalPlaces,
+                              )
                             : "Select product and location to view balance.";
                         return (
                           <div
