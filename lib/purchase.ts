@@ -38,6 +38,7 @@ type PurchaseLinePayload = {
   discountType?: string | null;
   locationId?: string | null;
   batchNo?: string | null;
+  expiryDate?: string | null;
   serialNos?: string[] | null;
   taxCodeId?: string | null;
   remarks?: string | null;
@@ -136,6 +137,16 @@ function normalizeDate(value: unknown) {
   const date = new Date(`${raw}T00:00:00.000+08:00`);
   if (Number.isNaN(date.getTime()))
     throw new Error("Document Date is invalid.");
+  return date;
+}
+
+function normalizeOptionalDate(value: unknown, label = "Expiry Date") {
+  const raw = typeof value === "string" && value.trim() ? value.trim() : null;
+  if (!raw) return null;
+  const date = new Date(raw.includes("T") ? raw : `${raw}T00:00:00.000+08:00`);
+  if (Number.isNaN(date.getTime())) {
+    throw new Error(`${label} is invalid.`);
+  }
   return date;
 }
 
@@ -358,6 +369,7 @@ async function mapLine(
     : null;
 
   const batchNo = normalizeText(line.batchNo)?.toUpperCase() || null;
+  const expiryDate = normalizeOptionalDate(line.expiryDate);
   const serialNos = normalizeSerialNumbers(line.serialNos);
   const mustCaptureTracking =
     (docType === "GRN" || docType === "PI") &&
@@ -392,6 +404,7 @@ async function mapLine(
     locationCode: location?.code || null,
     locationName: location?.name || null,
     batchNo,
+    expiryDate,
     serialNos,
     taxCodeId: taxCode?.id || null,
     taxCode: taxCode?.code || null,
@@ -528,6 +541,7 @@ async function createStockReceive(
           qty: createStoredQtyDecimal(line.qty),
           unitCost: decimal(line.unitCost, 3),
           batchNo: line.batchNo,
+          expiryDate: line.expiryDate ?? undefined,
           locationId: line.locationId,
           remarks: `${transaction.docType} ${transaction.docNo}`,
           serialEntries: Array.isArray(line.serialNos) && line.serialNos.length
@@ -553,10 +567,13 @@ async function createStockReceive(
             batchNo: stockLine.batchNo,
           },
         },
-        update: {},
+        update: {
+          expiryDate: stockLine.expiryDate ?? undefined,
+        },
         create: {
           inventoryProductId: stockLine.inventoryProductId,
           batchNo: stockLine.batchNo,
+          expiryDate: stockLine.expiryDate ?? undefined,
         },
       });
       batchId = batch.id;

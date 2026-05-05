@@ -148,6 +148,7 @@ type PurchaseTransactionRecord = {
     discountType?: string | null;
     locationId?: string | null;
     batchNo?: string | null;
+    expiryDate?: string | Date | null;
     serialNos?: string[] | null;
     taxCodeId?: string | null;
     remarks?: string | null;
@@ -1011,7 +1012,7 @@ export function AdminPurchaseInvoiceClient(props: Props) {
         locationId: line.locationId || props.defaultLocationId,
         batchNo: line.batchNo || "",
         batchMode: line.batchNo ? "existing" : "existing",
-        expiryDate: "",
+        expiryDate: (line as any).expiryDate ? formatDateInput((line as any).expiryDate) : "",
         serialNos: Array.isArray(line.serialNos) ? line.serialNos : [],
         serialSearch: "",
         serialEntryText: "",
@@ -1336,7 +1337,7 @@ export function AdminPurchaseInvoiceClient(props: Props) {
         locationId: line.locationId || props.defaultLocationId,
         batchNo: line.batchNo || "",
         batchMode: line.batchNo ? "existing" : "existing",
-        expiryDate: "",
+        expiryDate: (line as any).expiryDate ? formatDateInput((line as any).expiryDate) : "",
         serialNos: Array.isArray(line.serialNos) ? line.serialNos : [],
         serialSearch: "",
         serialEntryText: "",
@@ -1416,7 +1417,17 @@ export function AdminPurchaseInvoiceClient(props: Props) {
       updateLineValues(index, { batchMode: "new", batchNo: "", expiryDate: "", serialNos: [], serialSearch: "", serialEntryText: "" });
       return;
     }
-    updateLineValues(index, { batchMode: "existing", batchNo: value.toUpperCase(), serialNos: [], serialSearch: "", serialEntryText: "" });
+    const selectedBatch = (availableBatches[index] || []).find(
+      (batch) => batch.batchNo.toUpperCase() === value.toUpperCase(),
+    );
+    updateLineValues(index, {
+      batchMode: "existing",
+      batchNo: value.toUpperCase(),
+      expiryDate: selectedBatch?.expiryDate ? formatDateInput(selectedBatch.expiryDate) : "",
+      serialNos: [],
+      serialSearch: "",
+      serialEntryText: "",
+    });
   }
 
   function setInboundNewBatchValue(index: number, value: string) {
@@ -2423,7 +2434,7 @@ export function AdminPurchaseInvoiceClient(props: Props) {
                                         { id: "__NEW__", label: "+ Create New Batch", searchText: "create new batch new" },
                                         ...(availableBatches[index] || []).map((batch) => ({
                                           id: batch.batchNo,
-                                          label: `${batch.batchNo}${batch.expiryDate ? ` • Exp ${batch.expiryDate}` : ""}${typeof batch.balance === "number" ? ` • Bal ${batch.balance.toLocaleString("en-MY", { minimumFractionDigits: qtyDecimalPlaces, maximumFractionDigits: qtyDecimalPlaces })}` : ""}`,
+                                          label: `${batch.batchNo}${batch.expiryDate ? ` • Exp ${batch.expiryDate.slice(0, 10)}` : ""}${typeof batch.balance === "number" ? ` • Bal ${batch.balance.toLocaleString("en-MY", { minimumFractionDigits: qtyDecimalPlaces, maximumFractionDigits: qtyDecimalPlaces })}` : ""}`,
                                           searchText: `${batch.batchNo} ${batch.expiryDate || ""}`.toLowerCase(),
                                         })),
                                       ]}
