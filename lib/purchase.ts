@@ -296,6 +296,7 @@ async function snapshotTaxCode(
 
 async function mapLine(
   tx: Prisma.TransactionClient,
+  docType: PurchaseDocType,
   line: PurchaseLinePayload,
   index: number,
   taxEnabled: boolean,
@@ -356,10 +357,19 @@ async function mapLine(
       })
     : null;
 
+  const batchNo = normalizeText(line.batchNo)?.toUpperCase() || null;
   const serialNos = normalizeSerialNumbers(line.serialNos);
-  if (product?.serialNumberTracking) {
+  const mustCaptureTracking =
+    (docType === "GRN" || docType === "PI") &&
+    product?.itemType === "STOCK_ITEM";
+
+  if (mustCaptureTracking && product?.batchTracking && !batchNo) {
+    throw new Error(`Line ${index + 1}: Batch No is required for batch-tracked product.`);
+  }
+
+  if (mustCaptureTracking && product?.serialNumberTracking) {
     if (serialNos.length === 0) {
-      throw new Error(`Line ${index + 1}: Serial No is required for serial-tracked product.`);
+      throw new Error(`Line ${index + 1}: S/N No is required for serial-tracked product.`);
     }
     if (serialNos.length !== toNumber(qty)) {
       throw new Error(`Line ${index + 1}: Serial quantity must match the item quantity.`);
@@ -381,7 +391,7 @@ async function mapLine(
     locationId: location?.id || normalizeText(line.locationId),
     locationCode: location?.code || null,
     locationName: location?.name || null,
-    batchNo: normalizeText(line.batchNo)?.toUpperCase() || null,
+    batchNo,
     serialNos,
     taxCodeId: taxCode?.id || null,
     taxCode: taxCode?.code || null,
@@ -401,6 +411,7 @@ async function mapLine(
 
 async function mapLines(
   tx: Prisma.TransactionClient,
+  docType: PurchaseDocType,
   lines: PurchaseLinePayload[] | undefined,
   taxEnabled: boolean,
   defaultTaxCodeId: string | null,
@@ -410,7 +421,7 @@ async function mapLines(
     throw new Error("At least one item line is required.");
   return Promise.all(
     rawLines.map((line, index) =>
-      mapLine(tx, line, index, taxEnabled, defaultTaxCodeId),
+      mapLine(tx, docType, line, index, taxEnabled, defaultTaxCodeId),
     ),
   );
 }
@@ -929,6 +940,7 @@ export async function createPurchaseTransaction(
     );
     const lines = await mapLines(
       tx,
+      docType,
       body.lines,
       taxSettings.taxModuleEnabled,
       taxSettings.taxCalculationMode === "LINE_ITEM"
@@ -1219,6 +1231,7 @@ export async function updatePurchaseTransaction(
     );
     const lines = await mapLines(
       tx,
+      docType,
       body.lines,
       taxSettings.taxModuleEnabled,
       taxSettings.taxCalculationMode === "LINE_ITEM"

@@ -284,6 +284,19 @@ function formatDecimalInput(value: unknown, decimalPlaces: number) {
   if (!Number.isFinite(numeric)) return (0).toFixed(decimalPlaces);
   return numeric.toFixed(decimalPlaces);
 }
+function uniqueSerialNos(values: string[]) {
+  const seen = new Set<string>();
+  const next: string[] = [];
+  for (const value of values) {
+    const normalized = String(value || "").trim();
+    if (!normalized) continue;
+    const key = normalized.toUpperCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    next.push(normalized);
+  }
+  return next;
+}
 function normalizeDocNoInput(value: string) {
   return value.toUpperCase().replace(/\s+/g, "").slice(0, 30);
 }
@@ -1429,6 +1442,30 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
     setError("");
     setMessage("");
     setCancelNotice(null);
+    for (let index = 0; index < lines.length; index += 1) {
+      const line = lines[index];
+      const product = props.initialProducts.find(
+        (item) => item.id === line.inventoryProductId,
+      );
+      if (!product || product.itemType !== "STOCK_ITEM") continue;
+      if (product.batchTracking && !line.batchNo.trim()) {
+        setError(`Product line ${index + 1} requires Batch No.`);
+        setActiveTab("BODY");
+        return;
+      }
+      if (product.serialNumberTracking) {
+        if (line.serialNos.length === 0) {
+          setError(`Product line ${index + 1} requires S/N No.`);
+          setActiveTab("BODY");
+          return;
+        }
+        if (Number(line.qty || 0) !== line.serialNos.length) {
+          setError(`Product line ${index + 1} quantity must match selected S/N count.`);
+          setActiveTab("BODY");
+          return;
+        }
+      }
+    }
     setIsSubmitting(true);
     const wasEditing = Boolean(editingTransaction);
     const wasRevising = Boolean(reviseTransaction && !editingTransaction);
@@ -2231,7 +2268,7 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
                                 </p>
                               </div>
                               {product?.batchTracking ? (
-                                <div>
+                                <div className="md:col-span-2">
                                   <label className="label-rk">Batch No</label>
                                   <input
                                     value={line.batchNo}
@@ -2243,12 +2280,16 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
                                       )
                                     }
                                     className="input-rk"
+                                    placeholder="Enter or select Batch No"
                                   />
+                                  <p className="mt-2 text-xs text-white/45">
+                                    Batch No is required for batch-tracked stock items.
+                                  </p>
                                 </div>
                               ) : null}
                               {product?.serialNumberTracking ? (
-                                <div>
-                                  <label className="label-rk">Serial No</label>
+                                <div className="md:col-span-2 space-y-3">
+                                  <label className="label-rk">S/N No</label>
                                   <textarea
                                     value={line.serialNos.join("\n")}
                                     onChange={(e) =>
@@ -2257,20 +2298,49 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
                                           itemIndex === index
                                             ? {
                                                 ...item,
-                                                serialNos: e.target.value
-                                                  .split(/\r?\n/)
-                                                  .map((serial) =>
-                                                    serial.trim(),
-                                                  )
-                                                  .filter(Boolean),
+                                                serialNos: uniqueSerialNos(
+                                                  e.target.value.split(/\r?\n/),
+                                                ),
                                               }
                                             : item,
                                         ),
                                       )
                                     }
-                                    className="input-rk min-h-[52px]"
-                                    placeholder="One serial number per line"
+                                    className="input-rk min-h-[96px]"
+                                    placeholder="Enter one S/N No per line"
                                   />
+                                  <div className="text-xs text-white/45">
+                                    S/N No is required for serial-tracked stock items. Quantity must match selected S/N count.
+                                  </div>
+                                  {line.serialNos.length > 0 ? (
+                                    <div className="flex flex-wrap gap-2">
+                                      {line.serialNos.map((serialNo) => (
+                                        <button
+                                          key={serialNo}
+                                          type="button"
+                                          onClick={() =>
+                                            setLines((prev) =>
+                                              prev.map((item, itemIndex) =>
+                                                itemIndex === index
+                                                  ? {
+                                                      ...item,
+                                                      serialNos: item.serialNos.filter(
+                                                        (value) =>
+                                                          value.toUpperCase() !==
+                                                          serialNo.toUpperCase(),
+                                                      ),
+                                                    }
+                                                  : item,
+                                              ),
+                                            )
+                                          }
+                                          className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs text-white/80 transition hover:bg-white/10"
+                                        >
+                                          {serialNo} ×
+                                        </button>
+                                      ))}
+                                    </div>
+                                  ) : null}
                                 </div>
                               ) : null}
                               {props.taxConfig.taxModuleEnabled &&
