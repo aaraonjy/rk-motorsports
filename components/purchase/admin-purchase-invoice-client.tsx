@@ -195,7 +195,11 @@ type LineForm = {
   discountType: "PERCENT" | "AMOUNT";
   locationId: string;
   batchNo: string;
+  batchMode: "existing" | "new";
+  expiryDate: string;
   serialNos: string[];
+  serialSearch: string;
+  serialEntryText: string;
   taxCodeId: string;
   remarks: string;
 };
@@ -377,12 +381,23 @@ function emptyLine(
     discountType: "PERCENT",
     locationId: defaultLocationId,
     batchNo: "",
+    batchMode: "existing",
+    expiryDate: "",
     serialNos: [],
+    serialSearch: "",
+    serialEntryText: "",
     taxCodeId: defaultTaxCodeId,
     remarks: "",
   };
 }
-type BalanceResponse = { ok?: boolean; balance?: number; error?: string };
+type BalanceResponse = { ok?: boolean; balance?: number; balances?: Array<{ batchNo?: string | null; balance?: number | null; expiryDate?: string | null }>; error?: string };
+
+type AvailableBatch = {
+  id: string;
+  batchNo: string;
+  expiryDate?: string | null;
+  balance?: number | null;
+};
 function balanceKey(productId: string, locationId: string, batchNo = "") {
   return `${productId}__${locationId}__${batchNo || ""}`;
 }
@@ -713,6 +728,51 @@ export function AdminPurchaseInvoiceClient(props: Props) {
     Record<string, boolean>
   >({});
   const [balanceRefreshKey, setBalanceRefreshKey] = useState(0);
+  const [availableBatches, setAvailableBatches] = useState<Record<number, AvailableBatch[]>>({});
+  const [loadingBatches, setLoadingBatches] = useState<Record<number, boolean>>({});
+
+
+  useEffect(() => {
+    let cancelled = false;
+    lines.forEach((line, index) => {
+      const product = props.initialProducts.find((item) => item.id === line.inventoryProductId);
+      if (!product?.batchTracking || !line.inventoryProductId || !line.locationId) {
+        setAvailableBatches((prev) => ({ ...prev, [index]: [] }));
+        return;
+      }
+
+      setLoadingBatches((prev) => ({ ...prev, [index]: true }));
+      const params = new URLSearchParams();
+      params.set("inventoryProductId", line.inventoryProductId);
+      params.set("locationId", line.locationId);
+
+      fetch(`/api/admin/stock/balance?${params.toString()}`, { cache: "no-store" })
+        .then((res) => res.json() as Promise<BalanceResponse>)
+        .then((data) => {
+          if (cancelled) return;
+          const rows = Array.isArray(data.balances) ? data.balances : [];
+          const batches = rows
+            .filter((row) => row.batchNo)
+            .map((row) => ({
+              id: String(row.batchNo || ""),
+              batchNo: String(row.batchNo || ""),
+              expiryDate: row.expiryDate || null,
+              balance: typeof row.balance === "number" ? row.balance : Number(row.balance || 0),
+            }))
+            .filter((row) => row.batchNo);
+          setAvailableBatches((prev) => ({ ...prev, [index]: batches }));
+        })
+        .catch(() => {
+          if (!cancelled) setAvailableBatches((prev) => ({ ...prev, [index]: [] }));
+        })
+        .finally(() => {
+          if (!cancelled) setLoadingBatches((prev) => ({ ...prev, [index]: false }));
+        });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [lines, props.initialProducts, balanceRefreshKey]);
 
   function refreshStockBalances() {
     setBalances({});
@@ -944,7 +1004,11 @@ export function AdminPurchaseInvoiceClient(props: Props) {
         discountType: line.discountType === "AMOUNT" ? "AMOUNT" : "PERCENT",
         locationId: line.locationId || props.defaultLocationId,
         batchNo: line.batchNo || "",
+        batchMode: line.batchNo ? "existing" : "existing",
+        expiryDate: "",
         serialNos: Array.isArray(line.serialNos) ? line.serialNos : [],
+        serialSearch: "",
+        serialEntryText: "",
         taxCodeId: "",
         remarks: line.remarks || "",
       })),
@@ -1265,7 +1329,11 @@ export function AdminPurchaseInvoiceClient(props: Props) {
         discountType: line.discountType === "AMOUNT" ? "AMOUNT" : "PERCENT",
         locationId: line.locationId || props.defaultLocationId,
         batchNo: line.batchNo || "",
+        batchMode: line.batchNo ? "existing" : "existing",
+        expiryDate: "",
         serialNos: Array.isArray(line.serialNos) ? line.serialNos : [],
+        serialSearch: "",
+        serialEntryText: "",
         taxCodeId: "",
         remarks: line.remarks || "",
       })),
@@ -1310,6 +1378,12 @@ export function AdminPurchaseInvoiceClient(props: Props) {
                 unitCostDecimalPlaces,
               ),
               locationId: line.locationId || props.defaultLocationId,
+              batchNo: "",
+              batchMode: "existing",
+              expiryDate: "",
+              serialNos: [],
+              serialSearch: "",
+              serialEntryText: "",
             }
           : line,
       ),
@@ -1320,6 +1394,44 @@ export function AdminPurchaseInvoiceClient(props: Props) {
       prev.map((line, lineIndex) =>
         lineIndex === index ? { ...line, [key]: value } : line,
       ),
+    );
+  }
+
+  function updateLineValues(index: number, values: Partial<LineForm>) {
+    setLines((prev) =>
+      prev.map((line, lineIndex) =>
+        lineIndex === index ? { ...line, ...values } : line,
+      ),
+    );
+  }
+
+  function setInboundBatch(index: number, value: string) {
+    if (value === "__NEW__") {
+      updateLineValues(index, { batchMode: "new", batchNo: "", expiryDate: "", serialNos: [], serialSearch: "", serialEntryText: "" });
+      return;
+    }
+    updateLineValues(index, { batchMode: "existing", batchNo: value.toUpperCase(), serialNos: [], serialSearch: "", serialEntryText: "" });
+  }
+
+  function setInboundNewBatchValue(index: number, value: string) {
+    updateLineValues(index, { batchMode: "new", batchNo: value.toUpperCase(), serialNos: [], serialSearch: "", serialEntryText: "" });
+  }
+
+  function addInboundSerial(index: number, serialNo: string) {
+    const normalized = serialNo.trim().toUpperCase();
+    if (!normalized) return;
+    setLines((prev) =>
+      prev.map((line, lineIndex) => {
+        if (lineIndex !== index) return line;
+        const serialNos = uniqueSerialNos([...line.serialNos, normalized]);
+        return {
+          ...line,
+          serialNos,
+          qty: formatDecimalInput(serialNos.length, qtyDecimalPlaces),
+          serialSearch: "",
+          serialEntryText: "",
+        };
+      }),
     );
   }
   function addLine() {
@@ -2236,6 +2348,7 @@ export function AdminPurchaseInvoiceClient(props: Props) {
                                     updateLine(index, "qty", e.target.value)
                                   }
                                   className="input-rk"
+                                  disabled={Boolean(product?.serialNumberTracking)}
                                 />
                               </div>
                               <div>
@@ -2296,70 +2409,122 @@ export function AdminPurchaseInvoiceClient(props: Props) {
                                 </p>
                               </div>
                               {product?.batchTracking ? (
-                                <div className="md:col-span-2">
-                                  <label className="label-rk">Batch No</label>
-                                  <input
-                                    value={line.batchNo}
-                                    onChange={(e) =>
-                                      updateLine(
-                                        index,
-                                        "batchNo",
-                                        e.target.value.toUpperCase(),
-                                      )
-                                    }
-                                    className="input-rk"
-                                    placeholder="Enter or select Batch No"
-                                  />
-                                  <p className="mt-2 text-xs text-white/45">
-                                    Batch No is required for batch-tracked stock items.
-                                  </p>
-                                </div>
+                                <>
+                                  <div className="md:col-span-2">
+                                    <SearchableSelect
+                                      label="Batch No"
+                                      placeholder={loadingBatches[index] ? "Loading existing batch numbers..." : "Select existing batch or create new"}
+                                      options={[
+                                        { id: "__NEW__", label: "+ Create New Batch", searchText: "create new batch new" },
+                                        ...(availableBatches[index] || []).map((batch) => ({
+                                          id: batch.batchNo,
+                                          label: `${batch.batchNo}${batch.expiryDate ? ` • Exp ${batch.expiryDate}` : ""}${typeof batch.balance === "number" ? ` • Bal ${batch.balance.toLocaleString("en-MY", { minimumFractionDigits: qtyDecimalPlaces, maximumFractionDigits: qtyDecimalPlaces })}` : ""}`,
+                                          searchText: `${batch.batchNo} ${batch.expiryDate || ""}`.toLowerCase(),
+                                        })),
+                                      ]}
+                                      value={line.batchMode === "new" ? "__NEW__" : line.batchNo}
+                                      disabled={Boolean(loadingBatches[index])}
+                                      onChange={(option) => setInboundBatch(index, option?.id || "")}
+                                    />
+                                    <p className="mt-2 text-xs text-white/45">
+                                      {line.batchMode === "new"
+                                        ? "Create a new batch no for this stock-in transaction."
+                                        : (availableBatches[index] || []).length > 0
+                                          ? "Select an existing batch or choose “Create New Batch”."
+                                          : "No existing batch numbers found. Choose “Create New Batch” to continue."}
+                                    </p>
+                                  </div>
+
+                                  {line.batchMode === "new" ? (
+                                    <div>
+                                      <label className="label-rk">New Batch No</label>
+                                      <input
+                                        className="input-rk"
+                                        value={line.batchNo}
+                                        onChange={(e) => setInboundNewBatchValue(index, e.target.value)}
+                                        placeholder="Enter new batch no"
+                                      />
+                                    </div>
+                                  ) : null}
+
+                                  <div>
+                                    <label className="label-rk">Expiry Date</label>
+                                    <input
+                                      type="date"
+                                      className="input-rk"
+                                      value={line.expiryDate}
+                                      onChange={(e) => updateLine(index, "expiryDate", e.target.value)}
+                                    />
+                                  </div>
+                                </>
                               ) : null}
                               {product?.serialNumberTracking ? (
-                                <div className="md:col-span-2 space-y-3">
-                                  <label className="label-rk">S/N No</label>
-                                  <textarea
-                                    value={line.serialNos.join("\n")}
-                                    onChange={(e) =>
-                                      setLines((prev) =>
-                                        prev.map((item, itemIndex) =>
-                                          itemIndex === index
-                                            ? {
-                                                ...item,
-                                                serialNos: uniqueSerialNos(
-                                                  e.target.value.split(/\r?\n/),
-                                                ),
-                                              }
-                                            : item,
-                                        ),
-                                      )
-                                    }
-                                    className="input-rk min-h-[96px]"
-                                    placeholder="Enter one S/N No per line"
-                                  />
-                                  <div className="text-xs text-white/45">
-                                    S/N No is required for serial-tracked stock items. Quantity must match selected S/N count.
+                                <>
+                                  <div className="md:col-span-2">
+                                    <SearchableSelect
+                                      label="Serial No"
+                                      placeholder="Select existing serial or create new"
+                                      options={[
+                                        { id: "__NEW__", label: "+ Create New Serial", searchText: "create new serial" },
+                                        ...(line.serialNos.length > 1
+                                          ? [{ id: "__COUNT__", label: `${line.serialNos.length} serial(s) selected`, searchText: line.serialNos.join(" ").toLowerCase() }]
+                                          : []),
+                                        ...line.serialNos.map((serialNo) => ({
+                                          id: serialNo,
+                                          label: serialNo,
+                                          searchText: serialNo.toLowerCase(),
+                                        })),
+                                      ]}
+                                      value={line.serialSearch === "__NEW__" ? "__NEW__" : line.serialNos.length > 1 ? "__COUNT__" : line.serialNos[0] || ""}
+                                      onChange={(option) => {
+                                        if (!option) return;
+                                        if (option.id === "__NEW__") {
+                                          updateLineValues(index, { serialSearch: "__NEW__", serialEntryText: "" });
+                                          return;
+                                        }
+                                        if (option.id === "__COUNT__") return;
+                                        addInboundSerial(index, option.id);
+                                      }}
+                                    />
+                                    <p className="mt-2 text-xs text-white/45">
+                                      Qty auto-follows selected serial count and uses Base UOM.
+                                    </p>
                                   </div>
+
+                                  {line.serialSearch === "__NEW__" ? (
+                                    <div>
+                                      <label className="label-rk">New Serial No</label>
+                                      <div className="flex gap-3">
+                                        <input
+                                          className="input-rk"
+                                          value={line.serialEntryText}
+                                          onChange={(e) => updateLine(index, "serialEntryText", e.target.value.toUpperCase())}
+                                          placeholder="Enter new serial no"
+                                        />
+                                        <button
+                                          type="button"
+                                          onClick={() => addInboundSerial(index, line.serialEntryText)}
+                                          className="inline-flex items-center justify-center rounded-xl bg-white/10 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/15"
+                                        >
+                                          Add
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ) : null}
+
                                   {line.serialNos.length > 0 ? (
-                                    <div className="flex flex-wrap gap-2">
+                                    <div className="md:col-span-2 flex flex-wrap gap-2">
                                       {line.serialNos.map((serialNo) => (
                                         <button
                                           key={serialNo}
                                           type="button"
                                           onClick={() =>
                                             setLines((prev) =>
-                                              prev.map((item, itemIndex) =>
-                                                itemIndex === index
-                                                  ? {
-                                                      ...item,
-                                                      serialNos: item.serialNos.filter(
-                                                        (value) =>
-                                                          value.toUpperCase() !==
-                                                          serialNo.toUpperCase(),
-                                                      ),
-                                                    }
-                                                  : item,
-                                              ),
+                                              prev.map((item, itemIndex) => {
+                                                if (itemIndex !== index) return item;
+                                                const serialNos = item.serialNos.filter((value) => value.toUpperCase() !== serialNo.toUpperCase());
+                                                return { ...item, serialNos, qty: formatDecimalInput(serialNos.length, qtyDecimalPlaces) };
+                                              }),
                                             )
                                           }
                                           className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs text-white/80 transition hover:bg-white/10"
@@ -2369,7 +2534,7 @@ export function AdminPurchaseInvoiceClient(props: Props) {
                                       ))}
                                     </div>
                                   ) : null}
-                                </div>
+                                </>
                               ) : null}
                               {props.taxConfig.taxModuleEnabled &&
                               taxMode === "LINE_ITEM" ? (
