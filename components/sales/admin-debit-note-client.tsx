@@ -514,7 +514,13 @@ export function AdminDebitNoteClient({ initialProducts, initialLocations, defaul
 
   function toggleSerial(line: LineForm, serialNo: string) {
     const selected = line.serialNos.includes(serialNo);
-    patchLine(line.key, { serialNos: selected ? line.serialNos.filter((item) => item !== serialNo) : [...line.serialNos, serialNo] });
+    const nextSerialNos = selected
+      ? line.serialNos.filter((item) => item !== serialNo)
+      : [...line.serialNos, serialNo];
+    patchLine(line.key, {
+      serialNos: nextSerialNos,
+      qty: nextSerialNos.length > 0 ? String(nextSerialNos.length) : "0",
+    });
   }
 
   async function submitDebitNote() {

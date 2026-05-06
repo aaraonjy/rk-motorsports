@@ -176,6 +176,18 @@ type AvailableBatch = {
   balance?: number | null;
 };
 
+function formatBatchExpiryDate(value: string | Date | null | undefined) {
+  if (!value) return "";
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? "" : value.toISOString().slice(0, 10);
+  }
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0, 10);
+  const date = new Date(raw);
+  return Number.isNaN(date.getTime()) ? raw : date.toISOString().slice(0, 10);
+}
+
 function requiresSingleLocation(type: StockTransactionTypeValue) {
   return type === "OB" || type === "SR" || type === "SI" || type === "SA" || type === "AS";
 }
@@ -538,7 +550,7 @@ function OutboundSerialPicker({
               ) : (
                 filtered.map((serial) => {
                   const selected = selectedSerials.some((value) => value.toUpperCase() === serial.serialNo.toUpperCase());
-                  const meta = [serial.batchNo || null, serial.expiryDate ? `Exp ${serial.expiryDate}` : null]
+                  const meta = [serial.batchNo || null, serial.expiryDate ? `Exp ${formatBatchExpiryDate(serial.expiryDate)}` : null]
                     .filter(Boolean)
                     .join(" • ");
 
@@ -1335,7 +1347,7 @@ export function AdminStockTransactionEditClient({
                         <SearchableSelect
                           label="Batch No"
                           placeholder={loadingBatches[index] ? (outboundBatchFlow ? "Loading available batches..." : "Loading existing batches...") : outboundBatchFlow ? "Search or select batch no" : "Select existing batch or create new"}
-                          options={outboundBatchFlow ? (availableBatches[index] || []).map((batch) => ({ id: batch.batchNo, label: batch.balance != null ? `${batch.batchNo}${batch.expiryDate ? ` • Exp ${formatDateInput(batch.expiryDate)}` : ""} • Bal ${formatQty(batch.balance, stockSettings.qtyDecimalPlaces)}` : `${batch.batchNo}${batch.expiryDate ? ` • Exp ${formatDateInput(batch.expiryDate)}` : ""}`, searchText: `${batch.batchNo} ${batch.expiryDate || ""}`.toLowerCase() })) : [{ id: "__NEW__", label: "+ Create New Batch", searchText: "create new batch new" }, ...(availableBatches[index] || []).map((batch) => ({ id: batch.batchNo, label: `${batch.batchNo}${batch.expiryDate ? ` • Exp ${formatDateInput(batch.expiryDate)}` : ""}`, searchText: `${batch.batchNo} ${batch.expiryDate || ""}`.toLowerCase() }))]}
+                          options={outboundBatchFlow ? (availableBatches[index] || []).map((batch) => ({ id: batch.batchNo, label: batch.balance != null ? `${batch.batchNo} • Bal ${formatQty(batch.balance, stockSettings.qtyDecimalPlaces)}${batch.expiryDate ? ` • Exp ${formatBatchExpiryDate(batch.expiryDate)}` : ""}` : `${batch.batchNo}${batch.expiryDate ? ` • Exp ${formatBatchExpiryDate(batch.expiryDate)}` : ""}`, searchText: `${batch.batchNo} ${batch.expiryDate || ""}`.toLowerCase() })) : [{ id: "__NEW__", label: "+ Create New Batch", searchText: "create new batch new" }, ...(availableBatches[index] || []).map((batch) => ({ id: batch.batchNo, label: `${batch.batchNo}${batch.expiryDate ? ` • Exp ${formatBatchExpiryDate(batch.expiryDate)}` : ""}`, searchText: `${batch.batchNo} ${batch.expiryDate || ""}`.toLowerCase() }))]}
                           value={inboundBatchFlow && line.batchMode === "new" ? "__NEW__" : line.batchNo}
                           disabled={loadingBatches[index]}
                           onChange={(option) => outboundBatchFlow ? setOutboundBatch(index, option?.id || "") : setInboundBatch(index, option?.id || "")}

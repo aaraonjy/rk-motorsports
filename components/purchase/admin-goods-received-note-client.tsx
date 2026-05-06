@@ -279,6 +279,18 @@ function formatDateInput(value: string | Date | null | undefined) {
   const day = parts.find((part) => part.type === "day")?.value;
   return year && month && day ? `${year}-${month}-${day}` : todayInput();
 }
+function formatBatchExpiryDate(value: string | Date | null | undefined) {
+  if (!value) return "";
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? "" : value.toISOString().slice(0, 10);
+  }
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0, 10);
+  const date = new Date(raw);
+  return Number.isNaN(date.getTime()) ? raw : date.toISOString().slice(0, 10);
+}
+
 function getDecimalPlaces(value: unknown, fallback = 2) {
   const numeric = Number(value ?? fallback);
   if (!Number.isFinite(numeric)) return fallback;
@@ -2474,7 +2486,7 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
                                         { id: "__NEW__", label: "+ Create New Batch", searchText: "create new batch new" },
                                         ...(availableBatches[index] || []).map((batch) => ({
                                           id: batch.batchNo,
-                                          label: `${batch.batchNo}${batch.expiryDate ? ` • Exp ${batch.expiryDate.slice(0, 10)}` : ""}${typeof batch.balance === "number" ? ` • Bal ${batch.balance.toLocaleString("en-MY", { minimumFractionDigits: qtyDecimalPlaces, maximumFractionDigits: qtyDecimalPlaces })}` : ""}`,
+                                          label: `${batch.batchNo}${typeof batch.balance === "number" ? ` • Bal ${batch.balance.toLocaleString("en-MY", { minimumFractionDigits: qtyDecimalPlaces, maximumFractionDigits: qtyDecimalPlaces })}` : ""}${batch.expiryDate ? ` • Exp ${formatBatchExpiryDate(batch.expiryDate)}` : ""}`,
                                           searchText: `${batch.batchNo} ${batch.expiryDate || ""}`.toLowerCase(),
                                         })),
                                       ]}

@@ -331,7 +331,7 @@ function uniqueSerialNos(values: string[]) {
 function batchOptionLabel(batch: AvailableBatch, qtyDecimalPlaces: number) {
   const parts = [batch.batchNo];
   if (typeof batch.balance === "number") parts.push(`Bal ${moneyWithPlaces(batch.balance, qtyDecimalPlaces)}`);
-  if (batch.expiryDate) parts.push(`Exp ${batch.expiryDate.slice(0, 10)}`);
+  if (batch.expiryDate) parts.push(`Exp ${formatBatchExpiryDate(batch.expiryDate)}`);
   return parts.join(" • ");
 }
 
@@ -394,6 +394,18 @@ function todayInput() {
 
 function money(value: number) {
   return value.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function formatBatchExpiryDate(value: string | Date | null | undefined) {
+  if (!value) return "";
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? "" : value.toISOString().slice(0, 10);
+  }
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0, 10);
+  const date = new Date(raw);
+  return Number.isNaN(date.getTime()) ? raw : date.toISOString().slice(0, 10);
 }
 
 function getDecimalPlaces(value: unknown, fallback = 2) {
@@ -798,7 +810,7 @@ function OutboundSerialPicker({
               ) : (
                 filtered.map((serial) => {
                   const selected = selectedSerials.some((value) => value.toUpperCase() === serial.serialNo.toUpperCase());
-                  const meta = [serial.batchNo || null, serial.expiryDate ? `Exp ${serial.expiryDate.slice(0, 10)}` : null].filter(Boolean).join(" • ");
+                  const meta = [serial.batchNo || null, serial.expiryDate ? `Exp ${formatBatchExpiryDate(serial.expiryDate)}` : null].filter(Boolean).join(" • ");
                   return (
                     <button
                       key={serial.id}
