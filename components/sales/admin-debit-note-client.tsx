@@ -313,6 +313,8 @@ export function AdminDebitNoteClient({ initialProducts, initialLocations, defaul
   const selectedCustomer = useMemo(() => customerOptions.find((item) => item.id === selectedCustomerId) || null, [customerOptions, selectedCustomerId]);
   const selectedCustomerInvoice = useMemo(() => sourceInvoices.find((item) => item.customerId === selectedCustomerId) || null, [sourceInvoices, selectedCustomerId]);
 
+  const billingSource = useMemo(() => selectedInvoice || selectedCustomerInvoice || null, [selectedInvoice, selectedCustomerInvoice]);
+
   const filteredInvoices = useMemo(() => {
     if (!selectedCustomerId) return [];
     const keyword = sourceSearch.trim().toLowerCase();
@@ -815,13 +817,13 @@ export function AdminDebitNoteClient({ initialProducts, initialLocations, defaul
                   </div>
 
                   <div className="mt-5 grid gap-5 md:grid-cols-2">
-                    <div><label className="label-rk">Billing Address Line 1</label><input className="input-rk" value={selectedInvoice?.billingAddressLine1 || ""} readOnly /></div>
-                    <div><label className="label-rk">Billing Address Line 2</label><input className="input-rk" value={selectedInvoice?.billingAddressLine2 || ""} readOnly /></div>
-                    <div><label className="label-rk">Billing Address Line 3</label><input className="input-rk" value={selectedInvoice?.billingAddressLine3 || ""} readOnly /></div>
-                    <div><label className="label-rk">Billing Address Line 4</label><input className="input-rk" value={selectedInvoice?.billingAddressLine4 || ""} readOnly /></div>
-                    <div><label className="label-rk">City</label><input className="input-rk" value={selectedInvoice?.billingCity || ""} readOnly /></div>
-                    <div><label className="label-rk">Post Code</label><input className="input-rk" value={selectedInvoice?.billingPostCode || ""} readOnly /></div>
-                    <div><label className="label-rk">Country Code</label><input className="input-rk" value={selectedInvoice?.billingCountryCode || "MY"} readOnly /></div>
+                    <div><label className="label-rk">Billing Address Line 1</label><input className="input-rk" value={billingSource?.billingAddressLine1 || ""} readOnly /></div>
+                    <div><label className="label-rk">Billing Address Line 2</label><input className="input-rk" value={billingSource?.billingAddressLine2 || ""} readOnly /></div>
+                    <div><label className="label-rk">Billing Address Line 3</label><input className="input-rk" value={billingSource?.billingAddressLine3 || ""} readOnly /></div>
+                    <div><label className="label-rk">Billing Address Line 4</label><input className="input-rk" value={billingSource?.billingAddressLine4 || ""} readOnly /></div>
+                    <div><label className="label-rk">City</label><input className="input-rk" value={billingSource?.billingCity || ""} readOnly /></div>
+                    <div><label className="label-rk">Post Code</label><input className="input-rk" value={billingSource?.billingPostCode || ""} readOnly /></div>
+                    <div><label className="label-rk">Country Code</label><input className="input-rk" value={billingSource?.billingCountryCode || "MY"} readOnly /></div>
                   </div>
                 </div>
               </div>
