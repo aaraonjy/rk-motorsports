@@ -651,6 +651,59 @@ async function createStockReceive(
   return stockTransaction.id;
 }
 
+async function syncPurchaseBatchExpiryToStock(
+  tx: Prisma.TransactionClient,
+  stockTransactionId: string | null | undefined,
+  lines: Array<{
+    inventoryProductId?: string | null;
+    locationId?: string | null;
+    batchNo?: string | null;
+    expiryDate?: Date | null;
+  }>,
+) {
+  if (!stockTransactionId) return;
+
+  const batchLines = lines.filter(
+    (line) =>
+      line.inventoryProductId &&
+      line.locationId &&
+      line.batchNo &&
+      line.expiryDate,
+  );
+
+  if (batchLines.length === 0) return;
+
+  for (const line of batchLines) {
+    const batchNo = normalizeText(line.batchNo)?.toUpperCase();
+    if (!line.inventoryProductId || !line.locationId || !batchNo || !line.expiryDate) continue;
+
+    await tx.stockTransactionLine.updateMany({
+      where: {
+        transactionId: stockTransactionId,
+        inventoryProductId: line.inventoryProductId,
+        locationId: line.locationId,
+        batchNo,
+      },
+      data: { expiryDate: line.expiryDate },
+    });
+
+    await tx.inventoryBatch.upsert({
+      where: {
+        inventoryProductId_batchNo: {
+          inventoryProductId: line.inventoryProductId,
+          batchNo,
+        },
+      },
+      update: { expiryDate: line.expiryDate },
+      create: {
+        inventoryProductId: line.inventoryProductId,
+        batchNo,
+        expiryDate: line.expiryDate,
+      },
+    });
+  }
+}
+
 async function refreshSourceStatus(
   tx: Prisma.TransactionClient,
   sourceTransactionId: string,
@@ -1125,7 +1178,6 @@ export async function createPurchaseTransaction(
             locationCode: line.locationCode,
             locationName: line.locationName,
             batchNo: line.batchNo,
-            expiryDate: line.expiryDate,
             taxCodeId: line.taxCodeId,
             taxCode: line.taxCode,
             taxDescription: line.taxDescription,
@@ -1301,7 +1353,6 @@ export async function updatePurchaseTransaction(
             locationCode: line.locationCode,
             locationName: line.locationName,
             batchNo: line.batchNo,
-            expiryDate: line.expiryDate,
             taxCodeId: line.taxCodeId,
             taxCode: line.taxCode,
             taxDescription: line.taxDescription,
@@ -1316,6 +1367,9 @@ export async function updatePurchaseTransaction(
         },
       },
     });
+
+    await syncPurchaseBatchExpiryToStock(tx, current.stockTransactionId, lines);
+
     return updated;
   });
 }
