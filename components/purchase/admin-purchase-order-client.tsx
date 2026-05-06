@@ -369,8 +369,12 @@ function emptyLine(
   };
 }
 type BalanceResponse = { ok?: boolean; balance?: number; error?: string };
+type SerialNoResponse = { ok?: boolean; items?: Array<{ id?: string; serialNo?: string | null }>; error?: string };
 function balanceKey(productId: string, locationId: string, batchNo = "") {
   return `${productId}__${locationId}__${batchNo || ""}`;
+}
+function serialAvailabilityKey(productId: string, locationId: string) {
+  return `${productId}__${locationId}`;
 }
 function formatQtyBalance(
   value: number | undefined,
@@ -381,6 +385,15 @@ function formatQtyBalance(
   if (typeof value !== "number")
     return "Select product and location to view balance.";
   return `Current Balance: ${value.toLocaleString("en-MY", { minimumFractionDigits: qtyDecimalPlaces, maximumFractionDigits: qtyDecimalPlaces })}`;
+}
+function formatSerialAvailability(
+  value: number | undefined,
+  isLoading: boolean,
+  qtyDecimalPlaces: number,
+) {
+  if (isLoading) return "Loading serial availability...";
+  if (typeof value !== "number") return "Select product and location to view serial availability.";
+  return `Current Balance: ${value.toLocaleString("en-MY", { minimumFractionDigits: qtyDecimalPlaces, maximumFractionDigits: qtyDecimalPlaces })} (${value.toLocaleString("en-MY")} Serial No${value === 1 ? "" : "s"} Available)`;
 }
 function statusClass(status: string) {
   if (status === "LOCKED") return "border-white/15 bg-white/5 text-white/50";
@@ -686,10 +699,41 @@ export function AdminPurchaseOrderClient(props: Props) {
   const [showDocNoOverride, setShowDocNoOverride] = useState(false);
   const [docNoDraft, setDocNoDraft] = useState("");
   const [balances, setBalances] = useState<Record<string, number>>({});
+  const [serialAvailabilityCounts, setSerialAvailabilityCounts] = useState<Record<string, number>>({});
+  const [loadingSerialAvailability, setLoadingSerialAvailability] = useState<Record<string, boolean>>({});
   const [loadingBalances, setLoadingBalances] = useState<
     Record<string, boolean>
   >({});
   const [balanceRefreshKey, setBalanceRefreshKey] = useState(0);
+
+  useEffect(() => {
+    lines.forEach((line) => {
+      if (!line.inventoryProductId || !line.locationId) return;
+      const product = props.initialProducts.find((item) => item.id === line.inventoryProductId);
+      if (!product?.serialNumberTracking) return;
+      const key = serialAvailabilityKey(line.inventoryProductId, line.locationId);
+      if (serialAvailabilityCounts[key] !== undefined || loadingSerialAvailability[key]) return;
+
+      setLoadingSerialAvailability((prev) => ({ ...prev, [key]: true }));
+      const params = new URLSearchParams({
+        productId: line.inventoryProductId,
+        locationId: line.locationId,
+        status: "IN_STOCK",
+      });
+      fetch(`/api/admin/stock/serial-no?${params.toString()}`, { cache: "no-store" })
+        .then((response) => response.json())
+        .then((data: SerialNoResponse) => {
+          setSerialAvailabilityCounts((prev) => ({
+            ...prev,
+            [key]: data?.ok && Array.isArray(data.items) ? data.items.length : 0,
+          }));
+        })
+        .catch(() => null)
+        .finally(() => {
+          setLoadingSerialAvailability((prev) => ({ ...prev, [key]: false }));
+        });
+    });
+  }, [serialAvailabilityCounts, props.initialProducts, lines, loadingSerialAvailability]);
 
   function refreshStockBalances() {
     setBalances({});
@@ -1863,13 +1907,23 @@ export function AdminPurchaseOrderClient(props: Props) {
                           line.inventoryProductId && line.locationId
                             ? balanceKey(line.inventoryProductId, line.locationId, "")
                             : "";
+                        const serialAvailabilityKeyValue =
+                          line.inventoryProductId && line.locationId
+                            ? serialAvailabilityKey(line.inventoryProductId, line.locationId)
+                            : "";
                         const balanceText =
                           line.inventoryProductId && line.locationId
-                            ? formatQtyBalance(
-                                balances[balanceKeyValue],
-                                Boolean(loadingBalances[balanceKeyValue]),
-                                qtyDecimalPlaces,
-                              )
+                            ? product?.serialNumberTracking
+                              ? formatSerialAvailability(
+                                  serialAvailabilityCounts[serialAvailabilityKeyValue],
+                                  Boolean(loadingSerialAvailability[serialAvailabilityKeyValue]),
+                                  qtyDecimalPlaces,
+                                )
+                              : formatQtyBalance(
+                                  balances[balanceKeyValue],
+                                  Boolean(loadingBalances[balanceKeyValue]),
+                                  qtyDecimalPlaces,
+                                )
                             : "Select product and location to view balance.";
                         return (
                           <div

@@ -415,6 +415,12 @@ function getBalanceDisplay(value: number | undefined, isLoading: boolean, decima
   return `Current Balance: ${moneyWithPlaces(value, decimalPlaces)}`;
 }
 
+function getSerialAvailabilityDisplay(value: number | undefined, isLoading: boolean, decimalPlaces: number) {
+  if (isLoading) return "Loading serial availability...";
+  if (typeof value !== "number") return "Select product and location to view serial availability.";
+  return `Current Balance: ${moneyWithPlaces(value, decimalPlaces)} (${value.toLocaleString("en-MY")} Serial No${value === 1 ? "" : "s"} Available)`;
+}
+
 
 function todayInput() {
   return new Date().toISOString().slice(0, 10);
@@ -2496,11 +2502,17 @@ export function AdminSalesInvoiceClient({
                               ? "Service item claim by amount."
                               : selectedProduct?.batchTracking && !line.batchNo
                               ? "Select Batch No to view batch balance."
-                              : getBalanceDisplay(
-                                  line.inventoryProductId && line.locationId ? balances[balanceKey(line.inventoryProductId, line.locationId, selectedProduct?.batchTracking ? line.batchNo : "")] : undefined,
-                                  line.inventoryProductId && line.locationId ? Boolean(loadingBalances[balanceKey(line.inventoryProductId, line.locationId, selectedProduct?.batchTracking ? line.batchNo : "")]) : false,
-                                  qtyDecimalPlaces
-                                )}
+                              : selectedProduct?.serialNumberTracking
+                                ? getSerialAvailabilityDisplay(
+                                    line.inventoryProductId && line.locationId ? (availableSerials[index] || []).length : undefined,
+                                    line.inventoryProductId && line.locationId ? Boolean(loadingSerials[index]) : false,
+                                    qtyDecimalPlaces,
+                                  )
+                                : getBalanceDisplay(
+                                    line.inventoryProductId && line.locationId ? balances[balanceKey(line.inventoryProductId, line.locationId, selectedProduct?.batchTracking ? line.batchNo : "")] : undefined,
+                                    line.inventoryProductId && line.locationId ? Boolean(loadingBalances[balanceKey(line.inventoryProductId, line.locationId, selectedProduct?.batchTracking ? line.batchNo : "")]) : false,
+                                    qtyDecimalPlaces
+                                  )}
                           </p>
                         </div>
                         {selectedProduct?.batchTracking ? (

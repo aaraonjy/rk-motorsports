@@ -1898,7 +1898,9 @@ export function AdminStockAssemblyClient({
                             </div>
                             {!product?.batchTracking ? (
                               <div className="mt-2 text-xs text-white/45">
-                                Current Balance: {formatQty(lineBalances[index] ?? 0, stockSettings.qtyDecimalPlaces)}
+                                {product?.serialNumberTracking
+                                  ? `Current Balance: ${formatQty(serials.length, stockSettings.qtyDecimalPlaces)} (${serials.length.toLocaleString("en-MY")} Serial No${serials.length === 1 ? "" : "s"} Available)`
+                                  : `Current Balance: ${formatQty(lineBalances[index] ?? 0, stockSettings.qtyDecimalPlaces)}`}
                               </div>
                             ) : null}
                             {product?.serialNumberTracking ? (

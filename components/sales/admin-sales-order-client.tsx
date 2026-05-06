@@ -807,8 +807,13 @@ function buildSalesOrderRevisionDocNoPreview(transaction: SalesOrderRecord) {
 }
 
 type BalanceResponse = { ok?: boolean; balance?: number; error?: string };
+type SerialNoResponse = { ok?: boolean; items?: Array<{ id?: string; serialNo?: string | null }>; error?: string };
 
 function balanceKey(productId: string, locationId: string) {
+  return `${productId}__${locationId}`;
+}
+
+function serialAvailabilityKey(productId: string, locationId: string) {
   return `${productId}__${locationId}`;
 }
 
@@ -821,6 +826,16 @@ function getBalanceDisplay(
   if (typeof value !== "number")
     return "Select product and location to view balance.";
   return `Current Balance: ${moneyWithPlaces(value, decimalPlaces)}`;
+}
+
+function getSerialAvailabilityDisplay(
+  value: number | undefined,
+  isLoading: boolean,
+  decimalPlaces: number,
+) {
+  if (isLoading) return "Loading serial availability...";
+  if (typeof value !== "number") return "Select product and location to view serial availability.";
+  return `Current Balance: ${moneyWithPlaces(value, decimalPlaces)} (${value.toLocaleString("en-MY")} Serial No${value === 1 ? "" : "s"} Available)`;
 }
 
 function hasActiveDownstreamTransaction(transaction: SalesOrderRecord) {
@@ -1008,6 +1023,8 @@ export function AdminSalesOrderClient({
     ),
   ]);
   const [balances, setBalances] = useState<Record<string, number>>({});
+  const [serialAvailabilityCounts, setSerialAvailabilityCounts] = useState<Record<string, number>>({});
+  const [loadingSerialAvailability, setLoadingSerialAvailability] = useState<Record<string, boolean>>({});
   const [loadingBalances, setLoadingBalances] = useState<
     Record<string, boolean>
   >({});
@@ -1428,6 +1445,35 @@ export function AdminSalesOrderClient({
         });
     });
   }, [balances, lines, loadingBalances]);
+
+  useEffect(() => {
+    lines.forEach((line) => {
+      if (!line.inventoryProductId || !line.locationId) return;
+      const product = products.find((item) => item.id === line.inventoryProductId);
+      if (!product?.serialNumberTracking) return;
+      const key = serialAvailabilityKey(line.inventoryProductId, line.locationId);
+      if (serialAvailabilityCounts[key] !== undefined || loadingSerialAvailability[key]) return;
+
+      setLoadingSerialAvailability((prev) => ({ ...prev, [key]: true }));
+      const params = new URLSearchParams({
+        productId: line.inventoryProductId,
+        locationId: line.locationId,
+        status: "IN_STOCK",
+      });
+      fetch(`/api/admin/stock/serial-no?${params.toString()}`, { cache: "no-store" })
+        .then((response) => response.json())
+        .then((data: SerialNoResponse) => {
+          setSerialAvailabilityCounts((prev) => ({
+            ...prev,
+            [key]: data?.ok && Array.isArray(data.items) ? data.items.length : 0,
+          }));
+        })
+        .catch(() => null)
+        .finally(() => {
+          setLoadingSerialAvailability((prev) => ({ ...prev, [key]: false }));
+        });
+    });
+  }, [serialAvailabilityCounts, products, lines, loadingSerialAvailability]);
 
   function resetForm() {
     setActiveTab("HEADER");
@@ -2699,27 +2745,37 @@ export function AdminSalesOrderClient({
                             }
                           />
                           <p className="mt-2 text-xs text-white/45">
-                            {getBalanceDisplay(
-                              line.inventoryProductId && line.locationId
-                                ? balances[
-                                    balanceKey(
-                                      line.inventoryProductId,
-                                      line.locationId,
-                                    )
-                                  ]
-                                : undefined,
-                              line.inventoryProductId && line.locationId
-                                ? Boolean(
-                                    loadingBalances[
-                                      balanceKey(
-                                        line.inventoryProductId,
-                                        line.locationId,
+                            {selectedProduct?.serialNumberTracking
+                              ? getSerialAvailabilityDisplay(
+                                  line.inventoryProductId && line.locationId
+                                    ? serialAvailabilityCounts[serialAvailabilityKey(line.inventoryProductId, line.locationId)]
+                                    : undefined,
+                                  line.inventoryProductId && line.locationId
+                                    ? Boolean(loadingSerialAvailability[serialAvailabilityKey(line.inventoryProductId, line.locationId)])
+                                    : false,
+                                  qtyDecimalPlaces,
+                                )
+                              : getBalanceDisplay(
+                                  line.inventoryProductId && line.locationId
+                                    ? balances[
+                                        balanceKey(
+                                          line.inventoryProductId,
+                                          line.locationId,
+                                        )
+                                      ]
+                                    : undefined,
+                                  line.inventoryProductId && line.locationId
+                                    ? Boolean(
+                                        loadingBalances[
+                                          balanceKey(
+                                            line.inventoryProductId,
+                                            line.locationId,
+                                          )
+                                        ],
                                       )
-                                    ],
-                                  )
-                                : false,
-                              qtyDecimalPlaces,
-                            )}
+                                    : false,
+                                  qtyDecimalPlaces,
+                                )}
                           </p>
                         </div>
                         {isLineItemTaxMode ? (

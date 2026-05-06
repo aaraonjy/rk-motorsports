@@ -872,7 +872,7 @@ export function AdminStockTransactionEditClient({
   useEffect(() => {
     lines.forEach((line, index) => {
       const product = initialProducts.find((item) => item.id === line.inventoryProductId);
-      const shouldFetch = !!product?.serialNumberTracking && isOutboundSerialFlow(transactionType, line.adjustmentDirection) && !!line.inventoryProductId && !!(transactionType === "ST" ? line.fromLocationId : line.locationId) && (!product.batchTracking || !!line.batchNo.trim());
+      const shouldFetch = !!product?.serialNumberTracking && !!line.inventoryProductId && !!(transactionType === "ST" ? line.fromLocationId : line.locationId) && (!product.batchTracking || !!line.batchNo.trim());
       if (!shouldFetch) {
         setAvailableSerials((prev) => ({ ...prev, [index]: line.serialNos.map((serialNo) => ({ id: `current-${serialNo}`, serialNo, batchNo: line.batchNo || null })) }));
         return;
@@ -938,9 +938,14 @@ export function AdminStockTransactionEditClient({
     setLines((prev) => (prev.length === 1 ? prev : prev.filter((_, i) => i !== index)));
   }
 
-  function getBalanceText(productId: string, locationId: string, batchNo?: string, product?: InventoryProductOption | null, direction: "" | AdjustmentDirectionValue = "") {
+  function getBalanceText(productId: string, locationId: string, batchNo?: string, product?: InventoryProductOption | null, direction: "" | AdjustmentDirectionValue = "", serialCount?: number, isSerialLoading = false) {
     if (!productId || !locationId) return "Select product and location to view balance.";
     if (requiresBatchSelectionBeforeBalance(product, transactionType, direction) && !batchNo?.trim()) return "Select batch no to view balance.";
+    if (product?.serialNumberTracking) {
+      if (isSerialLoading) return "Loading serial availability...";
+      if (typeof serialCount !== "number") return "Select product and location to view serial availability.";
+      return `Current Balance: ${formatQty(serialCount, stockSettings.qtyDecimalPlaces)} (${serialCount.toLocaleString("en-MY")} Serial No${serialCount === 1 ? "" : "s"} Available)`;
+    }
     const key = balanceKey(productId, locationId, batchNo);
     if (loadingBalances[key]) return "Loading current balance...";
     return `Current Balance: ${formatQty(typeof balances[key] === "number" ? balances[key] : 0, stockSettings.qtyDecimalPlaces)}`;
@@ -1293,7 +1298,7 @@ export function AdminStockTransactionEditClient({
                   {requiresSingleLocation(transactionType) ? (
                     <div className="md:col-span-2 xl:col-span-2">
                       <SearchableSelect label="Location" placeholder="Search or select location" options={locationOptions} value={singleLocationMode && lockedLocationId ? lockedLocationId : line.locationId} disabled={singleLocationMode} onChange={(option) => updateLine(index, { locationId: option?.id || "", batchNo: "", batchMode: "existing", expiryDate: "", serialNos: [], serialSearch: "" })} />
-                      <p className="mt-2 text-xs text-white/45">{getBalanceText(line.inventoryProductId, line.locationId, balanceBatchNo, selectedProduct, line.adjustmentDirection)}</p>
+                      <p className="mt-2 text-xs text-white/45">{getBalanceText(line.inventoryProductId, line.locationId, balanceBatchNo, selectedProduct, line.adjustmentDirection, serialRows.length, Boolean(loadingSerials[index]))}</p>
                     </div>
                   ) : null}
 
@@ -1315,11 +1320,11 @@ export function AdminStockTransactionEditClient({
                     <>
                       <div>
                         <SearchableSelect label="From Location" placeholder="Search or select source location" options={locationOptions} value={line.fromLocationId} onChange={(option) => updateLine(index, { fromLocationId: option?.id || "", batchNo: "", batchMode: "existing", expiryDate: "", serialNos: [], serialSearch: "" })} />
-                        <p className="mt-2 text-xs text-white/45">{getBalanceText(line.inventoryProductId, line.fromLocationId, balanceBatchNo, selectedProduct, line.adjustmentDirection)}</p>
+                        <p className="mt-2 text-xs text-white/45">{getBalanceText(line.inventoryProductId, line.fromLocationId, balanceBatchNo, selectedProduct, line.adjustmentDirection, serialRows.length, Boolean(loadingSerials[index]))}</p>
                       </div>
                       <div>
                         <SearchableSelect label="To Location" placeholder="Search or select destination location" options={locationOptions} value={line.toLocationId} onChange={(option) => updateLine(index, { toLocationId: option?.id || "" })} />
-                        <p className="mt-2 text-xs text-white/45">{getBalanceText(line.inventoryProductId, line.toLocationId, balanceBatchNo, selectedProduct, line.adjustmentDirection)}</p>
+                        <p className="mt-2 text-xs text-white/45">{getBalanceText(line.inventoryProductId, line.toLocationId, balanceBatchNo, selectedProduct, line.adjustmentDirection, undefined, false)}</p>
                       </div>
                     </>
                   ) : null}
