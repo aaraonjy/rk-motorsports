@@ -2505,6 +2505,29 @@ export function AdminPurchaseInvoiceClient(props: Props) {
                                     <p className="mt-2 text-xs text-white/45">
                                       Qty auto-follows selected serial count and uses Base UOM.
                                     </p>
+
+                                    {line.serialNos.length > 0 ? (
+                                      <div className="mt-3 flex flex-wrap gap-2">
+                                        {line.serialNos.map((serialNo) => (
+                                          <button
+                                            key={serialNo}
+                                            type="button"
+                                            onClick={() =>
+                                              setLines((prev) =>
+                                                prev.map((item, itemIndex) => {
+                                                  if (itemIndex !== index) return item;
+                                                  const serialNos = item.serialNos.filter((value) => value.toUpperCase() !== serialNo.toUpperCase());
+                                                  return { ...item, serialNos, qty: formatDecimalInput(serialNos.length, qtyDecimalPlaces) };
+                                                }),
+                                              )
+                                            }
+                                            className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs text-white/80 transition hover:bg-white/10"
+                                          >
+                                            {serialNo} ×
+                                          </button>
+                                        ))}
+                                      </div>
+                                    ) : null}
                                   </div>
 
                                   {line.serialSearch === "__NEW__" ? (
@@ -2525,29 +2548,6 @@ export function AdminPurchaseInvoiceClient(props: Props) {
                                           Add
                                         </button>
                                       </div>
-                                    </div>
-                                  ) : null}
-
-                                  {line.serialNos.length > 0 ? (
-                                    <div className="md:col-span-2 flex flex-wrap gap-2">
-                                      {line.serialNos.map((serialNo) => (
-                                        <button
-                                          key={serialNo}
-                                          type="button"
-                                          onClick={() =>
-                                            setLines((prev) =>
-                                              prev.map((item, itemIndex) => {
-                                                if (itemIndex !== index) return item;
-                                                const serialNos = item.serialNos.filter((value) => value.toUpperCase() !== serialNo.toUpperCase());
-                                                return { ...item, serialNos, qty: formatDecimalInput(serialNos.length, qtyDecimalPlaces) };
-                                              }),
-                                            )
-                                          }
-                                          className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs text-white/80 transition hover:bg-white/10"
-                                        >
-                                          {serialNo} ×
-                                        </button>
-                                      ))}
                                     </div>
                                   ) : null}
                                 </>
