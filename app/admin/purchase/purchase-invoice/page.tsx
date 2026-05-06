@@ -42,6 +42,135 @@ function sumLinkedAmount(
     .reduce((sum, link) => sum + toNumber(link.claimAmount), 0);
 }
 
+
+type PurchaseTrackingMeta = {
+  batchNo: string | null;
+  expiryDate: string | null;
+  serialNos: string[];
+};
+
+function normalizeTrackingText(value: unknown) {
+  return String(value || "").trim();
+}
+
+function normalizeTrackingKey(value: unknown) {
+  return normalizeTrackingText(value).toUpperCase();
+}
+
+function uniqueTrackingSerialNos(values: Array<string | null | undefined>) {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const value of values) {
+    const text = normalizeTrackingText(value);
+    if (!text) continue;
+    const key = text.toUpperCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(text);
+  }
+  return result;
+}
+
+function formatTrackingDateInput(value: Date | string | null | undefined) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kuala_Lumpur",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  const day = parts.find((part) => part.type === "day")?.value;
+  return year && month && day ? `${year}-${month}-${day}` : null;
+}
+
+function findMatchingStockTrackingLine(
+  stockLines: Array<{
+    inventoryProductId?: string | null;
+    locationId?: string | null;
+    batchNo?: string | null;
+    expiryDate?: Date | string | null;
+    serialEntries?: Array<{ serialNo?: string | null }>;
+  }>,
+  line: {
+    inventoryProductId?: string | null;
+    locationId?: string | null;
+    batchNo?: string | null;
+  },
+) {
+  const productId = normalizeTrackingText(line.inventoryProductId);
+  const locationId = normalizeTrackingText(line.locationId);
+  const batchNo = normalizeTrackingKey(line.batchNo);
+
+  return stockLines.find((stockLine) => {
+    if (normalizeTrackingText(stockLine.inventoryProductId) !== productId) return false;
+    if (locationId && normalizeTrackingText(stockLine.locationId) !== locationId) return false;
+    if (batchNo && normalizeTrackingKey(stockLine.batchNo) !== batchNo) return false;
+    return true;
+  }) || null;
+}
+
+async function buildPurchaseTrackingByLine(transactions: any[]) {
+  const stockTransactionIds = new Set<string>();
+  for (const transaction of transactions) {
+    if (transaction.stockTransactionId) stockTransactionIds.add(transaction.stockTransactionId);
+    for (const line of transaction.lines || []) {
+      for (const link of line.targetLineLinks || []) {
+        const sourceStockTransactionId = link.sourceLine?.transaction?.stockTransactionId;
+        if (sourceStockTransactionId) stockTransactionIds.add(sourceStockTransactionId);
+      }
+    }
+  }
+
+  if (stockTransactionIds.size === 0) return new Map<string, PurchaseTrackingMeta>();
+
+  const stockTransactions = await db.stockTransaction.findMany({
+    where: { id: { in: Array.from(stockTransactionIds) } },
+    include: {
+      lines: {
+        orderBy: { createdAt: "asc" },
+        include: { serialEntries: { orderBy: { createdAt: "asc" } } },
+      },
+    },
+  });
+
+  const stockLinesByTransactionId = new Map<string, typeof stockTransactions[number]["lines"]>();
+  for (const stockTransaction of stockTransactions) {
+    stockLinesByTransactionId.set(stockTransaction.id, stockTransaction.lines);
+  }
+
+  const trackingByLine = new Map<string, PurchaseTrackingMeta>();
+  for (const transaction of transactions) {
+    for (const line of transaction.lines || []) {
+      const candidateStockTransactionIds = [
+        transaction.stockTransactionId,
+        ...((line.targetLineLinks || [])
+          .map((link: any) => link.sourceLine?.transaction?.stockTransactionId)
+          .filter(Boolean) as string[]),
+      ];
+
+      for (const stockTransactionId of candidateStockTransactionIds) {
+        if (!stockTransactionId) continue;
+        const stockLines = stockLinesByTransactionId.get(stockTransactionId) || [];
+        const stockLine = findMatchingStockTrackingLine(stockLines, line);
+        if (!stockLine) continue;
+        const serialNos = uniqueTrackingSerialNos((stockLine.serialEntries || []).map((entry) => entry.serialNo));
+        trackingByLine.set(`${transaction.id}__${line.id}`, {
+          batchNo: stockLine.batchNo || line.batchNo || null,
+          expiryDate: formatTrackingDateInput(stockLine.expiryDate),
+          serialNos,
+        });
+        break;
+      }
+    }
+  }
+
+  return trackingByLine;
+}
+
 async function loadSharedData(docType: PurchaseDocType) {
   const [suppliers, products, locations, agents, projects, departments, stockConfig, taxConfig, taxCodes, transactions, sourceDocuments] = await Promise.all([
     db.supplier.findMany({
@@ -114,6 +243,19 @@ async function loadSharedData(docType: PurchaseDocType) {
             sourceLineLinks: {
               include: { targetTransaction: { select: { id: true, status: true } } },
             },
+            targetLineLinks: {
+              include: {
+                sourceLine: {
+                  select: {
+                    id: true,
+                    inventoryProductId: true,
+                    locationId: true,
+                    batchNo: true,
+                    transaction: { select: { id: true, stockTransactionId: true } },
+                  },
+                },
+              },
+            },
           },
         },
         sourceLinks: { include: { targetTransaction: { select: { id: true, docType: true, docNo: true, status: true } } } },
@@ -122,6 +264,8 @@ async function loadSharedData(docType: PurchaseDocType) {
     }),
     loadPurchaseSources(docType),
   ]);
+
+  const trackingByLine = await buildPurchaseTrackingByLine(transactions as any[]);
 
   return {
     suppliers,
@@ -208,6 +352,7 @@ async function loadSharedData(docType: PurchaseDocType) {
         const orderedAmount = toNumber(line.lineTotal);
         const receivedAmount = sumLinkedAmount(line, "RECEIVED_TO");
         const invoicedAmount = sumLinkedAmount(line, "INVOICED_TO");
+        const trackingMeta = trackingByLine.get(`${transaction.id}__${line.id}`);
         return {
           id: line.id,
           inventoryProductId: line.inventoryProductId,
@@ -229,7 +374,9 @@ async function loadSharedData(docType: PurchaseDocType) {
           discountRate: toNumber(line.discountRate),
           discountType: line.discountType,
           locationId: line.locationId,
-          batchNo: line.batchNo,
+          batchNo: trackingMeta?.batchNo || line.batchNo,
+          expiryDate: trackingMeta?.expiryDate || null,
+          serialNos: trackingMeta?.serialNos || [],
           taxCodeId: line.taxCodeId,
           remarks: line.remarks,
         };
