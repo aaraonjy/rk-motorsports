@@ -152,8 +152,17 @@ async function buildPurchaseTrackingByLine(transactions: any[]) {
   const stockTransactionIds = new Set<string>();
   for (const transaction of transactions) {
     if (transaction.stockTransactionId) stockTransactionIds.add(transaction.stockTransactionId);
+    if (transaction.revisedFrom?.stockTransactionId) stockTransactionIds.add(transaction.revisedFrom.stockTransactionId);
+
     for (const line of transaction.lines || []) {
       for (const link of line.targetLineLinks || []) {
+        const sourceStockTransactionId = link.sourceLine?.transaction?.stockTransactionId;
+        if (sourceStockTransactionId) stockTransactionIds.add(sourceStockTransactionId);
+      }
+    }
+
+    for (const originalLine of transaction.revisedFrom?.lines || []) {
+      for (const link of originalLine.targetLineLinks || []) {
         const sourceStockTransactionId = link.sourceLine?.transaction?.stockTransactionId;
         if (sourceStockTransactionId) stockTransactionIds.add(sourceStockTransactionId);
       }
@@ -180,11 +189,19 @@ async function buildPurchaseTrackingByLine(transactions: any[]) {
   const trackingByLine = new Map<string, PurchaseTrackingMeta>();
   for (const transaction of transactions) {
     for (const line of transaction.lines || []) {
+      const revisedFromStockTransactionIds = [
+        transaction.revisedFrom?.stockTransactionId,
+        ...((transaction.revisedFrom?.lines || [])
+          .flatMap((originalLine: any) => originalLine.targetLineLinks || [])
+          .map((link: any) => link.sourceLine?.transaction?.stockTransactionId)
+          .filter(Boolean) as string[]),
+      ];
       const candidateStockTransactionIds = [
         transaction.stockTransactionId,
         ...((line.targetLineLinks || [])
           .map((link: any) => link.sourceLine?.transaction?.stockTransactionId)
           .filter(Boolean) as string[]),
+        ...revisedFromStockTransactionIds,
       ];
 
       for (const stockTransactionId of candidateStockTransactionIds) {
@@ -269,7 +286,35 @@ export default async function PurchaseDetailPage({ params, searchParams }: Param
       agent: { select: { id: true, code: true, name: true } },
       project: { select: { id: true, code: true, name: true } },
       department: { select: { id: true, code: true, name: true, projectId: true } },
-      revisedFrom: { select: { id: true, docNo: true } },
+      revisedFrom: {
+        select: {
+          id: true,
+          docNo: true,
+          stockTransactionId: true,
+          lines: {
+            orderBy: { lineNo: "asc" },
+            select: {
+              id: true,
+              inventoryProductId: true,
+              locationId: true,
+              batchNo: true,
+              targetLineLinks: {
+                include: {
+                  sourceLine: {
+                    select: {
+                      id: true,
+                      inventoryProductId: true,
+                      locationId: true,
+                      batchNo: true,
+                      transaction: { select: { id: true, stockTransactionId: true } },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
       revisions: { select: { id: true, docNo: true, status: true } },
       sourceLinks: {
         include: { targetTransaction: { select: { id: true, docType: true, docNo: true, status: true } } },
