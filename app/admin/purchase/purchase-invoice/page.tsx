@@ -87,6 +87,12 @@ function formatTrackingDateInput(value: Date | string | null | undefined) {
   return year && month && day ? `${year}-${month}-${day}` : null;
 }
 
+function getRevisionBaseDocNo(docNo: string | null | undefined) {
+  const value = normalizeTrackingText(docNo).toUpperCase();
+  const match = value.match(/^(.+-\d{4})(?:-\d+)?$/);
+  return match ? match[1] : value;
+}
+
 function findMatchingStockTrackingLine(
   stockLines: Array<{
     inventoryProductId?: string | null;
@@ -115,8 +121,21 @@ function findMatchingStockTrackingLine(
 
 async function buildPurchaseTrackingByLine(transactions: any[]) {
   const stockTransactionIds = new Set<string>();
+  const stockTransactionIdsByBaseDocNo = new Map<string, string[]>();
+
+  function rememberStockTransactionForBase(docNo: string | null | undefined, stockTransactionId: string | null | undefined) {
+    if (!docNo || !stockTransactionId) return;
+    const baseDocNo = getRevisionBaseDocNo(docNo);
+    if (!baseDocNo) return;
+    const existing = stockTransactionIdsByBaseDocNo.get(baseDocNo) || [];
+    if (!existing.includes(stockTransactionId)) existing.push(stockTransactionId);
+    stockTransactionIdsByBaseDocNo.set(baseDocNo, existing);
+    stockTransactionIds.add(stockTransactionId);
+  }
+
   for (const transaction of transactions) {
-    if (transaction.stockTransactionId) stockTransactionIds.add(transaction.stockTransactionId);
+    rememberStockTransactionForBase(transaction.docNo, transaction.stockTransactionId);
+    rememberStockTransactionForBase(transaction.revisedFrom?.docNo, transaction.revisedFrom?.stockTransactionId);
     for (const line of transaction.lines || []) {
       for (const link of line.targetLineLinks || []) {
         const sourceStockTransactionId = link.sourceLine?.transaction?.stockTransactionId;
@@ -145,12 +164,15 @@ async function buildPurchaseTrackingByLine(transactions: any[]) {
   const trackingByLine = new Map<string, PurchaseTrackingMeta>();
   for (const transaction of transactions) {
     for (const line of transaction.lines || []) {
-      const candidateStockTransactionIds = [
+      const baseDocNo = getRevisionBaseDocNo(transaction.docNo);
+      const candidateStockTransactionIds = Array.from(new Set([
         transaction.stockTransactionId,
+        transaction.revisedFrom?.stockTransactionId,
+        ...(stockTransactionIdsByBaseDocNo.get(baseDocNo) || []),
         ...((line.targetLineLinks || [])
           .map((link: any) => link.sourceLine?.transaction?.stockTransactionId)
           .filter(Boolean) as string[]),
-      ];
+      ].filter(Boolean) as string[]));
 
       for (const stockTransactionId of candidateStockTransactionIds) {
         if (!stockTransactionId) continue;
@@ -235,7 +257,7 @@ async function loadSharedData(docType: PurchaseDocType) {
       where: { docType },
       orderBy: [{ docDate: "desc" }, { docNo: "desc" }],
       include: {
-        revisedFrom: { select: { id: true, docNo: true } },
+        revisedFrom: { select: { id: true, docNo: true, stockTransactionId: true } },
         revisions: { select: { id: true, docNo: true, status: true } },
         lines: {
           orderBy: { lineNo: "asc" },
