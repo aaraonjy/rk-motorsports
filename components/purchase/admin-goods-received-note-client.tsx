@@ -391,6 +391,7 @@ function emptyLine(
   };
 }
 type BalanceResponse = { ok?: boolean; balance?: number; balances?: Array<{ batchNo?: string | null; balance?: number | null; expiryDate?: string | null }>; error?: string };
+type SerialNoResponse = { ok?: boolean; items?: Array<{ id?: string; serialNo?: string | null }>; error?: string };
 
 type AvailableBatch = {
   id: string;
@@ -401,6 +402,9 @@ type AvailableBatch = {
 function balanceKey(productId: string, locationId: string, batchNo = "") {
   return `${productId}__${locationId}__${batchNo || ""}`;
 }
+function serialAvailabilityKey(productId: string, locationId: string, batchNo = "") {
+  return `${productId}__${locationId}__${String(batchNo || "").trim().toUpperCase()}`;
+}
 function formatQtyBalance(
   value: number | undefined,
   isLoading: boolean,
@@ -410,6 +414,15 @@ function formatQtyBalance(
   if (typeof value !== "number")
     return "Select product and location to view balance.";
   return `Qty Balance: ${value.toLocaleString("en-MY", { minimumFractionDigits: qtyDecimalPlaces, maximumFractionDigits: qtyDecimalPlaces })}`;
+}
+function formatSerialAvailability(
+  value: number | undefined,
+  isLoading: boolean,
+  qtyDecimalPlaces: number,
+) {
+  if (isLoading) return "Loading serial availability...";
+  if (typeof value !== "number") return "Select product and location to view serial availability.";
+  return `Qty Balance: ${value.toLocaleString("en-MY", { minimumFractionDigits: qtyDecimalPlaces, maximumFractionDigits: qtyDecimalPlaces })} (${value.toLocaleString("en-MY")} Serial No${value === 1 ? "" : "s"} Available)`;
 }
 function statusClass(status: string) {
   if (status === "CANCELLED")
@@ -734,6 +747,8 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
   const [balanceRefreshKey, setBalanceRefreshKey] = useState(0);
   const [availableBatches, setAvailableBatches] = useState<Record<number, AvailableBatch[]>>({});
   const [loadingBatches, setLoadingBatches] = useState<Record<number, boolean>>({});
+  const [serialAvailabilityCounts, setSerialAvailabilityCounts] = useState<Record<string, number>>({});
+  const [loadingSerialAvailability, setLoadingSerialAvailability] = useState<Record<string, boolean>>({});
 
 
   useEffect(() => {
@@ -781,6 +796,8 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
   function refreshStockBalances() {
     setBalances({});
     setLoadingBalances({});
+    setSerialAvailabilityCounts({});
+    setLoadingSerialAvailability({});
     setBalanceRefreshKey((prev) => prev + 1);
   }
 
@@ -1020,6 +1037,7 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
       const product = props.initialProducts.find(
         (item) => item.id === line.inventoryProductId,
       );
+      if (product?.serialNumberTracking) continue;
       const batchNo = product?.batchTracking ? line.batchNo : "";
       if (product?.batchTracking && !batchNo) continue;
       const key = balanceKey(line.inventoryProductId, line.locationId, batchNo);
@@ -1045,6 +1063,40 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
         );
     }
   }, [balances, props.initialProducts, lines, loadingBalances, balanceRefreshKey]);
+
+  useEffect(() => {
+    for (const line of lines) {
+      if (!line.inventoryProductId || !line.locationId) continue;
+      const product = props.initialProducts.find(
+        (item) => item.id === line.inventoryProductId,
+      );
+      if (!product?.serialNumberTracking) continue;
+      const batchNo = product.batchTracking ? line.batchNo : "";
+      if (product.batchTracking && !batchNo) continue;
+      const key = serialAvailabilityKey(line.inventoryProductId, line.locationId, batchNo);
+      if (serialAvailabilityCounts[key] !== undefined || loadingSerialAvailability[key]) continue;
+      setLoadingSerialAvailability((prev) => ({ ...prev, [key]: true }));
+      const params = new URLSearchParams({
+        productId: line.inventoryProductId,
+        locationId: line.locationId,
+        status: "IN_STOCK",
+      });
+      if (batchNo) params.set("batchNo", batchNo);
+      params.set("_ts", `${Date.now()}-${balanceRefreshKey}`);
+      fetch(`/api/admin/stock/serial-no?${params.toString()}`, {
+        cache: "no-store",
+      })
+        .then((response) => response.json() as Promise<SerialNoResponse>)
+        .then((data) => {
+          if (data?.ok && Array.isArray(data.items)) {
+            setSerialAvailabilityCounts((prev) => ({ ...prev, [key]: data.items?.length || 0 }));
+          }
+        })
+        .finally(() =>
+          setLoadingSerialAvailability((prev) => ({ ...prev, [key]: false })),
+        );
+    }
+  }, [serialAvailabilityCounts, props.initialProducts, lines, loadingSerialAvailability, balanceRefreshKey]);
 
   const headerTaxCode =
     props.taxConfig.taxCodes.find((item) => item.id === form.taxCodeId) || null;
@@ -2262,15 +2314,31 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
                                 product?.batchTracking ? line.batchNo : "",
                               )
                             : "";
+                        const serialAvailabilityKeyValue =
+                          line.inventoryProductId && line.locationId
+                            ? serialAvailabilityKey(
+                                line.inventoryProductId,
+                                line.locationId,
+                                product?.batchTracking ? line.batchNo : "",
+                              )
+                            : "";
                         const balanceText =
                           line.inventoryProductId && line.locationId
-                            ? product?.batchTracking && !line.batchNo
-                              ? "Select Batch No to view batch balance."
-                              : formatQtyBalance(
-                                  balances[balanceKeyValue],
-                                  Boolean(loadingBalances[balanceKeyValue]),
-                                  qtyDecimalPlaces,
-                                )
+                            ? product?.serialNumberTracking
+                              ? product.batchTracking && !line.batchNo
+                                ? "Select Batch No to view serial availability."
+                                : formatSerialAvailability(
+                                    serialAvailabilityCounts[serialAvailabilityKeyValue],
+                                    Boolean(loadingSerialAvailability[serialAvailabilityKeyValue]),
+                                    qtyDecimalPlaces,
+                                  )
+                              : product?.batchTracking && !line.batchNo
+                                ? "Select Batch No to view batch balance."
+                                : formatQtyBalance(
+                                    balances[balanceKeyValue],
+                                    Boolean(loadingBalances[balanceKeyValue]),
+                                    qtyDecimalPlaces,
+                                  )
                             : "Select product and location to view balance.";
                         return (
                           <div
