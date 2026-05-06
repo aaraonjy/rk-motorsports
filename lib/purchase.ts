@@ -975,7 +975,7 @@ export async function createPurchaseTransaction(
     const revisedFrom = revisedFromId
       ? await tx.purchaseTransaction.findUnique({
           where: { id: revisedFromId },
-          select: { id: true, docType: true, docNo: true, status: true },
+          select: { id: true, docType: true, docNo: true, status: true, stockTransactionId: true },
         })
       : null;
     if (revisedFromId && (!revisedFrom || revisedFrom.docType !== docType)) {
@@ -1050,7 +1050,7 @@ export async function createPurchaseTransaction(
     const sourceTransactions = sourceTransactionIds.length
       ? await tx.purchaseTransaction.findMany({
           where: { id: { in: sourceTransactionIds } },
-          select: { id: true, docType: true, status: true },
+          select: { id: true, docType: true, status: true, stockTransactionId: true },
         })
       : [];
     if (
@@ -1228,8 +1228,17 @@ export async function createPurchaseTransaction(
         await refreshSourceStatus(tx, sourceTransactionId);
     }
 
-    if (!revisedFrom && shouldPostStock(docType, sourceDocType)) {
-      await createStockReceive(tx, transaction, lines);
+    if (shouldPostStock(docType, sourceDocType)) {
+      if (revisedFrom) {
+        const sourceStockTransactionId =
+          revisedFrom.stockTransactionId ||
+          sourceTransactions.find((source) => source.docType === "GRN")?.stockTransactionId ||
+          firstSource?.stockTransactionId ||
+          null;
+        await syncPurchaseBatchExpiryToStock(tx, sourceStockTransactionId, lines);
+      } else {
+        await createStockReceive(tx, transaction, lines);
+      }
     }
 
     return transaction;

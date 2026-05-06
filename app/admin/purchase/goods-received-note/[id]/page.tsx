@@ -150,11 +150,16 @@ function findMatchingStockTrackingLine(
 
 async function buildPurchaseTrackingByLine(transactions: any[]) {
   const stockTransactionIds = new Set<string>();
+  const batchLookupKeys = new Set<string>();
   for (const transaction of transactions) {
     if (transaction.stockTransactionId) stockTransactionIds.add(transaction.stockTransactionId);
     if (transaction.revisedFrom?.stockTransactionId) stockTransactionIds.add(transaction.revisedFrom.stockTransactionId);
 
     for (const line of transaction.lines || []) {
+      const productId = normalizeTrackingText(line.inventoryProductId);
+      const batchNo = normalizeTrackingKey(line.batchNo);
+      if (productId && batchNo) batchLookupKeys.add(`${productId}__${batchNo}`);
+
       for (const link of line.targetLineLinks || []) {
         const sourceStockTransactionId = link.sourceLine?.transaction?.stockTransactionId;
         if (sourceStockTransactionId) stockTransactionIds.add(sourceStockTransactionId);
@@ -169,21 +174,39 @@ async function buildPurchaseTrackingByLine(transactions: any[]) {
     }
   }
 
-  if (stockTransactionIds.size === 0) return new Map<string, PurchaseTrackingMeta>();
-
-  const stockTransactions = await db.stockTransaction.findMany({
-    where: { id: { in: Array.from(stockTransactionIds) } },
-    include: {
-      lines: {
-        orderBy: { createdAt: "asc" },
-        include: { serialEntries: { orderBy: { createdAt: "asc" } } },
-      },
-    },
-  });
+  const stockTransactions = stockTransactionIds.size > 0
+    ? await db.stockTransaction.findMany({
+        where: { id: { in: Array.from(stockTransactionIds) } },
+        include: {
+          lines: {
+            orderBy: { createdAt: "asc" },
+            include: { serialEntries: { orderBy: { createdAt: "asc" } } },
+          },
+        },
+      })
+    : [];
 
   const stockLinesByTransactionId = new Map<string, typeof stockTransactions[number]["lines"]>();
   for (const stockTransaction of stockTransactions) {
     stockLinesByTransactionId.set(stockTransaction.id, stockTransaction.lines);
+  }
+
+  const batchLookupConditions = Array.from(batchLookupKeys).map((key) => {
+    const [inventoryProductId, batchNo] = key.split("__");
+    return { inventoryProductId, batchNo };
+  });
+  const batchRecords = batchLookupConditions.length > 0
+    ? await db.inventoryBatch.findMany({
+        where: { OR: batchLookupConditions },
+        select: { inventoryProductId: true, batchNo: true, expiryDate: true },
+      })
+    : [];
+  const expiryDateByBatchKey = new Map<string, string | null>();
+  for (const batch of batchRecords) {
+    expiryDateByBatchKey.set(
+      `${normalizeTrackingText(batch.inventoryProductId)}__${normalizeTrackingKey(batch.batchNo)}`,
+      formatTrackingDateInput(batch.expiryDate),
+    );
   }
 
   const trackingByLine = new Map<string, PurchaseTrackingMeta>();
@@ -210,12 +233,23 @@ async function buildPurchaseTrackingByLine(transactions: any[]) {
         const stockLine = findMatchingStockTrackingLine(stockLines, line);
         if (!stockLine) continue;
         const serialNos = uniqueTrackingSerialNos((stockLine.serialEntries || []).map((entry) => entry.serialNo));
+        const batchKey = `${normalizeTrackingText(stockLine.inventoryProductId)}__${normalizeTrackingKey(stockLine.batchNo || line.batchNo)}`;
         trackingByLine.set(`${transaction.id}__${line.id}`, {
           batchNo: stockLine.batchNo || line.batchNo || null,
-          expiryDate: formatTrackingDateInput(stockLine.expiryDate),
+          expiryDate: formatTrackingDateInput(stockLine.expiryDate) || expiryDateByBatchKey.get(batchKey) || null,
           serialNos,
         });
         break;
+      }
+
+      const lineKey = `${transaction.id}__${line.id}`;
+      if (!trackingByLine.has(lineKey) && line.batchNo) {
+        const batchKey = `${normalizeTrackingText(line.inventoryProductId)}__${normalizeTrackingKey(line.batchNo)}`;
+        trackingByLine.set(lineKey, {
+          batchNo: line.batchNo,
+          expiryDate: expiryDateByBatchKey.get(batchKey) || null,
+          serialNos: [],
+        });
       }
     }
   }
