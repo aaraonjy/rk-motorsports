@@ -550,7 +550,7 @@ function OutboundSerialPicker({
               ) : (
                 filtered.map((serial) => {
                   const selected = selectedSerials.some((value) => value.toUpperCase() === serial.serialNo.toUpperCase());
-                  const meta = [serial.batchNo || null, serial.expiryDate ? `Exp ${formatBatchExpiryDate(serial.expiryDate)}` : null]
+                  const meta = [serial.batchNo || null]
                     .filter(Boolean)
                     .join(" • ");
 

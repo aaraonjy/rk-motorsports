@@ -361,8 +361,7 @@ function formatTraceLineMeta(line: AssemblyTraceLine, qtyDecimalPlaces: number) 
   if (serialEntries.length > 0) {
     const serialText = serialEntries
       .map((entry) => {
-        const expiryDate = formatTraceExpiryDate(entry.expiryDate);
-        const batchText = entry.batchNo ? ` / Batch No: ${entry.batchNo}${expiryDate ? ` (Expiry Date: ${expiryDate})` : ""}` : "";
+        const batchText = entry.batchNo ? ` / Batch No: ${entry.batchNo}` : "";
         return `${entry.serialNo}${batchText}`;
       })
       .join(", ");
@@ -810,7 +809,7 @@ function OutboundSerialPicker({
               ) : (
                 filtered.map((serial) => {
                   const selected = selectedSerials.some((value) => value.toUpperCase() === serial.serialNo.toUpperCase());
-                  const meta = [serial.batchNo || null, serial.expiryDate ? `Exp ${formatBatchExpiryDate(serial.expiryDate)}` : null].filter(Boolean).join(" • ");
+                  const meta = [serial.batchNo || null].filter(Boolean).join(" • ");
                   return (
                     <button
                       key={serial.id}

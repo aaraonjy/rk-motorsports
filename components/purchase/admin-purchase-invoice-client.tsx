@@ -785,7 +785,7 @@ export function AdminPurchaseInvoiceClient(props: Props) {
         .then((data) => {
           if (cancelled) return;
           const rows = Array.isArray(data.balances) ? data.balances : [];
-          const batches = rows
+          const batches: AvailableBatch[] = rows
             .filter((row) => row.batchNo)
             .map((row) => ({
               id: String(row.batchNo || ""),
@@ -794,6 +794,17 @@ export function AdminPurchaseInvoiceClient(props: Props) {
               balance: typeof row.balance === "number" ? row.balance : Number(row.balance || 0),
             }))
             .filter((row) => row.batchNo);
+
+          const selectedBatchNo = String(line.batchNo || "").trim();
+          if (selectedBatchNo && !batches.some((batch) => batch.batchNo.toUpperCase() === selectedBatchNo.toUpperCase())) {
+            batches.unshift({
+              id: selectedBatchNo,
+              batchNo: selectedBatchNo,
+              expiryDate: line.expiryDate || null,
+              balance: null,
+            });
+          }
+
           setAvailableBatches((prev) => ({ ...prev, [index]: batches }));
         })
         .catch(() => {
