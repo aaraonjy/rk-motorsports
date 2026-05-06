@@ -685,17 +685,7 @@ export async function POST(req: Request) {
 
               let serialRecord;
               if (existing) {
-                if (existing.status === "IN_STOCK") {
-                  throw new Error(`Serial No ${serialEntry.serialNo} is already in stock for this product.`);
-                }
-                serialRecord = await tx.inventorySerial.update({
-                  where: { id: existing.id },
-                  data: {
-                    inventoryBatchId: batchId,
-                    currentLocationId: line.locationId!,
-                    status: "IN_STOCK",
-                  },
-                });
+                throw new Error(`Serial No ${serialEntry.serialNo} already exists for this product. Serial No can only be created once and must be reused through outbound / return flows.`);
               } else {
                 serialRecord = await tx.inventorySerial.create({
                   data: {

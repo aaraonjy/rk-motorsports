@@ -659,6 +659,15 @@ export async function PUT(req: Request, context: Params) {
         ]
       );
 
+      const reusableSerialKeysFromCurrentTransaction = new Set<string>();
+      for (const currentLine of current.lines) {
+        for (const serialEntry of currentLine.serialEntries || []) {
+          const serialNo = String(serialEntry.serialNo || "").trim().toUpperCase();
+          if (!serialNo) continue;
+          reusableSerialKeysFromCurrentTransaction.add(`${currentLine.inventoryProductId}__${serialNo}`);
+        }
+      }
+
       await applyCancellation(tx, current, admin.id, "Edited and reposted");
 
       const negativeStockDetails: Array<{ inventoryProductId: string; locationId: string; batchNo?: string | null; balance: number; requiredQty: number; message: string }> = [];
@@ -872,8 +881,9 @@ export async function PUT(req: Request, context: Params) {
               });
               let serialRecord;
               if (existingSerial) {
-                if (existingSerial.status === "IN_STOCK") {
-                  throw new Error(`Serial No ${serialEntry.serialNo} is already in stock for this product.`);
+                const serialKey = `${line.inventoryProductId}__${String(serialEntry.serialNo || "").trim().toUpperCase()}`;
+                if (!reusableSerialKeysFromCurrentTransaction.has(serialKey)) {
+                  throw new Error(`Serial No ${serialEntry.serialNo} already exists for this product. Serial No can only be created once and must be reused through outbound / return flows.`);
                 }
                 serialRecord = await tx.inventorySerial.update({
                   where: { id: existingSerial.id },
