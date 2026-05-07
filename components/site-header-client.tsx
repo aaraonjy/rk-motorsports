@@ -240,6 +240,7 @@ function AdminDropdownLink({ item, onClick }: { item: HeaderLink; onClick: () =>
   return (
     <Link
       href={item.href}
+      prefetch={false}
       className={`block rounded-xl px-3 py-3 text-sm transition hover:bg-white/10 hover:text-white ${
         active ? "bg-white/10 text-white" : "text-white/85"
       }`}
@@ -503,6 +504,7 @@ export function AdminDesktopNavigation() {
     <>
       <Link
         href="/admin"
+        prefetch={false}
         className={`text-sm font-medium transition hover:text-white ${
           pathname === "/admin" ? "text-white" : "text-white/80"
         }`}
@@ -515,6 +517,7 @@ export function AdminDesktopNavigation() {
 
       <Link
         href="/admin/reports"
+        prefetch={false}
         className={`text-sm font-medium transition hover:text-white ${
           reportActive ? "text-white" : "text-white/80"
         }`}
@@ -564,6 +567,7 @@ export function SiteHeaderClient({ user }: { user: HeaderUser }) {
         <div className="absolute right-0 top-[calc(100%+10px)] z-[70] w-56 overflow-hidden rounded-2xl border border-white/10 bg-[#0b0b0c]/95 shadow-2xl backdrop-blur-xl">
           <Link
             href="/change-password"
+            prefetch={false}
             onClick={() => setIsDashboardOpen(false)}
             className="block px-4 py-4 text-white/85 transition hover:bg-white/10 hover:text-white"
           >
@@ -683,6 +687,7 @@ export function MobileSiteHeaderMenu({ user }: { user: HeaderUser | null }) {
                           <Link
                             key={item.href}
                             href={item.href}
+                            prefetch={false}
                             onClick={() => setIsOpen(false)}
                             className={`block border-b border-white/10 px-4 py-3 text-sm transition last:border-b-0 hover:bg-white/10 hover:text-white ${
                               active ? "bg-white/10 text-white" : "text-white/75"
@@ -703,6 +708,7 @@ export function MobileSiteHeaderMenu({ user }: { user: HeaderUser | null }) {
                 <div className="space-y-3">
                   <Link
                     href="/change-password"
+                    prefetch={false}
                     onClick={() => setIsOpen(false)}
                     className="flex w-full items-center justify-center rounded-full border border-white/15 px-4 py-3 text-sm font-medium text-white/85 transition hover:bg-white/10 hover:text-white"
                   >
@@ -721,6 +727,7 @@ export function MobileSiteHeaderMenu({ user }: { user: HeaderUser | null }) {
               ) : (
                 <Link
                   href="/login"
+                  prefetch={false}
                   onClick={() => setIsOpen(false)}
                   className="flex w-full items-center justify-center rounded-full bg-red-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-red-500"
                 >
