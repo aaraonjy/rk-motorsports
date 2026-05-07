@@ -20,8 +20,8 @@ type NotificationsResponse = {
   unreadCount: number;
 };
 
-//const REFRESH_INTERVAL_MS = 60_000;
 const REFRESH_INTERVAL_MS = 120_000;
+const MIN_REFRESH_GAP_MS = 10_000;
 
 function formatRelativeTime(value: string) {
   const date = new Date(value);
@@ -40,6 +40,8 @@ function formatRelativeTime(value: string) {
 export function AdminNotificationBell() {
   const router = useRouter();
   const wrapperRef = useRef<HTMLDivElement | null>(null);
+  const lastRefreshAtRef = useRef(0);
+  const refreshInFlightRef = useRef(false);
 
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -50,8 +52,18 @@ export function AdminNotificationBell() {
     unreadCount: 0,
   });
 
-  async function loadNotifications(showLoader = false) {
+  async function loadNotifications(options?: { showLoader?: boolean; force?: boolean }) {
+    const showLoader = Boolean(options?.showLoader);
+    const force = Boolean(options?.force);
+    const now = Date.now();
+
+    if (refreshInFlightRef.current) return;
+    if (!force && now - lastRefreshAtRef.current < MIN_REFRESH_GAP_MS) return;
+
     try {
+      refreshInFlightRef.current = true;
+      lastRefreshAtRef.current = now;
+
       if (showLoader) setLoading(true);
 
       const res = await fetch("/api/notifications", {
@@ -66,34 +78,20 @@ export function AdminNotificationBell() {
     } catch (error) {
       console.error("Failed to load notifications:", error);
     } finally {
+      refreshInFlightRef.current = false;
       if (showLoader) setLoading(false);
     }
   }
 
   useEffect(() => {
-    loadNotifications(true);
+    loadNotifications({ showLoader: true, force: true });
 
     const interval = window.setInterval(() => {
-      loadNotifications(false);
+      loadNotifications();
     }, REFRESH_INTERVAL_MS);
-
-    function handleWindowFocus() {
-      loadNotifications(false);
-    }
-
-    function handleVisibilityChange() {
-      if (document.visibilityState === "visible") {
-        loadNotifications(false);
-      }
-    }
-
-    window.addEventListener("focus", handleWindowFocus);
-    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
       window.clearInterval(interval);
-      window.removeEventListener("focus", handleWindowFocus);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, []);
 
@@ -178,7 +176,7 @@ export function AdminNotificationBell() {
         onClick={() => {
           setOpen((prev) => {
             const nextOpen = !prev;
-            if (nextOpen) loadNotifications(false);
+            if (nextOpen) loadNotifications({ force: true });
             return nextOpen;
           });
         }}
@@ -224,6 +222,7 @@ export function AdminNotificationBell() {
 
               <Link
                 href="/dashboard"
+                prefetch={false}
                 onClick={() => setOpen(false)}
                 className="text-xs text-white/55 transition hover:text-white"
               >

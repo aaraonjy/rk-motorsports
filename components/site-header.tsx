@@ -23,7 +23,7 @@ export async function SiteHeader() {
   return (
     <header className="absolute left-0 top-0 z-50 w-full bg-transparent">
       <div className="container-rk flex h-20 items-center justify-between">
-        <Link href="/" className="shrink-0">
+        <Link href="/" prefetch={false} className="shrink-0">
           <Image
             src="/logo.png"
             alt="RK Motorsports"
@@ -43,6 +43,7 @@ export async function SiteHeader() {
                 <Link
                   key={href}
                   href={href}
+                  prefetch={false}
                   className="text-sm font-medium text-white/80 transition hover:text-white"
                 >
                   {label}
@@ -71,6 +72,7 @@ export async function SiteHeader() {
             ) : (
               <Link
                 href="/login"
+                prefetch={false}
                 className="rounded-full bg-red-600 px-5 py-2 font-medium text-white transition hover:bg-red-500"
               >
                 Login
