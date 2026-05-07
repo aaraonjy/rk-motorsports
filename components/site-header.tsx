@@ -54,35 +54,37 @@ export async function SiteHeader() {
 
           <div className="hidden h-6 w-px bg-white/10 md:block" />
 
-          <div className="hidden items-center gap-4 text-sm md:flex">
-            {user ? (
-              <>
-                <AdminNotificationBell />
-                <SiteHeaderClient user={user} />
-
-                <form action="/api/auth/logout" method="post">
-                  <button
-                    type="submit"
-                    className="rounded-full border border-white/20 px-4 py-2 text-white/85 transition hover:bg-white/10"
-                  >
-                    Logout
-                  </button>
-                </form>
-              </>
-            ) : (
-              <Link
-                href="/login"
-                prefetch={false}
-                className="rounded-full bg-red-600 px-5 py-2 font-medium text-white transition hover:bg-red-500"
-              >
-                Login
-              </Link>
-            )}
-          </div>
-
-          <div className="flex items-center gap-3 md:hidden">
+          <div className="flex items-center gap-3 md:gap-4">
             {user ? <AdminNotificationBell /> : null}
-            <MobileSiteHeaderMenu user={user} />
+
+            <div className="hidden items-center gap-4 text-sm md:flex">
+              {user ? (
+                <>
+                  <SiteHeaderClient user={user} />
+
+                  <form action="/api/auth/logout" method="post">
+                    <button
+                      type="submit"
+                      className="rounded-full border border-white/20 px-4 py-2 text-white/85 transition hover:bg-white/10"
+                    >
+                      Logout
+                    </button>
+                  </form>
+                </>
+              ) : (
+                <Link
+                  href="/login"
+                  prefetch={false}
+                  className="rounded-full bg-red-600 px-5 py-2 font-medium text-white transition hover:bg-red-500"
+                >
+                  Login
+                </Link>
+              )}
+            </div>
+
+            <div className="flex items-center gap-3 md:hidden">
+              <MobileSiteHeaderMenu user={user} />
+            </div>
           </div>
         </div>
       </div>
