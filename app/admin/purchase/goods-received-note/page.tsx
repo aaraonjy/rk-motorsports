@@ -280,7 +280,19 @@ async function loadSharedData(docType: PurchaseDocType) {
             },
           },
         },
-        sourceLinks: { include: { targetTransaction: { select: { id: true, docType: true, docNo: true, status: true } } } },
+        sourceLinks: {
+          include: {
+            targetTransaction: {
+              select: {
+                id: true,
+                docType: true,
+                docNo: true,
+                status: true,
+                revisions: { select: { id: true, status: true } },
+              },
+            },
+          },
+        },
         targetLinks: { include: { sourceTransaction: { select: { id: true, docType: true, docNo: true, status: true } } } },
       },
     }),

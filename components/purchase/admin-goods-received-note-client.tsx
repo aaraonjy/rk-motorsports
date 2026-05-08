@@ -122,6 +122,7 @@ type PurchaseTransactionRecord = {
       docType?: string | null;
       docNo?: string | null;
       status?: string | null;
+      revisions?: Array<{ id?: string | null; status?: string | null }>;
     } | null;
   }>;
   targetLinks?: Array<{
@@ -444,6 +445,19 @@ function statusClass(status: string) {
   if (status === "PARTIAL")
     return "border-indigo-500/25 bg-indigo-500/10 text-indigo-200";
   return "border-amber-500/25 bg-amber-500/10 text-amber-200";
+}
+
+function isActivePurchaseDocumentForLock(item?: {
+  status?: string | null;
+  revisions?: Array<{ status?: string | null }>;
+} | null) {
+  if (!item) return false;
+  if (String(item.status || "").toUpperCase() === "CANCELLED") return false;
+
+  // Superseded documents must not keep source GRN locked. Older data may have
+  // active-looking revisions, so any revision child means this document should
+  // no longer be treated as the active downstream document.
+  return (item.revisions || []).length === 0;
 }
 
 type SearchableSelectOption = {
@@ -1530,9 +1544,8 @@ export function AdminGoodsReceivedNoteClient(props: Props) {
   }
 
   function hasActiveDownstream(item: PurchaseTransactionRecord) {
-    return (item.sourceLinks || []).some(
-      (link) =>
-        link.targetTransaction && link.targetTransaction.status !== "CANCELLED",
+    return (item.sourceLinks || []).some((link) =>
+      isActivePurchaseDocumentForLock(link.targetTransaction),
     );
   }
 

@@ -61,7 +61,7 @@ type PurchaseSourceRecord = {
 type PurchaseSourceLineLinkRecord = {
   linkType: PurchaseLineLinkType;
   qty: Prisma.Decimal | number | string | null;
-  targetTransaction: { status?: string | null };
+  targetTransaction: { status?: string | null; revisions?: PurchaseSourceRevisionRecord[] | null };
 };
 
 type PurchaseSourceLineRecord = {
@@ -157,6 +157,19 @@ function normalizeText(value: unknown) {
 function toNumber(value: Prisma.Decimal | number | string | null | undefined) {
   const numeric = Number(value ?? 0);
   return Number.isFinite(numeric) ? numeric : 0;
+}
+
+function isActivePurchaseTarget(transaction: {
+  status?: string | null;
+  revisions?: Array<{ status?: string | null }> | null;
+}) {
+  if (String(transaction.status || "").toUpperCase() === "CANCELLED") return false;
+
+  // A document that has been revised is superseded by its revision chain.
+  // Even if old data was not marked CANCELLED previously, it must not keep
+  // the source document locked or completed. Only the latest active document
+  // without revision children should be counted.
+  return (transaction.revisions || []).length === 0;
 }
 
 function decimal(
@@ -713,7 +726,19 @@ async function refreshSourceStatus(
     where: { id: sourceTransactionId },
     include: {
       lines: {
-        include: { sourceLineLinks: { include: { targetTransaction: true } } },
+        include: {
+          sourceLineLinks: {
+            include: {
+              targetTransaction: {
+                select: {
+                  id: true,
+                  status: true,
+                  revisions: { select: { id: true, status: true } },
+                },
+              },
+            },
+          },
+        },
       },
     },
   });
@@ -733,9 +758,8 @@ async function refreshSourceStatus(
   let all = true;
   for (const line of source.lines) {
     const fulfilled = line.sourceLineLinks
-      .filter(
-        (link: PurchaseSourceLineLinkRecord) =>
-          link.targetTransaction.status !== "CANCELLED",
+      .filter((link: PurchaseSourceLineLinkRecord) =>
+        isActivePurchaseTarget(link.targetTransaction),
       )
       .filter((link: PurchaseSourceLineLinkRecord) =>
         acceptedLinkTypes.includes(link.linkType),
@@ -992,7 +1016,17 @@ async function validatePurchaseSourceAvailability(
     where: { id: { in: sourceLineIds } },
     include: {
       transaction: { select: { id: true, docType: true, status: true } },
-      sourceLineLinks: { include: { targetTransaction: true } },
+      sourceLineLinks: {
+        include: {
+          targetTransaction: {
+            select: {
+              id: true,
+              status: true,
+              revisions: { select: { id: true, status: true } },
+            },
+          },
+        },
+      },
     },
   });
 
@@ -1031,7 +1065,9 @@ async function validatePurchaseSourceAvailability(
     const sourceLine = sourceLineMap.get(sourceLineId);
     if (!sourceLine) continue;
     const fulfilledQty = sourceLine.sourceLineLinks
-      .filter((link: PurchaseSourceLineLinkRecord) => link.targetTransaction.status !== "CANCELLED")
+      .filter((link: PurchaseSourceLineLinkRecord) =>
+        isActivePurchaseTarget(link.targetTransaction),
+      )
       .filter((link: PurchaseSourceLineLinkRecord) => link.linkType === linkType)
       .reduce((sum: number, link: PurchaseSourceLineLinkRecord) => sum + toNumber(link.qty), 0);
     const remainingQty = Math.max(0, toNumber(sourceLine.qty) - fulfilledQty);
@@ -1292,6 +1328,18 @@ export async function createPurchaseTransaction(
       },
       include: { lines: true },
     });
+
+    if (revisedFrom) {
+      await tx.purchaseTransaction.update({
+        where: { id: revisedFrom.id },
+        data: {
+          status: "CANCELLED",
+          cancelledByAdminId: adminId,
+          cancelledAt: new Date(),
+          cancelReason: `Revised to ${transaction.docNo}`,
+        },
+      });
+    }
 
     if (sourceTransactionIds.length > 0) {
       for (const sourceTransactionId of sourceTransactionIds) {
@@ -1700,7 +1748,19 @@ export async function loadPurchaseTransaction(id: string) {
       department: true,
       lines: {
         orderBy: { lineNo: "asc" },
-        include: { sourceLineLinks: { include: { targetTransaction: true } } },
+        include: {
+          sourceLineLinks: {
+            include: {
+              targetTransaction: {
+                select: {
+                  id: true,
+                  status: true,
+                  revisions: { select: { id: true, status: true } },
+                },
+              },
+            },
+          },
+        },
       },
       targetLinks: { include: { sourceTransaction: true } },
       sourceLinks: { include: { targetTransaction: true } },
@@ -1724,7 +1784,19 @@ export async function loadPurchaseSources(docType: PurchaseDocType) {
     include: {
       lines: {
         orderBy: { lineNo: "asc" },
-        include: { sourceLineLinks: { include: { targetTransaction: true } } },
+        include: {
+          sourceLineLinks: {
+            include: {
+              targetTransaction: {
+                select: {
+                  id: true,
+                  status: true,
+                  revisions: { select: { id: true, status: true } },
+                },
+              },
+            },
+          },
+        },
       },
       supplier: true,
     },
@@ -1743,7 +1815,9 @@ export async function loadPurchaseSources(docType: PurchaseDocType) {
                 ? "RECEIVED_TO"
                 : "INVOICED_TO";
           const usedQty = line.sourceLineLinks
-            .filter((link: PurchaseSourceLineLinkRecord) => link.targetTransaction.status !== "CANCELLED")
+            .filter((link: PurchaseSourceLineLinkRecord) =>
+        isActivePurchaseTarget(link.targetTransaction),
+      )
             .filter((link: PurchaseSourceLineLinkRecord) => link.linkType === linkType)
             .reduce((sum: number, link: PurchaseSourceLineLinkRecord) => sum + toNumber(link.qty), 0);
           const remainingQty = Math.max(0, toNumber(line.qty) - usedQty);
