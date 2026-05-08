@@ -100,6 +100,9 @@ enum PurchaseDocType {
   PO
   GRN
   PI
+  CP
+  PR
+  PDN
 }
 
 enum PurchaseTransactionStatus {
@@ -112,6 +115,8 @@ enum PurchaseTransactionStatus {
 enum PurchaseLineLinkType {
   RECEIVED_TO
   INVOICED_TO
+  RETURNED_TO
+  DEBITED_TO
 }
 
 enum SalesTransactionStatus {

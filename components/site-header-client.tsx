@@ -87,6 +87,9 @@ const purchaseItems: HeaderLink[] = [
   { label: "Purchase Order", href: "/admin/purchase/purchase-order" },
   { label: "Goods Received Note", href: "/admin/purchase/goods-received-note" },
   { label: "Purchase Invoice", href: "/admin/purchase/purchase-invoice" },
+  { label: "Cash Purchase", href: "/admin/purchase/cash-purchase" },
+  { label: "Purchase Return", href: "/admin/purchase/purchase-return" },
+  { label: "Purchase Debit Note", href: "/admin/purchase/purchase-debit-note" },
 ];
 
 const purchaseDesktopSections: HeaderLinkSection[] = [
@@ -474,7 +477,7 @@ export function AdminDesktopNavigation() {
     {
       key: "purchase",
       label: "Purchase",
-      description: "PO, GRN, purchase invoice",
+      description: "PO, GRN, PI, CP, PR, PDN",
       sections: purchaseDesktopSections,
     },
   ];

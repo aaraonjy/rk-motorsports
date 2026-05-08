@@ -121,12 +121,18 @@ const DOC_LABEL: Record<PurchaseDocType, string> = {
   PO: "Purchase Order",
   GRN: "Goods Received Note",
   PI: "Purchase Invoice",
+  CP: "Cash Purchase",
+  PR: "Purchase Return",
+  PDN: "Purchase Debit Note",
 };
 
 const DOC_PREFIX: Record<PurchaseDocType, string> = {
   PO: "PO",
   GRN: "GRN",
   PI: "PI",
+  CP: "CP",
+  PR: "PR",
+  PDN: "PDN",
 };
 
 function normalizeDate(value: unknown) {
@@ -385,7 +391,7 @@ async function mapLine(
   const expiryDate = normalizeOptionalDate(line.expiryDate);
   const serialNos = normalizeSerialNumbers(line.serialNos);
   const mustCaptureTracking =
-    (docType === "GRN" || docType === "PI") &&
+    (docType === "GRN" || docType === "PI" || docType === "CP" || docType === "PR") &&
     product?.itemType === "STOCK_ITEM";
 
   if (mustCaptureTracking && product?.batchTracking && !batchNo) {
@@ -664,6 +670,129 @@ async function createStockReceive(
   return stockTransaction.id;
 }
 
+
+async function createStockIssueFromPurchase(
+  tx: Prisma.TransactionClient,
+  transaction: any,
+  lines: any[],
+) {
+  const stockLines = lines.filter(
+    (line) =>
+      line.inventoryProductId &&
+      line.locationId &&
+      line.itemType === "STOCK_ITEM",
+  );
+  if (stockLines.length === 0) return null;
+
+  await acquireStockMutationLocks(
+    tx,
+    stockLines.map((line) => ({
+      inventoryProductId: line.inventoryProductId!,
+      locationId: line.locationId!,
+      batchNo: line.batchNo,
+    })),
+  );
+  await acquireAdvisoryLock(
+    tx,
+    buildTransactionNumberLockKey(StockTransactionType.SI, transaction.docDate),
+  );
+  const stockTransactionNo = await generateStockTransactionNumber(
+    tx,
+    StockTransactionType.SI,
+    transaction.docDate,
+  );
+
+  const stockTransaction = await tx.stockTransaction.create({
+    data: {
+      transactionNo: stockTransactionNo,
+      transactionType: StockTransactionType.SI,
+      transactionDate: transaction.docDate,
+      docNo: transaction.docNo,
+      reference: `${transaction.docType} ${transaction.docNo}`,
+      remarks: "Auto-created from purchase return.",
+      status: StockTransactionStatus.POSTED,
+      createdByAdminId: transaction.createdByAdminId,
+      lines: {
+        create: stockLines.map((line) => ({
+          inventoryProductId: line.inventoryProductId!,
+          qty: createStoredQtyDecimal(line.qty),
+          unitCost: decimal(line.unitCost, 3),
+          batchNo: line.batchNo,
+          expiryDate: line.expiryDate ?? undefined,
+          locationId: line.locationId,
+          remarks: `${transaction.docType} ${transaction.docNo}`,
+          serialEntries: Array.isArray(line.serialNos) && line.serialNos.length
+            ? {
+                create: line.serialNos.map((serialNo: string) => ({
+                  inventoryProductId: line.inventoryProductId!,
+                  serialNo,
+                })),
+              }
+            : undefined,
+        })),
+      },
+    },
+    include: { lines: { include: { serialEntries: true } } },
+  });
+
+  for (const stockLine of stockTransaction.lines) {
+    const values = buildLedgerValues(
+      createStoredQtyDecimal(stockLine.qty),
+      "OUT",
+    );
+    await tx.stockLedger.create({
+      data: {
+        movementDate: transaction.docDate,
+        movementType: StockTransactionType.SI,
+        movementDirection: StockMovementDirection.OUT,
+        qty: values.qty,
+        qtyIn: values.qtyIn,
+        qtyOut: values.qtyOut,
+        batchNo: stockLine.batchNo,
+        inventoryProductId: stockLine.inventoryProductId,
+        locationId: stockLine.locationId!,
+        transactionId: stockTransaction.id,
+        transactionLineId: stockLine.id,
+        referenceNo: transaction.docNo,
+        referenceText: `${transaction.docType} ${transaction.docNo}`,
+        sourceType: `PURCHASE_${transaction.docType}`,
+        sourceId: transaction.id,
+        remarks: stockLine.remarks,
+      },
+    });
+
+    for (const serialEntry of stockLine.serialEntries || []) {
+      const serialRecord = await tx.inventorySerial.findUnique({
+        where: {
+          inventoryProductId_serialNo: {
+            inventoryProductId: stockLine.inventoryProductId,
+            serialNo: serialEntry.serialNo,
+          },
+        },
+      });
+      if (serialRecord) {
+        await tx.inventorySerial.update({
+          where: { id: serialRecord.id },
+          data: {
+            currentLocationId: stockLine.locationId!,
+            status: "OUT_OF_STOCK",
+          },
+        });
+        await tx.stockTransactionLineSerial.update({
+          where: { id: serialEntry.id },
+          data: { inventorySerialId: serialRecord.id },
+        });
+      }
+    }
+  }
+
+  await tx.purchaseTransaction.update({
+    where: { id: transaction.id },
+    data: { stockTransactionId: stockTransaction.id },
+  });
+  return stockTransaction.id;
+}
+
 async function syncPurchaseBatchExpiryToStock(
   tx: Prisma.TransactionClient,
   stockTransactionId: string | null | undefined,
@@ -841,7 +970,7 @@ function shouldPostStock(
   docType: PurchaseDocType,
   sourceDocType?: PurchaseDocType | null,
 ) {
-  if (docType === "GRN") return true;
+  if (docType === "GRN" || docType === "CP") return true;
   if (docType === "PI") return sourceDocType !== "GRN";
   return false;
 }
@@ -936,7 +1065,10 @@ async function acquirePurchaseTransactionLocks(
 }
 
 function getPurchaseLinkTypeForTarget(docType: PurchaseDocType): PurchaseLineLinkType {
-  return docType === "GRN" ? "RECEIVED_TO" : "INVOICED_TO";
+  if (docType === "GRN") return "RECEIVED_TO";
+  if (docType === "PR") return "RETURNED_TO";
+  if (docType === "PDN") return "DEBITED_TO";
+  return "INVOICED_TO";
 }
 
 async function validatePurchaseSourceAvailability(
@@ -982,7 +1114,11 @@ async function validatePurchaseSourceAvailability(
   }
 
   const allowedSourceDocTypes: PurchaseDocType[] =
-    docType === "GRN" ? ["PO"] : ["PO", "GRN"];
+    docType === "GRN" ? ["PO"] :
+    docType === "PI" ? ["PO", "GRN"] :
+    docType === "PR" ? ["PI", "CP"] :
+    docType === "PDN" ? ["PI"] :
+    [];
   const sourceMap = new Map<string, PurchaseSourceRecord>(sources.map((source) => [source.id, source]));
 
   for (const source of sources) {
@@ -1009,6 +1145,11 @@ async function validatePurchaseSourceAvailability(
   if (docType === "PI" && distinctSourceDocTypes.length > 1) {
     throw new Error(
       "Please generate Purchase Invoice from either Purchase Order or Goods Received Note only.",
+    );
+  }
+  if (docType === "PR" && distinctSourceDocTypes.length > 1) {
+    throw new Error(
+      "Please generate Purchase Return from either Purchase Invoice or Cash Purchase only.",
     );
   }
 
@@ -1351,8 +1492,7 @@ export async function createPurchaseTransaction(
           },
         });
       }
-      const linkType: PurchaseLineLinkType =
-        docType === "GRN" ? "RECEIVED_TO" : "INVOICED_TO";
+      const linkType: PurchaseLineLinkType = getPurchaseLinkTypeForTarget(docType);
       for (let index = 0; index < lines.length; index += 1) {
         const revisionSourceLineLink = revisedFrom?.lines?.[index]?.targetLineLinks?.find(
           (link) => link.linkType === linkType,
@@ -1380,7 +1520,11 @@ export async function createPurchaseTransaction(
         await refreshSourceStatus(tx, sourceTransactionId);
     }
 
-    if (shouldPostStock(docType, sourceDocType)) {
+    if (docType === "PR") {
+      if (!revisedFrom) {
+        await createStockIssueFromPurchase(tx, transaction, lines);
+      }
+    } else if (shouldPostStock(docType, sourceDocType)) {
       if (revisedFrom) {
         const sourceStockTransactionId =
           revisedFrom.stockTransactionId ||
@@ -1659,15 +1803,16 @@ export async function cancelPurchaseTransaction(
           );
 
           for (const stockLine of reverseLines) {
+            const reverseDirection = stockTransaction.transactionType === StockTransactionType.SI ? "IN" : "OUT";
             const values = buildLedgerValues(
               createStoredQtyDecimal(stockLine.qty),
-              "OUT",
+              reverseDirection,
             );
             await tx.stockLedger.create({
               data: {
                 movementDate: new Date(),
                 movementType: stockTransaction.transactionType,
-                movementDirection: StockMovementDirection.OUT,
+                movementDirection: reverseDirection === "IN" ? StockMovementDirection.IN : StockMovementDirection.OUT,
                 qty: values.qty,
                 qtyIn: values.qtyIn,
                 qtyOut: values.qtyOut,
@@ -1787,9 +1932,13 @@ export async function loadPurchaseTransaction(id: string) {
 }
 
 export async function loadPurchaseSources(docType: PurchaseDocType) {
-  if (docType === "PO") return [];
+  if (docType === "PO" || docType === "CP") return [];
   const sourceDocTypes: PurchaseDocType[] =
-    docType === "GRN" ? ["PO"] : ["PO", "GRN"];
+    docType === "GRN" ? ["PO"] :
+    docType === "PI" ? ["PO", "GRN"] :
+    docType === "PR" ? ["PI", "CP"] :
+    docType === "PDN" ? ["PI"] :
+    [];
   const sources = await db.purchaseTransaction.findMany({
     where: {
       docType: { in: sourceDocTypes },
@@ -1826,12 +1975,7 @@ export async function loadPurchaseSources(docType: PurchaseDocType) {
       ...source,
       lines: source.lines
         .map((line) => {
-          const linkType: PurchaseLineLinkType =
-            source.docType === "GRN"
-              ? "INVOICED_TO"
-              : docType === "GRN"
-                ? "RECEIVED_TO"
-                : "INVOICED_TO";
+          const linkType: PurchaseLineLinkType = getPurchaseLinkTypeForTarget(docType);
           const usedQty = line.sourceLineLinks
             .filter((link: PurchaseSourceLineLinkRecord) =>
         isActivePurchaseTarget(link.targetTransaction),
