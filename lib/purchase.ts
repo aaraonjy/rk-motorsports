@@ -1409,7 +1409,13 @@ export async function updatePurchaseTransaction(
       where: { id },
       include: {
         lines: { orderBy: { lineNo: "asc" } },
-        sourceLinks: { include: { targetTransaction: true } },
+        sourceLinks: {
+          include: {
+            targetTransaction: {
+              include: { revisions: { select: { id: true, status: true } } },
+            },
+          },
+        },
         targetLinks: { include: { sourceTransaction: true } },
         revisions: { select: { id: true, status: true } },
       },
@@ -1428,8 +1434,8 @@ export async function updatePurchaseTransaction(
       );
     }
 
-    const activeDownstream = current.sourceLinks.filter(
-      (link) => link.targetTransaction.status !== "CANCELLED",
+    const activeDownstream = current.sourceLinks.filter((link) =>
+      isActivePurchaseTarget(link.targetTransaction),
     );
     if (activeDownstream.length > 0) {
       const generatedDocs = activeDownstream
@@ -1590,7 +1596,13 @@ export async function cancelPurchaseTransaction(
       where: { id },
       include: {
         lines: true,
-        sourceLinks: { include: { targetTransaction: true } },
+        sourceLinks: {
+          include: {
+            targetTransaction: {
+              include: { revisions: { select: { id: true, status: true } } },
+            },
+          },
+        },
         targetLinks: { include: { sourceTransaction: true } },
         revisedFrom: {
           include: { targetLinks: { include: { sourceTransaction: true } } },
@@ -1603,8 +1615,8 @@ export async function cancelPurchaseTransaction(
       return tx.purchaseTransaction.findUnique({ where: { id } });
     }
 
-    const activeDownstream = current.sourceLinks.filter(
-      (link) => link.targetTransaction.status !== "CANCELLED",
+    const activeDownstream = current.sourceLinks.filter((link) =>
+      isActivePurchaseTarget(link.targetTransaction),
     );
     if (activeDownstream.length > 0) {
       const generatedDocs = activeDownstream
@@ -1763,7 +1775,13 @@ export async function loadPurchaseTransaction(id: string) {
         },
       },
       targetLinks: { include: { sourceTransaction: true } },
-      sourceLinks: { include: { targetTransaction: true } },
+      sourceLinks: {
+        include: {
+          targetTransaction: {
+            include: { revisions: { select: { id: true, status: true } } },
+          },
+        },
+      },
     },
   });
 }

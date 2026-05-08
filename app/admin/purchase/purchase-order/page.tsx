@@ -10,19 +10,28 @@ function toNumber(value: unknown) {
   return Number.isFinite(numeric) ? numeric : 0;
 }
 
+function isActiveLinkedPurchaseTransaction(transaction: {
+  status?: string | null;
+  revisions?: Array<{ status?: string | null }> | null;
+} | null | undefined) {
+  if (!transaction) return false;
+  if (String(transaction.status || "").toUpperCase() === "CANCELLED") return false;
+  return (transaction.revisions || []).length === 0;
+}
+
 function sumLinkedQty(
   line: {
     sourceLineLinks?: Array<{
       linkType?: string | null;
       qty?: unknown;
-      targetTransaction?: { status?: string | null } | null;
+      targetTransaction?: { status?: string | null; revisions?: Array<{ status?: string | null }> | null } | null;
     }>;
   },
   linkType: "RECEIVED_TO" | "INVOICED_TO",
 ) {
   return (line.sourceLineLinks || [])
     .filter((link) => link.linkType === linkType)
-    .filter((link) => link.targetTransaction?.status !== "CANCELLED")
+    .filter((link) => isActiveLinkedPurchaseTransaction(link.targetTransaction))
     .reduce((sum, link) => sum + toNumber(link.qty), 0);
 }
 
@@ -31,14 +40,14 @@ function sumLinkedAmount(
     sourceLineLinks?: Array<{
       linkType?: string | null;
       claimAmount?: unknown;
-      targetTransaction?: { status?: string | null } | null;
+      targetTransaction?: { status?: string | null; revisions?: Array<{ status?: string | null }> | null } | null;
     }>;
   },
   linkType: "RECEIVED_TO" | "INVOICED_TO",
 ) {
   return (line.sourceLineLinks || [])
     .filter((link) => link.linkType === linkType)
-    .filter((link) => link.targetTransaction?.status !== "CANCELLED")
+    .filter((link) => isActiveLinkedPurchaseTransaction(link.targetTransaction))
     .reduce((sum, link) => sum + toNumber(link.claimAmount), 0);
 }
 
@@ -112,11 +121,11 @@ async function loadSharedData(docType: PurchaseDocType) {
           orderBy: { lineNo: "asc" },
           include: {
             sourceLineLinks: {
-              include: { targetTransaction: { select: { id: true, status: true } } },
+              include: { targetTransaction: { select: { id: true, status: true, revisions: { select: { id: true, status: true } } } } },
             },
           },
         },
-        sourceLinks: { include: { targetTransaction: { select: { id: true, docType: true, docNo: true, status: true } } } },
+        sourceLinks: { include: { targetTransaction: { select: { id: true, docType: true, docNo: true, status: true, revisions: { select: { id: true, status: true } } } } } },
         targetLinks: { include: { sourceTransaction: { select: { id: true, docType: true, docNo: true, status: true } } } },
       },
     }),
@@ -160,7 +169,7 @@ async function loadSharedData(docType: PurchaseDocType) {
       taxCodes: taxCodes.map((tax) => ({ ...tax, rate: toNumber(tax.rate) })),
     },
     transactions: transactions
-      .filter((transaction) => !transaction.revisions.some((revision) => String(revision.status || "").toUpperCase() !== "CANCELLED"))
+      .filter((transaction) => transaction.revisions.length === 0)
       .map((transaction) => ({
       id: transaction.id,
       docNo: transaction.docNo,

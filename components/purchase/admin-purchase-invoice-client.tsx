@@ -122,6 +122,7 @@ type PurchaseTransactionRecord = {
       docType?: string | null;
       docNo?: string | null;
       status?: string | null;
+      revisions?: Array<{ id?: string | null; status?: string | null } | null>;
     } | null;
   }>;
   targetLinks?: Array<{
@@ -437,6 +438,15 @@ function formatSerialAvailability(
   if (typeof value !== "number") return "Select product and location to view serial availability.";
   return `Qty Balance: ${value.toLocaleString("en-MY", { minimumFractionDigits: qtyDecimalPlaces, maximumFractionDigits: qtyDecimalPlaces })} (${value.toLocaleString("en-MY")} Serial No${value === 1 ? "" : "s"} Available)`;
 }
+function isActiveLinkedTransaction(transaction: {
+  status?: string | null;
+  revisions?: Array<{ status?: string | null } | null> | null;
+} | null | undefined) {
+  if (!transaction) return false;
+  if (String(transaction.status || "").toUpperCase() === "CANCELLED") return false;
+  return (transaction.revisions || []).length === 0;
+}
+
 function statusClass(status: string) {
   if (status === "CANCELLED")
     return "border-red-500/25 bg-red-500/10 text-red-200";
@@ -1003,11 +1013,7 @@ export function AdminPurchaseInvoiceClient(props: Props) {
   const visibleTransactions = useMemo(
     () =>
       props.initialTransactions.filter((item) => {
-        const hasActiveRevision = (item.revisions || []).some(
-          (revision) =>
-            String(revision.status || "").toUpperCase() !== "CANCELLED",
-        );
-        if (hasActiveRevision) return false;
+        if ((item.revisions || []).length > 0) return false;
         if (listingStatus !== "ALL" && item.status !== listingStatus)
           return false;
         return true;
@@ -1564,9 +1570,8 @@ export function AdminPurchaseInvoiceClient(props: Props) {
   }
 
   function hasActiveDownstream(item: PurchaseTransactionRecord) {
-    return (item.sourceLinks || []).some(
-      (link) =>
-        link.targetTransaction && link.targetTransaction.status !== "CANCELLED",
+    return (item.sourceLinks || []).some((link) =>
+      isActiveLinkedTransaction(link.targetTransaction),
     );
   }
 
