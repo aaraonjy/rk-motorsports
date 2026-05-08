@@ -814,6 +814,19 @@ function getStockReverseLinesFromPurchaseLines(
   );
 }
 
+function isGeneratedPurchaseInvoice(transaction: {
+  docType: PurchaseDocType;
+  targetLinks?: Array<{
+    sourceTransaction?: { status?: string | null } | null;
+  }>;
+}) {
+  return (
+    transaction.docType === "PI" &&
+    (transaction.targetLinks || []).some(
+      (link) => link.sourceTransaction?.status !== "CANCELLED",
+    )
+  );
+}
 
 function purchaseTransactionLockKey(id: string) {
   return `purchase-transaction:${id}`;
@@ -975,7 +988,20 @@ export async function createPurchaseTransaction(
     const revisedFrom = revisedFromId
       ? await tx.purchaseTransaction.findUnique({
           where: { id: revisedFromId },
-          select: { id: true, docType: true, docNo: true, status: true, stockTransactionId: true },
+          select: {
+            id: true,
+            docType: true,
+            docNo: true,
+            status: true,
+            stockTransactionId: true,
+            targetLinks: {
+              include: { sourceTransaction: { select: { id: true, docType: true, status: true, stockTransactionId: true } } },
+            },
+            lines: {
+              orderBy: { lineNo: "asc" },
+              include: { targetLineLinks: true },
+            },
+          },
         })
       : null;
     if (revisedFromId && (!revisedFrom || revisedFrom.docType !== docType)) {
@@ -1014,6 +1040,12 @@ export async function createPurchaseTransaction(
       headerTaxCode,
     );
 
+    const revisionSourceTransactionIds =
+      docType === "PI" && revisedFrom
+        ? (revisedFrom.targetLinks || [])
+            .filter((link) => link.sourceTransaction?.status !== "CANCELLED")
+            .map((link) => link.sourceTransactionId)
+        : [];
     const sourceTransactionIds = Array.from(
       new Set(
         [
@@ -1021,6 +1053,7 @@ export async function createPurchaseTransaction(
           ...((body.lines || [])
             .map((line) => normalizeText(line.sourceTransactionId))
             .filter(Boolean) as string[]),
+          ...revisionSourceTransactionIds,
         ].filter(Boolean) as string[],
       ),
     );
@@ -1207,9 +1240,14 @@ export async function createPurchaseTransaction(
       const linkType: PurchaseLineLinkType =
         docType === "GRN" ? "RECEIVED_TO" : "INVOICED_TO";
       for (let index = 0; index < lines.length; index += 1) {
-        const sourceLineId = lines[index].sourceLineId;
+        const revisionSourceLineLink = revisedFrom?.lines?.[index]?.targetLineLinks?.find(
+          (link) => link.linkType === linkType,
+        );
+        const sourceLineId = lines[index].sourceLineId || revisionSourceLineLink?.sourceLineId;
         const lineSourceTransactionId =
-          lines[index].sourceTransactionId || firstSourceTransactionId;
+          lines[index].sourceTransactionId ||
+          revisionSourceLineLink?.sourceTransactionId ||
+          firstSourceTransactionId;
         if (!sourceLineId || !lineSourceTransactionId) continue;
         const targetLine = transaction.lines[index];
         await tx.purchaseTransactionLineLink.create({
@@ -1220,7 +1258,7 @@ export async function createPurchaseTransaction(
             targetTransactionId: transaction.id,
             linkType,
             qty: targetLine.qty,
-            claimAmount: lines[index].claimAmount,
+            claimAmount: lines[index].claimAmount || revisionSourceLineLink?.claimAmount,
           },
         });
       }
@@ -1256,8 +1294,9 @@ export async function updatePurchaseTransaction(
     const current = await tx.purchaseTransaction.findUnique({
       where: { id },
       include: {
-        lines: true,
+        lines: { orderBy: { lineNo: "asc" } },
         sourceLinks: { include: { targetTransaction: true } },
+        targetLinks: { include: { sourceTransaction: true } },
         revisions: { select: { id: true, status: true } },
       },
     });
@@ -1287,9 +1326,12 @@ export async function updatePurchaseTransaction(
         `This document has active generated document${activeDownstream.length > 1 ? "s" : ""}${generatedDocs ? `: ${generatedDocs}` : ""}. Please revise or cancel the downstream document first.`,
       );
     }
-    await tx.purchaseTransactionLine.deleteMany({
-      where: { transactionId: id },
-    });
+    const shouldLockBody = isGeneratedPurchaseInvoice(current);
+    if (!shouldLockBody) {
+      await tx.purchaseTransactionLine.deleteMany({
+        where: { transactionId: id },
+      });
+    }
     const docDate = normalizeDate(body.docDate);
     const supplierId = normalizeText(body.supplierId) || current.supplierId;
     const supplier = await assertActiveSupplier(tx, supplierId);
@@ -1298,15 +1340,48 @@ export async function updatePurchaseTransaction(
       tx,
       normalizeText(body.taxCodeId),
     );
-    const lines = await mapLines(
-      tx,
-      docType,
-      body.lines,
-      taxSettings.taxModuleEnabled,
-      taxSettings.taxCalculationMode === "LINE_ITEM"
-        ? taxSettings.defaultAdminTaxCodeId
-        : null,
-    );
+    const lines = shouldLockBody
+      ? current.lines.map((line) => ({
+          lineNo: line.lineNo,
+          inventoryProductId: line.inventoryProductId,
+          productCode: line.productCode,
+          productDescription: line.productDescription,
+          itemType: line.itemType as any,
+          uom: line.uom,
+          qty: line.qty,
+          unitCost: line.unitCost,
+          discountRate: line.discountRate,
+          discountType: line.discountType,
+          discountAmount: line.discountAmount,
+          locationId: line.locationId,
+          locationCode: line.locationCode,
+          locationName: line.locationName,
+          batchNo: line.batchNo,
+          expiryDate: null,
+          serialNos: [],
+          taxCodeId: line.taxCodeId,
+          taxCode: line.taxCode,
+          taxDescription: line.taxDescription,
+          taxDisplayLabel: line.taxDisplayLabel,
+          taxRate: line.taxRate,
+          taxCalculationMethod: line.taxCalculationMethod,
+          taxAmount: line.taxAmount,
+          lineSubtotal: line.lineSubtotal,
+          lineTotal: line.lineTotal,
+          remarks: line.remarks,
+          sourceLineId: null,
+          sourceTransactionId: null,
+          claimAmount: line.lineTotal,
+        }))
+      : await mapLines(
+          tx,
+          docType,
+          body.lines,
+          taxSettings.taxModuleEnabled,
+          taxSettings.taxCalculationMode === "LINE_ITEM"
+            ? taxSettings.defaultAdminTaxCodeId
+            : null,
+        );
     const totals = calculateTotals(
       lines,
       taxSettings.taxCalculationMode,
@@ -1345,39 +1420,45 @@ export async function updatePurchaseTransaction(
         termsAndConditions: normalizeText(body.termsAndConditions),
         bankAccount: normalizeText(body.bankAccount),
         footerRemarks: normalizeText(body.footerRemarks),
-        lines: {
-          create: lines.map((line) => ({
-            lineNo: line.lineNo,
-            inventoryProductId: line.inventoryProductId,
-            productCode: line.productCode,
-            productDescription: line.productDescription,
-            itemType: line.itemType,
-            uom: line.uom,
-            qty: line.qty,
-            unitCost: line.unitCost,
-            discountRate: line.discountRate,
-            discountType: line.discountType,
-            discountAmount: line.discountAmount,
-            locationId: line.locationId,
-            locationCode: line.locationCode,
-            locationName: line.locationName,
-            batchNo: line.batchNo,
-            taxCodeId: line.taxCodeId,
-            taxCode: line.taxCode,
-            taxDescription: line.taxDescription,
-            taxDisplayLabel: line.taxDisplayLabel,
-            taxRate: line.taxRate,
-            taxCalculationMethod: line.taxCalculationMethod,
-            taxAmount: line.taxAmount,
-            lineSubtotal: line.lineSubtotal,
-            lineTotal: line.lineTotal,
-            remarks: line.remarks,
-          })),
-        },
+        ...(shouldLockBody
+          ? {}
+          : {
+              lines: {
+                create: lines.map((line) => ({
+                  lineNo: line.lineNo,
+                  inventoryProductId: line.inventoryProductId,
+                  productCode: line.productCode,
+                  productDescription: line.productDescription,
+                  itemType: line.itemType,
+                  uom: line.uom,
+                  qty: line.qty,
+                  unitCost: line.unitCost,
+                  discountRate: line.discountRate,
+                  discountType: line.discountType,
+                  discountAmount: line.discountAmount,
+                  locationId: line.locationId,
+                  locationCode: line.locationCode,
+                  locationName: line.locationName,
+                  batchNo: line.batchNo,
+                  taxCodeId: line.taxCodeId,
+                  taxCode: line.taxCode,
+                  taxDescription: line.taxDescription,
+                  taxDisplayLabel: line.taxDisplayLabel,
+                  taxRate: line.taxRate,
+                  taxCalculationMethod: line.taxCalculationMethod,
+                  taxAmount: line.taxAmount,
+                  lineSubtotal: line.lineSubtotal,
+                  lineTotal: line.lineTotal,
+                  remarks: line.remarks,
+                })),
+              },
+            }),
       },
     });
 
-    await syncPurchaseBatchExpiryToStock(tx, current.stockTransactionId, lines);
+    if (!shouldLockBody) {
+      await syncPurchaseBatchExpiryToStock(tx, current.stockTransactionId, lines);
+    }
 
     return updated;
   });

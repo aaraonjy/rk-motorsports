@@ -739,7 +739,25 @@ export function AdminPurchaseInvoiceClient(props: Props) {
     {},
   );
   const [generatedSourceLabel, setGeneratedSourceLabel] = useState("");
-  const isBodyLocked = Boolean(isGeneratedFromSource || generatedSourceLabel);
+  const activeGeneratedFromDocs = useMemo(
+    () =>
+      (editingTransaction || reviseTransaction)?.targetLinks
+        ?.map((link) => link.sourceTransaction)
+        .filter(
+          (source): source is NonNullable<typeof source> =>
+            Boolean(source?.docNo) && source?.status !== "CANCELLED",
+        ) || [],
+    [editingTransaction, reviseTransaction],
+  );
+  const activeGeneratedFromLabel = activeGeneratedFromDocs
+    .map((source) => String(source.docNo))
+    .filter(Boolean)
+    .join(", ");
+  const isBodyLocked = Boolean(
+    isGeneratedFromSource || generatedSourceLabel || activeGeneratedFromLabel,
+  );
+  const bodyLockSourceLabel =
+    generatedSourceLabel || activeGeneratedFromLabel || sourceTransaction?.docNo || "source document";
   const [generateFromError, setGenerateFromError] = useState("");
   const [cancelTarget, setCancelTarget] =
     useState<PurchaseTransactionRecord | null>(null);
@@ -1919,12 +1937,7 @@ export function AdminPurchaseInvoiceClient(props: Props) {
                     </td>
                     <td className="px-4 py-4 text-right">{`${item.currency || "MYR"} ${money(item.grandTotal)}`}</td>
                     <td className="px-4 py-4 text-right">
-                      {item.status !== "CANCELLED" &&
-                      (hasActiveSourceDocument(item) || hasActiveDownstream(item)) ? (
-                        <span className="rounded-xl border border-white/15 px-4 py-2 text-xs text-white/45">
-                          Locked
-                        </span>
-                      ) : item.status !== "CANCELLED" ? (
+                      {item.status !== "CANCELLED" ? (
                         <div className="flex flex-wrap justify-end gap-2">
                           <>
                               <button
@@ -2038,18 +2051,17 @@ export function AdminPurchaseInvoiceClient(props: Props) {
               {isBodyLocked ? (
                 <div className="mt-5 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm leading-6 text-amber-100">
                   This {TITLE} is generated from{" "}
-                  {generatedSourceLabel || sourceTransaction?.docNo}. Body
-                  pricing and product details are locked. To change product,
-                  qty, cost, discount, tax, or footer pricing details, cancel
-                  this {TITLE} and generate a new one.
+                  {bodyLockSourceLabel}. Body product, qty, cost, discount,
+                  tax, batch and serial details are locked to keep the generated
+                  document tally with its source. Header and Footer are still
+                  editable.
                 </div>
               ) : null}
               {isBodyLocked ? (
                 <div className="mt-5 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
                   Imported from{" "}
-                  {generatedSourceLabel || sourceTransaction?.docNo}. Body
-                  pricing is locked because this {TITLE} is generated from
-                  source document.
+                  {bodyLockSourceLabel}. Body is locked because this {TITLE}
+                  is generated from source document.
                 </div>
               ) : null}
 
