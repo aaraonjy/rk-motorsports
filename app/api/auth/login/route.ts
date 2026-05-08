@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSession, verifyPassword } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { db, withDbRetry } from "@/lib/db";
 import { createAuditLogFromRequest } from "@/lib/audit";
 import {
   buildRateLimitHeaders,
@@ -55,7 +55,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const user = await db.user.findUnique({ where: { email } });
+    const user = await withDbRetry(() =>
+      db.user.findUnique({ where: { email } })
+    );
 
     if (!user) {
       try {

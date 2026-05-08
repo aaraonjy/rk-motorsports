@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import { cookies } from "next/headers";
 import bcrypt from "bcryptjs";
-import { db } from "@/lib/db";
+import { db, withDbRetry } from "@/lib/db";
 
 const COOKIE_NAME = "rk_session";
 
@@ -39,7 +39,9 @@ export async function getSessionUser() {
   const payload = `${parts[0]}.${parts[1]}`;
   if (sign(payload) !== parts[2]) return null;
 
-  const user = await db.user.findUnique({ where: { id: parts[0] } });
+  const user = await withDbRetry(() =>
+    db.user.findUnique({ where: { id: parts[0] } })
+  );
   if (!user) return null;
   return user;
 }
