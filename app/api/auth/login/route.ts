@@ -55,8 +55,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const user = await withDbRetry(() =>
-      db.user.findUnique({ where: { email } })
+    const user = await withDbRetry(
+      () => db.user.findUnique({ where: { email } }),
+      { attempts: 2, delayMs: 250, maxDelayMs: 600 }
     );
 
     if (!user) {

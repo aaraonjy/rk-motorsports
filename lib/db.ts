@@ -19,61 +19,74 @@ if (process.env.NODE_ENV !== "production") {
   globalForPrisma.prisma = db;
 }
 
-function isRetryableDatabaseError(error: unknown) {
-  const maybeError = error as {
-    code?: unknown;
-    message?: unknown;
-    cause?: { code?: unknown; message?: unknown };
-  };
+const RETRYABLE_PRISMA_CODES = new Set([
+  "P1001", // Cannot reach database server
+  "P1002", // Database server reached but timed out
+  "P1008", // Operations timed out
+]);
 
-  const code = typeof maybeError.code === "string" ? maybeError.code : "";
-  const causeCode = typeof maybeError.cause?.code === "string" ? maybeError.cause.code : "";
-  const message = [maybeError.message, maybeError.cause?.message]
-    .filter((item): item is string => typeof item === "string")
-    .join(" ")
-    .toLowerCase();
+type DbRetryOptions = {
+  attempts?: number;
+  delayMs?: number;
+  maxDelayMs?: number;
+};
 
-  return (
-    code === "P1001" ||
-    code === "P1002" ||
-    code === "P1017" ||
-    causeCode === "ECONNRESET" ||
-    causeCode === "ETIMEDOUT" ||
-    causeCode === "ECONNREFUSED" ||
-    message.includes("can't reach database server") ||
-    message.includes("connect timeout") ||
-    message.includes("connection terminated") ||
-    message.includes("connection closed") ||
-    message.includes("connection refused") ||
-    message.includes("timed out")
-  );
-}
-
-function delay(ms: number) {
+function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-export async function withDbRetry<T>(operation: () => Promise<T>, retries = 3): Promise<T> {
+function getErrorCode(error: unknown) {
+  if (error && typeof error === "object" && "code" in error) {
+    const code = (error as { code?: unknown }).code;
+    return typeof code === "string" ? code : null;
+  }
+
+  return null;
+}
+
+export function isRetryableDatabaseError(error: unknown) {
+  const code = getErrorCode(error);
+  if (code && RETRYABLE_PRISMA_CODES.has(code)) return true;
+
+  const message =
+    error instanceof Error
+      ? error.message
+      : typeof error === "string"
+        ? error
+        : "";
+
+  return (
+    message.includes("Can't reach database server") ||
+    message.includes("Timed out fetching a new connection") ||
+    message.includes("Connection terminated") ||
+    message.includes("connection closed") ||
+    message.includes("ECONNRESET") ||
+    message.includes("ETIMEDOUT")
+  );
+}
+
+export async function withDbRetry<T>(
+  operation: () => Promise<T>,
+  options: DbRetryOptions = {}
+): Promise<T> {
+  const attempts = Math.max(1, options.attempts ?? 2);
+  const delayMs = Math.max(0, options.delayMs ?? 300);
+  const maxDelayMs = Math.max(delayMs, options.maxDelayMs ?? 700);
+
   let lastError: unknown;
 
-  for (let attempt = 0; attempt <= retries; attempt += 1) {
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
     try {
       return await operation();
     } catch (error) {
       lastError = error;
 
-      if (attempt >= retries || !isRetryableDatabaseError(error)) {
+      if (attempt >= attempts || !isRetryableDatabaseError(error)) {
         throw error;
       }
 
-      const backoffMs = 500 * Math.pow(2, attempt);
-      await delay(backoffMs);
-
-      try {
-        await db.$connect();
-      } catch {
-        // Ignore reconnect failure here so the next retry can surface the real Prisma error if it still fails.
-      }
+      const retryDelay = Math.min(delayMs * attempt, maxDelayMs);
+      await sleep(retryDelay);
     }
   }
 

@@ -39,9 +39,11 @@ export async function getSessionUser() {
   const payload = `${parts[0]}.${parts[1]}`;
   if (sign(payload) !== parts[2]) return null;
 
-  const user = await withDbRetry(() =>
-    db.user.findUnique({ where: { id: parts[0] } })
+  const user = await withDbRetry(
+    () => db.user.findUnique({ where: { id: parts[0] } }),
+    { attempts: 2, delayMs: 250, maxDelayMs: 600 }
   );
+
   if (!user) return null;
   return user;
 }
