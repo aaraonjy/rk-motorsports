@@ -112,7 +112,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    await createSession(user.id);
+    await createSession({
+      id: user.id,
+      role: user.role,
+      name: user.name,
+      email: user.email,
+    });
 
     try {
       await createAuditLogFromRequest({

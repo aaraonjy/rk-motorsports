@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { destroySession } from "@/lib/auth";
+import { destroySession, getSessionUser } from "@/lib/auth";
 import { createAuditLogFromRequest } from "@/lib/audit";
-import { getSessionUser } from "@/lib/auth";
 
 export async function POST(req: Request) {
   const user = await getSessionUser();
