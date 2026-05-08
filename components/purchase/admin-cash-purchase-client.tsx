@@ -207,7 +207,7 @@ type LineForm = {
 };
 
 type ActiveTab = "HEADER" | "BODY" | "FOOTER";
-type PurchaseSourceDocumentType = "PI" | "CP";
+type PurchaseSourceDocumentType = "PO" | "GRN";
 
 const DOC_TYPE = "CP";
 const TITLE = "Cash Purchase";
