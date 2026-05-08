@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { hashPassword, requireUser, verifyPassword } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { db, withDbRetry } from "@/lib/db";
 
 function validatePasswordComplexity(password: string) {
   if (password.length < 8) {
@@ -24,7 +24,7 @@ function validatePasswordComplexity(password: string) {
 
 export async function POST(req: Request) {
   try {
-    const user = await requireUser();
+    const sessionUser = await requireUser();
 
     const form = await req.formData();
     const currentPassword = String(form.get("currentPassword") || "");
@@ -63,6 +63,25 @@ export async function POST(req: Request) {
       );
     }
 
+    const user = await withDbRetry(
+      () =>
+        db.user.findUnique({
+          where: { id: sessionUser.id },
+          select: {
+            id: true,
+            passwordHash: true,
+          },
+        }),
+      { attempts: 2, delayMs: 250, maxDelayMs: 600 }
+    );
+
+    if (!user) {
+      return NextResponse.json(
+        { ok: false, error: "Please login to continue." },
+        { status: 401 }
+      );
+    }
+
     const passwordOk = await verifyPassword(currentPassword, user.passwordHash);
 
     if (!passwordOk) {
@@ -74,12 +93,16 @@ export async function POST(req: Request) {
 
     const newPasswordHash = await hashPassword(newPassword);
 
-    await db.user.update({
-      where: { id: user.id },
-      data: {
-        passwordHash: newPasswordHash,
-      },
-    });
+    await withDbRetry(
+      () =>
+        db.user.update({
+          where: { id: user.id },
+          data: {
+            passwordHash: newPasswordHash,
+          },
+        }),
+      { attempts: 2, delayMs: 250, maxDelayMs: 600 }
+    );
 
     return NextResponse.json({
       ok: true,
