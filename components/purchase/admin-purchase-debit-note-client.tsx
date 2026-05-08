@@ -983,12 +983,7 @@ export function AdminPurchaseDebitNoteClient(props: Props) {
     [props.sourceDocuments],
   );
 
-  const selectedSourceTypeLabel =
-    selectedSourceType === "PO"
-      ? "Purchase Order"
-      : selectedSourceType === "GRN"
-        ? "Goods Received Note"
-        : "Document Source";
+  const selectedSourceTypeLabel = "Purchase Invoice";
 
   const filteredSourceDocuments = useMemo(() => {
     const keyword = sourceSearch.trim().toLowerCase();
@@ -1251,7 +1246,7 @@ export function AdminPurchaseDebitNoteClient(props: Props) {
       return;
     }
     setSourceSearch("");
-    setSelectedSourceType(null);
+    setSelectedSourceType("PI");
     setSelectedSourceId("");
     setSelectedSourceIds([]);
     setSourceProductsLoaded(false);
@@ -2833,66 +2828,18 @@ export function AdminPurchaseDebitNoteClient(props: Props) {
                 : "Pick Document Source"}
             </h3>
             <p className="mt-3 text-sm leading-6 text-white/60">
-              {selectedSourceType
-                ? `Only ${selectedSourceTypeLabel} documents with remaining invoice qty are shown.`
-                : "Choose whether this Purchase Invoice should be generated from a Purchase Order or Goods Received Note."}
+              Only Purchase Invoice documents with remaining debit qty are shown.
             </p>
 
-            {!selectedSourceType ? (
-              <div className="mt-6 grid gap-4 md:grid-cols-2">
-                <button
-                  type="button"
-                  onClick={() => chooseSourceType("PO")}
-                  className="rounded-2xl border border-white/10 bg-black/30 p-5 text-left transition hover:border-sky-400/40 hover:bg-sky-500/10"
-                >
-                  <div className="text-lg font-bold text-white">
-                    Purchase Order
-                  </div>
-                  <div className="mt-2 text-sm leading-6 text-white/55">
-                    Generate Purchase Invoice from Purchase Order balance.
-                  </div>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => chooseSourceType("GRN")}
-                  className="rounded-2xl border border-white/10 bg-black/30 p-5 text-left transition hover:border-sky-400/40 hover:bg-sky-500/10"
-                >
-                  <div className="text-lg font-bold text-white">
-                    Goods Received Note
-                  </div>
-                  <div className="mt-2 text-sm leading-6 text-white/55">
-                    Generate Purchase Invoice from received stock.
-                  </div>
-                </button>
-              </div>
-            ) : null}
-
-            {selectedSourceType ? (
-              <div className="mt-6 flex flex-wrap items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => chooseSourceType("PO")}
-                  className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
-                    selectedSourceType === "PO"
-                      ? "border border-sky-500/30 bg-sky-500/20 text-sky-100"
-                      : "border border-white/10 text-white/60 hover:bg-white/10 hover:text-white"
-                  }`}
-                >
-                  Purchase Order
-                </button>
-                <button
-                  type="button"
-                  onClick={() => chooseSourceType("GRN")}
-                  className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
-                    selectedSourceType === "GRN"
-                      ? "border border-sky-500/30 bg-sky-500/20 text-sky-100"
-                      : "border border-white/10 text-white/60 hover:bg-white/10 hover:text-white"
-                  }`}
-                >
-                  Goods Received Note
-                </button>
-              </div>
-            ) : null}
+            <div className="mt-6 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() => chooseSourceType("PI")}
+                className="rounded-xl border border-sky-500/30 bg-sky-500/20 px-4 py-2 text-sm font-semibold text-sky-100 transition"
+              >
+                Purchase Invoice
+              </button>
+            </div>
 
             {selectedSourceType ? (
               <div className="mt-6">
