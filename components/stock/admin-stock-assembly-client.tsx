@@ -714,8 +714,7 @@ export function AdminStockAssemblyClient({
   const [searchKeyword, setSearchKeyword] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [filterProjectId, setFilterProjectId] = useState("");
-  const [filterDepartmentId, setFilterDepartmentId] = useState("");
+  const [documentStatus, setDocumentStatus] = useState("");
   const [projectOptions, setProjectOptions] = useState<ProjectOption[]>([]);
   const [departmentOptions, setDepartmentOptions] = useState<DepartmentOption[]>([]);
   const [isStockSettingsLoaded, setIsStockSettingsLoaded] = useState(false);
@@ -782,11 +781,6 @@ export function AdminStockAssemblyClient({
     () => (projectId ? departmentOptions.filter((item) => item.groupId === projectId && item.isActive) : []),
     [departmentOptions, projectId]
   );
-  const filteredListDepartmentOptions = useMemo(
-    () => (filterProjectId ? departmentOptions.filter((item) => item.groupId === filterProjectId && item.isActive) : []),
-    [departmentOptions, filterProjectId]
-  );
-
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const successMessage = params.get("success");
@@ -812,8 +806,7 @@ export function AdminStockAssemblyClient({
       if (searchKeyword.trim()) params.set("q", searchKeyword.trim());
       if (dateFrom) params.set("dateFrom", dateFrom);
       if (dateTo) params.set("dateTo", dateTo);
-      if (projectFeatureEnabled && filterProjectId) params.set("projectId", filterProjectId);
-      if (departmentFeatureEnabled && filterDepartmentId) params.set("departmentId", filterDepartmentId);
+      if (documentStatus) params.set("status", documentStatus);
 
       const response = await fetch(`/api/admin/stock/transactions?${params.toString()}`, { cache: "no-store" });
       const data = await response.json();
@@ -846,7 +839,7 @@ export function AdminStockAssemblyClient({
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchKeyword, dateFrom, dateTo, filterProjectId, filterDepartmentId]);
+  }, [searchKeyword, dateFrom, dateTo, documentStatus]);
 
   useEffect(() => {
     if (currentPage > pagination.totalPages) setCurrentPage(pagination.totalPages);
@@ -854,7 +847,7 @@ export function AdminStockAssemblyClient({
 
   useEffect(() => {
     void loadTransactions(currentPage);
-  }, [currentPage, searchKeyword, dateFrom, dateTo, filterProjectId, filterDepartmentId, projectFeatureEnabled, departmentFeatureEnabled]);
+  }, [currentPage, searchKeyword, dateFrom, dateTo, documentStatus]);
 
   useEffect(() => {
     let cancelled = false;
@@ -878,11 +871,13 @@ export function AdminStockAssemblyClient({
       }
     }
 
-    void loadProjectDepartmentOptions();
+    if (isCreateOpen && (projectFeatureEnabled || departmentFeatureEnabled)) {
+      void loadProjectDepartmentOptions();
+    }
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [isCreateOpen, projectFeatureEnabled, departmentFeatureEnabled]);
 
   useEffect(() => {
     if (departmentId && !filteredDepartmentOptions.some((item) => item.id === departmentId)) {
@@ -890,25 +885,17 @@ export function AdminStockAssemblyClient({
     }
   }, [departmentId, filteredDepartmentOptions]);
 
-  useEffect(() => {
-    if (filterDepartmentId && !filteredListDepartmentOptions.some((item) => item.id === filterDepartmentId)) {
-      setFilterDepartmentId("");
-    }
-  }, [filterDepartmentId, filteredListDepartmentOptions]);
 
   useEffect(() => {
     if (projectFeatureEnabled) return;
     if (projectId) setProjectId("");
     if (departmentId) setDepartmentId("");
-    if (filterProjectId) setFilterProjectId("");
-    if (filterDepartmentId) setFilterDepartmentId("");
-  }, [projectFeatureEnabled, projectId, departmentId, filterProjectId, filterDepartmentId]);
+  }, [projectFeatureEnabled, projectId, departmentId]);
 
   useEffect(() => {
     if (departmentFeatureEnabled) return;
     if (departmentId) setDepartmentId("");
-    if (filterDepartmentId) setFilterDepartmentId("");
-  }, [departmentFeatureEnabled, departmentId, filterDepartmentId]);
+  }, [departmentFeatureEnabled, departmentId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1445,14 +1432,14 @@ export function AdminStockAssemblyClient({
         </div>
 
         <div className="mt-8 rounded-2xl border border-white/10 bg-black/20 p-4">
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-            <div className="xl:col-span-2">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div>
               <label className="label-rk">Search</label>
               <input
                 className="input-rk"
                 value={searchKeyword}
                 onChange={(e) => setSearchKeyword(e.target.value)}
-                placeholder={`Search doc no / desc${projectFeatureEnabled ? " / project" : ""}${departmentFeatureEnabled ? " / department" : ""} / reference / product / location / batch / serial`}
+                placeholder="Search doc no / description / reference / remarks"
               />
             </div>
             <div>
@@ -1463,40 +1450,19 @@ export function AdminStockAssemblyClient({
               <label className="label-rk">Date To</label>
               <input type="date" className="input-rk" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
             </div>
-            {projectFeatureEnabled ? (
-              <div>
-                <SearchableSelect
-                  label="Project"
-                  placeholder="All projects"
-                  options={projectOptions.filter((item) => item.isActive).map((item) => ({
-                    id: item.id,
-                    label: `${item.code} — ${item.name}`,
-                    searchText: `${item.code} ${item.name}`.toLowerCase(),
-                  }))}
-                  value={filterProjectId}
-                  onChange={(option) => {
-                    setFilterProjectId(option?.id || "");
-                    setFilterDepartmentId("");
-                  }}
-                />
-              </div>
-            ) : null}
-            {departmentFeatureEnabled ? (
-              <div>
-                <SearchableSelect
-                  label="Department"
-                  placeholder={filterProjectId ? "All departments" : "Select project first"}
-                  options={filteredListDepartmentOptions.map((item) => ({
-                    id: item.id,
-                    label: `${item.code} — ${item.name}`,
-                    searchText: `${item.code} ${item.name}`.toLowerCase(),
-                  }))}
-                  value={filterDepartmentId}
-                  disabled={!filterProjectId}
-                  onChange={(option) => setFilterDepartmentId(option?.id || "")}
-                />
-              </div>
-            ) : null}
+            <div className="relative">
+              <label className="label-rk">Document Status</label>
+              <select
+                className="input-rk appearance-none pr-12"
+                value={documentStatus}
+                onChange={(e) => setDocumentStatus(e.target.value)}
+              >
+                <option value="">All Status</option>
+                <option value="POSTED">Posted</option>
+                <option value="CANCELLED">Cancelled</option>
+              </select>
+              <span className="pointer-events-none absolute bottom-3 right-4 text-xs text-white/50">▼</span>
+            </div>
           </div>
         </div>
 

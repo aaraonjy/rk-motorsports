@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { Prisma, StockAdjustmentDirection, StockTransactionType } from "@prisma/client";
+import { Prisma, StockAdjustmentDirection, StockTransactionStatus, StockTransactionType } from "@prisma/client";
 import { requireAdmin, verifyPassword } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { createAuditLogFromRequest } from "@/lib/audit";
@@ -172,6 +172,8 @@ export async function GET(req: Request) {
     const q = searchParams.get("q")?.trim() || undefined;
     const dateFrom = searchParams.get("dateFrom")?.trim() || undefined;
     const dateTo = searchParams.get("dateTo")?.trim() || undefined;
+    const rawStatus = searchParams.get("status")?.trim().toUpperCase();
+    const status = rawStatus === "POSTED" || rawStatus === "CANCELLED" ? (rawStatus as StockTransactionStatus) : undefined;
     const projectId = searchParams.get("projectId")?.trim() || undefined;
     const departmentId = searchParams.get("departmentId")?.trim() || undefined;
     const rawPage = Number(searchParams.get("page") || "1");
@@ -180,6 +182,7 @@ export async function GET(req: Request) {
 
     const where: Prisma.StockTransactionWhereInput = {
       ...(type ? { transactionType: type as StockTransactionType } : {}),
+      ...(status ? { status } : {}),
       ...(projectId ? { projectId } : {}),
       ...(departmentId ? { departmentId } : {}),
       revisions: { none: {} },
