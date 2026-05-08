@@ -984,10 +984,10 @@ export function AdminPurchaseReturnClient(props: Props) {
   );
 
   const selectedSourceTypeLabel =
-    selectedSourceType === "PO"
-      ? "Purchase Order"
-      : selectedSourceType === "GRN"
-        ? "Goods Received Note"
+    selectedSourceType === "PI"
+      ? "Purchase Invoice"
+      : selectedSourceType === "CP"
+        ? "Cash Purchase"
         : "Document Source";
 
   const filteredSourceDocuments = useMemo(() => {
@@ -2834,34 +2834,34 @@ export function AdminPurchaseReturnClient(props: Props) {
             </h3>
             <p className="mt-3 text-sm leading-6 text-white/60">
               {selectedSourceType
-                ? `Only ${selectedSourceTypeLabel} documents with remaining invoice qty are shown.`
-                : "Choose whether this Purchase Invoice should be generated from a Purchase Order or Goods Received Note."}
+                ? `Only ${selectedSourceTypeLabel} documents with remaining return qty are shown.`
+                : "Choose whether this Purchase Return should be generated from a Purchase Invoice or Cash Purchase."}
             </p>
 
             {!selectedSourceType ? (
               <div className="mt-6 grid gap-4 md:grid-cols-2">
                 <button
                   type="button"
-                  onClick={() => chooseSourceType("PO")}
+                  onClick={() => chooseSourceType("PI")}
                   className="rounded-2xl border border-white/10 bg-black/30 p-5 text-left transition hover:border-sky-400/40 hover:bg-sky-500/10"
                 >
                   <div className="text-lg font-bold text-white">
-                    Purchase Order
+                    Purchase Invoice
                   </div>
                   <div className="mt-2 text-sm leading-6 text-white/55">
-                    Generate Purchase Invoice from Purchase Order balance.
+                    Generate Purchase Return from Purchase Invoice balance.
                   </div>
                 </button>
                 <button
                   type="button"
-                  onClick={() => chooseSourceType("GRN")}
+                  onClick={() => chooseSourceType("CP")}
                   className="rounded-2xl border border-white/10 bg-black/30 p-5 text-left transition hover:border-sky-400/40 hover:bg-sky-500/10"
                 >
                   <div className="text-lg font-bold text-white">
-                    Goods Received Note
+                    Cash Purchase
                   </div>
                   <div className="mt-2 text-sm leading-6 text-white/55">
-                    Generate Purchase Invoice from received stock.
+                    Generate Purchase Return from Cash Purchase balance.
                   </div>
                 </button>
               </div>
@@ -2871,25 +2871,25 @@ export function AdminPurchaseReturnClient(props: Props) {
               <div className="mt-6 flex flex-wrap items-center gap-3">
                 <button
                   type="button"
-                  onClick={() => chooseSourceType("PO")}
+                  onClick={() => chooseSourceType("PI")}
                   className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
-                    selectedSourceType === "PO"
+                    selectedSourceType === "PI"
                       ? "border border-sky-500/30 bg-sky-500/20 text-sky-100"
                       : "border border-white/10 text-white/60 hover:bg-white/10 hover:text-white"
                   }`}
                 >
-                  Purchase Order
+                  Purchase Invoice
                 </button>
                 <button
                   type="button"
-                  onClick={() => chooseSourceType("GRN")}
+                  onClick={() => chooseSourceType("CP")}
                   className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
-                    selectedSourceType === "GRN"
+                    selectedSourceType === "CP"
                       ? "border border-sky-500/30 bg-sky-500/20 text-sky-100"
                       : "border border-white/10 text-white/60 hover:bg-white/10 hover:text-white"
                   }`}
                 >
-                  Goods Received Note
+                  Cash Purchase
                 </button>
               </div>
             ) : null}
