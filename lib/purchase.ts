@@ -717,22 +717,34 @@ async function refreshSourceStatus(
       },
     },
   });
-  if (!source || source.status === "CANCELLED") return;
-  if (source.lines.length === 0) return;
-  const linkType: PurchaseLineLinkType =
-    source.docType === "GRN" ? "INVOICED_TO" : "RECEIVED_TO";
-  const altLinkType: PurchaseLineLinkType = "INVOICED_TO";
+  if (!source || source.status === "CANCELLED") return null;
+  if (source.lines.length === 0) return source;
+
+  const acceptedLinkTypes: PurchaseLineLinkType[] =
+    source.docType === "GRN"
+      ? ["INVOICED_TO"]
+      : source.docType === "PO"
+        ? ["RECEIVED_TO", "INVOICED_TO"]
+        : [];
+
+  if (acceptedLinkTypes.length === 0) return source;
+
   let any = false;
   let all = true;
   for (const line of source.lines) {
     const fulfilled = line.sourceLineLinks
-      .filter((link: PurchaseSourceLineLinkRecord) => link.targetTransaction.status !== "CANCELLED")
       .filter(
         (link: PurchaseSourceLineLinkRecord) =>
-          link.linkType === linkType ||
-          (source.docType === "PO" && link.linkType === altLinkType),
+          link.targetTransaction.status !== "CANCELLED",
       )
-      .reduce((sum: number, link: PurchaseSourceLineLinkRecord) => sum + toNumber(link.qty), 0);
+      .filter((link: PurchaseSourceLineLinkRecord) =>
+        acceptedLinkTypes.includes(link.linkType),
+      )
+      .reduce(
+        (sum: number, link: PurchaseSourceLineLinkRecord) =>
+          sum + toNumber(link.qty),
+        0,
+      );
     if (fulfilled > 0) any = true;
     if (fulfilled + 0.0001 < toNumber(line.qty)) all = false;
   }
@@ -745,6 +757,60 @@ async function refreshSourceStatus(
     where: { id: source.id },
     data: { status },
   });
+  return { ...source, status };
+}
+
+async function collectPurchaseSourceTransactionIds(
+  tx: Prisma.TransactionClient,
+  targetTransactionId: string,
+) {
+  const [documentLinks, lineLinks] = await Promise.all([
+    tx.purchaseTransactionLink.findMany({
+      where: { targetTransactionId },
+      select: { sourceTransactionId: true },
+    }),
+    tx.purchaseTransactionLineLink.findMany({
+      where: { targetTransactionId },
+      select: { sourceTransactionId: true },
+    }),
+  ]);
+
+  return Array.from(
+    new Set(
+      [...documentLinks, ...lineLinks]
+        .map((link) => normalizeText(link.sourceTransactionId))
+        .filter(Boolean) as string[],
+    ),
+  );
+}
+
+async function refreshSourceStatusesAfterTargetChange(
+  tx: Prisma.TransactionClient,
+  targetTransactionId: string,
+) {
+  const sourceTransactionIds = await collectPurchaseSourceTransactionIds(
+    tx,
+    targetTransactionId,
+  );
+
+  const refreshedSourceIds: string[] = [];
+  for (const sourceTransactionId of sourceTransactionIds) {
+    const source = await refreshSourceStatus(tx, sourceTransactionId);
+    if (source?.id) refreshedSourceIds.push(source.id);
+  }
+
+  const upstreamSourceIds = new Set<string>();
+  for (const sourceTransactionId of refreshedSourceIds) {
+    const upstreamIds = await collectPurchaseSourceTransactionIds(
+      tx,
+      sourceTransactionId,
+    );
+    upstreamIds.forEach((id) => upstreamSourceIds.add(id));
+  }
+
+  for (const upstreamSourceId of upstreamSourceIds) {
+    await refreshSourceStatus(tx, upstreamSourceId);
+  }
 }
 
 function shouldPostStock(
@@ -1619,8 +1685,7 @@ export async function cancelPurchaseTransaction(
         cancelReason: normalizeText(reason) || "Cancelled by admin",
       },
     });
-    for (const link of current.targetLinks)
-      await refreshSourceStatus(tx, link.sourceTransactionId);
+    await refreshSourceStatusesAfterTargetChange(tx, current.id);
     return updated;
   });
 }
